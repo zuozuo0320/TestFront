@@ -505,7 +505,7 @@ onMounted(async () => {
                     <thead>
                       <tr>
                         <th style="width: 90px" class="sortable" @click="toggleSort('id')">ID</th>
-                        <th>用例名称</th>
+                        <th class="sticky-col sticky-name">用例名称</th>
                         <th style="width: 90px">用例等级</th>
                         <th style="width: 100px">评审结果</th>
                         <th style="width: 100px">执行结果</th>
@@ -515,7 +515,7 @@ onMounted(async () => {
                         <th style="width: 170px" class="sortable" @click="toggleSort('updated_at')">更新时间</th>
                         <th style="width: 110px">创建人</th>
                         <th style="width: 170px" class="sortable" @click="toggleSort('created_at')">创建时间</th>
-                        <th style="width: 120px">操作</th>
+                        <th style="width: 120px" class="sticky-col sticky-action">操作</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -533,7 +533,7 @@ onMounted(async () => {
                       </tr>
                       <tr v-else v-for="r in rows" :key="r.id">
                         <td class="id">{{ r.id }}</td>
-                        <td class="name">{{ r.title }}</td>
+                        <td class="name sticky-col sticky-name" :title="r.title">{{ r.title }}</td>
                         <td>{{ r.level }}</td>
                         <td>{{ r.reviewResult }}</td>
                         <td>{{ r.execResult }}</td>
@@ -543,7 +543,7 @@ onMounted(async () => {
                         <td>{{ r.updatedAt }}</td>
                         <td>{{ r.createdByName }}</td>
                         <td>{{ r.createdAt }}</td>
-                        <td>
+                        <td class="sticky-col sticky-action">
                           <div class="action-group">
                             <button class="action-btn action-edit" @click="openEdit(r)">编辑</button>
                             <button class="action-btn action-delete" @click="onDelete(r)">删除</button>

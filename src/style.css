@@ -227,10 +227,31 @@ body { margin: 0; background: #f3f4f6; }
   text-overflow: ellipsis;
 }
 
+.sticky-col {
+  position: sticky;
+  background: #fff;
+  z-index: 2;
+}
+
+.sticky-name {
+  left: 90px;
+  min-width: 220px;
+}
+
+.sticky-action {
+  right: 0;
+  z-index: 3;
+  min-width: 132px;
+}
+
 .table-shell th {
   background: #fafafa;
   color: #606266;
   font-weight: 600;
+}
+
+.table-shell thead .sticky-col {
+  background: #fafafa;
 }
 
 .table-shell th.sortable {
@@ -435,10 +456,6 @@ body { margin: 0; background: #f3f4f6; }
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  position: sticky;
-  right: 0;
-  background: #fff;
-  padding-left: 6px;
 }
 
 .action-btn {
