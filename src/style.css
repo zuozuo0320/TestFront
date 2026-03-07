@@ -272,12 +272,124 @@ body { margin: 0; background: #f3f4f6; }
   --el-button-active-border-color: #030712 !important;
 }
 
-.el-button:not(.el-button--primary) {
-  --el-button-bg-color: var(--tp-btn-plain-bg) !important;
-  --el-button-border-color: var(--tp-btn-plain-border) !important;
-  --el-button-text-color: var(--tp-btn-plain-text) !important;
-  --el-button-hover-bg-color: #f9fafb !important;
-  --el-button-hover-border-color: #9ca3af !important;
-  --el-button-hover-text-color: #111827 !important;
+.case-editor-drawer :deep(.el-drawer__header) {
+  margin-bottom: 0;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 14px 18px;
+  color: #111827;
+  font-weight: 600;
+}
+
+.case-editor-drawer :deep(.el-drawer__body) {
+  padding: 0;
+  background: #f5f6f8;
+}
+
+.case-editor {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.case-editor-head {
+  height: 64px;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.head-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.case-tag {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #4b5563;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 2px 8px;
+}
+
+.head-left h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #111827;
+}
+
+.head-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.case-editor-form {
+  padding: 14px 16px 22px;
+  overflow: auto;
+}
+
+.editor-block {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px 14px 8px;
+  margin-bottom: 12px;
+}
+
+.block-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+.block-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.block-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.block-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 1100px) {
+  .block-grid-2,
+  .block-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.case-editor :deep(.el-form-item) {
+  margin-bottom: 10px;
+}
+
+.case-editor :deep(.el-form-item__label) {
+  padding-bottom: 6px;
+  color: #374151;
+  font-size: 12px;
+}
+
+.case-editor :deep(.el-input__wrapper),
+.case-editor :deep(.el-textarea__inner),
+.case-editor :deep(.el-select__wrapper) {
+  border-radius: 6px;
+  border-color: #d1d5db;
+  box-shadow: none;
+}
+
+.case-editor :deep(.el-input__wrapper.is-focus),
+.case-editor :deep(.el-select__wrapper.is-focused),
+.case-editor :deep(.el-textarea__inner:focus) {
+  border-color: #111827;
 }
 

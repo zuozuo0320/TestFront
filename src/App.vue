@@ -438,49 +438,95 @@ onMounted(async () => {
         </div>
       </div>
 
-      <el-dialog v-model="dialogVisible" :title="editingId ? '修改测试用例' : '新增测试用例'" width="560px">
-        <el-form label-position="top">
-          <el-form-item label="用例名称">
-            <el-input v-model="caseForm.title" />
-          </el-form-item>
-          <el-form-item label="用例等级">
-            <el-select v-model="caseForm.level" style="width: 180px">
-              <el-option label="P0" value="P0" />
-              <el-option label="P1" value="P1" />
-              <el-option label="P2" value="P2" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="评审结果">
-            <el-select v-model="caseForm.reviewResult" style="width: 220px">
-              <el-option label="未评审" value="未评审" />
-              <el-option label="已通过" value="已通过" />
-              <el-option label="不通过" value="不通过" />
-              <el-option label="重新提审" value="重新提审" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="执行结果">
-            <el-select v-model="caseForm.execResult" style="width: 220px">
-              <el-option label="未执行" value="未执行" />
-              <el-option label="成功" value="成功" />
-              <el-option label="失败" value="失败" />
-              <el-option label="阻塞" value="阻塞" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="所属模块">
-            <el-input v-model="caseForm.modulePath" placeholder="如 /内容/文章" />
-          </el-form-item>
-          <el-form-item label="标签">
-            <el-input v-model="caseForm.tags" placeholder="多个标签以逗号分隔" />
-          </el-form-item>
-          <el-form-item label="步骤">
-            <el-input v-model="caseForm.steps" type="textarea" :rows="4" />
-          </el-form-item>
-        </el-form>
-        <template #footer>
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" :loading="saving" @click="submitCase">保存</el-button>
-        </template>
-      </el-dialog>
+      <el-drawer
+        v-model="dialogVisible"
+        :title="editingId ? '编辑用例' : '新建用例'"
+        size="68%"
+        direction="rtl"
+        class="case-editor-drawer"
+      >
+        <div class="case-editor">
+          <div class="case-editor-head">
+            <div class="head-left">
+              <div class="case-tag">TEST CASE</div>
+              <h3>{{ editingId ? '编辑测试用例' : '新建测试用例' }}</h3>
+            </div>
+            <div class="head-right">
+              <el-button @click="dialogVisible = false">取消</el-button>
+              <el-button type="primary" :loading="saving" @click="submitCase">保存</el-button>
+            </div>
+          </div>
+
+          <el-form label-position="top" class="case-editor-form">
+            <section class="editor-block">
+              <div class="block-title">基础信息</div>
+              <div class="block-grid block-grid-2">
+                <el-form-item label="用例名称">
+                  <el-input v-model="caseForm.title" placeholder="请输入用例名称" />
+                </el-form-item>
+                <el-form-item label="所属模块">
+                  <el-input v-model="caseForm.modulePath" placeholder="如 /内容/文章" />
+                </el-form-item>
+
+                <el-form-item label="用例等级">
+                  <el-select v-model="caseForm.level">
+                    <el-option label="P0" value="P0" />
+                    <el-option label="P1" value="P1" />
+                    <el-option label="P2" value="P2" />
+                  </el-select>
+                </el-form-item>
+
+                <el-form-item label="标签">
+                  <el-input v-model="caseForm.tags" placeholder="多个标签以逗号分隔" />
+                </el-form-item>
+              </div>
+            </section>
+
+            <section class="editor-block">
+              <div class="block-title">评审与执行状态</div>
+              <div class="block-grid block-grid-3">
+                <el-form-item label="评审结果">
+                  <el-select v-model="caseForm.reviewResult">
+                    <el-option label="未评审" value="未评审" />
+                    <el-option label="已通过" value="已通过" />
+                    <el-option label="不通过" value="不通过" />
+                    <el-option label="重新提审" value="重新提审" />
+                  </el-select>
+                </el-form-item>
+
+                <el-form-item label="执行结果">
+                  <el-select v-model="caseForm.execResult">
+                    <el-option label="未执行" value="未执行" />
+                    <el-option label="成功" value="成功" />
+                    <el-option label="失败" value="失败" />
+                    <el-option label="阻塞" value="阻塞" />
+                  </el-select>
+                </el-form-item>
+
+                <el-form-item label="优先级">
+                  <el-select v-model="caseForm.priority">
+                    <el-option label="high" value="high" />
+                    <el-option label="medium" value="medium" />
+                    <el-option label="low" value="low" />
+                  </el-select>
+                </el-form-item>
+              </div>
+            </section>
+
+            <section class="editor-block">
+              <div class="block-title">步骤描述</div>
+              <el-form-item>
+                <el-input
+                  v-model="caseForm.steps"
+                  type="textarea"
+                  :rows="12"
+                  placeholder="请输入步骤，建议：\n1. 前置条件\n2. 操作步骤\n3. 预期结果"
+                />
+              </el-form-item>
+            </section>
+          </el-form>
+        </div>
+      </el-drawer>
     </template>
   </div>
 </template>
