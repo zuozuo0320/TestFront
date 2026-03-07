@@ -170,6 +170,32 @@ function removeStepRow(index: number) {
   stepRows.value.splice(index, 1)
 }
 
+function moveStepUp(index: number) {
+  if (index <= 0) return
+  const arr = stepRows.value
+  const current = arr[index]
+  const prev = arr[index - 1]
+  if (!current || !prev) return
+  arr[index - 1] = current
+  arr[index] = prev
+}
+
+function moveStepDown(index: number) {
+  const arr = stepRows.value
+  if (index >= arr.length - 1) return
+  const current = arr[index]
+  const next = arr[index + 1]
+  if (!current || !next) return
+  arr[index] = next
+  arr[index + 1] = current
+}
+
+function copyStepRow(index: number) {
+  const src = stepRows.value[index]
+  if (!src) return
+  stepRows.value.splice(index + 1, 0, { action: src.action, expected: src.expected })
+}
+
 async function doLogin() {
   loginLoading.value = true
   try {
@@ -694,7 +720,12 @@ onMounted(async () => {
               <div class="steps-grid-row" v-for="(s, idx) in stepRows" :key="idx">
                 <el-input v-model="s.action" placeholder="请输入步骤" />
                 <el-input v-model="s.expected" placeholder="请输入预期结果" />
-                <el-button link type="danger" @click="removeStepRow(idx)">删除</el-button>
+                <div class="step-ops">
+                  <button class="step-op" :disabled="idx === 0" @click="moveStepUp(idx)">↑</button>
+                  <button class="step-op" :disabled="idx === stepRows.length - 1" @click="moveStepDown(idx)">↓</button>
+                  <button class="step-op" @click="copyStepRow(idx)">复制</button>
+                  <button class="step-op danger" @click="removeStepRow(idx)">删除</button>
+                </div>
               </div>
 
               <div class="steps-grid-actions">

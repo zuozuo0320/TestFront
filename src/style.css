@@ -294,6 +294,9 @@ body { margin: 0; background: #f3f4f6; }
   background: #fafafa;
   color: #606266;
   font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 6;
 }
 
 .table-shell thead .sticky-col {
@@ -502,7 +505,7 @@ body { margin: 0; background: #f3f4f6; }
 
 .steps-grid-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 70px;
+  grid-template-columns: 1fr 1fr 170px;
   gap: 10px;
   margin-top: 10px;
   align-items: center;
@@ -510,6 +513,37 @@ body { margin: 0; background: #f3f4f6; }
 
 .steps-grid-actions {
   margin-top: 10px;
+}
+
+.step-ops {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.step-op {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.step-op:disabled {
+  color: #9ca3af;
+  border-color: #e5e7eb;
+  cursor: not-allowed;
+}
+
+.step-op.danger {
+  color: #6b7280;
+}
+
+.step-op.danger:hover {
+  color: #111827;
+  border-color: #9ca3af;
 }
 
 .action-group {
