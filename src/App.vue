@@ -82,14 +82,6 @@ const caseForm = reactive({
 
 const pageSizeOptions = [10, 20, 50]
 
-const pageCount = computed(() => {
-  if (total.value <= 0) return 1
-  return Math.max(1, Math.ceil(total.value / pageSize.value))
-})
-
-const canPrev = computed(() => page.value > 1)
-const canNext = computed(() => page.value < pageCount.value)
-
 const activeFilterChips = computed(() => {
   const chips: Array<{ key: 'keyword' | 'level' | 'review' | 'exec'; label: string; value: string }> = []
   if (keyword.value.trim()) chips.push({ key: 'keyword', label: '关键字', value: keyword.value.trim() })
@@ -301,20 +293,15 @@ function onResetSearch() {
   loadCases()
 }
 
-function onChangePageSize() {
+function onPaginationSizeChange(size: number) {
+  pageSize.value = size
   page.value = 1
   loadCases()
 }
 
-function onJumpPage() {
-  const p = Number(pageInput.value)
-  if (!Number.isFinite(p) || p < 1) {
-    pageInput.value = String(page.value)
-    return
-  }
-  const target = Math.min(pageCount.value, Math.floor(p))
-  page.value = target
-  pageInput.value = String(target)
+function onPaginationCurrentChange(current: number) {
+  page.value = current
+  pageInput.value = String(current)
   loadCases()
 }
 
@@ -437,18 +424,6 @@ async function onDelete(row: TableRow) {
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.error || '删除失败')
   }
-}
-
-function prevPage() {
-  if (!canPrev.value) return
-  page.value -= 1
-  loadCases()
-}
-
-function nextPage() {
-  if (!canNext.value) return
-  page.value += 1
-  loadCases()
 }
 
 async function onProjectChange() {
@@ -669,21 +644,17 @@ onMounted(async () => {
                 </div>
 
                 <div class="pager">
-                  <div class="pager-left">
-                    <span class="pager-total">共 {{ total }} 条</span>
-                  </div>
-                  <div class="pager-right">
-                    <span class="pager-label">每页</span>
-                    <el-select v-model="pageSize" size="small" class="pager-size" @change="onChangePageSize">
-                      <el-option v-for="s in pageSizeOptions" :key="s" :label="String(s)" :value="s" />
-                    </el-select>
-                    <el-button size="small" :disabled="!canPrev" @click="prevPage">上一页</el-button>
-                    <span class="pager-index">{{ page }} / {{ pageCount }}</span>
-                    <el-button size="small" :disabled="!canNext" @click="nextPage">下一页</el-button>
-                    <span class="pager-label">跳至</span>
-                    <el-input v-model="pageInput" size="small" class="pager-jump" @keyup.enter="onJumpPage" />
-                    <el-button size="small" class="pager-go" @click="onJumpPage">GO</el-button>
-                  </div>
+                  <el-pagination
+                    background
+                    small
+                    :current-page="page"
+                    :page-size="pageSize"
+                    :page-sizes="pageSizeOptions"
+                    :total="total"
+                    layout="total, sizes, prev, pager, next, jumper"
+                    @size-change="onPaginationSizeChange"
+                    @current-change="onPaginationCurrentChange"
+                  />
                 </div>
               </div>
             </div>
