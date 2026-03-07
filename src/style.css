@@ -251,6 +251,7 @@ body { margin: 0; background: #f3f4f6; }
   border-radius: 6px;
   overflow: auto;
   position: relative;
+  min-height: 320px;
 }
 
 .table-shell table {
@@ -509,6 +510,7 @@ body { margin: 0; background: #f3f4f6; }
   gap: 10px;
   margin-top: 10px;
   align-items: center;
+  cursor: move;
 }
 
 .steps-grid-actions {
@@ -544,6 +546,34 @@ body { margin: 0; background: #f3f4f6; }
 .step-op.danger:hover {
   color: #111827;
   border-color: #9ca3af;
+}
+
+.table-skeleton {
+  padding: 10px;
+}
+
+.skeleton-row {
+  display: grid;
+  grid-template-columns: 70px 210px repeat(9, 110px) 120px;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.sk {
+  height: 14px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 37%, #f3f4f6 63%);
+  background-size: 400% 100%;
+  animation: sk-loading 1.2s ease infinite;
+}
+
+.sk-id { width: 60px; }
+.sk-name { width: 190px; }
+.sk-op { width: 100px; }
+
+@keyframes sk-loading {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
 }
 
 .action-group {

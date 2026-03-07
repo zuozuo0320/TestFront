@@ -64,6 +64,7 @@ const execFilter = ref('')
 
 const rows = ref<TableRow[]>([])
 const stepRows = ref<StepRow[]>([{ action: '', expected: '' }])
+const draggingStepIndex = ref<number | null>(null)
 
 const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
@@ -194,6 +195,34 @@ function copyStepRow(index: number) {
   const src = stepRows.value[index]
   if (!src) return
   stepRows.value.splice(index + 1, 0, { action: src.action, expected: src.expected })
+}
+
+function onStepDragStart(index: number) {
+  draggingStepIndex.value = index
+}
+
+function onStepDrop(targetIndex: number) {
+  const from = draggingStepIndex.value
+  if (from === null || from === targetIndex) {
+    draggingStepIndex.value = null
+    return
+  }
+
+  const arr = stepRows.value
+  const item = arr[from]
+  if (!item) {
+    draggingStepIndex.value = null
+    return
+  }
+
+  arr.splice(from, 1)
+  const insertAt = from < targetIndex ? targetIndex - 1 : targetIndex
+  arr.splice(insertAt, 0, item)
+  draggingStepIndex.value = null
+}
+
+function onStepDragEnd() {
+  draggingStepIndex.value = null
 }
 
 async function doLogin() {
@@ -553,7 +582,24 @@ onMounted(async () => {
                 </div>
 
                 <div class="table-shell" v-loading="appLoading">
-                  <table>
+                  <div v-if="appLoading" class="table-skeleton">
+                    <div class="skeleton-row" v-for="i in 8" :key="i">
+                      <span class="sk sk-id"></span>
+                      <span class="sk sk-name"></span>
+                      <span class="sk"></span>
+                      <span class="sk"></span>
+                      <span class="sk"></span>
+                      <span class="sk"></span>
+                      <span class="sk"></span>
+                      <span class="sk"></span>
+                      <span class="sk"></span>
+                      <span class="sk"></span>
+                      <span class="sk"></span>
+                      <span class="sk sk-op"></span>
+                    </div>
+                  </div>
+
+                  <table v-else>
                     <thead>
                       <tr>
                         <th style="width: 90px" class="sortable" @click="toggleSort('id')">
@@ -717,7 +763,16 @@ onMounted(async () => {
                 <div>操作</div>
               </div>
 
-              <div class="steps-grid-row" v-for="(s, idx) in stepRows" :key="idx">
+              <div
+                class="steps-grid-row"
+                v-for="(s, idx) in stepRows"
+                :key="idx"
+                draggable="true"
+                @dragstart="onStepDragStart(idx)"
+                @dragover.prevent
+                @drop="onStepDrop(idx)"
+                @dragend="onStepDragEnd"
+              >
                 <el-input v-model="s.action" placeholder="请输入步骤" />
                 <el-input v-model="s.expected" placeholder="请输入预期结果" />
                 <div class="step-ops">
