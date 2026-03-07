@@ -206,6 +206,62 @@ body { margin: 0; background: #f3f4f6; }
   gap: 8px;
 }
 
+.filter-bar {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 6px;
+  background: #f8fafc;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.query-input {
+  width: 240px;
+}
+
+.filter-select.level { width: 96px; }
+.filter-select.review { width: 118px; }
+.filter-select.exec { width: 118px; }
+
+.filter-bar .el-input__wrapper,
+.filter-bar .el-select__wrapper {
+  border-color: #d1d5db;
+  box-shadow: none;
+  background: #fff;
+}
+
+.filter-bar .el-input__wrapper:hover,
+.filter-bar .el-select__wrapper:hover {
+  border-color: #9ca3af;
+}
+
+.filter-bar .el-input__wrapper.is-focus,
+.filter-bar .el-select__wrapper.is-focused {
+  border-color: #374151;
+}
+
+.toolbar-btn {
+  min-width: 60px;
+  border-radius: 6px !important;
+}
+
+.btn-query {
+  --el-button-bg-color: #111827 !important;
+  --el-button-border-color: #111827 !important;
+  --el-button-text-color: #ffffff !important;
+  --el-button-hover-bg-color: #0b1220 !important;
+  --el-button-hover-border-color: #0b1220 !important;
+}
+
+.btn-reset {
+  --el-button-bg-color: #fff !important;
+  --el-button-border-color: #d1d5db !important;
+  --el-button-text-color: #374151 !important;
+  --el-button-hover-bg-color: #f3f4f6 !important;
+  --el-button-hover-border-color: #9ca3af !important;
+}
+
 .filter-chips {
   display: flex;
   align-items: center;
