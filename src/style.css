@@ -246,10 +246,38 @@ body { margin: 0; background: #f3f4f6; }
 .status.fail { color: #4b5563; }
 .status.pending { color: #909399; }
 
-.pager {
-  margin-top: 10px;
-  font-size: 12px;
-  color: #909399;
-  text-align: right;
+/* unified minimalist black button style */
+:root {
+  --tp-btn-bg: #111827;
+  --tp-btn-bg-hover: #0b1220;
+  --tp-btn-text: #ffffff;
+  --tp-btn-border: #1f2937;
+  --tp-btn-plain-bg: #ffffff;
+  --tp-btn-plain-text: #111827;
+  --tp-btn-plain-border: #d1d5db;
+}
+
+.el-button {
+  border-radius: 8px !important;
+  font-weight: 500;
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--tp-btn-bg) !important;
+  --el-button-border-color: var(--tp-btn-border) !important;
+  --el-button-text-color: var(--tp-btn-text) !important;
+  --el-button-hover-bg-color: var(--tp-btn-bg-hover) !important;
+  --el-button-hover-border-color: var(--tp-btn-bg-hover) !important;
+  --el-button-active-bg-color: #030712 !important;
+  --el-button-active-border-color: #030712 !important;
+}
+
+.el-button:not(.el-button--primary) {
+  --el-button-bg-color: var(--tp-btn-plain-bg) !important;
+  --el-button-border-color: var(--tp-btn-plain-border) !important;
+  --el-button-text-color: var(--tp-btn-plain-text) !important;
+  --el-button-hover-bg-color: #f9fafb !important;
+  --el-button-hover-border-color: #9ca3af !important;
+  --el-button-hover-text-color: #111827 !important;
 }
 
