@@ -112,7 +112,14 @@ async function doLogin() {
 function logout() {
   localStorage.removeItem('tp-token')
   localStorage.removeItem('tp-user-id')
+  sessionStorage.removeItem('tp-token')
+  sessionStorage.removeItem('tp-user-id')
+
+  currentUser.value = null
   loggedIn.value = false
+
+  // hard fallback to avoid stale state/cache issues in dev mode
+  window.location.reload()
 }
 
 onMounted(() => {
