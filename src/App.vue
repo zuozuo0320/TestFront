@@ -31,7 +31,6 @@ const projectOptions = [
   { id: '100001100002', name: '演示项目B' },
 ]
 const selectedProject = ref(projectOptions[0]?.id ?? '')
-const selectedProjectName = computed(() => projectOptions.find((p) => p.id === selectedProject.value)?.name || '未选择项目')
 
 const topCaseTabs = ['用例', '评审']
 const activeTopCaseTab = ref('用例')
@@ -146,15 +145,10 @@ onMounted(() => {
           </div>
 
           <div class="project-area">
-            <div class="project-switch-card">
-              <div class="project-label">当前项目</div>
-              <el-select v-model="selectedProject" class="project-select" popper-class="project-select-popper">
-                <template #prefix>
-                  <span class="project-prefix">📁</span>
-                </template>
+            <div class="project-inline">
+              <el-select v-model="selectedProject" class="project-select-inline" popper-class="project-select-popper">
                 <el-option v-for="p in projectOptions" :key="p.id" :label="p.name" :value="p.id" />
               </el-select>
-              <div class="project-sub">{{ selectedProjectName }}</div>
             </div>
 
             <div class="mini-tabs">
