@@ -236,12 +236,14 @@ body { margin: 0; background: #f3f4f6; }
 .sticky-name {
   left: 90px;
   min-width: 220px;
+  box-shadow: 8px 0 8px -8px rgba(17, 24, 39, 0.18);
 }
 
 .sticky-action {
   right: 0;
   z-index: 3;
   min-width: 132px;
+  box-shadow: -8px 0 8px -8px rgba(17, 24, 39, 0.22);
 }
 
 .table-shell th {
@@ -261,6 +263,20 @@ body { margin: 0; background: #f3f4f6; }
 
 .table-shell th.sortable:hover {
   color: #111827;
+}
+
+.sort-flag {
+  display: inline-block;
+  margin-left: 4px;
+  color: #9ca3af;
+  font-size: 11px;
+  width: 12px;
+  text-align: center;
+}
+
+.sort-flag.active {
+  color: #111827;
+  font-weight: 700;
 }
 
 .id { color: #111827; }

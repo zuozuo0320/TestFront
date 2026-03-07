@@ -504,7 +504,10 @@ onMounted(async () => {
                   <table>
                     <thead>
                       <tr>
-                        <th style="width: 90px" class="sortable" @click="toggleSort('id')">ID</th>
+                        <th style="width: 90px" class="sortable" @click="toggleSort('id')">
+                          ID
+                          <span class="sort-flag" :class="{ active: sortBy === 'id' }">{{ sortBy === 'id' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                        </th>
                         <th class="sticky-col sticky-name">用例名称</th>
                         <th style="width: 90px">用例等级</th>
                         <th style="width: 100px">评审结果</th>
@@ -512,9 +515,15 @@ onMounted(async () => {
                         <th style="width: 140px">所属模块</th>
                         <th style="width: 120px">标签</th>
                         <th style="width: 110px">更新人</th>
-                        <th style="width: 170px" class="sortable" @click="toggleSort('updated_at')">更新时间</th>
+                        <th style="width: 170px" class="sortable" @click="toggleSort('updated_at')">
+                          更新时间
+                          <span class="sort-flag" :class="{ active: sortBy === 'updated_at' }">{{ sortBy === 'updated_at' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                        </th>
                         <th style="width: 110px">创建人</th>
-                        <th style="width: 170px" class="sortable" @click="toggleSort('created_at')">创建时间</th>
+                        <th style="width: 170px" class="sortable" @click="toggleSort('created_at')">
+                          创建时间
+                          <span class="sort-flag" :class="{ active: sortBy === 'created_at' }">{{ sortBy === 'created_at' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                        </th>
                         <th style="width: 120px" class="sticky-col sticky-action">操作</th>
                       </tr>
                     </thead>
@@ -538,7 +547,7 @@ onMounted(async () => {
                         <td>{{ r.reviewResult }}</td>
                         <td>{{ r.execResult }}</td>
                         <td>{{ r.modulePath }}</td>
-                        <td>{{ r.tags || '-' }}</td>
+                        <td :title="r.tags || '-'">{{ r.tags || '-' }}</td>
                         <td>{{ r.updatedByName }}</td>
                         <td>{{ r.updatedAt }}</td>
                         <td>{{ r.createdByName }}</td>
