@@ -1,25 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { listProjects, listTestCases, loginByEmail, type LoginResp } from './api'
+import { loginByEmail, type LoginResp } from './api'
 
-type Project = {
-  id: number
+type CaseItem = {
+  id: string
   name: string
-  description: string
+  level: 'P0' | 'P1' | 'P2'
+  creator: string
+  updatedAt: string
 }
 
-type TestCase = {
-  id: number
-  title: string
-  steps: string
-  priority: string
-  project_id: number
-  created_at?: string
-  updated_at?: string
-}
-
-const appLoading = ref(false)
 const loginLoading = ref(false)
 const loggedIn = ref(false)
 const currentUser = ref<LoginResp['user'] | null>(null)
@@ -30,53 +21,28 @@ const loginForm = reactive({
   agree: true,
 })
 
-const projects = ref<Project[]>([])
-const selectedProjectId = ref<number | null>(null)
-const testcases = ref<TestCase[]>([])
+const folderTree = [
+  { name: '全部用例', count: 2 },
+  { name: '登录模块', count: 1 },
+  { name: '订单模块', count: 1 },
+]
 
-const keyword = ref('')
-const statusTab = ref<'open' | 'closed'>('open')
-const closedIds = ref<number[]>([])
-
-const openCount = computed(() => testcases.value.filter((c) => !closedIds.value.includes(c.id)).length)
-const closedCount = computed(() => closedIds.value.length)
-
-const filteredCases = computed(() => {
-  return testcases.value
-    .filter((item) => {
-      const matchesKeyword =
-        keyword.value.trim() === '' ||
-        item.title.toLowerCase().includes(keyword.value.trim().toLowerCase()) ||
-        item.steps.toLowerCase().includes(keyword.value.trim().toLowerCase())
-
-      const isClosed = closedIds.value.includes(item.id)
-      const matchesStatus = statusTab.value === 'open' ? !isClosed : isClosed
-
-      return matchesKeyword && matchesStatus
-    })
-    .sort((a, b) => b.id - a.id)
-})
-
-function isClosed(id: number) {
-  return closedIds.value.includes(id)
-}
-
-function toggleStatus(id: number) {
-  if (isClosed(id)) {
-    closedIds.value = closedIds.value.filter((x) => x !== id)
-    ElMessage.success(`已重新打开用例 #${id}`)
-    return
-  }
-  closedIds.value = [...closedIds.value, id]
-  ElMessage.success(`已关闭用例 #${id}`)
-}
-
-function formatWhen(value?: string) {
-  if (!value) return 'just now'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return 'just now'
-  return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-}
+const mockCases = ref<CaseItem[]>([
+  {
+    id: 'TC-10001',
+    name: '登录成功-有效账号密码',
+    level: 'P1',
+    creator: 'Tom Tester',
+    updatedAt: '2026-03-07 16:22',
+  },
+  {
+    id: 'TC-10002',
+    name: '下单成功-购物车结算流程',
+    level: 'P0',
+    creator: 'Mia Manager',
+    updatedAt: '2026-03-07 16:24',
+  },
+])
 
 async function doLogin() {
   if (!loginForm.email.trim() || !loginForm.password.trim()) {
@@ -96,7 +62,6 @@ async function doLogin() {
     currentUser.value = data.user
     loggedIn.value = true
     ElMessage.success(`欢迎回来，${data.user.name}`)
-    await loadProjectsAndCases()
   } catch (err: any) {
     ElMessage.error(err?.response?.data?.error || err?.message || '登录失败')
   } finally {
@@ -109,53 +74,12 @@ function logout() {
   localStorage.removeItem('tp-token')
   loggedIn.value = false
   currentUser.value = null
-  projects.value = []
-  selectedProjectId.value = null
-  testcases.value = []
-  keyword.value = ''
-  statusTab.value = 'open'
-  closedIds.value = []
 }
 
-async function loadProjectsAndCases() {
-  appLoading.value = true
-  try {
-    projects.value = await listProjects()
-    const first = projects.value[0]
-    if (!selectedProjectId.value && first) {
-      selectedProjectId.value = first.id
-    }
-    await loadTestCases()
-  } catch (err: any) {
-    ElMessage.error(err?.response?.data?.error || err?.message || '加载项目失败')
-  } finally {
-    appLoading.value = false
-  }
-}
-
-async function loadTestCases() {
-  if (!selectedProjectId.value) {
-    testcases.value = []
-    return
-  }
-
-  appLoading.value = true
-  try {
-    testcases.value = await listTestCases(selectedProjectId.value)
-    closedIds.value = []
-  } catch (err: any) {
-    ElMessage.error(err?.response?.data?.error || err?.message || '加载测试用例失败')
-  } finally {
-    appLoading.value = false
-  }
-}
-
-onMounted(async () => {
+onMounted(() => {
   const token = localStorage.getItem('tp-token')
-  const userId = localStorage.getItem('tp-user-id')
-  if (token && userId) {
+  if (token) {
     loggedIn.value = true
-    await loadProjectsAndCases()
   }
 })
 </script>
@@ -184,7 +108,6 @@ onMounted(async () => {
             </div>
 
             <el-button class="primary-btn" :loading="loginLoading" @click="doLogin">Continue</el-button>
-
             <div class="demo-tip">Demo: tester@testpilot.local / TestPilot@2026</div>
           </el-form>
         </div>
@@ -192,64 +115,95 @@ onMounted(async () => {
     </template>
 
     <template v-else>
-      <div class="issues-page">
-        <div class="issues-page-header">
-          <div>
-            <h2>Issues</h2>
-            <p>Manage test cases in issue workflow</p>
+      <div class="ms-page">
+        <header class="ms-topbar">
+          <div class="left">
+            <h2>用例管理</h2>
+            <span class="crumb">项目 / 测试管理 / 功能用例</span>
           </div>
-          <div class="page-actions">
-            <el-select v-model="selectedProjectId" style="width: 220px" @change="loadTestCases">
-              <el-option v-for="p in projects" :key="p.id" :label="`${p.name} (#${p.id})`" :value="p.id" />
-            </el-select>
-            <el-button @click="loadTestCases" :loading="appLoading">刷新</el-button>
-            <el-button plain @click="logout">退出</el-button>
+          <div class="right">
+            <span class="user">{{ currentUser?.name || 'Demo User' }}</span>
+            <el-button size="small" @click="logout">退出</el-button>
           </div>
+        </header>
+
+        <div class="ms-tabs">
+          <button class="tab active">功能用例</button>
+          <button class="tab">接口用例</button>
+          <button class="tab">场景用例</button>
         </div>
 
-        <div class="gh-card">
-          <div class="gh-topline">
-            <div class="gh-tabs">
-              <button :class="['gh-tab', statusTab === 'open' ? 'active' : '']" @click="statusTab = 'open'">
-                Open <span>{{ openCount }}</span>
-              </button>
-              <button :class="['gh-tab', statusTab === 'closed' ? 'active' : '']" @click="statusTab = 'closed'">
-                Closed <span>{{ closedCount }}</span>
-              </button>
-            </div>
-            <el-button type="success" size="small">New issue</el-button>
-          </div>
-
-          <div class="gh-filterline">
-            <el-input v-model="keyword" clearable placeholder="Search all issues" class="gh-search" />
-            <div class="gh-filter-actions">
-              <button>Filters</button>
-              <button>Labels</button>
-              <button>Milestones</button>
-              <button>Assignees</button>
-              <button>Sort</button>
-            </div>
-          </div>
-
-          <div v-loading="appLoading">
-            <div v-if="filteredCases.length === 0" class="empty">No results matched your search.</div>
-
-            <div v-else>
-              <div v-for="item in filteredCases" :key="item.id" class="gh-row">
-                <div class="gh-row-main">
-                  <div class="gh-title-line">
-                    <span :class="['dot', isClosed(item.id) ? 'dot-closed' : 'dot-open']"></span>
-                    <span class="gh-title">{{ item.title }}</span>
-                  </div>
-                  <div class="gh-meta">#{{ item.id }} opened · updated {{ formatWhen(item.updated_at || item.created_at) }}</div>
-                </div>
-                <div class="gh-row-right">
-                  <el-button size="small" @click="toggleStatus(item.id)">{{ isClosed(item.id) ? 'Reopen' : 'Close' }}</el-button>
-                </div>
+        <main class="ms-main">
+          <aside class="ms-left">
+            <div class="left-title">用例目录</div>
+            <el-input size="small" placeholder="搜索目录" />
+            <div class="tree">
+              <div v-for="node in folderTree" :key="node.name" class="tree-item">
+                <span>{{ node.name }}</span>
+                <span class="count">{{ node.count }}</span>
               </div>
             </div>
-          </div>
-        </div>
+          </aside>
+
+          <section class="ms-right">
+            <div class="toolbar-1">
+              <div class="filters">
+                <el-input placeholder="请输入 ID/名称" style="width: 220px" />
+                <el-select placeholder="优先级" style="width: 120px">
+                  <el-option label="全部" value="all" />
+                  <el-option label="P0" value="p0" />
+                  <el-option label="P1" value="p1" />
+                  <el-option label="P2" value="p2" />
+                </el-select>
+                <el-button>查询</el-button>
+                <el-button>重置</el-button>
+              </div>
+              <div class="actions">
+                <el-button>导入</el-button>
+                <el-button type="primary">新建用例</el-button>
+              </div>
+            </div>
+
+            <div class="toolbar-2">
+              <el-checkbox>全选</el-checkbox>
+              <el-button size="small">批量删除</el-button>
+              <el-button size="small">批量移动</el-button>
+            </div>
+
+            <div class="table-wrap">
+              <table class="case-table">
+                <thead>
+                  <tr>
+                    <th style="width: 42px"></th>
+                    <th style="width: 140px">ID</th>
+                    <th>用例名称</th>
+                    <th style="width: 90px">优先级</th>
+                    <th style="width: 150px">创建人</th>
+                    <th style="width: 170px">更新时间</th>
+                    <th style="width: 140px">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in mockCases" :key="item.id">
+                    <td><el-checkbox /></td>
+                    <td class="id">{{ item.id }}</td>
+                    <td class="name">{{ item.name }}</td>
+                    <td>
+                      <span class="level" :class="item.level.toLowerCase()">{{ item.level }}</span>
+                    </td>
+                    <td>{{ item.creator }}</td>
+                    <td>{{ item.updatedAt }}</td>
+                    <td>
+                      <a href="javascript:void(0)">编辑</a>
+                      <span class="sep">|</span>
+                      <a href="javascript:void(0)">执行</a>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </main>
       </div>
     </template>
   </div>
