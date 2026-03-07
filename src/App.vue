@@ -669,17 +669,21 @@ onMounted(async () => {
                 </div>
 
                 <div class="pager">
-                  <span>共 {{ total }} 条</span>
-                  <span>每页</span>
-                  <el-select v-model="pageSize" size="small" style="width: 88px" @change="onChangePageSize">
-                    <el-option v-for="s in pageSizeOptions" :key="s" :label="String(s)" :value="s" />
-                  </el-select>
-                  <el-button size="small" :disabled="!canPrev" @click="prevPage">上一页</el-button>
-                  <span>{{ page }} / {{ pageCount }}</span>
-                  <el-button size="small" :disabled="!canNext" @click="nextPage">下一页</el-button>
-                  <span>跳至</span>
-                  <el-input v-model="pageInput" size="small" style="width: 64px" @keyup.enter="onJumpPage" />
-                  <el-button size="small" @click="onJumpPage">GO</el-button>
+                  <div class="pager-left">
+                    <span class="pager-total">共 {{ total }} 条</span>
+                  </div>
+                  <div class="pager-right">
+                    <span class="pager-label">每页</span>
+                    <el-select v-model="pageSize" size="small" class="pager-size" @change="onChangePageSize">
+                      <el-option v-for="s in pageSizeOptions" :key="s" :label="String(s)" :value="s" />
+                    </el-select>
+                    <el-button size="small" :disabled="!canPrev" @click="prevPage">上一页</el-button>
+                    <span class="pager-index">{{ page }} / {{ pageCount }}</span>
+                    <el-button size="small" :disabled="!canNext" @click="nextPage">下一页</el-button>
+                    <span class="pager-label">跳至</span>
+                    <el-input v-model="pageInput" size="small" class="pager-jump" @keyup.enter="onJumpPage" />
+                    <el-button size="small" class="pager-go" @click="onJumpPage">GO</el-button>
+                  </div>
                 </div>
               </div>
             </div>

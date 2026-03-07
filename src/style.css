@@ -632,6 +632,55 @@ body { margin: 0; background: #f3f4f6; }
   background: #eef2f7;
 }
 
+.pager {
+  margin-top: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pager-left {
+  color: #6b7280;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.pager-right {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pager-label {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.pager-index {
+  min-width: 64px;
+  text-align: center;
+  color: #374151;
+  font-size: 12px;
+}
+
+.pager-size {
+  width: 88px;
+}
+
+.pager-jump {
+  width: 64px;
+}
+
+.pager-go {
+  min-width: 42px;
+}
+
 .btn-icon {
   width: 14px;
   height: 14px;
