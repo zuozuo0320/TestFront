@@ -672,8 +672,9 @@ body { margin: 0; background: #f3f4f6; }
 }
 
 .pager :deep(.el-pager li.is-active) {
-  background: #111827 !important;
-  color: #fff !important;
+  background: #374151 !important;
+  border-color: #374151 !important;
+  color: #f9fafb !important;
 }
 
 .btn-icon {
