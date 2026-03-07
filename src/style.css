@@ -18,7 +18,7 @@ body {
   min-height: 100vh;
 }
 
-/* Login: keep original minimal style */
+/* Login: minimal */
 .login-shell {
   min-height: 100vh;
   display: flex;
@@ -93,7 +93,7 @@ body {
   text-align: center;
 }
 
-/* Keep GitHub-like layout, but in minimal visual style */
+/* GitHub Issues-like layout */
 .issues-shell {
   max-width: 1120px;
   margin: 0 auto;
@@ -169,15 +169,12 @@ body {
   border-color: #e5e7eb;
 }
 
-.issues-filters {
-  display: flex;
-  gap: 8px;
-  padding: 10px 14px;
-  border-bottom: 1px solid #e5e7eb;
+.spacer {
+  flex: 1;
 }
 
 .search-input {
-  max-width: 380px;
+  width: 240px;
 }
 
 .empty {

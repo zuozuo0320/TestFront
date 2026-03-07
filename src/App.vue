@@ -35,7 +35,6 @@ const selectedProjectId = ref<number | null>(null)
 const testcases = ref<TestCase[]>([])
 
 const keyword = ref('')
-const priorityFilter = ref<'all' | 'high' | 'medium' | 'low'>('all')
 const statusTab = ref<'open' | 'closed'>('open')
 const closedIds = ref<number[]>([])
 
@@ -50,11 +49,10 @@ const filteredCases = computed(() => {
         item.title.toLowerCase().includes(keyword.value.trim().toLowerCase()) ||
         item.steps.toLowerCase().includes(keyword.value.trim().toLowerCase())
 
-      const matchesPriority = priorityFilter.value === 'all' || item.priority === priorityFilter.value
       const isClosed = closedIds.value.includes(item.id)
       const matchesStatus = statusTab.value === 'open' ? !isClosed : isClosed
 
-      return matchesKeyword && matchesPriority && matchesStatus
+      return matchesKeyword && matchesStatus
     })
     .sort((a, b) => b.id - a.id)
 })
@@ -71,12 +69,6 @@ function toggleStatus(id: number) {
   }
   closedIds.value = [...closedIds.value, id]
   ElMessage.success(`已关闭用例 #${id}`)
-}
-
-function priorityTagType(priority: string) {
-  if (priority === 'high') return 'danger'
-  if (priority === 'medium') return 'warning'
-  return 'info'
 }
 
 function formatWhen(value?: string) {
@@ -121,7 +113,6 @@ function logout() {
   selectedProjectId.value = null
   testcases.value = []
   keyword.value = ''
-  priorityFilter.value = 'all'
   statusTab.value = 'open'
   closedIds.value = []
 }
@@ -151,6 +142,8 @@ async function loadTestCases() {
   appLoading.value = true
   try {
     testcases.value = await listTestCases(selectedProjectId.value)
+    // 保证存在两条演示数据时默认全部展示在 open
+    closedIds.value = []
   } catch (err: any) {
     ElMessage.error(err?.response?.data?.error || err?.message || '加载测试用例失败')
   } finally {
@@ -204,10 +197,10 @@ onMounted(async () => {
         <div class="issues-header">
           <div>
             <h2>Test Cases</h2>
-            <p>{{ projects.length }} projects · {{ testcases.length }} total cases</p>
+            <p>{{ openCount }} open · {{ closedCount }} closed</p>
           </div>
           <div class="header-actions">
-            <el-select v-model="selectedProjectId" style="width: 260px" @change="loadTestCases">
+            <el-select v-model="selectedProjectId" style="width: 240px" @change="loadTestCases">
               <el-option v-for="p in projects" :key="p.id" :label="`${p.name} (#${p.id})`" :value="p.id" />
             </el-select>
             <el-button @click="loadTestCases" :loading="appLoading">刷新</el-button>
@@ -223,16 +216,8 @@ onMounted(async () => {
             <button :class="['tab-btn', statusTab === 'closed' ? 'active' : '']" @click="statusTab = 'closed'">
               Closed <span>{{ closedCount }}</span>
             </button>
-          </div>
-
-          <div class="issues-filters">
-            <el-input v-model="keyword" placeholder="Search test cases" clearable class="search-input" />
-            <el-select v-model="priorityFilter" style="width: 140px">
-              <el-option label="Priority: All" value="all" />
-              <el-option label="High" value="high" />
-              <el-option label="Medium" value="medium" />
-              <el-option label="Low" value="low" />
-            </el-select>
+            <div class="spacer"></div>
+            <el-input v-model="keyword" placeholder="Search" clearable class="search-input" />
           </div>
 
           <div v-loading="appLoading">
@@ -244,7 +229,6 @@ onMounted(async () => {
                   <div class="issue-title-row">
                     <span :class="['dot', isClosed(item.id) ? 'dot-closed' : 'dot-open']"></span>
                     <span class="title">{{ item.title }}</span>
-                    <el-tag size="small" :type="priorityTagType(item.priority)">{{ item.priority }}</el-tag>
                   </div>
                   <div class="issue-meta">
                     #{{ item.id }} opened · updated {{ formatWhen(item.updated_at || item.created_at) }}
