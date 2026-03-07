@@ -52,7 +52,7 @@ body { margin: 0; background: #f5f7fa; }
 }
 .name { font-weight: 600; }
 
-\.project-area { display: flex; align-items: center; gap: 10px; justify-content: flex-start; }
+.project-area { display: flex; align-items: center; gap: 10px; justify-content: flex-start; flex-wrap: nowrap; }
 .project-inline {
   width: 190px;
 }
@@ -78,7 +78,7 @@ body { margin: 0; background: #f5f7fa; }
 .project-select-inline :deep(.el-input__wrapper.is-focus) {
   border-color: #409eff;
 }
-.mini-tabs { display: flex; gap: 4px; }
+.mini-tabs { display: inline-flex; gap: 4px; align-items: center; flex-wrap: nowrap; }
 .mini-tab {
   border: none;
   background: transparent;
