@@ -537,6 +537,9 @@ body { margin: 0; background: #f3f4f6; }
   line-height: 1;
   cursor: pointer;
   transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .step-op:hover {
@@ -606,6 +609,9 @@ body { margin: 0; background: #f3f4f6; }
   padding: 5px 9px;
   cursor: pointer;
   transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .action-btn:hover {
@@ -624,5 +630,12 @@ body { margin: 0; background: #f3f4f6; }
 .action-delete:hover {
   color: #111827;
   background: #eef2f7;
+}
+
+.btn-icon {
+  width: 14px;
+  text-align: center;
+  font-size: 11px;
+  opacity: 0.9;
 }
 

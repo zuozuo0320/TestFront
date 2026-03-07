@@ -652,8 +652,14 @@ onMounted(async () => {
                         <td>{{ r.createdAt }}</td>
                         <td class="sticky-col sticky-action">
                           <div class="action-group">
-                            <button class="action-btn action-edit" @click="openEdit(r)">编辑</button>
-                            <button class="action-btn action-delete" @click="onDelete(r)">删除</button>
+                            <button class="action-btn action-edit" @click="openEdit(r)">
+                              <span class="btn-icon">✎</span>
+                              <span>编辑</span>
+                            </button>
+                            <button class="action-btn action-delete" @click="onDelete(r)">
+                              <span class="btn-icon">🗑</span>
+                              <span>删除</span>
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -776,10 +782,22 @@ onMounted(async () => {
                 <el-input v-model="s.action" placeholder="请输入步骤" />
                 <el-input v-model="s.expected" placeholder="请输入预期结果" />
                 <div class="step-ops">
-                  <button class="step-op" :disabled="idx === 0" @click="moveStepUp(idx)">↑</button>
-                  <button class="step-op" :disabled="idx === stepRows.length - 1" @click="moveStepDown(idx)">↓</button>
-                  <button class="step-op" @click="copyStepRow(idx)">复制</button>
-                  <button class="step-op danger" @click="removeStepRow(idx)">删除</button>
+                  <button class="step-op" :disabled="idx === 0" @click="moveStepUp(idx)">
+                    <span class="btn-icon">↑</span>
+                    <span>上移</span>
+                  </button>
+                  <button class="step-op" :disabled="idx === stepRows.length - 1" @click="moveStepDown(idx)">
+                    <span class="btn-icon">↓</span>
+                    <span>下移</span>
+                  </button>
+                  <button class="step-op" @click="copyStepRow(idx)">
+                    <span class="btn-icon">⎘</span>
+                    <span>复制</span>
+                  </button>
+                  <button class="step-op danger" @click="removeStepRow(idx)">
+                    <span class="btn-icon">🗑</span>
+                    <span>删除</span>
+                  </button>
                 </div>
               </div>
 
