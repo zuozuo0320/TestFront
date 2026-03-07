@@ -1,17 +1,26 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { loginByEmail, type LoginResp } from './api'
+import { listProjects, listTestCases, loginByEmail, type LoginResp } from './api'
 
-type CaseItem = {
-  id: string
+type Project = {
+  id: number
   name: string
-  level: 'P0' | 'P1' | 'P2'
-  creator: string
-  updatedAt: string
+  description: string
+}
+
+type TestCase = {
+  id: number
+  title: string
+  steps: string
+  priority: string
+  project_id: number
+  created_at?: string
+  updated_at?: string
 }
 
 const loginLoading = ref(false)
+const appLoading = ref(false)
 const loggedIn = ref(false)
 const currentUser = ref<LoginResp['user'] | null>(null)
 
@@ -21,28 +30,55 @@ const loginForm = reactive({
   agree: true,
 })
 
-const folderTree = [
-  { name: '全部用例', count: 2 },
-  { name: '登录模块', count: 1 },
-  { name: '订单模块', count: 1 },
+const projects = ref<Project[]>([])
+const selectedProjectId = ref<number | null>(null)
+const testcases = ref<TestCase[]>([])
+const keyword = ref('')
+
+const navItems = ['工作台', '项目管理', '测试计划', '测试用例', 'E2E测试']
+
+const mockFallback: TestCase[] = [
+  {
+    id: 10001,
+    title: '登录成功-有效账号密码',
+    steps: '1. 打开登录页 2. 输入有效账号密码 3. 点击登录',
+    priority: 'high',
+    project_id: 1,
+    updated_at: '2026-03-07T16:22:00+08:00',
+  },
+  {
+    id: 10002,
+    title: '下单成功-购物车结算流程',
+    steps: '1. 加购物车 2. 去结算 3. 提交订单',
+    priority: 'medium',
+    project_id: 1,
+    updated_at: '2026-03-07T16:24:00+08:00',
+  },
 ]
 
-const mockCases = ref<CaseItem[]>([
-  {
-    id: 'TC-10001',
-    name: '登录成功-有效账号密码',
-    level: 'P1',
-    creator: 'Tom Tester',
-    updatedAt: '2026-03-07 16:22',
-  },
-  {
-    id: 'TC-10002',
-    name: '下单成功-购物车结算流程',
-    level: 'P0',
-    creator: 'Mia Manager',
-    updatedAt: '2026-03-07 16:24',
-  },
-])
+function formatWhen(value?: string) {
+  if (!value) return '-'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return '-'
+  return d.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function levelText(priority: string) {
+  if (priority === 'high') return 'P0'
+  if (priority === 'medium') return 'P1'
+  return 'P2'
+}
+
+const visibleCases = () => {
+  const q = keyword.value.trim().toLowerCase()
+  if (!q) return testcases.value
+  return testcases.value.filter((c) => c.title.toLowerCase().includes(q) || c.steps.toLowerCase().includes(q))
+}
 
 async function doLogin() {
   if (!loginForm.email.trim() || !loginForm.password.trim()) {
@@ -62,10 +98,44 @@ async function doLogin() {
     currentUser.value = data.user
     loggedIn.value = true
     ElMessage.success(`欢迎回来，${data.user.name}`)
+    await loadProjectsAndCases()
   } catch (err: any) {
     ElMessage.error(err?.response?.data?.error || err?.message || '登录失败')
   } finally {
     loginLoading.value = false
+  }
+}
+
+async function loadProjectsAndCases() {
+  appLoading.value = true
+  try {
+    projects.value = await listProjects()
+    const first = projects.value[0]
+    if (!selectedProjectId.value && first) {
+      selectedProjectId.value = first.id
+    }
+    await loadTestCases()
+  } catch {
+    testcases.value = mockFallback
+  } finally {
+    appLoading.value = false
+  }
+}
+
+async function loadTestCases() {
+  if (!selectedProjectId.value) {
+    testcases.value = mockFallback
+    return
+  }
+
+  appLoading.value = true
+  try {
+    const data = await listTestCases(selectedProjectId.value)
+    testcases.value = data.length > 0 ? data : mockFallback
+  } catch {
+    testcases.value = mockFallback
+  } finally {
+    appLoading.value = false
   }
 }
 
@@ -76,10 +146,12 @@ function logout() {
   currentUser.value = null
 }
 
-onMounted(() => {
+onMounted(async () => {
   const token = localStorage.getItem('tp-token')
-  if (token) {
+  const userId = localStorage.getItem('tp-user-id')
+  if (token && userId) {
     loggedIn.value = true
+    await loadProjectsAndCases()
   }
 })
 </script>
@@ -115,95 +187,66 @@ onMounted(() => {
     </template>
 
     <template v-else>
-      <div class="ms-page">
-        <header class="ms-topbar">
-          <div class="left">
-            <h2>用例管理</h2>
-            <span class="crumb">项目 / 测试管理 / 功能用例</span>
+      <div class="app-shell">
+        <header class="global-header">
+          <div class="brand">
+            <span class="brand-icon">TP</span>
+            <span class="brand-name">TestPilot</span>
           </div>
-          <div class="right">
-            <span class="user">{{ currentUser?.name || 'Demo User' }}</span>
+
+          <div class="project-switch">
+            <span>项目：</span>
+            <el-select v-model="selectedProjectId" style="width: 240px" @change="loadTestCases">
+              <el-option v-for="p in projects" :key="p.id" :label="`${p.name} (#${p.id})`" :value="p.id" />
+            </el-select>
+          </div>
+
+          <div class="user-area">
+            <span>{{ currentUser?.name || 'Demo User' }}</span>
             <el-button size="small" @click="logout">退出</el-button>
           </div>
         </header>
 
-        <div class="ms-tabs">
-          <button class="tab active">功能用例</button>
-          <button class="tab">接口用例</button>
-          <button class="tab">场景用例</button>
-        </div>
-
-        <main class="ms-main">
-          <aside class="ms-left">
-            <div class="left-title">用例目录</div>
-            <el-input size="small" placeholder="搜索目录" />
-            <div class="tree">
-              <div v-for="node in folderTree" :key="node.name" class="tree-item">
-                <span>{{ node.name }}</span>
-                <span class="count">{{ node.count }}</span>
-              </div>
+        <div class="app-body">
+          <aside class="left-nav">
+            <div
+              v-for="item in navItems"
+              :key="item"
+              :class="['nav-item', item === '测试用例' ? 'active' : '']"
+            >
+              {{ item }}
             </div>
           </aside>
 
-          <section class="ms-right">
-            <div class="toolbar-1">
-              <div class="filters">
-                <el-input placeholder="请输入 ID/名称" style="width: 220px" />
-                <el-select placeholder="优先级" style="width: 120px">
-                  <el-option label="全部" value="all" />
-                  <el-option label="P0" value="p0" />
-                  <el-option label="P1" value="p1" />
-                  <el-option label="P2" value="p2" />
-                </el-select>
-                <el-button>查询</el-button>
-                <el-button>重置</el-button>
-              </div>
-              <div class="actions">
-                <el-button>导入</el-button>
+          <main class="content">
+            <div class="content-card">
+              <div class="content-toolbar">
+                <el-input v-model="keyword" placeholder="请输入用例名称/步骤" style="width: 260px" clearable />
+                <el-button @click="loadTestCases" :loading="appLoading">刷新</el-button>
                 <el-button type="primary">新建用例</el-button>
               </div>
-            </div>
 
-            <div class="toolbar-2">
-              <el-checkbox>全选</el-checkbox>
-              <el-button size="small">批量删除</el-button>
-              <el-button size="small">批量移动</el-button>
-            </div>
-
-            <div class="table-wrap">
               <table class="case-table">
                 <thead>
                   <tr>
-                    <th style="width: 42px"></th>
                     <th style="width: 140px">ID</th>
                     <th>用例名称</th>
                     <th style="width: 90px">优先级</th>
-                    <th style="width: 150px">创建人</th>
-                    <th style="width: 170px">更新时间</th>
-                    <th style="width: 140px">操作</th>
+                    <th style="width: 180px">更新时间</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="item in mockCases" :key="item.id">
-                    <td><el-checkbox /></td>
-                    <td class="id">{{ item.id }}</td>
-                    <td class="name">{{ item.name }}</td>
-                    <td>
-                      <span class="level" :class="item.level.toLowerCase()">{{ item.level }}</span>
-                    </td>
-                    <td>{{ item.creator }}</td>
-                    <td>{{ item.updatedAt }}</td>
-                    <td>
-                      <a href="javascript:void(0)">编辑</a>
-                      <span class="sep">|</span>
-                      <a href="javascript:void(0)">执行</a>
-                    </td>
+                  <tr v-for="item in visibleCases()" :key="item.id">
+                    <td class="id">TC-{{ item.id }}</td>
+                    <td>{{ item.title }}</td>
+                    <td>{{ levelText(item.priority) }}</td>
+                    <td>{{ formatWhen(item.updated_at || item.created_at) }}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-          </section>
-        </main>
+          </main>
+        </div>
       </div>
     </template>
   </div>

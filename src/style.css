@@ -88,139 +88,107 @@ body {
   text-align: center;
 }
 
-.ms-page {
-  padding: 16px;
+.app-shell {
+  min-height: 100vh;
 }
 
-.ms-topbar {
+.global-header {
   height: 56px;
   padding: 0 16px;
   background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.ms-topbar h2 {
-  margin: 0;
-  font-size: 18px;
-}
-
-.crumb {
-  margin-left: 10px;
-  color: #6b7280;
-  font-size: 12px;
-}
-
-.ms-topbar .right {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.user {
-  font-size: 13px;
-  color: #374151;
-}
-
-.ms-tabs {
-  margin-top: 12px;
-  display: flex;
-  gap: 8px;
-}
-
-.tab {
-  border: 1px solid #d1d5db;
-  background: #fff;
-  border-radius: 8px;
-  padding: 8px 14px;
-  font-size: 13px;
-}
-
-.tab.active {
-  border-color: #2563eb;
-  color: #2563eb;
-}
-
-.ms-main {
-  margin-top: 12px;
+  border-bottom: 1px solid #e5e7eb;
   display: grid;
-  grid-template-columns: 260px 1fr;
-  gap: 12px;
+  grid-template-columns: 200px 1fr auto;
+  align-items: center;
+  gap: 16px;
 }
 
-.ms-left,
-.ms-right {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.ms-left {
-  padding: 12px;
+.brand-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #2563eb;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
 }
 
-.left-title {
-  font-size: 13px;
+.brand-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.project-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: #374151;
-  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.user-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.app-body {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  min-height: calc(100vh - 56px);
+}
+
+.left-nav {
+  background: #fff;
+  border-right: 1px solid #e5e7eb;
+  padding: 10px 8px;
+}
+
+.nav-item {
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #334155;
+  cursor: default;
+}
+
+.nav-item + .nav-item {
+  margin-top: 4px;
+}
+
+.nav-item.active {
+  background: #eff6ff;
+  color: #2563eb;
   font-weight: 600;
 }
 
-.tree {
-  margin-top: 10px;
+.content {
+  padding: 16px;
 }
 
-.tree-item {
-  padding: 8px;
-  display: flex;
-  justify-content: space-between;
-  border-radius: 6px;
-  font-size: 13px;
-}
-
-.tree-item:hover {
-  background: #f3f4f6;
-}
-
-.count {
-  color: #6b7280;
-  font-size: 12px;
-}
-
-.ms-right {
+.content-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
   padding: 12px;
 }
 
-.toolbar-1,
-.toolbar-2 {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.toolbar-2 {
-  margin-top: 10px;
-  padding: 8px 0;
-  border-top: 1px dashed #e5e7eb;
-  border-bottom: 1px dashed #e5e7eb;
-}
-
-.filters,
-.actions {
+.content-toolbar {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.table-wrap {
-  margin-top: 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  overflow: hidden;
+  margin-bottom: 12px;
 }
 
 .case-table {
@@ -229,18 +197,17 @@ body {
   font-size: 13px;
 }
 
-.case-table thead th {
-  background: #f9fafb;
-  color: #374151;
+.case-table th {
   text-align: left;
-  font-weight: 600;
-  padding: 10px 8px;
+  background: #f9fafb;
   border-bottom: 1px solid #e5e7eb;
+  padding: 10px 8px;
+  color: #374151;
 }
 
-.case-table tbody td {
+.case-table td {
+  border-bottom: 1px solid #f1f5f9;
   padding: 10px 8px;
-  border-bottom: 1px solid #f0f2f5;
 }
 
 .case-table tbody tr:last-child td {
@@ -249,34 +216,4 @@ body {
 
 .id {
   color: #2563eb;
-}
-
-.name {
-  color: #1f2937;
-}
-
-.level {
-  font-size: 12px;
-  border-radius: 10px;
-  padding: 2px 8px;
-}
-
-.level.p0 {
-  background: #fee2e2;
-  color: #b91c1c;
-}
-
-.level.p1 {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.level.p2 {
-  background: #e0f2fe;
-  color: #075985;
-}
-
-.sep {
-  margin: 0 6px;
-  color: #9ca3af;
 }
