@@ -88,6 +88,15 @@ const pageCount = computed(() => {
 const canPrev = computed(() => page.value > 1)
 const canNext = computed(() => page.value < pageCount.value)
 
+const activeFilterChips = computed(() => {
+  const chips: Array<{ key: 'keyword' | 'level' | 'review' | 'exec'; label: string; value: string }> = []
+  if (keyword.value.trim()) chips.push({ key: 'keyword', label: '关键字', value: keyword.value.trim() })
+  if (levelFilter.value) chips.push({ key: 'level', label: '等级', value: levelFilter.value })
+  if (reviewFilter.value) chips.push({ key: 'review', label: '评审', value: reviewFilter.value })
+  if (execFilter.value) chips.push({ key: 'exec', label: '执行', value: execFilter.value })
+  return chips
+})
+
 function toRow(tc: TestCase): TableRow {
   return {
     id: tc.id,
@@ -260,6 +269,15 @@ function toggleSort(field: 'id' | 'created_at' | 'updated_at') {
     sortBy.value = field
     sortOrder.value = 'desc'
   }
+  page.value = 1
+  loadCases()
+}
+
+function clearOneFilter(kind: 'keyword' | 'level' | 'review' | 'exec') {
+  if (kind === 'keyword') keyword.value = ''
+  if (kind === 'level') levelFilter.value = ''
+  if (kind === 'review') reviewFilter.value = ''
+  if (kind === 'exec') execFilter.value = ''
   page.value = 1
   loadCases()
 }
@@ -498,6 +516,14 @@ onMounted(async () => {
                     <el-button @click="onSearch">查询</el-button>
                     <el-button @click="onResetSearch">重置</el-button>
                   </div>
+                </div>
+
+                <div class="filter-chips" v-if="activeFilterChips.length > 0">
+                  <div class="chip" v-for="f in activeFilterChips" :key="f.key">
+                    <span>{{ f.label }}: {{ f.value }}</span>
+                    <button class="chip-close" @click="clearOneFilter(f.key)">×</button>
+                  </div>
+                  <button class="chip-clear-all" @click="onResetSearch">清空筛选</button>
                 </div>
 
                 <div class="table-shell" v-loading="appLoading">

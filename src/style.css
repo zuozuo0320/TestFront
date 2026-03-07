@@ -193,12 +193,56 @@ body { margin: 0; background: #f3f4f6; }
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  background: #fff;
+  padding-bottom: 8px;
 }
 .toolbar-1 .left,
 .toolbar-1 .right {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.filter-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  color: #374151;
+  border-radius: 14px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.chip-close {
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.chip-clear-all {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #111827;
+  border-radius: 14px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
 }
 
 .table-shell {
