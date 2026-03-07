@@ -520,22 +520,32 @@ body { margin: 0; background: #f3f4f6; }
 .step-ops {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 2px;
 }
 
 .step-op {
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #374151;
+  border: none;
+  background: transparent;
+  color: #4b5563;
   border-radius: 6px;
-  padding: 4px 8px;
+  padding: 4px 7px;
   font-size: 12px;
+  line-height: 1;
   cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.step-op:hover {
+  background: #eef2f7;
+  color: #111827;
 }
 
 .step-op:disabled {
-  color: #9ca3af;
-  border-color: #e5e7eb;
+  color: #c0c4cc;
   cursor: not-allowed;
 }
 
@@ -545,7 +555,7 @@ body { margin: 0; background: #f3f4f6; }
 
 .step-op.danger:hover {
   color: #111827;
-  border-color: #9ca3af;
+  background: #eef2f7;
 }
 
 .table-skeleton {
@@ -579,24 +589,28 @@ body { margin: 0; background: #f3f4f6; }
 .action-group {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 2px;
 }
 
 .action-btn {
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #374151;
+  border: none;
+  background: transparent;
+  color: #4b5563;
   border-radius: 6px;
   font-size: 12px;
   line-height: 1;
-  padding: 6px 10px;
+  padding: 5px 9px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .action-btn:hover {
-  border-color: #9ca3af;
-  background: #f9fafb;
+  background: #eef2f7;
+  color: #111827;
 }
 
 .action-edit {
@@ -604,11 +618,11 @@ body { margin: 0; background: #f3f4f6; }
 }
 
 .action-delete {
-  color: #4b5563;
+  color: #6b7280;
 }
 
 .action-delete:hover {
-  border-color: #6b7280;
   color: #111827;
+  background: #eef2f7;
 }
 
