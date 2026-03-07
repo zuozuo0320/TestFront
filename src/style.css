@@ -1,0 +1,59 @@
+:root {
+  font-family: 'Microsoft YaHei', Inter, Avenir, Helvetica, Arial, sans-serif;
+  color: #1f2937;
+  background: #f5f7fa;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 1280px;
+  background: #f5f7fa;
+}
+
+#app {
+  padding: 16px;
+}
+
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.card {
+  border-radius: 10px;
+}
+
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-row h2 {
+  margin: 0;
+}
+
+.header-row p {
+  margin: 8px 0 0;
+  color: #6b7280;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.stats {
+  margin-top: 8px;
+}
+
+.run-box h3 {
+  margin: 0 0 12px;
+}
