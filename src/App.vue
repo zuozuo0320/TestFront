@@ -154,11 +154,11 @@ onMounted(() => {
             <div class="mini-tabs">
               <button v-for="t in topCaseTabs" :key="t" :class="['mini-tab', t === activeTopCaseTab ? 'active' : '']">{{ t }}</button>
             </div>
-          </div>
 
-          <div class="user-box">
-            <span>{{ currentUser?.name || 'demo' }}</span>
-            <el-button size="small" @click="logout">退出</el-button>
+            <div class="user-inline">
+              <span class="user-name">{{ currentUser?.name || 'demo' }}</span>
+              <el-button size="small" @click="logout">退出</el-button>
+            </div>
           </div>
         </header>
 

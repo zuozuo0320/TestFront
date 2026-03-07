@@ -32,7 +32,7 @@ body { margin: 0; background: #f5f7fa; }
   background: #fff;
   border-bottom: 1px solid #ebeef5;
   display: grid;
-  grid-template-columns: 180px 1fr auto;
+  grid-template-columns: 180px 1fr;
   align-items: center;
   padding: 0 14px;
   gap: 8px;
@@ -52,9 +52,19 @@ body { margin: 0; background: #f5f7fa; }
 }
 .name { font-weight: 600; }
 
-\.project-area { display: flex; align-items: center; gap: 10px; }
+\.project-area { display: flex; align-items: center; gap: 10px; justify-content: flex-start; }
 .project-inline {
   width: 190px;
+}
+.user-inline {
+  margin-left: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.user-name {
+  font-size: 13px;
+  color: #606266;
 }
 .project-select-inline {
   width: 100%;
@@ -79,7 +89,7 @@ body { margin: 0; background: #f5f7fa; }
 }
 .mini-tab.active { background: #ecf5ff; color: #409eff; }
 
-.user-box { display: flex; align-items: center; gap: 8px; }
+.user-box { display: none; }
 
 .main {
   display: grid;
