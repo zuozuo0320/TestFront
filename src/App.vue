@@ -463,9 +463,10 @@ onMounted(async () => {
                         <td>{{ r.createdBy || '-' }}</td>
                         <td>{{ r.createdAt }}</td>
                         <td>
-                          <a href="javascript:void(0)" @click="openEdit(r)">编辑</a>
-                          <span class="sep">|</span>
-                          <a href="javascript:void(0)" @click="onDelete(r)">删除</a>
+                          <div class="action-group">
+                            <button class="action-btn action-edit" @click="openEdit(r)">编辑</button>
+                            <button class="action-btn action-delete" @click="onDelete(r)">删除</button>
+                          </div>
                         </td>
                       </tr>
                       <tr v-if="rows.length === 0">

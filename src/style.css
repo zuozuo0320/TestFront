@@ -418,3 +418,39 @@ body { margin: 0; background: #f3f4f6; }
   margin-top: 10px;
 }
 
+.action-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.action-btn {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.action-btn:hover {
+  border-color: #9ca3af;
+  background: #f9fafb;
+}
+
+.action-edit {
+  color: #111827;
+}
+
+.action-delete {
+  color: #4b5563;
+}
+
+.action-delete:hover {
+  border-color: #6b7280;
+  color: #111827;
+}
+
