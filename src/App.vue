@@ -153,8 +153,8 @@ onMounted(() => {
       <div class="layout">
         <header class="top-header">
           <div class="brand">
-            <div class="logo">M</div>
-            <div class="name">MeterSphere</div>
+            <div class="logo">TP</div>
+            <div class="name">TestPilot</div>
           </div>
 
           <div class="project-area">

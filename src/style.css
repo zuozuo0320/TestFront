@@ -4,7 +4,7 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; background: #f5f7fa; }
+body { margin: 0; background: #f3f4f6; }
 
 .login-wrap {
   min-height: 100vh;
@@ -57,7 +57,7 @@ body { margin: 0; background: #f5f7fa; }
 }
 .hint { color: #909399; font-size: 12px; }
 .link {
-  color: #0969da;
+  color: #111827;
   text-decoration: none;
   font-size: 12px;
   white-space: nowrap;
@@ -89,7 +89,7 @@ body { margin: 0; background: #f5f7fa; }
   width: 26px;
   height: 26px;
   border-radius: 6px;
-  background: #409eff;
+  background: #111827;
   color: #fff;
   display: inline-flex;
   align-items: center;
@@ -122,7 +122,7 @@ body { margin: 0; background: #f5f7fa; }
   background: #fff;
 }
 .project-select-inline :deep(.el-input__wrapper.is-focus) {
-  border-color: #409eff;
+  border-color: #111827;
 }
 .mini-tabs { display: inline-flex; gap: 4px; align-items: center; flex-wrap: nowrap; }
 .mini-tab {
@@ -133,7 +133,7 @@ body { margin: 0; background: #f5f7fa; }
   font-size: 13px;
   color: #606266;
 }
-.mini-tab.active { background: #ecf5ff; color: #409eff; }
+.mini-tab.active { background: #f3f4f6; color: #111827; }
 
 .main {
   display: grid;
@@ -152,7 +152,7 @@ body { margin: 0; background: #f5f7fa; }
   color: #606266;
   font-size: 13px;
 }
-.main-nav-item.active { background: #ecf5ff; color: #409eff; font-weight: 600; }
+.main-nav-item.active { background: #f3f4f6; color: #111827; font-weight: 600; }
 
 .content-wrap { padding: 10px; }
 
@@ -229,7 +229,7 @@ body { margin: 0; background: #f5f7fa; }
   font-weight: 600;
 }
 
-.id { color: #409eff; }
+.id { color: #111827; }
 .name { color: #303133; }
 
 .level {
@@ -237,13 +237,13 @@ body { margin: 0; background: #f5f7fa; }
   border-radius: 10px;
   padding: 2px 8px;
 }
-.level-p0 { background: #fef0f0; color: #f56c6c; }
-.level-p1 { background: #fdf6ec; color: #e6a23c; }
-.level-p2 { background: #ecf5ff; color: #409eff; }
+.level-p0 { background: #f3f4f6; color: #4b5563; }
+.level-p1 { background: #f3f4f6; color: #4b5563; }
+.level-p2 { background: #f3f4f6; color: #111827; }
 
 .status { font-size: 12px; }
-.status.ok { color: #67c23a; }
-.status.fail { color: #f56c6c; }
+.status.ok { color: #111827; }
+.status.fail { color: #4b5563; }
 .status.pending { color: #909399; }
 
 .pager {
@@ -252,3 +252,4 @@ body { margin: 0; background: #f5f7fa; }
   color: #909399;
   text-align: right;
 }
+
