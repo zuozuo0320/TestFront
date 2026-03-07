@@ -27,6 +27,29 @@ export type LoginResp = {
   }
 }
 
+export type Project = {
+  id: number
+  name: string
+  description: string
+}
+
+export type TestCase = {
+  id: number
+  project_id: number
+  title: string
+  steps: string
+  priority: string
+  created_at?: string
+  updated_at?: string
+}
+
+export type TestCaseListResp = {
+  items: TestCase[]
+  total: number
+  page: number
+  pageSize: number
+}
+
 export async function loginByEmail(email: string, password: string) {
   const { data } = await apiClient.post<LoginResp>('/auth/login', { email, password })
   return data
@@ -34,10 +57,25 @@ export async function loginByEmail(email: string, password: string) {
 
 export async function listProjects() {
   const { data } = await apiClient.get('/projects')
-  return data.projects ?? []
+  return (data.projects ?? []) as Project[]
 }
 
-export async function listTestCases(projectId: number) {
-  const { data } = await apiClient.get(`/projects/${projectId}/testcases`)
-  return data.testcases ?? []
+export async function listTestCases(projectId: number, params: { page: number; pageSize: number; keyword?: string }) {
+  const { data } = await apiClient.get<TestCaseListResp>(`/projects/${projectId}/testcases`, { params })
+  return data
+}
+
+export async function createTestCase(projectId: number, payload: { title: string; steps: string; priority: string }) {
+  const { data } = await apiClient.post<TestCase>(`/projects/${projectId}/testcases`, payload)
+  return data
+}
+
+export async function updateTestCase(projectId: number, testcaseId: number, payload: { title?: string; steps?: string; priority?: string }) {
+  const { data } = await apiClient.put<TestCase>(`/projects/${projectId}/testcases/${testcaseId}`, payload)
+  return data
+}
+
+export async function deleteTestCase(projectId: number, testcaseId: number) {
+  const { data } = await apiClient.delete<{ message: string }>(`/projects/${projectId}/testcases/${testcaseId}`)
+  return data
 }
