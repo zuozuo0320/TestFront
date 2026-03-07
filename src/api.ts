@@ -73,6 +73,9 @@ export async function listTestCases(projectId: number, params: {
   page: number
   pageSize: number
   keyword?: string
+  level?: string
+  review_result?: string
+  exec_result?: string
   sortBy?: 'id' | 'created_at' | 'updated_at'
   sortOrder?: 'asc' | 'desc'
 }) {

@@ -58,6 +58,9 @@ const pageInput = ref('1')
 const sortBy = ref<'id' | 'created_at' | 'updated_at'>('updated_at')
 const sortOrder = ref<'asc' | 'desc'>('desc')
 const loadError = ref('')
+const levelFilter = ref('')
+const reviewFilter = ref('')
+const execFilter = ref('')
 
 const rows = ref<TableRow[]>([])
 const stepRows = ref<StepRow[]>([{ action: '', expected: '' }])
@@ -200,6 +203,9 @@ async function loadCases() {
       page: page.value,
       pageSize: pageSize.value,
       keyword: keyword.value.trim() || undefined,
+      level: levelFilter.value || undefined,
+      review_result: reviewFilter.value || undefined,
+      exec_result: execFilter.value || undefined,
       sortBy: sortBy.value,
       sortOrder: sortOrder.value,
     })
@@ -223,6 +229,9 @@ function onSearch() {
 
 function onResetSearch() {
   keyword.value = ''
+  levelFilter.value = ''
+  reviewFilter.value = ''
+  execFilter.value = ''
   page.value = 1
   loadCases()
 }
@@ -468,7 +477,24 @@ onMounted(async () => {
                     <el-button type="primary" @click="openCreate">新建</el-button>
                   </div>
                   <div class="right">
-                    <el-input v-model="keyword" placeholder="通过 ID/名称/标签搜索" style="width: 240px" clearable @keyup.enter="onSearch" />
+                    <el-input v-model="keyword" placeholder="通过 ID/名称/标签搜索" style="width: 220px" clearable @keyup.enter="onSearch" />
+                    <el-select v-model="levelFilter" style="width: 100px" placeholder="等级" clearable>
+                      <el-option label="P0" value="P0" />
+                      <el-option label="P1" value="P1" />
+                      <el-option label="P2" value="P2" />
+                    </el-select>
+                    <el-select v-model="reviewFilter" style="width: 120px" placeholder="评审" clearable>
+                      <el-option label="未评审" value="未评审" />
+                      <el-option label="已通过" value="已通过" />
+                      <el-option label="不通过" value="不通过" />
+                      <el-option label="重新提审" value="重新提审" />
+                    </el-select>
+                    <el-select v-model="execFilter" style="width: 120px" placeholder="执行" clearable>
+                      <el-option label="未执行" value="未执行" />
+                      <el-option label="成功" value="成功" />
+                      <el-option label="失败" value="失败" />
+                      <el-option label="阻塞" value="阻塞" />
+                    </el-select>
                     <el-button @click="onSearch">查询</el-button>
                     <el-button @click="onResetSearch">重置</el-button>
                   </div>
