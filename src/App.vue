@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { listProjects, listTestCases, loginByEmail, type LoginResp } from './api'
 
@@ -15,6 +15,8 @@ type TestCase = {
   steps: string
   priority: string
   project_id: number
+  created_at?: string
+  updated_at?: string
 }
 
 const appLoading = ref(false)
@@ -31,6 +33,58 @@ const loginForm = reactive({
 const projects = ref<Project[]>([])
 const selectedProjectId = ref<number | null>(null)
 const testcases = ref<TestCase[]>([])
+
+const keyword = ref('')
+const priorityFilter = ref<'all' | 'high' | 'medium' | 'low'>('all')
+const statusTab = ref<'open' | 'closed'>('open')
+const closedIds = ref<number[]>([])
+
+const openCount = computed(() => testcases.value.filter((c) => !closedIds.value.includes(c.id)).length)
+const closedCount = computed(() => closedIds.value.length)
+
+const filteredCases = computed(() => {
+  return testcases.value
+    .filter((item) => {
+      const matchesKeyword =
+        keyword.value.trim() === '' ||
+        item.title.toLowerCase().includes(keyword.value.trim().toLowerCase()) ||
+        item.steps.toLowerCase().includes(keyword.value.trim().toLowerCase())
+
+      const matchesPriority = priorityFilter.value === 'all' || item.priority === priorityFilter.value
+      const isClosed = closedIds.value.includes(item.id)
+      const matchesStatus = statusTab.value === 'open' ? !isClosed : isClosed
+
+      return matchesKeyword && matchesPriority && matchesStatus
+    })
+    .sort((a, b) => b.id - a.id)
+})
+
+function isClosed(id: number) {
+  return closedIds.value.includes(id)
+}
+
+function toggleStatus(id: number) {
+  if (isClosed(id)) {
+    closedIds.value = closedIds.value.filter((x) => x !== id)
+    ElMessage.success(`已重新打开用例 #${id}`)
+    return
+  }
+  closedIds.value = [...closedIds.value, id]
+  ElMessage.success(`已关闭用例 #${id}`)
+}
+
+function priorityTagType(priority: string) {
+  if (priority === 'high') return 'danger'
+  if (priority === 'medium') return 'warning'
+  return 'info'
+}
+
+function formatWhen(value?: string) {
+  if (!value) return 'just now'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return 'just now'
+  return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
 
 async function doLogin() {
   if (!loginForm.email.trim() || !loginForm.password.trim()) {
@@ -66,6 +120,10 @@ function logout() {
   projects.value = []
   selectedProjectId.value = null
   testcases.value = []
+  keyword.value = ''
+  priorityFilter.value = 'all'
+  statusTab.value = 'open'
+  closedIds.value = []
 }
 
 async function loadProjectsAndCases() {
@@ -135,51 +193,73 @@ onMounted(async () => {
 
             <el-button class="primary-btn" :loading="loginLoading" @click="doLogin">Continue</el-button>
 
-            <div class="divider"><span>or</span></div>
-
-            <el-button class="ghost-btn" disabled>Continue with SSO</el-button>
-
-            <div class="demo-tip">
-              Demo: tester@testpilot.local / TestPilot@2026
-            </div>
+            <div class="demo-tip">Demo: tester@testpilot.local / TestPilot@2026</div>
           </el-form>
         </div>
       </section>
     </template>
 
     <template v-else>
-      <div class="workbench">
-        <el-card class="card">
-          <template #header>
-            <div class="header-row">
-              <div>
-                <h2>测试用例列表</h2>
-                <p>当前用户：{{ currentUser?.name || '已登录用户' }}（{{ currentUser?.role || '-' }}）</p>
-              </div>
-              <el-button type="danger" plain @click="logout">退出登录</el-button>
-            </div>
-          </template>
-
-          <div class="toolbar">
-            <el-select
-              v-model="selectedProjectId"
-              placeholder="选择项目"
-              style="width: 320px"
-              :disabled="!loggedIn"
-              @change="loadTestCases"
-            >
+      <div class="issues-shell">
+        <div class="issues-header">
+          <div>
+            <h2>Test Cases</h2>
+            <p>{{ projects.length }} projects · {{ testcases.length }} total cases</p>
+          </div>
+          <div class="header-actions">
+            <el-select v-model="selectedProjectId" style="width: 260px" @change="loadTestCases">
               <el-option v-for="p in projects" :key="p.id" :label="`${p.name} (#${p.id})`" :value="p.id" />
             </el-select>
-            <el-button :loading="appLoading" @click="loadTestCases">刷新测试用例</el-button>
+            <el-button @click="loadTestCases" :loading="appLoading">刷新</el-button>
+            <el-button type="danger" plain @click="logout">退出</el-button>
+          </div>
+        </div>
+
+        <div class="issues-card">
+          <div class="issues-tabs">
+            <button :class="['tab-btn', statusTab === 'open' ? 'active' : '']" @click="statusTab = 'open'">
+              Open <span>{{ openCount }}</span>
+            </button>
+            <button :class="['tab-btn', statusTab === 'closed' ? 'active' : '']" @click="statusTab = 'closed'">
+              Closed <span>{{ closedCount }}</span>
+            </button>
           </div>
 
-          <el-table :data="testcases" border stripe v-loading="appLoading" style="width: 100%">
-            <el-table-column prop="id" label="ID" width="80" />
-            <el-table-column prop="title" label="标题" min-width="260" />
-            <el-table-column prop="priority" label="优先级" width="120" />
-            <el-table-column prop="steps" label="步骤" min-width="420" show-overflow-tooltip />
-          </el-table>
-        </el-card>
+          <div class="issues-filters">
+            <el-input v-model="keyword" placeholder="Search test cases" clearable class="search-input" />
+            <el-select v-model="priorityFilter" style="width: 140px">
+              <el-option label="Priority: All" value="all" />
+              <el-option label="High" value="high" />
+              <el-option label="Medium" value="medium" />
+              <el-option label="Low" value="low" />
+            </el-select>
+          </div>
+
+          <div v-loading="appLoading">
+            <div v-if="filteredCases.length === 0" class="empty">No test cases found.</div>
+
+            <div v-else class="issue-list">
+              <div v-for="item in filteredCases" :key="item.id" class="issue-row">
+                <div class="issue-main">
+                  <div class="issue-title-row">
+                    <span :class="['dot', isClosed(item.id) ? 'dot-closed' : 'dot-open']"></span>
+                    <span class="title">{{ item.title }}</span>
+                    <el-tag size="small" :type="priorityTagType(item.priority)">{{ item.priority }}</el-tag>
+                  </div>
+                  <div class="issue-meta">
+                    #{{ item.id }} opened · updated {{ formatWhen(item.updated_at || item.created_at) }}
+                  </div>
+                </div>
+
+                <div class="issue-actions">
+                  <el-button size="small" @click="toggleStatus(item.id)">
+                    {{ isClosed(item.id) ? 'Reopen' : 'Close' }}
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </template>
   </div>
