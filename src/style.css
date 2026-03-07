@@ -135,8 +135,6 @@ body { margin: 0; background: #f5f7fa; }
 }
 .mini-tab.active { background: #ecf5ff; color: #409eff; }
 
-.user-box { display: none; }
-
 .main {
   display: grid;
   grid-template-columns: 160px 1fr;
