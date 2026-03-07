@@ -16,10 +16,17 @@ import {
 type TableRow = {
   id: number
   title: string
-  priority: string
-  steps: string
-  createdAt: string
+  level: string
+  reviewResult: string
+  execResult: string
+  modulePath: string
+  tags: string
+  updatedBy: number
   updatedAt: string
+  createdBy: number
+  createdAt: string
+  steps: string
+  priority: string
 }
 
 const loginLoading = ref(false)
@@ -47,6 +54,11 @@ const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
 const caseForm = reactive({
   title: '',
+  level: 'P1',
+  reviewResult: '未评审',
+  execResult: '未执行',
+  modulePath: '/未分类',
+  tags: '',
   steps: '',
   priority: 'medium',
 })
@@ -63,10 +75,17 @@ function toRow(tc: TestCase): TableRow {
   return {
     id: tc.id,
     title: tc.title,
-    priority: tc.priority,
-    steps: tc.steps,
-    createdAt: formatTime(tc.created_at),
+    level: tc.level,
+    reviewResult: tc.review_result,
+    execResult: tc.exec_result,
+    modulePath: tc.module_path,
+    tags: tc.tags,
+    updatedBy: tc.updated_by,
     updatedAt: formatTime(tc.updated_at),
+    createdBy: tc.created_by,
+    createdAt: formatTime(tc.created_at),
+    steps: tc.steps,
+    priority: tc.priority,
   }
 }
 
@@ -152,6 +171,11 @@ function onResetSearch() {
 function openCreate() {
   editingId.value = null
   caseForm.title = ''
+  caseForm.level = 'P1'
+  caseForm.reviewResult = '未评审'
+  caseForm.execResult = '未执行'
+  caseForm.modulePath = '/未分类'
+  caseForm.tags = ''
   caseForm.steps = ''
   caseForm.priority = 'medium'
   dialogVisible.value = true
@@ -160,6 +184,11 @@ function openCreate() {
 function openEdit(row: TableRow) {
   editingId.value = row.id
   caseForm.title = row.title
+  caseForm.level = row.level || 'P1'
+  caseForm.reviewResult = row.reviewResult || '未评审'
+  caseForm.execResult = row.execResult || '未执行'
+  caseForm.modulePath = row.modulePath || '/未分类'
+  caseForm.tags = row.tags || ''
   caseForm.steps = row.steps
   caseForm.priority = row.priority || 'medium'
   dialogVisible.value = true
@@ -177,6 +206,11 @@ async function submitCase() {
     if (editingId.value) {
       await updateTestCase(selectedProject.value, editingId.value, {
         title: caseForm.title.trim(),
+        level: caseForm.level,
+        review_result: caseForm.reviewResult,
+        exec_result: caseForm.execResult,
+        module_path: caseForm.modulePath.trim(),
+        tags: caseForm.tags.trim(),
         steps: caseForm.steps.trim(),
         priority: caseForm.priority,
       })
@@ -184,6 +218,11 @@ async function submitCase() {
     } else {
       await createTestCase(selectedProject.value, {
         title: caseForm.title.trim(),
+        level: caseForm.level,
+        review_result: caseForm.reviewResult,
+        exec_result: caseForm.execResult,
+        module_path: caseForm.modulePath.trim(),
+        tags: caseForm.tags.trim(),
         steps: caseForm.steps.trim(),
         priority: caseForm.priority,
       })
@@ -337,7 +376,7 @@ onMounted(async () => {
                     <el-button type="primary" @click="openCreate">新建</el-button>
                   </div>
                   <div class="right">
-                    <el-input v-model="keyword" placeholder="通过 ID/名称/步骤搜索" style="width: 240px" clearable @keyup.enter="onSearch" />
+                    <el-input v-model="keyword" placeholder="通过 ID/名称/标签搜索" style="width: 240px" clearable @keyup.enter="onSearch" />
                     <el-button @click="onSearch">查询</el-button>
                     <el-button @click="onResetSearch">重置</el-button>
                   </div>
@@ -349,9 +388,15 @@ onMounted(async () => {
                       <tr>
                         <th style="width: 90px">ID</th>
                         <th>用例名称</th>
-                        <th style="width: 90px">优先级</th>
-                        <th style="width: 220px">步骤</th>
+                        <th style="width: 90px">用例等级</th>
+                        <th style="width: 100px">评审结果</th>
+                        <th style="width: 100px">执行结果</th>
+                        <th style="width: 140px">所属模块</th>
+                        <th style="width: 120px">标签</th>
+                        <th style="width: 90px">更新人</th>
                         <th style="width: 170px">更新时间</th>
+                        <th style="width: 90px">创建人</th>
+                        <th style="width: 170px">创建时间</th>
                         <th style="width: 120px">操作</th>
                       </tr>
                     </thead>
@@ -359,9 +404,15 @@ onMounted(async () => {
                       <tr v-for="r in rows" :key="r.id">
                         <td class="id">{{ r.id }}</td>
                         <td class="name">{{ r.title }}</td>
-                        <td>{{ r.priority }}</td>
-                        <td>{{ r.steps || '-' }}</td>
+                        <td>{{ r.level }}</td>
+                        <td>{{ r.reviewResult }}</td>
+                        <td>{{ r.execResult }}</td>
+                        <td>{{ r.modulePath }}</td>
+                        <td>{{ r.tags || '-' }}</td>
+                        <td>{{ r.updatedBy || '-' }}</td>
                         <td>{{ r.updatedAt }}</td>
+                        <td>{{ r.createdBy || '-' }}</td>
+                        <td>{{ r.createdAt }}</td>
                         <td>
                           <a href="javascript:void(0)" @click="openEdit(r)">编辑</a>
                           <span class="sep">|</span>
@@ -369,7 +420,7 @@ onMounted(async () => {
                         </td>
                       </tr>
                       <tr v-if="rows.length === 0">
-                        <td colspan="6" class="empty-td">暂无数据</td>
+                        <td colspan="12" class="empty-td">暂无数据</td>
                       </tr>
                     </tbody>
                   </table>
@@ -392,12 +443,34 @@ onMounted(async () => {
           <el-form-item label="用例名称">
             <el-input v-model="caseForm.title" />
           </el-form-item>
-          <el-form-item label="优先级">
-            <el-select v-model="caseForm.priority" style="width: 180px">
-              <el-option label="high" value="high" />
-              <el-option label="medium" value="medium" />
-              <el-option label="low" value="low" />
+          <el-form-item label="用例等级">
+            <el-select v-model="caseForm.level" style="width: 180px">
+              <el-option label="P0" value="P0" />
+              <el-option label="P1" value="P1" />
+              <el-option label="P2" value="P2" />
             </el-select>
+          </el-form-item>
+          <el-form-item label="评审结果">
+            <el-select v-model="caseForm.reviewResult" style="width: 220px">
+              <el-option label="未评审" value="未评审" />
+              <el-option label="已通过" value="已通过" />
+              <el-option label="不通过" value="不通过" />
+              <el-option label="重新提审" value="重新提审" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="执行结果">
+            <el-select v-model="caseForm.execResult" style="width: 220px">
+              <el-option label="未执行" value="未执行" />
+              <el-option label="成功" value="成功" />
+              <el-option label="失败" value="失败" />
+              <el-option label="阻塞" value="阻塞" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="所属模块">
+            <el-input v-model="caseForm.modulePath" placeholder="如 /内容/文章" />
+          </el-form-item>
+          <el-form-item label="标签">
+            <el-input v-model="caseForm.tags" placeholder="多个标签以逗号分隔" />
           </el-form-item>
           <el-form-item label="步骤">
             <el-input v-model="caseForm.steps" type="textarea" :rows="4" />

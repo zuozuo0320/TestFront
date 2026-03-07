@@ -37,8 +37,15 @@ export type TestCase = {
   id: number
   project_id: number
   title: string
+  level: string
+  review_result: string
+  exec_result: string
+  module_path: string
+  tags: string
   steps: string
   priority: string
+  created_by: number
+  updated_by: number
   created_at?: string
   updated_at?: string
 }
@@ -65,12 +72,30 @@ export async function listTestCases(projectId: number, params: { page: number; p
   return data
 }
 
-export async function createTestCase(projectId: number, payload: { title: string; steps: string; priority: string }) {
+export async function createTestCase(projectId: number, payload: {
+  title: string
+  level?: string
+  review_result?: string
+  exec_result?: string
+  module_path?: string
+  tags?: string
+  steps?: string
+  priority?: string
+}) {
   const { data } = await apiClient.post<TestCase>(`/projects/${projectId}/testcases`, payload)
   return data
 }
 
-export async function updateTestCase(projectId: number, testcaseId: number, payload: { title?: string; steps?: string; priority?: string }) {
+export async function updateTestCase(projectId: number, testcaseId: number, payload: {
+  title?: string
+  level?: string
+  review_result?: string
+  exec_result?: string
+  module_path?: string
+  tags?: string
+  steps?: string
+  priority?: string
+}) {
   const { data } = await apiClient.put<TestCase>(`/projects/${projectId}/testcases/${testcaseId}`, payload)
   return data
 }
