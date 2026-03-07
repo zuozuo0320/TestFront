@@ -648,6 +648,27 @@ body { margin: 0; background: #f3f4f6; }
   --el-pagination-button-disabled-color: #9ca3af;
   --el-pagination-button-disabled-bg-color: #f3f4f6;
   --el-pagination-border-radius: 6px;
+  --el-fill-color-blank: #ffffff;
+  --el-border-color: #d1d5db;
+}
+
+.pager :deep(.el-pagination .el-select .el-input__wrapper),
+.pager :deep(.el-pagination__jump .el-input__wrapper) {
+  border-color: #d1d5db;
+  box-shadow: none;
+  background: #fff;
+}
+
+.pager :deep(.el-pagination button),
+.pager :deep(.el-pagination .el-pager li) {
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
+.pager :deep(.el-pagination button:hover),
+.pager :deep(.el-pagination .el-pager li:hover) {
+  color: #111827;
+  border-color: #9ca3af;
 }
 
 .pager :deep(.el-pager li.is-active) {
