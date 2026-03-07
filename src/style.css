@@ -187,23 +187,34 @@ body { margin: 0; background: #f3f4f6; }
   color: #606266;
 }
 
-.right-table { padding: 10px; overflow: hidden; }
+.right-table {
+  padding: 10px;
+  overflow: visible;
+}
+
 .toolbar-1 {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
   position: sticky;
   top: 0;
   z-index: 8;
   background: #fff;
   padding-bottom: 8px;
 }
+
 .toolbar-1 .left,
 .toolbar-1 .right {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.toolbar-1 .right {
+  margin-left: auto;
+  min-width: 0;
 }
 
 .filter-bar {
@@ -220,10 +231,14 @@ body { margin: 0; background: #f3f4f6; }
   border: none;
   background: transparent;
   padding: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .query-input {
   width: 280px;
+  min-width: 200px;
 }
 
 .btn-advanced {
