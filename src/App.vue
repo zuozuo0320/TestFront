@@ -113,62 +113,38 @@ onMounted(async () => {
 <template>
   <div class="shell">
     <template v-if="!loggedIn">
-      <div class="login-layout">
-        <section class="brand-panel">
-          <div class="brand-mask"></div>
-          <div class="brand-content">
-            <div class="brand-badge">INDUSTRIAL QA HUB</div>
-            <h1>TestPilot 质量中台</h1>
-            <p>连接需求、用例、脚本、执行、缺陷，构建可审计的工业级质量闭环。</p>
+      <section class="login-shell">
+        <div class="login-card">
+          <div class="wordmark">TP</div>
+          <h1>Sign in to TestPilot</h1>
+          <p class="sub">Industrial test management workspace</p>
 
-            <div class="brand-metrics">
-              <div class="metric-item">
-                <div class="metric-value">99.9%</div>
-                <div class="metric-label">执行服务可用性目标</div>
-              </div>
-              <div class="metric-item">
-                <div class="metric-value">95%</div>
-                <div class="metric-label">发布门禁通过阈值</div>
-              </div>
-              <div class="metric-item">
-                <div class="metric-value">30%+</div>
-                <div class="metric-label">人均覆盖项目提升目标</div>
-              </div>
-            </div>
-          </div>
-        </section>
+          <el-form label-position="top" @submit.prevent>
+            <el-form-item label="Email">
+              <el-input v-model="loginForm.email" size="large" placeholder="tester@testpilot.local" />
+            </el-form-item>
 
-        <section class="login-panel">
-          <div class="panel-card">
-            <div class="panel-title">
-              <h2>欢迎登录</h2>
-              <p>工业级测试管理平台 · 安全访问</p>
+            <el-form-item label="Password">
+              <el-input v-model="loginForm.password" size="large" type="password" show-password placeholder="Password" />
+            </el-form-item>
+
+            <div class="row-between">
+              <el-checkbox v-model="loginForm.agree">Agree to Terms</el-checkbox>
+              <a class="link" href="javascript:void(0)">Forgot password?</a>
             </div>
 
-            <el-form label-position="top" class="login-form" @submit.prevent>
-              <el-form-item label="企业邮箱">
-                <el-input v-model="loginForm.email" size="large" placeholder="例如：tester@testpilot.local" />
-              </el-form-item>
+            <el-button class="primary-btn" :loading="loginLoading" @click="doLogin">Continue</el-button>
 
-              <el-form-item label="密码">
-                <el-input v-model="loginForm.password" size="large" type="password" show-password placeholder="请输入密码" />
-              </el-form-item>
+            <div class="divider"><span>or</span></div>
 
-              <div class="row-between">
-                <el-checkbox v-model="loginForm.agree">我已阅读并同意服务协议</el-checkbox>
-                <a class="link" href="javascript:void(0)">忘记密码</a>
-              </div>
+            <el-button class="ghost-btn" disabled>Continue with SSO</el-button>
 
-              <el-button type="primary" size="large" class="login-btn" :loading="loginLoading" @click="doLogin">登录系统</el-button>
-
-              <div class="tips">
-                <p>Demo 账号：tester@testpilot.local</p>
-                <p>Demo 密码：TestPilot@2026</p>
-              </div>
-            </el-form>
-          </div>
-        </section>
-      </div>
+            <div class="demo-tip">
+              Demo: tester@testpilot.local / TestPilot@2026
+            </div>
+          </el-form>
+        </div>
+      </section>
     </template>
 
     <template v-else>
