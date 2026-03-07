@@ -37,6 +37,7 @@ const testcases = ref<TestCase[]>([])
 const keyword = ref('')
 const statusTab = ref<'open' | 'closed'>('open')
 const closedIds = ref<number[]>([])
+const uiRevision = 'UI-REV-20260307-1628'
 
 const openCount = computed(() => testcases.value.filter((c) => !closedIds.value.includes(c.id)).length)
 const closedCount = computed(() => closedIds.value.length)
@@ -197,7 +198,7 @@ onMounted(async () => {
         <div class="issues-header">
           <div>
             <h2>Test Cases</h2>
-            <p>{{ openCount }} open · {{ closedCount }} closed</p>
+            <p>{{ openCount }} open · {{ closedCount }} closed · {{ uiRevision }}</p>
           </div>
           <div class="header-actions">
             <el-select v-model="selectedProjectId" style="width: 240px" @change="loadTestCases">
