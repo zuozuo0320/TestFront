@@ -11,19 +11,65 @@ body { margin: 0; background: #f5f7fa; }
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 24px;
 }
 
 .login-card {
-  width: 360px;
+  width: 100%;
+  max-width: 420px;
   background: #fff;
-  border: 1px solid #e4e7ed;
+  border: 1px solid #d0d7de;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(140, 149, 159, 0.2);
+  padding: 28px 24px;
+}
+
+.wordmark {
+  width: 32px;
+  height: 32px;
   border-radius: 8px;
-  padding: 20px;
+  background: #24292f;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.login-card h1 {
+  margin: 14px 0 6px;
+  font-size: 26px;
+}
+
+.sub {
+  margin: 0 0 16px;
+  color: #57606a;
 }
 
 .mb12 { margin-bottom: 12px; }
-.w100 { width: 100%; }
-.demo-hint { margin-top: 10px; color: #909399; font-size: 12px; }
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 10px;
+}
+.hint { color: #909399; font-size: 12px; }
+.link {
+  color: #0969da;
+  text-decoration: none;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.primary-btn {
+  width: 100%;
+  height: 42px;
+  border-radius: 8px;
+  border: none;
+  background: #24292f;
+  color: #fff;
+}
 
 .layout { min-height: 100vh; }
 

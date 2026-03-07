@@ -22,8 +22,8 @@ const loggedIn = ref(false)
 const currentUser = ref<LoginResp['user'] | null>(null)
 
 const loginForm = reactive({
-  email: 'demo',
-  password: 'demo',
+  email: 'tester@testpilot.local',
+  password: 'TestPilot@2026',
 })
 
 const projectOptions = [
@@ -96,9 +96,7 @@ function statusClass(s: string) {
 async function doLogin() {
   loginLoading.value = true
   try {
-    const email = loginForm.email === 'demo' ? 'tester@testpilot.local' : loginForm.email
-    const password = loginForm.password === 'demo' ? 'TestPilot@2026' : loginForm.password
-    const data = await loginByEmail(email, password)
+    const data = await loginByEmail(loginForm.email, loginForm.password)
     localStorage.setItem('tp-token', data.token)
     localStorage.setItem('tp-user-id', String(data.user_id))
     currentUser.value = data.user
@@ -127,11 +125,19 @@ onMounted(() => {
     <template v-if="!loggedIn">
       <div class="login-wrap">
         <div class="login-card">
-          <h2>账号登录</h2>
-          <el-input v-model="loginForm.email" placeholder="请输入用户名" class="mb12" />
+          <div class="wordmark">TP</div>
+          <h1>Sign in to TestPilot</h1>
+          <p class="sub">Industrial test management workspace</p>
+
+          <el-input v-model="loginForm.email" placeholder="请输入用户名 / 邮箱" class="mb12" />
           <el-input v-model="loginForm.password" placeholder="请输入密码" show-password class="mb12" />
-          <el-button type="primary" :loading="loginLoading" class="w100" @click="doLogin">登录</el-button>
-          <div class="demo-hint">用户名：demo / 密码：demo</div>
+
+          <div class="row-between">
+            <span class="hint">Demo: tester@testpilot.local / TestPilot@2026</span>
+            <a class="link" href="javascript:void(0)">Forgot password?</a>
+          </div>
+
+          <el-button class="primary-btn" :loading="loginLoading" @click="doLogin">登录</el-button>
         </div>
       </div>
     </template>
