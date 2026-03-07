@@ -655,9 +655,22 @@ body { margin: 0; background: #f3f4f6; }
 
 .pager .el-pagination .el-select .el-input__wrapper,
 .pager .el-pagination__jump .el-input__wrapper {
-  border-color: #d1d5db;
-  box-shadow: none;
+  border: 1px solid #d1d5db !important;
+  border-color: #d1d5db !important;
+  box-shadow: none !important;
   background: #fff;
+}
+
+.pager .el-pagination .el-select .el-input__wrapper:hover,
+.pager .el-pagination__jump .el-input__wrapper:hover {
+  border-color: #9ca3af !important;
+}
+
+.pager .el-pagination .el-select .el-input__wrapper.is-focus,
+.pager .el-pagination__jump .el-input__wrapper.is-focus,
+.pager .el-pagination .el-select .el-input__wrapper.is-focused,
+.pager .el-pagination__jump .el-input__wrapper.is-focused {
+  border-color: #374151 !important;
 }
 
 .pager .el-pagination button,
