@@ -62,6 +62,7 @@ const loadError = ref('')
 const levelFilter = ref('')
 const reviewFilter = ref('')
 const execFilter = ref('')
+const filterPanelVisible = ref(false)
 
 const rows = ref<TableRow[]>([])
 const stepRows = ref<StepRow[]>([{ action: '', expected: '' }])
@@ -325,6 +326,12 @@ function clearOneFilter(kind: 'keyword' | 'level' | 'review' | 'exec') {
   loadCases()
 }
 
+function applyAdvancedFilters() {
+  filterPanelVisible.value = false
+  page.value = 1
+  loadCases()
+}
+
 function openCreate() {
   editingId.value = null
   caseForm.title = ''
@@ -525,26 +532,10 @@ onMounted(async () => {
                   <div class="left">
                     <el-button type="primary" @click="openCreate">新建</el-button>
                   </div>
-                  <div class="right filter-bar">
+                  <div class="right filter-bar minimal">
                     <el-input v-model="keyword" class="query-input" placeholder="通过 ID/名称/标签搜索" clearable @keyup.enter="onSearch" />
-                    <el-select v-model="levelFilter" class="filter-select level" placeholder="等级" clearable>
-                      <el-option label="P0" value="P0" />
-                      <el-option label="P1" value="P1" />
-                      <el-option label="P2" value="P2" />
-                    </el-select>
-                    <el-select v-model="reviewFilter" class="filter-select review" placeholder="评审" clearable>
-                      <el-option label="未评审" value="未评审" />
-                      <el-option label="已通过" value="已通过" />
-                      <el-option label="不通过" value="不通过" />
-                      <el-option label="重新提审" value="重新提审" />
-                    </el-select>
-                    <el-select v-model="execFilter" class="filter-select exec" placeholder="执行" clearable>
-                      <el-option label="未执行" value="未执行" />
-                      <el-option label="成功" value="成功" />
-                      <el-option label="失败" value="失败" />
-                      <el-option label="阻塞" value="阻塞" />
-                    </el-select>
                     <el-button class="toolbar-btn btn-query" @click="onSearch">查询</el-button>
+                    <el-button class="toolbar-btn btn-advanced" @click="filterPanelVisible = true">高级筛选</el-button>
                     <el-button class="toolbar-btn btn-reset" @click="onResetSearch">重置</el-button>
                   </div>
                 </div>
@@ -661,6 +652,50 @@ onMounted(async () => {
           </section>
         </div>
       </div>
+
+      <el-drawer
+        v-model="filterPanelVisible"
+        title="高级筛选"
+        size="360px"
+        direction="rtl"
+        class="advanced-filter-drawer"
+      >
+        <div class="advanced-filter-form">
+          <el-form label-position="top">
+            <el-form-item label="用例等级">
+              <el-select v-model="levelFilter" placeholder="请选择" clearable>
+                <el-option label="P0" value="P0" />
+                <el-option label="P1" value="P1" />
+                <el-option label="P2" value="P2" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="评审结果">
+              <el-select v-model="reviewFilter" placeholder="请选择" clearable>
+                <el-option label="未评审" value="未评审" />
+                <el-option label="已通过" value="已通过" />
+                <el-option label="不通过" value="不通过" />
+                <el-option label="重新提审" value="重新提审" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="执行结果">
+              <el-select v-model="execFilter" placeholder="请选择" clearable>
+                <el-option label="未执行" value="未执行" />
+                <el-option label="成功" value="成功" />
+                <el-option label="失败" value="失败" />
+                <el-option label="阻塞" value="阻塞" />
+              </el-select>
+            </el-form-item>
+          </el-form>
+
+          <div class="advanced-filter-actions">
+            <el-button @click="filterPanelVisible = false">取消</el-button>
+            <el-button class="btn-reset" @click="onResetSearch">重置</el-button>
+            <el-button class="btn-query" @click="applyAdvancedFilters">应用筛选</el-button>
+          </div>
+        </div>
+      </el-drawer>
 
       <el-drawer
         v-model="dialogVisible"

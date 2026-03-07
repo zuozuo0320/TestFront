@@ -216,8 +216,22 @@ body { margin: 0; background: #f3f4f6; }
   gap: 6px;
 }
 
+.filter-bar.minimal {
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
 .query-input {
-  width: 240px;
+  width: 280px;
+}
+
+.btn-advanced {
+  --el-button-bg-color: #f3f4f6 !important;
+  --el-button-border-color: #d1d5db !important;
+  --el-button-text-color: #374151 !important;
+  --el-button-hover-bg-color: #e5e7eb !important;
+  --el-button-hover-border-color: #9ca3af !important;
 }
 
 .filter-select.level { width: 96px; }
@@ -260,6 +274,27 @@ body { margin: 0; background: #f3f4f6; }
   --el-button-text-color: #374151 !important;
   --el-button-hover-bg-color: #f3f4f6 !important;
   --el-button-hover-border-color: #9ca3af !important;
+}
+
+.advanced-filter-drawer .el-drawer__header {
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 0;
+}
+
+.advanced-filter-form {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 12px;
+}
+
+.advanced-filter-actions {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 10px;
 }
 
 .filter-chips {
