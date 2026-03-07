@@ -8,8 +8,36 @@ export const apiClient = axios.create({
 })
 
 apiClient.interceptors.request.use((config) => {
-  const userId = localStorage.getItem('tp-user-id') || '2'
-  config.headers = config.headers || {}
-  config.headers['X-User-ID'] = userId
+  const userId = localStorage.getItem('tp-user-id')
+  if (userId) {
+    config.headers = config.headers || {}
+    config.headers['X-User-ID'] = userId
+  }
   return config
 })
+
+export type LoginResp = {
+  token: string
+  user_id: number
+  user: {
+    id: number
+    name: string
+    email: string
+    role: string
+  }
+}
+
+export async function loginByEmail(email: string) {
+  const { data } = await apiClient.post<LoginResp>('/auth/login', { email })
+  return data
+}
+
+export async function listProjects() {
+  const { data } = await apiClient.get('/projects')
+  return data.projects ?? []
+}
+
+export async function listTestCases(projectId: number) {
+  const { data } = await apiClient.get(`/projects/${projectId}/testcases`)
+  return data.testcases ?? []
+}
