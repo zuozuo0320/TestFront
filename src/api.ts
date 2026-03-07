@@ -4,7 +4,7 @@ const envBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim(
 
 export const apiClient = axios.create({
   baseURL: envBase && envBase.length > 0 ? envBase : 'http://localhost:8080/api/v1',
-  timeout: 10000,
+  timeout: 12000,
 })
 
 apiClient.interceptors.request.use((config) => {
@@ -27,8 +27,8 @@ export type LoginResp = {
   }
 }
 
-export async function loginByEmail(email: string) {
-  const { data } = await apiClient.post<LoginResp>('/auth/login', { email })
+export async function loginByEmail(email: string, password: string) {
+  const { data } = await apiClient.post<LoginResp>('/auth/login', { email, password })
   return data
 }
 
