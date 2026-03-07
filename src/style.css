@@ -229,6 +229,15 @@ body { margin: 0; background: #f3f4f6; }
   font-weight: 600;
 }
 
+.table-shell th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.table-shell th.sortable:hover {
+  color: #111827;
+}
+
 .id { color: #111827; }
 .name { color: #303133; }
 

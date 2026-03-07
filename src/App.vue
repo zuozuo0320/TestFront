@@ -22,8 +22,10 @@ type TableRow = {
   modulePath: string
   tags: string
   updatedBy: number
+  updatedByName: string
   updatedAt: string
   createdBy: number
+  createdByName: string
   createdAt: string
   steps: string
   priority: string
@@ -52,6 +54,10 @@ const keyword = ref('')
 const page = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
+const pageInput = ref('1')
+const sortBy = ref<'id' | 'created_at' | 'updated_at'>('updated_at')
+const sortOrder = ref<'asc' | 'desc'>('desc')
+const loadError = ref('')
 
 const rows = ref<TableRow[]>([])
 const stepRows = ref<StepRow[]>([{ action: '', expected: '' }])
@@ -68,6 +74,8 @@ const caseForm = reactive({
   steps: '',
   priority: 'medium',
 })
+
+const pageSizeOptions = [10, 20, 50]
 
 const pageCount = computed(() => {
   if (total.value <= 0) return 1
@@ -87,8 +95,10 @@ function toRow(tc: TestCase): TableRow {
     modulePath: tc.module_path,
     tags: tc.tags,
     updatedBy: tc.updated_by,
+    updatedByName: tc.updated_by_name || '-',
     updatedAt: formatTime(tc.updated_at),
     createdBy: tc.created_by,
+    createdByName: tc.created_by_name || '-',
     createdAt: formatTime(tc.created_at),
     steps: tc.steps,
     priority: tc.priority,
@@ -184,18 +194,23 @@ async function initAfterLogin() {
 async function loadCases() {
   if (!selectedProject.value) return
   appLoading.value = true
+  loadError.value = ''
   try {
     const data = await listTestCases(selectedProject.value, {
       page: page.value,
       pageSize: pageSize.value,
       keyword: keyword.value.trim() || undefined,
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value,
     })
     rows.value = data.items.map(toRow)
     total.value = data.total
     page.value = data.page
+    pageInput.value = String(data.page)
     pageSize.value = data.pageSize
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '加载用例失败')
+    loadError.value = e?.response?.data?.error || '加载用例失败，请重试'
+    ElMessage.error(loadError.value)
   } finally {
     appLoading.value = false
   }
@@ -208,6 +223,34 @@ function onSearch() {
 
 function onResetSearch() {
   keyword.value = ''
+  page.value = 1
+  loadCases()
+}
+
+function onChangePageSize() {
+  page.value = 1
+  loadCases()
+}
+
+function onJumpPage() {
+  const p = Number(pageInput.value)
+  if (!Number.isFinite(p) || p < 1) {
+    pageInput.value = String(page.value)
+    return
+  }
+  const target = Math.min(pageCount.value, Math.floor(p))
+  page.value = target
+  pageInput.value = String(target)
+  loadCases()
+}
+
+function toggleSort(field: 'id' | 'created_at' | 'updated_at') {
+  if (sortBy.value === field) {
+    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortBy.value = field
+    sortOrder.value = 'desc'
+  }
   page.value = 1
   loadCases()
 }
@@ -435,22 +478,34 @@ onMounted(async () => {
                   <table>
                     <thead>
                       <tr>
-                        <th style="width: 90px">ID</th>
+                        <th style="width: 90px" class="sortable" @click="toggleSort('id')">ID</th>
                         <th>用例名称</th>
                         <th style="width: 90px">用例等级</th>
                         <th style="width: 100px">评审结果</th>
                         <th style="width: 100px">执行结果</th>
                         <th style="width: 140px">所属模块</th>
                         <th style="width: 120px">标签</th>
-                        <th style="width: 90px">更新人</th>
-                        <th style="width: 170px">更新时间</th>
-                        <th style="width: 90px">创建人</th>
-                        <th style="width: 170px">创建时间</th>
+                        <th style="width: 110px">更新人</th>
+                        <th style="width: 170px" class="sortable" @click="toggleSort('updated_at')">更新时间</th>
+                        <th style="width: 110px">创建人</th>
+                        <th style="width: 170px" class="sortable" @click="toggleSort('created_at')">创建时间</th>
                         <th style="width: 120px">操作</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="r in rows" :key="r.id">
+                      <tr v-if="loadError">
+                        <td colspan="12" class="empty-td">
+                          {{ loadError }}
+                          <el-button size="small" @click="loadCases" style="margin-left: 10px">重试</el-button>
+                        </td>
+                      </tr>
+                      <tr v-else-if="rows.length === 0">
+                        <td colspan="12" class="empty-td">
+                          暂无数据
+                          <el-button size="small" @click="openCreate" style="margin-left: 10px">去新建</el-button>
+                        </td>
+                      </tr>
+                      <tr v-else v-for="r in rows" :key="r.id">
                         <td class="id">{{ r.id }}</td>
                         <td class="name">{{ r.title }}</td>
                         <td>{{ r.level }}</td>
@@ -458,9 +513,9 @@ onMounted(async () => {
                         <td>{{ r.execResult }}</td>
                         <td>{{ r.modulePath }}</td>
                         <td>{{ r.tags || '-' }}</td>
-                        <td>{{ r.updatedBy || '-' }}</td>
+                        <td>{{ r.updatedByName }}</td>
                         <td>{{ r.updatedAt }}</td>
-                        <td>{{ r.createdBy || '-' }}</td>
+                        <td>{{ r.createdByName }}</td>
                         <td>{{ r.createdAt }}</td>
                         <td>
                           <div class="action-group">
@@ -469,18 +524,22 @@ onMounted(async () => {
                           </div>
                         </td>
                       </tr>
-                      <tr v-if="rows.length === 0">
-                        <td colspan="12" class="empty-td">暂无数据</td>
-                      </tr>
                     </tbody>
                   </table>
                 </div>
 
                 <div class="pager">
                   <span>共 {{ total }} 条</span>
+                  <span>每页</span>
+                  <el-select v-model="pageSize" size="small" style="width: 88px" @change="onChangePageSize">
+                    <el-option v-for="s in pageSizeOptions" :key="s" :label="String(s)" :value="s" />
+                  </el-select>
                   <el-button size="small" :disabled="!canPrev" @click="prevPage">上一页</el-button>
                   <span>{{ page }} / {{ pageCount }}</span>
                   <el-button size="small" :disabled="!canNext" @click="nextPage">下一页</el-button>
+                  <span>跳至</span>
+                  <el-input v-model="pageInput" size="small" style="width: 64px" @keyup.enter="onJumpPage" />
+                  <el-button size="small" @click="onJumpPage">GO</el-button>
                 </div>
               </div>
             </div>

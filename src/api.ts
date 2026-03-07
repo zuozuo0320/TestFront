@@ -45,7 +45,9 @@ export type TestCase = {
   steps: string
   priority: string
   created_by: number
+  created_by_name?: string
   updated_by: number
+  updated_by_name?: string
   created_at?: string
   updated_at?: string
 }
@@ -67,7 +69,13 @@ export async function listProjects() {
   return (data.projects ?? []) as Project[]
 }
 
-export async function listTestCases(projectId: number, params: { page: number; pageSize: number; keyword?: string }) {
+export async function listTestCases(projectId: number, params: {
+  page: number
+  pageSize: number
+  keyword?: string
+  sortBy?: 'id' | 'created_at' | 'updated_at'
+  sortOrder?: 'asc' | 'desc'
+}) {
   const { data } = await apiClient.get<TestCaseListResp>(`/projects/${projectId}/testcases`, { params })
   return data
 }
