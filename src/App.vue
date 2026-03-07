@@ -37,7 +37,6 @@ const testcases = ref<TestCase[]>([])
 const keyword = ref('')
 const statusTab = ref<'open' | 'closed'>('open')
 const closedIds = ref<number[]>([])
-const uiRevision = 'UI-REV-20260307-1628'
 
 const openCount = computed(() => testcases.value.filter((c) => !closedIds.value.includes(c.id)).length)
 const closedCount = computed(() => closedIds.value.length)
@@ -143,7 +142,6 @@ async function loadTestCases() {
   appLoading.value = true
   try {
     testcases.value = await listTestCases(selectedProjectId.value)
-    // 保证存在两条演示数据时默认全部展示在 open
     closedIds.value = []
   } catch (err: any) {
     ElMessage.error(err?.response?.data?.error || err?.message || '加载测试用例失败')
@@ -194,52 +192,59 @@ onMounted(async () => {
     </template>
 
     <template v-else>
-      <div class="issues-shell">
-        <div class="issues-header">
+      <div class="issues-page">
+        <div class="issues-page-header">
           <div>
-            <h2>Test Cases</h2>
-            <p>{{ openCount }} open · {{ closedCount }} closed · {{ uiRevision }}</p>
+            <h2>Issues</h2>
+            <p>Manage test cases in issue workflow</p>
           </div>
-          <div class="header-actions">
-            <el-select v-model="selectedProjectId" style="width: 240px" @change="loadTestCases">
+          <div class="page-actions">
+            <el-select v-model="selectedProjectId" style="width: 220px" @change="loadTestCases">
               <el-option v-for="p in projects" :key="p.id" :label="`${p.name} (#${p.id})`" :value="p.id" />
             </el-select>
             <el-button @click="loadTestCases" :loading="appLoading">刷新</el-button>
-            <el-button type="danger" plain @click="logout">退出</el-button>
+            <el-button plain @click="logout">退出</el-button>
           </div>
         </div>
 
-        <div class="issues-card">
-          <div class="issues-tabs">
-            <button :class="['tab-btn', statusTab === 'open' ? 'active' : '']" @click="statusTab = 'open'">
-              Open <span>{{ openCount }}</span>
-            </button>
-            <button :class="['tab-btn', statusTab === 'closed' ? 'active' : '']" @click="statusTab = 'closed'">
-              Closed <span>{{ closedCount }}</span>
-            </button>
-            <div class="spacer"></div>
-            <el-input v-model="keyword" placeholder="Search" clearable class="search-input" />
+        <div class="gh-card">
+          <div class="gh-topline">
+            <div class="gh-tabs">
+              <button :class="['gh-tab', statusTab === 'open' ? 'active' : '']" @click="statusTab = 'open'">
+                Open <span>{{ openCount }}</span>
+              </button>
+              <button :class="['gh-tab', statusTab === 'closed' ? 'active' : '']" @click="statusTab = 'closed'">
+                Closed <span>{{ closedCount }}</span>
+              </button>
+            </div>
+            <el-button type="success" size="small">New issue</el-button>
+          </div>
+
+          <div class="gh-filterline">
+            <el-input v-model="keyword" clearable placeholder="Search all issues" class="gh-search" />
+            <div class="gh-filter-actions">
+              <button>Filters</button>
+              <button>Labels</button>
+              <button>Milestones</button>
+              <button>Assignees</button>
+              <button>Sort</button>
+            </div>
           </div>
 
           <div v-loading="appLoading">
-            <div v-if="filteredCases.length === 0" class="empty">No test cases found.</div>
+            <div v-if="filteredCases.length === 0" class="empty">No results matched your search.</div>
 
-            <div v-else class="issue-list">
-              <div v-for="item in filteredCases" :key="item.id" class="issue-row">
-                <div class="issue-main">
-                  <div class="issue-title-row">
+            <div v-else>
+              <div v-for="item in filteredCases" :key="item.id" class="gh-row">
+                <div class="gh-row-main">
+                  <div class="gh-title-line">
                     <span :class="['dot', isClosed(item.id) ? 'dot-closed' : 'dot-open']"></span>
-                    <span class="title">{{ item.title }}</span>
+                    <span class="gh-title">{{ item.title }}</span>
                   </div>
-                  <div class="issue-meta">
-                    #{{ item.id }} opened · updated {{ formatWhen(item.updated_at || item.created_at) }}
-                  </div>
+                  <div class="gh-meta">#{{ item.id }} opened · updated {{ formatWhen(item.updated_at || item.created_at) }}</div>
                 </div>
-
-                <div class="issue-actions">
-                  <el-button size="small" @click="toggleStatus(item.id)">
-                    {{ isClosed(item.id) ? 'Reopen' : 'Close' }}
-                  </el-button>
+                <div class="gh-row-right">
+                  <el-button size="small" @click="toggleStatus(item.id)">{{ isClosed(item.id) ? 'Reopen' : 'Close' }}</el-button>
                 </div>
               </div>
             </div>
