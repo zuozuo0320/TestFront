@@ -28,13 +28,14 @@ body { margin: 0; background: #f5f7fa; }
 .layout { min-height: 100vh; }
 
 .top-header {
-  height: 56px;
+  height: 64px;
   background: #fff;
   border-bottom: 1px solid #ebeef5;
   display: grid;
-  grid-template-columns: 180px 1fr auto;
+  grid-template-columns: 180px minmax(360px, 1fr) auto;
   align-items: center;
-  padding: 0 14px;
+  padding: 0 16px;
+  gap: 14px;
 }
 
 .brand { display: flex; align-items: center; gap: 8px; }
@@ -52,7 +53,46 @@ body { margin: 0; background: #f5f7fa; }
 .name { font-weight: 600; }
 
 .project-area { display: flex; align-items: center; gap: 14px; }
-.mini-tabs { display: flex; gap: 4px; }
+.project-switch-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-width: 250px;
+  max-width: 280px;
+  padding: 6px 10px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid #dbe7f7;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(36, 41, 47, 0.06);
+}
+.project-label {
+  font-size: 11px;
+  color: #6b7280;
+  line-height: 1;
+}
+.project-sub {
+  font-size: 11px;
+  color: #9aa4b2;
+  line-height: 1;
+}
+.project-prefix {
+  margin-left: 6px;
+  font-size: 13px;
+}
+.project-select {
+  width: 100%;
+}
+.project-select :deep(.el-input__wrapper) {
+  box-shadow: none;
+  border: 1px solid #dbe2ea;
+  border-radius: 8px;
+  background: #fff;
+}
+.project-select :deep(.el-input__wrapper.is-focus) {
+  border-color: #409eff;
+}
+.mini-tabs { display: flex; gap: 6px; align-items: center; }
 .mini-tab {
   border: none;
   background: transparent;
