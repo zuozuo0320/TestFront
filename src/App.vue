@@ -29,6 +29,11 @@ type TableRow = {
   priority: string
 }
 
+type StepRow = {
+  action: string
+  expected: string
+}
+
 const loginLoading = ref(false)
 const appLoading = ref(false)
 const saving = ref(false)
@@ -49,6 +54,7 @@ const pageSize = ref(10)
 const total = ref(0)
 
 const rows = ref<TableRow[]>([])
+const stepRows = ref<StepRow[]>([{ action: '', expected: '' }])
 
 const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
@@ -102,6 +108,44 @@ function formatTime(value?: string) {
     second: '2-digit',
     hour12: false,
   })
+}
+
+function parseStepsToRows(text: string): StepRow[] {
+  const raw = (text || '').split('\n').map((s) => s.trim()).filter(Boolean)
+  if (raw.length === 0) return [{ action: '', expected: '' }]
+
+  const rows = raw.map((line) => {
+    const parts = line.split('|')
+    if (parts.length >= 2) {
+      return {
+        action: (parts[0] ?? '').trim(),
+        expected: parts.slice(1).join('|').trim(),
+      }
+    }
+    return { action: line, expected: '' }
+  })
+
+  return rows.length > 0 ? rows : [{ action: '', expected: '' }]
+}
+
+function rowsToStepsText(rows: StepRow[]): string {
+  return rows
+    .map((r) => ({ action: (r.action || '').trim(), expected: (r.expected || '').trim() }))
+    .filter((r) => r.action || r.expected)
+    .map((r) => `${r.action} | ${r.expected}`)
+    .join('\n')
+}
+
+function addStepRow() {
+  stepRows.value.push({ action: '', expected: '' })
+}
+
+function removeStepRow(index: number) {
+  if (stepRows.value.length <= 1) {
+    stepRows.value = [{ action: '', expected: '' }]
+    return
+  }
+  stepRows.value.splice(index, 1)
 }
 
 async function doLogin() {
@@ -178,6 +222,7 @@ function openCreate() {
   caseForm.tags = ''
   caseForm.steps = ''
   caseForm.priority = 'medium'
+  stepRows.value = [{ action: '', expected: '' }]
   dialogVisible.value = true
 }
 
@@ -191,6 +236,7 @@ function openEdit(row: TableRow) {
   caseForm.tags = row.tags || ''
   caseForm.steps = row.steps
   caseForm.priority = row.priority || 'medium'
+  stepRows.value = parseStepsToRows(row.steps)
   dialogVisible.value = true
 }
 
@@ -203,6 +249,9 @@ async function submitCase() {
 
   saving.value = true
   try {
+    const stepsText = rowsToStepsText(stepRows.value)
+    caseForm.steps = stepsText
+
     if (editingId.value) {
       await updateTestCase(selectedProject.value, editingId.value, {
         title: caseForm.title.trim(),
@@ -211,7 +260,7 @@ async function submitCase() {
         exec_result: caseForm.execResult,
         module_path: caseForm.modulePath.trim(),
         tags: caseForm.tags.trim(),
-        steps: caseForm.steps.trim(),
+        steps: stepsText,
         priority: caseForm.priority,
       })
       ElMessage.success('修改成功')
@@ -223,7 +272,7 @@ async function submitCase() {
         exec_result: caseForm.execResult,
         module_path: caseForm.modulePath.trim(),
         tags: caseForm.tags.trim(),
-        steps: caseForm.steps.trim(),
+        steps: stepsText,
         priority: caseForm.priority,
       })
       ElMessage.success('新增成功')
@@ -515,14 +564,21 @@ onMounted(async () => {
 
             <section class="editor-block">
               <div class="block-title">步骤描述</div>
-              <el-form-item>
-                <el-input
-                  v-model="caseForm.steps"
-                  type="textarea"
-                  :rows="12"
-                  placeholder="请输入步骤，建议：\n1. 前置条件\n2. 操作步骤\n3. 预期结果"
-                />
-              </el-form-item>
+              <div class="steps-grid-head">
+                <div>步骤</div>
+                <div>预期结果</div>
+                <div>操作</div>
+              </div>
+
+              <div class="steps-grid-row" v-for="(s, idx) in stepRows" :key="idx">
+                <el-input v-model="s.action" placeholder="请输入步骤" />
+                <el-input v-model="s.expected" placeholder="请输入预期结果" />
+                <el-button link type="danger" @click="removeStepRow(idx)">删除</el-button>
+              </div>
+
+              <div class="steps-grid-actions">
+                <el-button @click="addStepRow">新增步骤</el-button>
+              </div>
             </section>
           </el-form>
         </div>
