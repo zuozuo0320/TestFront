@@ -115,6 +115,14 @@ body { margin: 0; background: #f3f4f6; }
   padding: 4px;
   border-radius: 999px;
 }
+.user-avatar-wrap::after {
+  content: '';
+  position: absolute;
+  right: -4px;
+  top: calc(100% - 1px);
+  width: 220px;
+  height: 14px;
+}
 .user-avatar {
   width: 34px;
   height: 34px;
@@ -133,7 +141,7 @@ body { margin: 0; background: #f3f4f6; }
 .user-hover-card {
   position: absolute;
   right: -4px;
-  top: calc(100% + 12px);
+  top: calc(100% + 8px);
   width: 210px;
   background: #ffffff;
   border: 1px solid #e2e8f0;
