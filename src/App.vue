@@ -71,7 +71,6 @@ const userForm = reactive({
   name: '',
   email: '',
   phone: '',
-  avatar: '',
   roleIds: [] as number[],
   projectIds: [] as number[],
   active: true,
@@ -142,6 +141,8 @@ const activeFilterChips = computed(() => {
   if (execFilter.value) chips.push({ key: 'exec', label: '执行', value: execFilter.value })
   return chips
 })
+
+const creatableRoles = computed(() => roles.value.filter((r) => r.name !== 'admin'))
 
 function toRow(tc: TestCase): TableRow {
   return {
@@ -544,7 +545,6 @@ function openCreateUser() {
   userForm.name = ''
   userForm.email = ''
   userForm.phone = ''
-  userForm.avatar = ''
   userForm.roleIds = []
   userForm.projectIds = selectedProject.value ? [selectedProject.value] : []
   userForm.active = true
@@ -556,7 +556,6 @@ function openEditUser(row: UserRow) {
   userForm.name = row.name
   userForm.email = row.email
   userForm.phone = row.phone || ''
-  userForm.avatar = row.avatar || ''
   userForm.roleIds = row.roleIds || []
   userForm.projectIds = row.projectIds || []
   userForm.active = row.active
@@ -564,8 +563,20 @@ function openEditUser(row: UserRow) {
 }
 
 async function submitUser() {
-  if (!userForm.name.trim() || !userForm.email.trim()) {
-    ElMessage.warning('姓名和邮箱必填')
+  const name = userForm.name.trim()
+  const email = userForm.email.trim().toLowerCase()
+  const phone = userForm.phone.trim()
+
+  if (!isValidName(name)) {
+    ElMessage.warning('姓名需为2-40位，只允许中文/英文/数字/空格/·/-/_')
+    return
+  }
+  if (!isValidEmail(email)) {
+    ElMessage.warning('邮箱格式不正确')
+    return
+  }
+  if (phone && !isValidPhone(phone)) {
+    ElMessage.warning('手机号格式不正确（需为11位手机号）')
     return
   }
   if (userForm.roleIds.length === 0 || userForm.projectIds.length === 0) {
@@ -577,10 +588,9 @@ async function submitUser() {
   try {
     if (editingUserId.value) {
       await updateUser(editingUserId.value, {
-        name: userForm.name.trim(),
-        email: userForm.email.trim(),
-        phone: userForm.phone.trim() || undefined,
-        avatar: userForm.avatar.trim() || undefined,
+        name,
+        email,
+        phone: phone || undefined,
         active: userForm.active,
         role_ids: userForm.roleIds,
         project_ids: userForm.projectIds,
@@ -589,10 +599,9 @@ async function submitUser() {
     } else {
       const defaultRoleName = roles.value.find((r) => r.id === userForm.roleIds[0])?.name || 'tester'
       await createUser({
-        name: userForm.name.trim(),
-        email: userForm.email.trim(),
-        phone: userForm.phone.trim() || undefined,
-        avatar: userForm.avatar.trim() || undefined,
+        name,
+        email,
+        phone: phone || undefined,
         role: defaultRoleName,
         role_ids: userForm.roleIds,
         project_ids: userForm.projectIds,
@@ -607,6 +616,24 @@ async function submitUser() {
   } finally {
     savingUser.value = false
   }
+}
+
+function isValidName(name: string) {
+  const value = name.trim()
+  if (value.length < 2 || value.length > 40) return false
+  return /^[\u4e00-\u9fa5A-Za-z0-9\s·_-]+$/.test(value)
+}
+
+function isValidEmail(email: string) {
+  const value = email.trim().toLowerCase()
+  if (!value || value.length > 120) return false
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+function isValidPhone(phone: string) {
+  const value = phone.trim()
+  if (!value) return true
+  return /^1\d{10}$/.test(value)
 }
 
 async function removeUser(row: UserRow) {
@@ -1040,10 +1067,9 @@ onMounted(async () => {
           <el-form-item label="姓名"><el-input v-model="userForm.name" /></el-form-item>
           <el-form-item label="邮箱"><el-input v-model="userForm.email" /></el-form-item>
           <el-form-item label="手机号"><el-input v-model="userForm.phone" /></el-form-item>
-          <el-form-item label="头像URL"><el-input v-model="userForm.avatar" /></el-form-item>
           <el-form-item label="角色（必选，可多选）">
             <el-select v-model="userForm.roleIds" multiple filterable placeholder="请选择角色">
-              <el-option v-for="r in roles" :key="r.id" :label="r.name" :value="r.id" />
+              <el-option v-for="r in creatableRoles" :key="r.id" :label="r.name" :value="r.id" />
             </el-select>
           </el-form-item>
           <el-form-item label="项目（必选，可多选）">
