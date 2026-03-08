@@ -189,7 +189,16 @@ export async function deleteRoleById(roleId: number) {
   return data
 }
 
-export async function updateMyProfile(payload: { name?: string; email?: string; phone?: string; avatar?: string }) {
+export async function updateMyProfile(payload: { name?: string; phone?: string; avatar?: string }) {
   const { data } = await apiClient.put<User>('/users/me/profile', payload)
+  return data
+}
+
+export async function uploadMyAvatar(file: File) {
+  const form = new FormData()
+  form.append('avatar', file)
+  const { data } = await apiClient.post<{ avatar: string }>('/users/me/avatar', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
   return data
 }

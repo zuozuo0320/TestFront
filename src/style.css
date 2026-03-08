@@ -625,6 +625,21 @@ body { margin: 0; background: #f3f4f6; }
   max-width: 520px;
 }
 
+.profile-avatar-uploader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.profile-avatar-preview {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #dbe2ea;
+  background: #f8fafc;
+}
+
 :root {
   --tp-btn-bg: #111827;
   --tp-btn-bg-hover: #0b1220;

@@ -18,6 +18,7 @@ import {
   updateRoleById,
   updateTestCase,
   updateUser,
+  uploadMyAvatar,
   type LoginResp,
   type Project,
   type Role,
@@ -84,7 +85,6 @@ const roleForm = reactive({
 
 const profileForm = reactive({
   name: '',
-  email: '',
   phone: '',
   avatar: '',
 })
@@ -146,8 +146,16 @@ const activeFilterChips = computed(() => {
 const creatableRoles = computed(() => roles.value.filter((r) => r.name !== 'admin'))
 
 const userAvatarUrl = computed(() => {
-  const avatar = ((currentUser.value as any)?.avatar || '').trim()
-  if (avatar) return avatar
+  const avatarRaw = ((currentUser.value as any)?.avatar || '').trim()
+  if (avatarRaw) {
+    if (/^https?:\/\//i.test(avatarRaw)) return avatarRaw
+    const envBase = ((import.meta as any).env?.VITE_API_BASE_URL as string | undefined)?.trim()
+    if (envBase && /^https?:\/\//i.test(envBase)) {
+      const origin = envBase.replace(/\/api\/v1\/?$/, '')
+      return `${origin}${avatarRaw.startsWith('/') ? '' : '/'}${avatarRaw}`
+    }
+    return `http://localhost:8080${avatarRaw.startsWith('/') ? '' : '/'}${avatarRaw}`
+  }
   const seed = encodeURIComponent((currentUser.value?.name || 'TestPilot').trim() || 'TestPilot')
   return `https://api.dicebear.com/7.x/initials/svg?seed=${seed}`
 })
@@ -542,7 +550,6 @@ function switchMenu(menu: 'users' | 'roles') {
 
 function syncProfileForm() {
   profileForm.name = currentUser.value?.name || ''
-  profileForm.email = currentUser.value?.email || ''
   profileForm.phone = (currentUser.value as any)?.phone || ''
   profileForm.avatar = (currentUser.value as any)?.avatar || ''
 }
@@ -733,7 +740,6 @@ async function saveProfile() {
   try {
     const data = await updateMyProfile({
       name: profileForm.name.trim() || undefined,
-      email: profileForm.email.trim() || undefined,
       phone: profileForm.phone.trim() || undefined,
       avatar: profileForm.avatar.trim() || undefined,
     })
@@ -742,6 +748,31 @@ async function saveProfile() {
     profileDialogVisible.value = false
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.error || '个人中心更新失败')
+  } finally {
+    savingProfile.value = false
+  }
+}
+
+async function onAvatarFileChange(file: any) {
+  const raw = file?.raw as File | undefined
+  if (!raw) return
+  const allowed = ['image/jpeg', 'image/png', 'image/webp']
+  if (!allowed.includes(raw.type)) {
+    ElMessage.warning('仅支持 JPG/PNG/WEBP 图片')
+    return
+  }
+  if (raw.size > 2 * 1024 * 1024) {
+    ElMessage.warning('头像大小不能超过 2MB')
+    return
+  }
+  try {
+    savingProfile.value = true
+    const data = await uploadMyAvatar(raw)
+    profileForm.avatar = data.avatar
+    currentUser.value = { ...(currentUser.value as any), avatar: data.avatar }
+    ElMessage.success('头像上传成功')
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '头像上传失败')
   } finally {
     savingProfile.value = false
   }
@@ -1068,14 +1099,22 @@ onMounted(async () => {
 
       <el-dialog v-model="profileDialogVisible" title="个人中心" width="520px">
         <el-form label-position="top" class="profile-form">
-          <el-form-item label="头像URL">
-            <el-input v-model="profileForm.avatar" placeholder="https://..." />
+          <el-form-item label="头像">
+            <div class="profile-avatar-uploader">
+              <img class="profile-avatar-preview" :src="userAvatarUrl" alt="avatar" />
+              <el-upload
+                class="avatar-upload"
+                :show-file-list="false"
+                :auto-upload="false"
+                :on-change="onAvatarFileChange"
+                accept=".jpg,.jpeg,.png,.webp"
+              >
+                <el-button size="small">上传头像</el-button>
+              </el-upload>
+            </div>
           </el-form-item>
           <el-form-item label="姓名">
             <el-input v-model="profileForm.name" />
-          </el-form-item>
-          <el-form-item label="邮箱">
-            <el-input v-model="profileForm.email" />
           </el-form-item>
           <el-form-item label="手机号">
             <el-input v-model="profileForm.phone" />
