@@ -468,26 +468,6 @@ function removeStepRow(index: number) {
   stepRows.value.splice(index, 1)
 }
 
-function moveStepUp(index: number) {
-  if (index <= 0) return
-  const arr = stepRows.value
-  const current = arr[index]
-  const prev = arr[index - 1]
-  if (!current || !prev) return
-  arr[index - 1] = current
-  arr[index] = prev
-}
-
-function moveStepDown(index: number) {
-  const arr = stepRows.value
-  if (index >= arr.length - 1) return
-  const current = arr[index]
-  const next = arr[index + 1]
-  if (!current || !next) return
-  arr[index] = next
-  arr[index + 1] = current
-}
-
 function copyStepRow(index: number) {
   const src = stepRows.value[index]
   if (!src) return
@@ -1777,12 +1757,6 @@ onMounted(async () => {
                 <el-input v-model="s.action" placeholder="请输入步骤" />
                 <el-input v-model="s.expected" placeholder="请输入预期结果" />
                 <div class="step-ops">
-                  <button class="step-op" :disabled="idx === 0" @click="moveStepUp(idx)" title="上移">
-                    <el-icon class="btn-icon"><ArrowUp /></el-icon>
-                  </button>
-                  <button class="step-op" :disabled="idx === stepRows.length - 1" @click="moveStepDown(idx)" title="下移">
-                    <el-icon class="btn-icon"><ArrowDown /></el-icon>
-                  </button>
                   <button class="step-op" @click="copyStepRow(idx)" title="复制">
                     <el-icon class="btn-icon"><CopyDocument /></el-icon>
                   </button>
