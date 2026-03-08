@@ -1316,7 +1316,6 @@ onMounted(async () => {
               <table class="simple-table users-table">
                 <thead>
                   <tr>
-                    <th>ID</th>
                     <th>姓名</th>
                     <th>邮箱</th>
                     <th>手机号</th>
@@ -1326,10 +1325,9 @@ onMounted(async () => {
                 </thead>
                 <tbody>
                   <tr v-if="users.length === 0">
-                    <td colspan="6" class="empty-td">暂无用户</td>
+                    <td colspan="5" class="empty-td">暂无用户</td>
                   </tr>
                   <tr v-for="u in pagedUsers" :key="u.id">
-                    <td class="mono">#{{ u.id }}</td>
                     <td>
                       <div class="user-cell">
                         <img class="user-cell-avatar" :src="resolveAvatarUrl(u.avatar, u.name)" alt="avatar" @error="(e: any) => { e.target.src = resolveAvatarUrl('', u.name) }" />
