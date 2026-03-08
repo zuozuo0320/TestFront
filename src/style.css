@@ -27,6 +27,8 @@ body { margin: 0; background: radial-gradient(1200px 500px at 12% -10%, rgba(17,
   align-items: center;
   padding: 0 14px;
   gap: 8px;
+  position: relative;
+  z-index: 120;
 }
 
 .login-card {
@@ -129,6 +131,7 @@ body { margin: 0; background: radial-gradient(1200px 500px at 12% -10%, rgba(17,
   align-items: center;
   justify-self: end;
   position: relative;
+  z-index: 150;
 }
 .user-avatar-wrap {
   position: relative;
@@ -171,7 +174,7 @@ body { margin: 0; background: radial-gradient(1200px 500px at 12% -10%, rgba(17,
   box-shadow: 0 14px 32px rgba(15, 23, 42, 0.18);
   padding: 10px;
   display: none;
-  z-index: 40;
+  z-index: 220;
 }
 .user-hover-card::before {
   content: '';
