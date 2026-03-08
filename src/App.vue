@@ -348,12 +348,12 @@ async function removeDirectory(path: string) {
 
   try {
     await ElMessageBox.confirm(
-      `确认删除目录 ${target} 吗？该目录下绑定用例数：${boundCount}。删除目录会同步删除目录下所有用例。`,
+      `确认删除目录 ${target}（含 ${boundCount} 条用例）？`,
       '删除确认',
-      { confirmButtonText: '继续删除', cancelButtonText: '取消', type: 'warning' },
+      { confirmButtonText: '继续', cancelButtonText: '取消', type: 'warning' },
     )
     await ElMessageBox.confirm(
-      `二次确认：将删除目录 ${target} 及其绑定用例（${boundCount} 条），该操作不可恢复。`,
+      `二次确认：删除后不可恢复。`,
       '二次确认',
       { confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'error' },
     )
