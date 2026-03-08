@@ -1016,8 +1016,10 @@ onMounted(async () => {
                     <span>全部用例</span>
                     <span>{{ total }}</span>
                   </div>
-                  <div class="tree-item" v-for="p in modulePaths" :key="p">
-                    <span>{{ p }}</span>
+                  <div class="tree-children">
+                    <div class="tree-item child" v-for="p in modulePaths" :key="p">
+                      <span>{{ p }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
