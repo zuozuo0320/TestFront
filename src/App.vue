@@ -610,9 +610,15 @@ async function loadProjects() {
 }
 
 async function loadCases() {
-  if (!selectedProject.value) return
-  appLoading.value = true
   loadError.value = ''
+  if (!selectedProject.value) {
+    rows.value = []
+    total.value = 0
+    page.value = 1
+    pageInput.value = '1'
+    return
+  }
+  appLoading.value = true
   try {
     const data = await listTestCases(selectedProject.value, {
       page: page.value,
