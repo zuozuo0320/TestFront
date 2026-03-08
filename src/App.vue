@@ -53,7 +53,8 @@ type StepRow = {
   expected: string
 }
 
-const activeMenu = ref<'testcases' | 'users' | 'roles' | 'profile'>('testcases')
+const topMenu = ref<'workbench' | 'project' | 'plan' | 'testcases' | 'e2e' | 'system'>('testcases')
+const activeMenu = ref<'users' | 'roles' | 'profile'>('users')
 const users = ref<UserRow[]>([])
 const roles = ref<Role[]>([])
 const usersLoading = ref(false)
@@ -513,7 +514,15 @@ async function loadRoles() {
   }
 }
 
-function switchMenu(menu: 'testcases' | 'users' | 'roles' | 'profile') {
+function switchTopMenu(menu: 'workbench' | 'project' | 'plan' | 'testcases' | 'e2e' | 'system') {
+  topMenu.value = menu
+  if (menu === 'system') {
+    if (roles.value.length === 0) loadRoles()
+    if (users.value.length === 0) loadUsers()
+  }
+}
+
+function switchMenu(menu: 'users' | 'roles' | 'profile') {
   activeMenu.value = menu
   if (menu === 'users') {
     loadUsers()
@@ -774,14 +783,22 @@ onMounted(async () => {
 
         <div class="main">
           <aside class="main-nav">
-            <div class="main-nav-item" @click="switchMenu('testcases')" :class="{ active: activeMenu === 'testcases' }">测试用例</div>
-            <div class="main-nav-item" @click="switchMenu('users')" :class="{ active: activeMenu === 'users' }">用户管理</div>
-            <div class="main-nav-item" @click="switchMenu('roles')" :class="{ active: activeMenu === 'roles' }">角色管理</div>
-            <div class="main-nav-item" @click="switchMenu('profile')" :class="{ active: activeMenu === 'profile' }">个人中心</div>
+            <div class="main-nav-item" @click="switchTopMenu('workbench')" :class="{ active: topMenu === 'workbench' }">工作台</div>
+            <div class="main-nav-item" @click="switchTopMenu('project')" :class="{ active: topMenu === 'project' }">项目管理</div>
+            <div class="main-nav-item" @click="switchTopMenu('plan')" :class="{ active: topMenu === 'plan' }">测试计划</div>
+            <div class="main-nav-item" @click="switchTopMenu('testcases')" :class="{ active: topMenu === 'testcases' }">测试用例</div>
+            <div class="main-nav-item" @click="switchTopMenu('e2e')" :class="{ active: topMenu === 'e2e' }">E2E测试</div>
+            <div class="main-nav-item" @click="switchTopMenu('system')" :class="{ active: topMenu === 'system' }">系统管理</div>
+
+            <div v-if="topMenu === 'system'" class="sub-nav">
+              <div class="sub-nav-item" @click="switchMenu('users')" :class="{ active: activeMenu === 'users' }">用户管理</div>
+              <div class="sub-nav-item" @click="switchMenu('roles')" :class="{ active: activeMenu === 'roles' }">角色管理</div>
+              <div class="sub-nav-item" @click="switchMenu('profile')" :class="{ active: activeMenu === 'profile' }">个人中心</div>
+            </div>
           </aside>
 
           <section class="content-wrap">
-            <div v-if="activeMenu === 'testcases'" class="case-page">
+            <div v-if="topMenu === 'testcases'" class="case-page">
               <div class="left-tree">
                 <el-input size="small" placeholder="请输入模块名称" />
                 <div class="tree-list">
@@ -915,7 +932,7 @@ onMounted(async () => {
               </div>
             </div>
 
-            <div v-else-if="activeMenu === 'users'" class="module-card" v-loading="usersLoading">
+            <div v-else-if="topMenu === 'system' && activeMenu === 'users'" class="module-card" v-loading="usersLoading">
               <div class="module-toolbar">
                 <h3>用户管理</h3>
                 <el-button type="primary" @click="openCreateUser">新建用户</el-button>
@@ -954,7 +971,7 @@ onMounted(async () => {
               </table>
             </div>
 
-            <div v-else-if="activeMenu === 'roles'" class="module-card" v-loading="rolesLoading">
+            <div v-else-if="topMenu === 'system' && activeMenu === 'roles'" class="module-card" v-loading="rolesLoading">
               <div class="module-toolbar">
                 <h3>角色管理</h3>
                 <el-button type="primary" @click="openCreateRole">新建角色</el-button>
@@ -987,7 +1004,7 @@ onMounted(async () => {
               </table>
             </div>
 
-            <div v-else class="module-card profile-card">
+            <div v-else-if="topMenu === 'system' && activeMenu === 'profile'" class="module-card profile-card">
               <div class="module-toolbar">
                 <h3>个人中心</h3>
               </div>
@@ -1006,6 +1023,13 @@ onMounted(async () => {
                 </el-form-item>
                 <el-button type="primary" :loading="savingProfile" @click="saveProfile">保存资料</el-button>
               </el-form>
+            </div>
+
+            <div v-else class="module-card">
+              <div class="module-toolbar">
+                <h3>{{ topMenu === 'workbench' ? '工作台' : topMenu === 'project' ? '项目管理' : topMenu === 'plan' ? '测试计划' : 'E2E测试' }}</h3>
+              </div>
+              <div class="empty-td">该模块保留原入口，页面建设中。</div>
             </div>
           </section>
         </div>
