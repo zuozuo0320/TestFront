@@ -561,15 +561,40 @@ async function initAfterLogin() {
       selectedProject.value = firstProject ? firstProject.id : null
     }
 
-    if (selectedProject.value) {
-      await loadCases()
-    }
-
+    await loadCurrentViewData()
     persistNavState()
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.error || '初始化失败')
   } finally {
     appLoading.value = false
+  }
+}
+
+async function loadCurrentViewData() {
+  if (topMenu.value === 'testcases') {
+    if (selectedProject.value) {
+      await loadCases()
+    }
+    return
+  }
+
+  if (topMenu.value === 'system') {
+    if (activeMenu.value === 'users') {
+      await Promise.all([loadUsers(), loadRoles()])
+      return
+    }
+    if (activeMenu.value === 'roles') {
+      await loadRoles()
+      return
+    }
+    if (activeMenu.value === 'projects') {
+      await loadProjects()
+      return
+    }
+  }
+
+  if (topMenu.value === 'project') {
+    await loadProjects()
   }
 }
 
