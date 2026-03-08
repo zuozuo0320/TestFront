@@ -136,14 +136,14 @@ const caseForm = reactive({
   level: 'P1',
   reviewResult: '未评审',
   execResult: '未执行',
-  modulePath: '/未分类',
+  modulePath: '/未规划用例',
   tags: '',
   steps: '',
   priority: 'medium',
 })
 
 const directoryForm = reactive({
-  parentPath: '/未分类',
+  parentPath: '/',
   name: '',
 })
 
@@ -162,33 +162,43 @@ const modulePaths = computed(() => {
   const set = new Set<string>()
   rows.value.forEach((r) => {
     const p = (r.modulePath || '').trim()
-    if (p) set.add(normalizeModulePath(p))
+    const normalized = normalizeCaseModulePath(p)
+    if (normalized !== '/未规划用例') set.add(normalized)
   })
-  customModulePaths.value.forEach((p) => set.add(normalizeModulePath(p)))
-  if (!set.size) set.add('/未分类')
+  customModulePaths.value.forEach((p) => {
+    const normalized = normalizeDirectoryPath(p)
+    if (normalized !== '/') set.add(normalized)
+  })
   return Array.from(set).sort((a, b) => a.localeCompare(b, 'zh-CN'))
 })
 
 const creatableRoles = computed(() => roles.value.filter((r) => r.name !== 'admin'))
 
-function normalizeModulePath(path: string) {
-  const normalized = `/${path.trim().replace(/^\/+/, '').replace(/\/+$/, '')}`
-  return normalized === '/' ? '/未分类' : normalized
+function normalizeDirectoryPath(path: string) {
+  const cleaned = path.trim().replace(/^\/+/, '').replace(/\/+$/, '')
+  if (!cleaned) return '/'
+  return `/${cleaned}`
+}
+
+function normalizeCaseModulePath(path: string) {
+  const normalized = normalizeDirectoryPath(path)
+  return normalized === '/' ? '/未规划用例' : normalized
 }
 
 function calcModuleDepth(path: string) {
-  const normalized = normalizeModulePath(path)
+  const normalized = normalizeDirectoryPath(path)
+  if (normalized === '/') return 0
   return normalized.split('/').filter(Boolean).length
 }
 
 function openCreateDirectory() {
-  directoryForm.parentPath = '/未分类'
+  directoryForm.parentPath = '/'
   directoryForm.name = ''
   directoryDialogVisible.value = true
 }
 
 function submitDirectory() {
-  const parent = normalizeModulePath(directoryForm.parentPath || '/未分类')
+  const parent = normalizeDirectoryPath(directoryForm.parentPath || '/')
   const name = directoryForm.name.trim().replace(/^\/+/, '').replace(/\/+$/, '')
   if (!name) {
     ElMessage.warning('目录名称不能为空')
@@ -198,7 +208,7 @@ function submitDirectory() {
     ElMessage.warning('目录名称仅支持中文、英文、数字、下划线、中划线')
     return
   }
-  const nextPath = normalizeModulePath(`${parent}/${name}`)
+  const nextPath = normalizeDirectoryPath(`${parent}/${name}`)
   if (calcModuleDepth(nextPath) > 5) {
     ElMessage.warning('目录最多支持 5 层')
     return
@@ -214,15 +224,16 @@ function submitDirectory() {
 }
 
 function isPathEqualOrChild(path: string, target: string) {
-  const normalizedPath = normalizeModulePath(path)
-  const normalizedTarget = normalizeModulePath(target)
+  const normalizedPath = normalizeCaseModulePath(path)
+  const normalizedTarget = normalizeDirectoryPath(target)
+  if (normalizedTarget === '/') return true
   return normalizedPath === normalizedTarget || normalizedPath.startsWith(`${normalizedTarget}/`)
 }
 
 async function removeDirectory(path: string) {
-  const target = normalizeModulePath(path)
-  if (target === '/未分类') {
-    ElMessage.warning('默认目录不可删除')
+  const target = normalizeDirectoryPath(path)
+  if (target === '/') {
+    ElMessage.warning('根目录不可删除')
     return
   }
   if (!selectedProject.value) {
@@ -236,7 +247,7 @@ async function removeDirectory(path: string) {
     return
   }
 
-  const boundCases = rows.value.filter((r) => isPathEqualOrChild(r.modulePath || '/未分类', target))
+  const boundCases = rows.value.filter((r) => isPathEqualOrChild(r.modulePath || '/未规划用例', target))
   const boundCount = boundCases.length
 
   try {
@@ -260,8 +271,8 @@ async function removeDirectory(path: string) {
     }
 
     customModulePaths.value = customModulePaths.value.filter((p) => !isPathEqualOrChild(p, target))
-    if (isPathEqualOrChild(caseForm.modulePath || '/未分类', target)) {
-      caseForm.modulePath = '/未分类'
+    if (isPathEqualOrChild(caseForm.modulePath || '/未规划用例', target)) {
+      caseForm.modulePath = '/未规划用例'
     }
 
     const maxAfterDelete = Math.max(1, Math.ceil((total.value - boundCount) / pageSize.value))
@@ -550,7 +561,7 @@ function openCreate() {
   caseForm.level = 'P1'
   caseForm.reviewResult = '未评审'
   caseForm.execResult = '未执行'
-  caseForm.modulePath = '/未分类'
+  caseForm.modulePath = '/未规划用例'
   caseForm.tags = ''
   caseForm.steps = ''
   caseForm.priority = 'medium'
@@ -564,7 +575,7 @@ function openEdit(row: TableRow) {
   caseForm.level = row.level || 'P1'
   caseForm.reviewResult = row.reviewResult || '未评审'
   caseForm.execResult = row.execResult || '未执行'
-  caseForm.modulePath = row.modulePath || '/未分类'
+  caseForm.modulePath = row.modulePath || '/未规划用例'
   caseForm.tags = row.tags || ''
   caseForm.steps = row.steps
   caseForm.priority = row.priority || 'medium'
@@ -1080,7 +1091,7 @@ onMounted(async () => {
                   <div class="tree-children">
                     <div class="tree-item child" v-for="p in modulePaths" :key="p">
                       <span>{{ p }}</span>
-                      <button v-if="p !== '/未分类'" class="tree-remove" @click.stop="removeDirectory(p)">删除</button>
+                      <button class="tree-remove" @click.stop="removeDirectory(p)">删除</button>
                     </div>
                   </div>
                 </div>
@@ -1410,6 +1421,7 @@ onMounted(async () => {
         <el-form label-position="top">
           <el-form-item label="父级目录">
             <el-select v-model="directoryForm.parentPath" placeholder="请选择父级目录">
+              <el-option label="全部用例（根目录）" value="/" />
               <el-option v-for="p in modulePaths" :key="p" :label="p" :value="p" />
             </el-select>
           </el-form-item>
