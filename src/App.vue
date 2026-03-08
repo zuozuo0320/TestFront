@@ -872,15 +872,15 @@ onMounted(async () => {
       <div class="login-wrap">
         <div class="login-card">
           <div class="wordmark">TP</div>
-          <h1>Sign in to TestPilot</h1>
-          <p class="sub">Industrial test management workspace</p>
+          <h1>登录 TestPilot</h1>
+          <p class="sub">工业级测试管理工作台</p>
 
           <el-input v-model="loginForm.email" placeholder="请输入用户名 / 邮箱" class="mb12" />
           <el-input v-model="loginForm.password" placeholder="请输入密码" show-password class="mb12" />
 
           <div class="row-between">
-            <span class="hint">Demo: tester@testpilot.local / TestPilot@2026</span>
-            <a class="link" href="javascript:void(0)">Forgot password?</a>
+            <span class="hint">示例账号：tester@testpilot.local / TestPilot@2026</span>
+            <a class="link" href="javascript:void(0)">忘记密码？</a>
           </div>
 
           <el-button class="primary-btn" :loading="loginLoading" @click="doLogin">登录</el-button>
@@ -916,7 +916,7 @@ onMounted(async () => {
                 <div class="hover-user-row">
                   <img class="hover-avatar" :src="userAvatarUrl" alt="avatar" />
                   <div class="hover-user-meta">
-                    <div class="hover-name">{{ currentUser?.name || 'demo' }}</div>
+                    <div class="hover-name">{{ currentUser?.name || '示例用户' }}</div>
                   </div>
                 </div>
                 <div class="hover-actions">
@@ -1116,7 +1116,7 @@ onMounted(async () => {
                     <td>{{ u.email }}</td>
                     <td>{{ u.phone || '-' }}</td>
                     <td>
-                      <el-tag size="small" :type="u.active ? 'success' : 'info'">{{ u.active ? 'active' : 'frozen' }}</el-tag>
+                      <el-tag size="small" :type="u.active ? 'success' : 'info'">{{ u.active ? '启用' : '冻结' }}</el-tag>
                     </td>
                     <td>
                       <div class="action-group">
@@ -1249,7 +1249,7 @@ onMounted(async () => {
             </el-select>
           </el-form-item>
           <el-form-item label="状态">
-            <el-switch v-model="userForm.active" active-text="active" inactive-text="frozen" />
+            <el-switch v-model="userForm.active" active-text="启用" inactive-text="冻结" />
           </el-form-item>
         </el-form>
         <template #footer>
