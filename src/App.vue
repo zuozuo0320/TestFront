@@ -1245,16 +1245,12 @@ onMounted(async () => {
                   <div class="tree-item active tree-root-row">
                     <span class="tree-root-title">全部用例（{{ total }}）</span>
                     <div class="tree-root-actions">
-                      <el-tooltip content="展开/收起目录" placement="top">
-                        <button class="tree-icon-btn ghost" @click.stop="treeExpanded = !treeExpanded">
-                          <el-icon><CaretBottom v-if="treeExpanded" /><CaretRight v-else /></el-icon>
-                        </button>
-                      </el-tooltip>
-                      <el-tooltip content="新建目录" placement="top">
-                        <button class="tree-icon-btn ghost" @click.stop="openCreateDirectory">
-                          <el-icon><FolderAdd /></el-icon>
-                        </button>
-                      </el-tooltip>
+                      <button class="tree-icon-btn ghost" @click.stop="treeExpanded = !treeExpanded">
+                        <el-icon><CaretBottom v-if="treeExpanded" /><CaretRight v-else /></el-icon>
+                      </button>
+                      <button class="tree-icon-btn ghost" @click.stop="openCreateDirectory">
+                        <el-icon><FolderAdd /></el-icon>
+                      </button>
                     </div>
                   </div>
                   <el-tree
@@ -1268,11 +1264,9 @@ onMounted(async () => {
                     <template #default="{ data }">
                       <div class="tree-node-row">
                         <span>{{ data.name }}</span>
-                        <el-tooltip content="删除目录" placement="top">
-                          <button class="tree-remove icon" @click.stop="removeDirectory(data.path)">
-                            <el-icon><Delete /></el-icon>
-                          </button>
-                        </el-tooltip>
+                        <button class="tree-remove icon" @click.stop="removeDirectory(data.path)">
+                          <el-icon><Delete /></el-icon>
+                        </button>
                       </div>
                     </template>
                   </el-tree>
@@ -1628,9 +1622,8 @@ onMounted(async () => {
             </el-select>
           </el-form-item>
           <el-form-item label="目录名称">
-            <el-input v-model="directoryForm.name" maxlength="40" show-word-limit placeholder="例如：登录" />
+            <el-input v-model="directoryForm.name" maxlength="40" placeholder="例如：登录" />
           </el-form-item>
-          <div class="directory-tip">规则：最多支持 5 层目录，如 /一级/二级/三级/四级/五级</div>
         </el-form>
         <template #footer>
           <el-button @click="directoryDialogVisible = false">取消</el-button>
