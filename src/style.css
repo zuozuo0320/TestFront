@@ -267,17 +267,18 @@ body { margin: 0; background: #f3f4f6; }
 
 .case-page {
   background: #fff;
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
+  border: 1px solid #e6ebf2;
+  border-radius: 12px;
   min-height: calc(100vh - 78px);
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 260px 1fr;
+  overflow: hidden;
 }
 
 .left-tree {
-  border-right: 1px solid #e6eaf0;
-  padding: 12px 10px;
-  background: linear-gradient(180deg, #fafcff 0%, #f5f8fc 100%);
+  border-right: 1px solid #edf2f7;
+  padding: 10px 8px;
+  background: #fbfdff;
 }
 .tree-header {
   display: grid;
@@ -292,12 +293,12 @@ body { margin: 0; background: #f3f4f6; }
   padding: 0;
 }
 .tree-icon-btn.ghost {
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.08);
-  color: #f8fafc;
+  border: 1px solid #dbe5f2;
+  background: #ffffff;
+  color: #475569;
 }
 .tree-icon-btn.ghost:hover {
-  background: rgba(255, 255, 255, 0.16);
+  background: #f1f5f9;
 }
 .tree-list { margin-top: 10px; }
 .tree-item {
@@ -365,11 +366,11 @@ body { margin: 0; background: #f3f4f6; }
   padding-right: 6px;
 }
 .tree-item.active {
-  background: #111827;
-  color: #f8fafc;
+  background: #eef4ff;
+  color: #1e3a8a;
   font-weight: 600;
-  border-color: #111827;
-  box-shadow: 0 6px 16px rgba(17, 24, 39, 0.22);
+  border-color: #dbeafe;
+  box-shadow: none;
 }
 .tree-root-row {
   align-items: center;
@@ -395,8 +396,9 @@ body { margin: 0; background: #f3f4f6; }
 }
 
 .right-table {
-  padding: 10px;
+  padding: 12px;
   overflow: visible;
+  background: #fff;
 }
 
 .toolbar-1 {
@@ -409,6 +411,7 @@ body { margin: 0; background: #f3f4f6; }
   z-index: 8;
   background: #fff;
   padding-bottom: 8px;
+  border-bottom: 1px solid #eef2f7;
 }
 
 .toolbar-1 .left,
@@ -564,11 +567,12 @@ body { margin: 0; background: #f3f4f6; }
 
 .table-shell {
   margin-top: 10px;
-  border: 1px solid #ebeef5;
-  border-radius: 6px;
+  border: 1px solid #e8edf3;
+  border-radius: 10px;
   overflow: auto;
   position: relative;
   min-height: 320px;
+  background: #fff;
 }
 
 .table-shell table {
@@ -580,8 +584,8 @@ body { margin: 0; background: #f3f4f6; }
 
 .table-shell th,
 .table-shell td {
-  border-bottom: 1px solid #f2f3f5;
-  padding: 8px 6px;
+  border-bottom: 1px solid #eff3f8;
+  padding: 10px 8px;
   white-space: nowrap;
   text-align: left;
   max-width: 220px;
@@ -609,9 +613,9 @@ body { margin: 0; background: #f3f4f6; }
 }
 
 .table-shell th {
-  background: #fafafa;
-  color: #606266;
-  font-weight: 600;
+  background: #f3f7fc;
+  color: #334155;
+  font-weight: 700;
   position: sticky;
   top: 0;
   z-index: 6;
