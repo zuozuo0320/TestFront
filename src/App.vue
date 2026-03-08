@@ -1343,9 +1343,12 @@ onMounted(async () => {
                         </td>
                       </tr>
                       <tr v-else-if="rows.length === 0">
-                        <td colspan="12" class="empty-td">
-                          暂无数据
-                          <el-button size="small" @click="openCreate" style="margin-left: 10px">去新建</el-button>
+                        <td colspan="12" class="empty-td testcase-empty-cell">
+                          <div class="testcase-empty-wrap">
+                            <el-empty description="暂无数据" :image-size="140">
+                              <el-button type="primary" plain @click="openCreate">去新建</el-button>
+                            </el-empty>
+                          </div>
                         </td>
                       </tr>
                       <tr v-else v-for="r in rows" :key="r.id">

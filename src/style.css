@@ -810,6 +810,21 @@ body { margin: 0; background: #f3f4f6; }
   color: #475569;
 }
 
+.testcase-empty-cell {
+  padding: 24px 8px !important;
+}
+
+.testcase-empty-wrap {
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.testcase-empty-wrap .el-empty {
+  padding: 0;
+}
+
 .profile-card {
   max-width: 720px;
 }
