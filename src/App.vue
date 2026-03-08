@@ -61,8 +61,6 @@ type ModuleTreeNode = {
   children: ModuleTreeNode[]
 }
 
-const topMenu = ref<'workbench' | 'project' | 'plan' | 'testcases' | 'e2e' | 'system'>('testcases')
-const activeMenu = ref<'users' | 'roles' | 'projects'>('users')
 const NAV_STATE_KEY = 'tp-nav-state-v1'
 const topMenus = ['workbench', 'project', 'plan', 'testcases', 'e2e', 'system'] as const
 const systemMenus = ['users', 'roles', 'projects'] as const
@@ -95,6 +93,10 @@ function restoreNavState(): Partial<NavState> {
     return {}
   }
 }
+
+const initialNavState = restoreNavState()
+const topMenu = ref<TopMenu>(initialNavState.topMenu || 'testcases')
+const activeMenu = ref<SystemMenu>(initialNavState.activeMenu || 'users')
 
 function persistNavState() {
   const payload: NavState = {
