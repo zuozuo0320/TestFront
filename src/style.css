@@ -390,15 +390,6 @@ body { margin: 0; background: #f3f4f6; }
   align-items: center;
   gap: 4px;
 }
-.tree-root-count {
-  font-size: 12px;
-  color: #64748b;
-  background: #ffffff;
-  border: 1px solid #dbe5f2;
-  border-radius: 10px;
-  padding: 0 6px;
-  line-height: 18px;
-}
 .recycle {
   margin-top: 12px;
   border-top: 1px solid #ebeef5;

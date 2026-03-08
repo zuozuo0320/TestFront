@@ -1128,9 +1128,8 @@ onMounted(async () => {
                 </div>
                 <div class="tree-list">
                   <div class="tree-item active tree-root-row">
-                    <span class="tree-root-title">全部用例</span>
+                    <span class="tree-root-title">全部用例（{{ total }}）</span>
                     <div class="tree-root-actions">
-                      <span class="tree-root-count">{{ total }}</span>
                       <el-tooltip content="展开/收起目录" placement="top">
                         <button class="tree-icon-btn ghost" @click.stop="treeExpanded = !treeExpanded">
                           <el-icon><CaretBottom v-if="treeExpanded" /><CaretRight v-else /></el-icon>
