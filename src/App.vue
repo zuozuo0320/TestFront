@@ -54,13 +54,14 @@ type StepRow = {
 }
 
 const topMenu = ref<'workbench' | 'project' | 'plan' | 'testcases' | 'e2e' | 'system'>('testcases')
-const activeMenu = ref<'users' | 'roles' | 'profile'>('users')
+const activeMenu = ref<'users' | 'roles'>('users')
 const users = ref<UserRow[]>([])
 const roles = ref<Role[]>([])
 const usersLoading = ref(false)
 const rolesLoading = ref(false)
 const userDialogVisible = ref(false)
 const roleDialogVisible = ref(false)
+const profileDialogVisible = ref(false)
 const editingUserId = ref<number | null>(null)
 const editingRoleId = ref<number | null>(null)
 const savingUser = ref(false)
@@ -530,14 +531,13 @@ function switchTopMenu(menu: 'workbench' | 'project' | 'plan' | 'testcases' | 'e
   }
 }
 
-function switchMenu(menu: 'users' | 'roles' | 'profile') {
+function switchMenu(menu: 'users' | 'roles') {
   activeMenu.value = menu
   if (menu === 'users') {
     loadUsers()
     if (roles.value.length === 0) loadRoles()
   }
   if (menu === 'roles') loadRoles()
-  if (menu === 'profile') syncProfileForm()
 }
 
 function syncProfileForm() {
@@ -739,6 +739,7 @@ async function saveProfile() {
     })
     currentUser.value = { ...currentUser.value!, ...data }
     ElMessage.success('个人中心更新成功')
+    profileDialogVisible.value = false
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.error || '个人中心更新失败')
   } finally {
@@ -747,8 +748,8 @@ async function saveProfile() {
 }
 
 function openProfileCenter() {
-  topMenu.value = 'system'
-  switchMenu('profile')
+  syncProfileForm()
+  profileDialogVisible.value = true
 }
 
 function logout() {
@@ -845,7 +846,6 @@ onMounted(async () => {
             <div v-if="topMenu === 'system'" class="sub-nav">
               <div class="sub-nav-item" @click="switchMenu('users')" :class="{ active: activeMenu === 'users' }">用户管理</div>
               <div class="sub-nav-item" @click="switchMenu('roles')" :class="{ active: activeMenu === 'roles' }">角色管理</div>
-              <div class="sub-nav-item" @click="switchMenu('profile')" :class="{ active: activeMenu === 'profile' }">个人中心</div>
             </div>
           </aside>
 
@@ -1056,27 +1056,6 @@ onMounted(async () => {
               </table>
             </div>
 
-            <div v-else-if="topMenu === 'system' && activeMenu === 'profile'" class="module-card profile-card">
-              <div class="module-toolbar">
-                <h3>个人中心</h3>
-              </div>
-              <el-form label-position="top" class="profile-form">
-                <el-form-item label="头像URL">
-                  <el-input v-model="profileForm.avatar" placeholder="https://..." />
-                </el-form-item>
-                <el-form-item label="姓名">
-                  <el-input v-model="profileForm.name" />
-                </el-form-item>
-                <el-form-item label="邮箱">
-                  <el-input v-model="profileForm.email" />
-                </el-form-item>
-                <el-form-item label="手机号">
-                  <el-input v-model="profileForm.phone" />
-                </el-form-item>
-                <el-button type="primary" :loading="savingProfile" @click="saveProfile">保存资料</el-button>
-              </el-form>
-            </div>
-
             <div v-else class="module-card">
               <div class="module-toolbar">
                 <h3>{{ topMenu === 'workbench' ? '工作台' : topMenu === 'project' ? '项目管理' : topMenu === 'plan' ? '测试计划' : 'E2E测试' }}</h3>
@@ -1086,6 +1065,27 @@ onMounted(async () => {
           </section>
         </div>
       </div>
+
+      <el-dialog v-model="profileDialogVisible" title="个人中心" width="520px">
+        <el-form label-position="top" class="profile-form">
+          <el-form-item label="头像URL">
+            <el-input v-model="profileForm.avatar" placeholder="https://..." />
+          </el-form-item>
+          <el-form-item label="姓名">
+            <el-input v-model="profileForm.name" />
+          </el-form-item>
+          <el-form-item label="邮箱">
+            <el-input v-model="profileForm.email" />
+          </el-form-item>
+          <el-form-item label="手机号">
+            <el-input v-model="profileForm.phone" />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="profileDialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="savingProfile" @click="saveProfile">保存资料</el-button>
+        </template>
+      </el-dialog>
 
       <el-dialog v-model="userDialogVisible" :title="editingUserId ? '编辑用户' : '新建用户'" width="640px">
         <el-form label-position="top">
