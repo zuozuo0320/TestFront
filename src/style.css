@@ -1002,14 +1002,15 @@ body { margin: 0; background: radial-gradient(1200px 500px at 12% -10%, rgba(17,
 .case-editor-drawer :deep(.el-drawer__header) {
   margin-bottom: 0;
   border-bottom: 1px solid #e5e7eb;
-  padding: 14px 18px;
+  padding: 14px 20px;
   color: #111827;
   font-weight: 600;
+  background: linear-gradient(90deg, rgba(248, 250, 252, 0.92) 0%, rgba(241, 245, 249, 0.92) 100%);
 }
 
 .case-editor-drawer :deep(.el-drawer__body) {
   padding: 0;
-  background: #f5f6f8;
+  background: linear-gradient(180deg, #f7f9fc 0%, #f3f5f8 100%);
 }
 
 .case-editor {
@@ -1019,13 +1020,15 @@ body { margin: 0; background: radial-gradient(1200px 500px at 12% -10%, rgba(17,
 }
 
 .case-editor-head {
-  height: 64px;
-  background: #ffffff;
+  height: 68px;
+  background: rgba(255, 255, 255, 0.92);
   border-bottom: 1px solid #e5e7eb;
-  padding: 0 18px;
+  padding: 0 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 .head-left {
@@ -1037,43 +1040,44 @@ body { margin: 0; background: radial-gradient(1200px 500px at 12% -10%, rgba(17,
 .case-tag {
   font-size: 11px;
   letter-spacing: 0.08em;
-  color: #4b5563;
+  color: #374151;
   background: #f3f4f6;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 2px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  padding: 2px 10px;
 }
 
 .head-left h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 17px;
   color: #111827;
 }
 
 .head-right {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .case-editor-form {
-  padding: 14px 16px 22px;
+  padding: 18px 18px 24px;
   overflow: auto;
 }
 
 .editor-block {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.94);
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 12px 14px 8px;
-  margin-bottom: 12px;
+  border-radius: 12px;
+  padding: 14px 16px 10px;
+  margin-bottom: 14px;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.05);
 }
 
 .block-title {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: #111827;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .block-grid {
@@ -1122,40 +1126,49 @@ body { margin: 0; background: radial-gradient(1200px 500px at 12% -10%, rgba(17,
 }
 
 .case-editor :deep(.el-form-item) {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .case-editor :deep(.el-form-item__label) {
   padding-bottom: 6px;
-  color: #374151;
+  color: #475569;
   font-size: 12px;
+  font-weight: 600;
 }
 
 .case-editor :deep(.el-input__wrapper),
 .case-editor :deep(.el-textarea__inner),
 .case-editor :deep(.el-select__wrapper) {
-  border-radius: 6px;
+  border-radius: 8px;
   border-color: #d1d5db;
   box-shadow: none;
+  background: #fff;
+  min-height: 34px;
+}
+
+.case-editor :deep(.el-input__wrapper:hover),
+.case-editor :deep(.el-select__wrapper:hover) {
+  border-color: #9ca3af;
 }
 
 .case-editor :deep(.el-input__wrapper.is-focus),
 .case-editor :deep(.el-select__wrapper.is-focused),
 .case-editor :deep(.el-textarea__inner:focus) {
-  border-color: #111827;
+  border-color: #374151;
+  box-shadow: 0 0 0 3px rgba(55, 65, 81, 0.12);
 }
 
 .steps-grid-head {
   display: grid;
   grid-template-columns: 1fr 1fr 156px;
   gap: 10px;
-  padding: 8px 10px;
+  padding: 9px 10px;
   background: #f8fafc;
   border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  border-radius: 8px;
   color: #4b5563;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .steps-grid-row {
@@ -1165,6 +1178,12 @@ body { margin: 0; background: radial-gradient(1200px 500px at 12% -10%, rgba(17,
   margin-top: 10px;
   align-items: center;
   cursor: move;
+  padding: 8px 8px;
+  border-radius: 8px;
+}
+
+.steps-grid-row:hover {
+  background: rgba(248, 250, 252, 0.9);
 }
 
 .steps-grid-actions {

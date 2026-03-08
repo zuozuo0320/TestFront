@@ -1684,7 +1684,7 @@ onMounted(async () => {
       <el-drawer
         v-model="dialogVisible"
         :title="editingId ? '编辑用例' : '新建用例'"
-        size="68%"
+        size="74%"
         direction="rtl"
         class="case-editor-drawer"
       >
