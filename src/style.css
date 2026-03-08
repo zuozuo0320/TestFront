@@ -112,38 +112,46 @@ body { margin: 0; background: #f3f4f6; }
   position: relative;
   display: inline-flex;
   align-items: center;
+  padding: 4px;
+  border-radius: 999px;
 }
 .user-avatar {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   object-fit: cover;
-  border: 1px solid #d1d5db;
+  border: 1px solid #cbd5e1;
   background: #f3f4f6;
   cursor: pointer;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.user-avatar-wrap:hover .user-avatar {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.2);
 }
 .user-hover-card {
   position: absolute;
-  right: 0;
-  top: calc(100% + 10px);
-  min-width: 180px;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.14);
-  padding: 10px;
+  right: -4px;
+  top: calc(100% + 12px);
+  width: 210px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.18);
+  padding: 12px;
   display: none;
-  z-index: 30;
+  z-index: 40;
 }
 .user-hover-card::before {
   content: '';
   position: absolute;
-  top: -6px;
-  right: 10px;
-  width: 10px;
-  height: 10px;
-  border-left: 1px solid #e5e7eb;
-  border-top: 1px solid #e5e7eb;
+  top: -7px;
+  right: 18px;
+  width: 12px;
+  height: 12px;
+  border-left: 1px solid #e2e8f0;
+  border-top: 1px solid #e2e8f0;
   background: #fff;
   transform: rotate(45deg);
 }
@@ -152,11 +160,19 @@ body { margin: 0; background: #f3f4f6; }
   flex-direction: column;
   gap: 10px;
 }
+.hover-title {
+  font-size: 11px;
+  color: #94a3b8;
+  letter-spacing: 0.2px;
+}
 .hover-name {
-  font-size: 13px;
-  color: #111827;
+  font-size: 14px;
+  color: #0f172a;
   font-weight: 600;
   word-break: break-all;
+}
+.hover-logout-btn {
+  width: 100%;
 }
 .project-select-inline {
   width: 100%;

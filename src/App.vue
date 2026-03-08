@@ -813,8 +813,9 @@ onMounted(async () => {
             <div class="user-avatar-wrap">
               <img class="user-avatar" :src="userAvatarUrl" alt="avatar" />
               <div class="user-hover-card">
+                <div class="hover-title">当前登录</div>
                 <div class="hover-name">{{ currentUser?.name || 'demo' }}</div>
-                <el-button size="small" type="danger" plain @click="logout">退出登录</el-button>
+                <el-button class="hover-logout-btn" size="small" type="danger" plain @click="logout">退出登录</el-button>
               </div>
             </div>
           </div>
