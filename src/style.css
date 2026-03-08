@@ -105,12 +105,34 @@ body { margin: 0; background: #f3f4f6; }
 .user-box {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   justify-self: end;
+  padding: 6px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #fff;
+}
+.user-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #e5e7eb;
+  background: #f3f4f6;
+}
+.user-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
 }
 .user-name {
   font-size: 13px;
-  color: #606266;
+  color: #111827;
+  font-weight: 600;
+}
+.user-role {
+  font-size: 11px;
+  color: #6b7280;
 }
 .project-select-inline {
   width: 100%;
