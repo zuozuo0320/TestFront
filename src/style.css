@@ -1198,6 +1198,10 @@ body { margin: 0; background: radial-gradient(1200px 500px at 12% -10%, rgba(17,
   padding: 0;
 }
 
+.step-op + .step-op.danger {
+  margin-left: 6px;
+}
+
 .step-op .btn-icon {
   margin: 0;
   font-size: 14px;
