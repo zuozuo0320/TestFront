@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { CaretBottom, CaretRight, CopyDocument, Delete, Edit, FolderAdd } from '@element-plus/icons-vue'
 import {
@@ -63,6 +63,48 @@ type ModuleTreeNode = {
 
 const topMenu = ref<'workbench' | 'project' | 'plan' | 'testcases' | 'e2e' | 'system'>('testcases')
 const activeMenu = ref<'users' | 'roles' | 'projects'>('users')
+const NAV_STATE_KEY = 'tp-nav-state-v1'
+const topMenus = ['workbench', 'project', 'plan', 'testcases', 'e2e', 'system'] as const
+const systemMenus = ['users', 'roles', 'projects'] as const
+
+type TopMenu = (typeof topMenus)[number]
+type SystemMenu = (typeof systemMenus)[number]
+type NavState = {
+  topMenu: TopMenu
+  activeMenu: SystemMenu
+  projectId: number | null
+}
+
+function restoreNavState(): Partial<NavState> {
+  try {
+    const raw = localStorage.getItem(NAV_STATE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as Partial<NavState>
+    const state: Partial<NavState> = {}
+    if (parsed.topMenu && (topMenus as readonly string[]).includes(parsed.topMenu)) {
+      state.topMenu = parsed.topMenu
+    }
+    if (parsed.activeMenu && (systemMenus as readonly string[]).includes(parsed.activeMenu)) {
+      state.activeMenu = parsed.activeMenu
+    }
+    if (typeof parsed.projectId === 'number' && Number.isFinite(parsed.projectId)) {
+      state.projectId = parsed.projectId
+    }
+    return state
+  } catch {
+    return {}
+  }
+}
+
+function persistNavState() {
+  const payload: NavState = {
+    topMenu: topMenu.value,
+    activeMenu: activeMenu.value,
+    projectId: selectedProject.value,
+  }
+  localStorage.setItem(NAV_STATE_KEY, JSON.stringify(payload))
+}
+
 const users = ref<UserRow[]>([])
 const roles = ref<Role[]>([])
 const usersLoading = ref(false)
@@ -504,11 +546,26 @@ async function initAfterLogin() {
   appLoading.value = true
   try {
     projects.value = await listProjects()
-    const firstProject = projects.value[0]
-    if (firstProject) {
-      selectedProject.value = firstProject.id
+    const restored = restoreNavState()
+
+    if (restored.topMenu) topMenu.value = restored.topMenu
+    if (restored.activeMenu) activeMenu.value = restored.activeMenu
+
+    const hasRestoredProject =
+      typeof restored.projectId === 'number' && projects.value.some((p) => p.id === restored.projectId)
+
+    if (hasRestoredProject) {
+      selectedProject.value = restored.projectId as number
+    } else {
+      const firstProject = projects.value[0]
+      selectedProject.value = firstProject ? firstProject.id : null
+    }
+
+    if (selectedProject.value) {
       await loadCases()
     }
+
+    persistNavState()
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.error || '初始化失败')
   } finally {
@@ -1051,6 +1108,11 @@ function logout() {
   loggedIn.value = false
   window.location.reload()
 }
+
+watch([topMenu, activeMenu, selectedProject], () => {
+  if (!loggedIn.value) return
+  persistNavState()
+})
 
 onMounted(async () => {
   if (localStorage.getItem('tp-token')) {
