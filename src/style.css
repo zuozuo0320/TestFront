@@ -310,6 +310,18 @@ body { margin: 0; background: #f3f4f6; }
   color: #64748b;
   padding: 8px 8px;
 }
+.tree-remove {
+  border: none;
+  background: transparent;
+  color: #dc2626;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.tree-remove:hover {
+  background: #fee2e2;
+}
 .tree-item.active {
   background: #111827;
   color: #f8fafc;

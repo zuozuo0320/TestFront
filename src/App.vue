@@ -213,6 +213,67 @@ function submitDirectory() {
   ElMessage.success(`目录已创建：${nextPath}`)
 }
 
+function isPathEqualOrChild(path: string, target: string) {
+  const normalizedPath = normalizeModulePath(path)
+  const normalizedTarget = normalizeModulePath(target)
+  return normalizedPath === normalizedTarget || normalizedPath.startsWith(`${normalizedTarget}/`)
+}
+
+async function removeDirectory(path: string) {
+  const target = normalizeModulePath(path)
+  if (target === '/未分类') {
+    ElMessage.warning('默认目录不可删除')
+    return
+  }
+  if (!selectedProject.value) {
+    ElMessage.warning('请先选择项目')
+    return
+  }
+
+  const childDirs = modulePaths.value.filter((p) => p !== target && p.startsWith(`${target}/`))
+  if (childDirs.length > 0) {
+    ElMessage.warning('仅支持从最下级目录开始删除，请先删除子目录')
+    return
+  }
+
+  const boundCases = rows.value.filter((r) => isPathEqualOrChild(r.modulePath || '/未分类', target))
+  const boundCount = boundCases.length
+
+  try {
+    await ElMessageBox.confirm(
+      `确认删除目录 ${target} 吗？该目录下绑定用例数：${boundCount}。删除目录会同步删除目录下所有用例。`,
+      '删除确认',
+      { confirmButtonText: '继续删除', cancelButtonText: '取消', type: 'warning' },
+    )
+    await ElMessageBox.confirm(
+      `二次确认：将删除目录 ${target} 及其绑定用例（${boundCount} 条），该操作不可恢复。`,
+      '二次确认',
+      { confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'error' },
+    )
+  } catch {
+    return
+  }
+
+  try {
+    for (const tc of boundCases) {
+      await deleteTestCase(selectedProject.value, tc.id)
+    }
+
+    customModulePaths.value = customModulePaths.value.filter((p) => !isPathEqualOrChild(p, target))
+    if (isPathEqualOrChild(caseForm.modulePath || '/未分类', target)) {
+      caseForm.modulePath = '/未分类'
+    }
+
+    const maxAfterDelete = Math.max(1, Math.ceil((total.value - boundCount) / pageSize.value))
+    if (page.value > maxAfterDelete) page.value = maxAfterDelete
+    await loadCases()
+
+    ElMessage.success(`目录已删除：${target}，同步删除用例 ${boundCount} 条`)
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '删除目录失败')
+  }
+}
+
 function resolveAvatarUrl(avatar?: string, fallbackName?: string) {
   const avatarRaw = (avatar || '').trim()
   if (avatarRaw) {
@@ -1019,6 +1080,7 @@ onMounted(async () => {
                   <div class="tree-children">
                     <div class="tree-item child" v-for="p in modulePaths" :key="p">
                       <span>{{ p }}</span>
+                      <button v-if="p !== '/未分类'" class="tree-remove" @click.stop="removeDirectory(p)">删除</button>
                     </div>
                   </div>
                 </div>
