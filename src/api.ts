@@ -69,6 +69,11 @@ export async function listProjects() {
   return (data.projects ?? []) as Project[]
 }
 
+export async function createProject(payload: { name: string; description?: string }) {
+  const { data } = await apiClient.post<Project>('/projects', payload)
+  return data
+}
+
 export async function listTestCases(projectId: number, params: {
   page: number
   pageSize: number

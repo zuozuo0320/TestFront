@@ -671,6 +671,10 @@ body { margin: 0; background: #f3f4f6; }
   color: #475569;
 }
 
+.project-selected-row {
+  background: #f5f9ff;
+}
+
 .simple-table {
   width: 100%;
   border-collapse: collapse;

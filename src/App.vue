@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown, ArrowUp, CopyDocument, Delete, Edit } from '@element-plus/icons-vue'
 import {
+  createProject,
   createRole,
   createTestCase,
   createUser,
@@ -55,7 +56,7 @@ type StepRow = {
 }
 
 const topMenu = ref<'workbench' | 'project' | 'plan' | 'testcases' | 'e2e' | 'system'>('testcases')
-const activeMenu = ref<'users' | 'roles'>('users')
+const activeMenu = ref<'users' | 'roles' | 'projects'>('users')
 const users = ref<UserRow[]>([])
 const roles = ref<Role[]>([])
 const usersLoading = ref(false)
@@ -63,11 +64,13 @@ const rolesLoading = ref(false)
 const userDialogVisible = ref(false)
 const roleDialogVisible = ref(false)
 const profileDialogVisible = ref(false)
+const projectDialogVisible = ref(false)
 const editingUserId = ref<number | null>(null)
 const editingRoleId = ref<number | null>(null)
 const savingUser = ref(false)
 const savingRole = ref(false)
 const savingProfile = ref(false)
+const savingProject = ref(false)
 
 const userForm = reactive({
   name: '',
@@ -79,6 +82,11 @@ const userForm = reactive({
 })
 
 const roleForm = reactive({
+  name: '',
+  description: '',
+})
+
+const projectForm = reactive({
   name: '',
   description: '',
 })
@@ -324,6 +332,17 @@ async function initAfterLogin() {
   }
 }
 
+async function loadProjects() {
+  projects.value = await listProjects()
+  const firstProject = projects.value[0]
+  if (firstProject) {
+    const exists = projects.value.some((p) => p.id === selectedProject.value)
+    if (!exists) selectedProject.value = firstProject.id
+  } else {
+    selectedProject.value = null
+  }
+}
+
 async function loadCases() {
   if (!selectedProject.value) return
   appLoading.value = true
@@ -507,7 +526,9 @@ async function onDelete(row: TableRow) {
 
 async function onProjectChange() {
   page.value = 1
-  await loadCases()
+  if (topMenu.value === 'testcases') {
+    await loadCases()
+  }
 }
 
 async function loadUsers() {
@@ -540,16 +561,21 @@ function switchTopMenu(menu: 'workbench' | 'project' | 'plan' | 'testcases' | 'e
   if (menu === 'system') {
     if (roles.value.length === 0) loadRoles()
     if (users.value.length === 0) loadUsers()
+    if (projects.value.length === 0) loadProjects()
+  }
+  if (menu === 'project' && projects.value.length === 0) {
+    loadProjects()
   }
 }
 
-function switchMenu(menu: 'users' | 'roles') {
+function switchMenu(menu: 'users' | 'roles' | 'projects') {
   activeMenu.value = menu
   if (menu === 'users') {
     loadUsers()
     if (roles.value.length === 0) loadRoles()
   }
   if (menu === 'roles') loadRoles()
+  if (menu === 'projects') loadProjects()
 }
 
 function syncProfileForm() {
@@ -739,6 +765,39 @@ async function removeRole(row: Role) {
   }
 }
 
+function openCreateProject() {
+  projectForm.name = ''
+  projectForm.description = ''
+  projectDialogVisible.value = true
+}
+
+async function submitProject() {
+  const name = projectForm.name.trim()
+  if (!name) {
+    ElMessage.warning('项目名称不能为空')
+    return
+  }
+  savingProject.value = true
+  try {
+    const project = await createProject({
+      name,
+      description: projectForm.description.trim() || undefined,
+    })
+    ElMessage.success('项目创建成功')
+    projectDialogVisible.value = false
+    await loadProjects()
+    selectedProject.value = project.id
+    if (topMenu.value === 'testcases') {
+      page.value = 1
+      await loadCases()
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '创建项目失败')
+  } finally {
+    savingProject.value = false
+  }
+}
+
 async function saveProfile() {
   savingProfile.value = true
   try {
@@ -881,6 +940,7 @@ onMounted(async () => {
             <div v-if="topMenu === 'system'" class="sub-nav">
               <div class="sub-nav-item" @click="switchMenu('users')" :class="{ active: activeMenu === 'users' }">用户管理</div>
               <div class="sub-nav-item" @click="switchMenu('roles')" :class="{ active: activeMenu === 'roles' }">角色管理</div>
+              <div class="sub-nav-item" @click="switchMenu('projects')" :class="{ active: activeMenu === 'projects' }">项目管理</div>
             </div>
           </aside>
 
@@ -1102,6 +1162,38 @@ onMounted(async () => {
               </table>
             </div>
 
+            <div v-else-if="topMenu === 'system' && activeMenu === 'projects'" class="module-card" v-loading="appLoading">
+              <div class="module-toolbar">
+                <h3>项目管理</h3>
+                <el-button type="primary" @click="openCreateProject">新建项目</el-button>
+              </div>
+              <table class="simple-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>项目名称</th>
+                    <th>项目描述</th>
+                    <th style="width: 180px">联动状态</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-if="projects.length === 0">
+                    <td colspan="4" class="empty-td">暂无项目</td>
+                  </tr>
+                  <tr v-for="p in projects" :key="p.id" :class="{ 'project-selected-row': selectedProject === p.id }">
+                    <td>{{ p.id }}</td>
+                    <td>{{ p.name }}</td>
+                    <td>{{ p.description || '-' }}</td>
+                    <td>
+                      <el-button size="small" :type="selectedProject === p.id ? 'primary' : 'default'" @click="selectedProject = p.id; onProjectChange()">
+                        {{ selectedProject === p.id ? '当前项目' : '设为当前' }}
+                      </el-button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
             <div v-else class="module-card">
               <div class="module-toolbar">
                 <h3>{{ topMenu === 'workbench' ? '工作台' : topMenu === 'project' ? '项目管理' : topMenu === 'plan' ? '测试计划' : 'E2E测试' }}</h3>
@@ -1163,6 +1255,21 @@ onMounted(async () => {
         <template #footer>
           <el-button @click="userDialogVisible = false">取消</el-button>
           <el-button type="primary" :loading="savingUser" @click="submitUser">保存</el-button>
+        </template>
+      </el-dialog>
+
+      <el-dialog v-model="projectDialogVisible" title="新建项目" width="520px">
+        <el-form label-position="top">
+          <el-form-item label="项目名称">
+            <el-input v-model="projectForm.name" maxlength="80" show-word-limit />
+          </el-form-item>
+          <el-form-item label="项目描述">
+            <el-input v-model="projectForm.description" type="textarea" :rows="3" maxlength="200" show-word-limit />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="projectDialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="savingProject" @click="submitProject">创建</el-button>
         </template>
       </el-dialog>
 
