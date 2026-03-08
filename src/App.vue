@@ -1777,21 +1777,17 @@ onMounted(async () => {
                 <el-input v-model="s.action" placeholder="请输入步骤" />
                 <el-input v-model="s.expected" placeholder="请输入预期结果" />
                 <div class="step-ops">
-                  <button class="step-op" :disabled="idx === 0" @click="moveStepUp(idx)">
+                  <button class="step-op" :disabled="idx === 0" @click="moveStepUp(idx)" title="上移">
                     <el-icon class="btn-icon"><ArrowUp /></el-icon>
-                    <span>上移</span>
                   </button>
-                  <button class="step-op" :disabled="idx === stepRows.length - 1" @click="moveStepDown(idx)">
+                  <button class="step-op" :disabled="idx === stepRows.length - 1" @click="moveStepDown(idx)" title="下移">
                     <el-icon class="btn-icon"><ArrowDown /></el-icon>
-                    <span>下移</span>
                   </button>
-                  <button class="step-op" @click="copyStepRow(idx)">
+                  <button class="step-op" @click="copyStepRow(idx)" title="复制">
                     <el-icon class="btn-icon"><CopyDocument /></el-icon>
-                    <span>复制</span>
                   </button>
-                  <button class="step-op danger" @click="removeStepRow(idx)">
+                  <button class="step-op danger" @click="removeStepRow(idx)" title="删除">
                     <el-icon class="btn-icon"><Delete /></el-icon>
-                    <span>删除</span>
                   </button>
                 </div>
               </div>
