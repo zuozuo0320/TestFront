@@ -630,11 +630,12 @@ async function loadCases() {
       sortBy: sortBy.value,
       sortOrder: sortOrder.value,
     })
-    rows.value = data.items.map(toRow)
-    total.value = data.total
-    page.value = data.page
-    pageInput.value = String(data.page)
-    pageSize.value = data.pageSize
+    const items = Array.isArray((data as any).items) ? (data as any).items : []
+    rows.value = items.map(toRow)
+    total.value = Number((data as any).total) || 0
+    page.value = Number((data as any).page) || 1
+    pageInput.value = String(page.value)
+    pageSize.value = Number((data as any).pageSize) || pageSize.value
   } catch (e: any) {
     loadError.value = e?.response?.data?.error || '加载用例失败，请重试'
     ElMessage.error(loadError.value)
