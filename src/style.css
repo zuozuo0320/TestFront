@@ -322,6 +322,26 @@ body { margin: 0; background: #f3f4f6; }
 .tree-remove:hover {
   background: #fee2e2;
 }
+.module-tree {
+  margin-top: 6px;
+  background: transparent;
+}
+.module-tree :deep(.el-tree-node__content) {
+  height: 30px;
+  border-radius: 6px;
+}
+.module-tree :deep(.el-tree-node__content:hover) {
+  background: #f2f6fb;
+}
+.tree-node-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #475569;
+  padding-right: 6px;
+}
 .tree-item.active {
   background: #111827;
   color: #f8fafc;

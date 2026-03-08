@@ -55,6 +55,12 @@ type StepRow = {
   expected: string
 }
 
+type ModuleTreeNode = {
+  name: string
+  path: string
+  children: ModuleTreeNode[]
+}
+
 const topMenu = ref<'workbench' | 'project' | 'plan' | 'testcases' | 'e2e' | 'system'>('testcases')
 const activeMenu = ref<'users' | 'roles' | 'projects'>('users')
 const users = ref<UserRow[]>([])
@@ -170,6 +176,43 @@ const modulePaths = computed(() => {
     if (normalized !== '/') set.add(normalized)
   })
   return Array.from(set).sort((a, b) => a.localeCompare(b, 'zh-CN'))
+})
+
+const moduleTree = computed<ModuleTreeNode[]>(() => {
+  const rootMap = new Map<string, ModuleTreeNode>()
+
+  const ensureChild = (nodes: ModuleTreeNode[], path: string, name: string) => {
+    let node = nodes.find((n) => n.path === path)
+    if (!node) {
+      node = { name, path, children: [] }
+      nodes.push(node)
+      nodes.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
+    }
+    return node
+  }
+
+  for (const p of modulePaths.value) {
+    const parts = p.split('/').filter(Boolean)
+    let currentPath = ''
+    let cursor: ModuleTreeNode[] = Array.from(rootMap.values())
+
+    for (const part of parts) {
+      currentPath += `/${part}`
+      if (!rootMap.has(currentPath) && currentPath.split('/').filter(Boolean).length === 1) {
+        rootMap.set(currentPath, { name: part, path: currentPath, children: [] })
+      }
+
+      let node: ModuleTreeNode
+      if (currentPath.split('/').filter(Boolean).length === 1) {
+        node = rootMap.get(currentPath)!
+      } else {
+        node = ensureChild(cursor, currentPath, part)
+      }
+      cursor = node.children
+    }
+  }
+
+  return Array.from(rootMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
 })
 
 const creatableRoles = computed(() => roles.value.filter((r) => r.name !== 'admin'))
@@ -1088,12 +1131,21 @@ onMounted(async () => {
                     <span>全部用例</span>
                     <span>{{ total }}</span>
                   </div>
-                  <div class="tree-children">
-                    <div class="tree-item child" v-for="p in modulePaths" :key="p">
-                      <span>{{ p }}</span>
-                      <button class="tree-remove" @click.stop="removeDirectory(p)">删除</button>
-                    </div>
-                  </div>
+                  <el-tree
+                    v-if="moduleTree.length > 0"
+                    class="module-tree"
+                    :data="moduleTree"
+                    node-key="path"
+                    default-expand-all
+                    :props="{ label: 'name', children: 'children' }"
+                  >
+                    <template #default="{ data }">
+                      <div class="tree-node-row">
+                        <span>{{ data.name }}</span>
+                        <button class="tree-remove" @click.stop="removeDirectory(data.path)">删除</button>
+                      </div>
+                    </template>
+                  </el-tree>
                 </div>
               </div>
 
