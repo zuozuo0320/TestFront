@@ -145,8 +145,8 @@ const activeFilterChips = computed(() => {
 
 const creatableRoles = computed(() => roles.value.filter((r) => r.name !== 'admin'))
 
-const userAvatarUrl = computed(() => {
-  const avatarRaw = ((currentUser.value as any)?.avatar || '').trim()
+function resolveAvatarUrl(avatar?: string, fallbackName?: string) {
+  const avatarRaw = (avatar || '').trim()
   if (avatarRaw) {
     if (/^https?:\/\//i.test(avatarRaw)) return avatarRaw
     const envBase = ((import.meta as any).env?.VITE_API_BASE_URL as string | undefined)?.trim()
@@ -156,8 +156,12 @@ const userAvatarUrl = computed(() => {
     }
     return `http://localhost:8080${avatarRaw.startsWith('/') ? '' : '/'}${avatarRaw}`
   }
-  const seed = encodeURIComponent((currentUser.value?.name || 'TestPilot').trim() || 'TestPilot')
+  const seed = encodeURIComponent((fallbackName || 'TestPilot').trim() || 'TestPilot')
   return `https://api.dicebear.com/7.x/initials/svg?seed=${seed}`
+}
+
+const userAvatarUrl = computed(() => {
+  return resolveAvatarUrl((currentUser.value as any)?.avatar, currentUser.value?.name)
 })
 
 function toRow(tc: TestCase): TableRow {
@@ -1015,12 +1019,15 @@ onMounted(async () => {
               </div>
             </div>
 
-            <div v-else-if="topMenu === 'system' && activeMenu === 'users'" class="module-card" v-loading="usersLoading">
-              <div class="module-toolbar">
+            <div v-else-if="topMenu === 'system' && activeMenu === 'users'" class="module-card users-card" v-loading="usersLoading">
+              <div class="module-toolbar users-toolbar">
                 <h3>用户管理</h3>
-                <el-button type="primary" @click="openCreateUser">新建用户</el-button>
+                <div class="toolbar-extra">
+                  <el-tag type="info" effect="plain">共 {{ users.length }} 个用户</el-tag>
+                  <el-button type="primary" @click="openCreateUser">新建用户</el-button>
+                </div>
               </div>
-              <table class="simple-table">
+              <table class="simple-table users-table">
                 <thead>
                   <tr>
                     <th>ID</th>
@@ -1036,8 +1043,16 @@ onMounted(async () => {
                     <td colspan="6" class="empty-td">暂无用户</td>
                   </tr>
                   <tr v-for="u in users" :key="u.id">
-                    <td>{{ u.id }}</td>
-                    <td>{{ u.name }}</td>
+                    <td class="mono">#{{ u.id }}</td>
+                    <td>
+                      <div class="user-cell">
+                        <img class="user-cell-avatar" :src="resolveAvatarUrl(u.avatar, u.name)" alt="avatar" />
+                        <div class="user-cell-meta">
+                          <div class="user-cell-name">{{ u.name }}</div>
+                          <div class="user-cell-sub">{{ u.email }}</div>
+                        </div>
+                      </div>
+                    </td>
                     <td>{{ u.email }}</td>
                     <td>{{ u.phone || '-' }}</td>
                     <td>

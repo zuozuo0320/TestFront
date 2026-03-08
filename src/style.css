@@ -599,6 +599,78 @@ body { margin: 0; background: #f3f4f6; }
   margin-bottom: 12px;
 }
 
+.users-card {
+  border: 1px solid #e6ebf2;
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+}
+
+.users-toolbar {
+  margin-bottom: 14px;
+}
+
+.toolbar-extra {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.users-table {
+  border: 1px solid #e9eef5;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.users-table th {
+  background: #f3f7fc;
+  color: #334155;
+  font-weight: 700;
+}
+
+.users-table tbody tr:hover {
+  background: #f8fbff;
+}
+
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 220px;
+}
+
+.user-cell-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #dbe2ea;
+  background: #f8fafc;
+}
+
+.user-cell-meta {
+  min-width: 0;
+}
+
+.user-cell-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.user-cell-sub {
+  font-size: 12px;
+  color: #64748b;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  color: #475569;
+}
+
 .simple-table {
   width: 100%;
   border-collapse: collapse;
