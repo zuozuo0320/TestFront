@@ -4,7 +4,7 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; background: #f3f4f6; }
+body { margin: 0; background: radial-gradient(1200px 500px at 12% -10%, rgba(17, 24, 39, 0.08), transparent 60%), #f3f4f6; }
 
 .login-wrap {
   min-height: 100vh;
@@ -12,6 +12,21 @@ body { margin: 0; background: #f3f4f6; }
   align-items: center;
   justify-content: center;
   padding: 24px;
+}
+
+.layout { min-height: 100vh; }
+
+.top-header {
+  height: 56px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-bottom: 1px solid #e5e7eb;
+  display: grid;
+  grid-template-columns: 180px 1fr auto;
+  align-items: center;
+  padding: 0 14px;
+  gap: 8px;
 }
 
 .login-card {
@@ -89,12 +104,13 @@ body { margin: 0; background: #f3f4f6; }
   width: 26px;
   height: 26px;
   border-radius: 6px;
-  background: #111827;
+  background: linear-gradient(135deg, #111827 0%, #374151 100%);
   color: #fff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
+  box-shadow: 0 0 0 1px rgba(17, 24, 39, 0.2), 0 6px 16px rgba(17, 24, 39, 0.28);
 }
 .name { font-weight: 600; }
 
@@ -292,13 +308,14 @@ body { margin: 0; background: #f3f4f6; }
 .content-wrap { padding: 14px; }
 
 .case-page {
-  background: #fff;
+  background: rgba(255, 255, 255, 0.92);
   border: 1px solid #e6ebf2;
   border-radius: 12px;
   min-height: calc(100vh - 78px);
   display: grid;
   grid-template-columns: 260px 1fr;
   overflow: hidden;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
 }
 
 .left-tree {
@@ -746,7 +763,8 @@ body { margin: 0; background: #f3f4f6; }
 .users-card {
   border: 1px solid #e6ebf2;
   border-radius: 12px;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(2px);
 }
 
 .users-toolbar {
@@ -910,6 +928,13 @@ body { margin: 0; background: #f3f4f6; }
   --el-button-hover-border-color: var(--tp-btn-bg-hover) !important;
   --el-button-active-bg-color: #030712 !important;
   --el-button-active-border-color: #030712 !important;
+  background-image: linear-gradient(90deg, #111827 0%, #374151 100%) !important;
+  border-color: #1f2937 !important;
+  box-shadow: 0 4px 10px rgba(17, 24, 39, 0.16);
+}
+
+.el-button--primary:hover {
+  background-image: linear-gradient(90deg, #0b1220 0%, #1f2937 100%) !important;
 }
 
 .case-editor-drawer :deep(.el-drawer__header) {
