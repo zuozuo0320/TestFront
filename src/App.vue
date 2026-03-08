@@ -370,7 +370,7 @@ async function removeDirectory(path: string) {
     if (page.value > maxAfterDelete) page.value = maxAfterDelete
     await loadCases()
 
-    ElMessage.success(`目录已删除：${target}，同步删除用例 ${boundCount} 条`)
+    ElMessage.success(`删除成功（${boundCount} 条）`)
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.error || '删除目录失败')
   }
