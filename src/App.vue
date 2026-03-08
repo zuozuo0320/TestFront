@@ -1332,7 +1332,7 @@ onMounted(async () => {
                     <td class="mono">#{{ u.id }}</td>
                     <td>
                       <div class="user-cell">
-                        <img class="user-cell-avatar" :src="resolveAvatarUrl(u.avatar, u.name)" alt="avatar" />
+                        <img class="user-cell-avatar" :src="resolveAvatarUrl(u.avatar, u.name)" alt="avatar" @error="(e: any) => { e.target.src = resolveAvatarUrl('', u.name) }" />
                         <div class="user-cell-meta">
                           <div class="user-cell-name">{{ u.name }}</div>
                           <div class="user-cell-sub">{{ u.email }}</div>
@@ -1347,7 +1347,14 @@ onMounted(async () => {
                     <td>
                       <div class="action-group">
                         <button class="action-btn action-edit" @click="openEditUser(u)">编辑</button>
-                        <button class="action-btn action-delete" @click="removeUser(u)">删除</button>
+                        <button
+                          class="action-btn action-delete"
+                          :class="{ disabled: String((u as any).role || '').toLowerCase() === 'admin' }"
+                          :disabled="String((u as any).role || '').toLowerCase() === 'admin'"
+                          @click="String((u as any).role || '').toLowerCase() !== 'admin' && removeUser(u)"
+                        >
+                          删除
+                        </button>
                       </div>
                     </td>
                   </tr>

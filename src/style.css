@@ -1145,6 +1145,19 @@ body { margin: 0; background: #f3f4f6; }
   background: #eef2f7;
 }
 
+.action-btn.disabled,
+.action-btn:disabled {
+  color: #94a3b8 !important;
+  cursor: not-allowed;
+  background: transparent !important;
+}
+
+.action-btn.disabled:hover,
+.action-btn:disabled:hover {
+  color: #94a3b8 !important;
+  background: transparent !important;
+}
+
 .pager {
   margin-top: 10px;
   display: flex;
