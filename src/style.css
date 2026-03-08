@@ -281,10 +281,14 @@ body { margin: 0; background: radial-gradient(1200px 500px at 12% -10%, rgba(17,
   letter-spacing: 0.1px;
   cursor: pointer;
   margin-bottom: 6px;
-  transition: all 0.18s ease;
+  background: transparent;
+  outline: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.16s ease, color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
 }
 .main-nav-item:hover {
-  background: #eef2f7;
+  background: #e5e7eb;
   color: #111827;
   transform: translateX(1px);
 }
@@ -294,6 +298,19 @@ body { margin: 0; background: radial-gradient(1200px 500px at 12% -10%, rgba(17,
   font-weight: 700;
   box-shadow: 0 4px 12px rgba(17, 24, 39, 0.22), inset 0 0 0 1px #4b5563;
 }
+.main-nav-item:active,
+.main-nav-item:focus,
+.main-nav-item:focus-visible {
+  outline: none;
+  background: #e5e7eb;
+}
+
+.main-nav-item.active:active,
+.main-nav-item.active:focus,
+.main-nav-item.active:focus-visible {
+  background: linear-gradient(90deg, #111827 0%, #374151 100%);
+}
+
 .main-nav-item.active::before {
   content: '';
   position: absolute;
