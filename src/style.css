@@ -1147,7 +1147,7 @@ body { margin: 0; background: radial-gradient(1200px 500px at 12% -10%, rgba(17,
 
 .steps-grid-head {
   display: grid;
-  grid-template-columns: 1fr 1fr 132px;
+  grid-template-columns: 1fr 1fr 156px;
   gap: 10px;
   padding: 8px 10px;
   background: #f8fafc;
@@ -1160,7 +1160,7 @@ body { margin: 0; background: radial-gradient(1200px 500px at 12% -10%, rgba(17,
 
 .steps-grid-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 132px;
+  grid-template-columns: 1fr 1fr 156px;
   gap: 10px;
   margin-top: 10px;
   align-items: center;
