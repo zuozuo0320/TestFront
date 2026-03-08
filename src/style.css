@@ -215,8 +215,9 @@ body { margin: 0; background: #f3f4f6; }
   margin-left: 0;
   min-width: 0;
   justify-content: flex-end;
-  overflow-x: auto;
-  overflow-y: hidden;
+  flex-wrap: wrap;
+  overflow: visible;
+  row-gap: 6px;
   padding-bottom: 2px;
 }
 
@@ -240,8 +241,8 @@ body { margin: 0; background: #f3f4f6; }
 }
 
 .query-input {
-  width: 280px;
-  min-width: 220px;
+  width: clamp(220px, 32vw, 320px);
+  min-width: 200px;
 }
 
 .btn-advanced {
@@ -576,6 +577,28 @@ body { margin: 0; background: #f3f4f6; }
 
   .toolbar-1 .right {
     justify-content: flex-start;
+    width: 100%;
+  }
+
+  .query-input {
+    flex: 1 1 280px;
+    min-width: 220px;
+  }
+}
+
+@media (max-width: 900px) {
+  .toolbar-1 .right {
+    gap: 6px;
+  }
+
+  .query-input {
+    flex-basis: 100%;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .toolbar-btn {
+    min-width: 72px;
   }
 }
 
