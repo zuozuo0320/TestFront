@@ -746,6 +746,11 @@ async function saveProfile() {
   }
 }
 
+function openProfileCenter() {
+  topMenu.value = 'system'
+  switchMenu('profile')
+}
+
 function logout() {
   localStorage.removeItem('tp-token')
   localStorage.removeItem('tp-user-id')
@@ -813,9 +818,16 @@ onMounted(async () => {
             <div class="user-avatar-wrap">
               <img class="user-avatar" :src="userAvatarUrl" alt="avatar" />
               <div class="user-hover-card">
-                <div class="hover-title">当前登录</div>
-                <div class="hover-name">{{ currentUser?.name || 'demo' }}</div>
-                <el-button class="hover-logout-btn" size="small" type="danger" plain @click="logout">退出登录</el-button>
+                <div class="hover-user-row">
+                  <img class="hover-avatar" :src="userAvatarUrl" alt="avatar" />
+                  <div class="hover-user-meta">
+                    <div class="hover-name">{{ currentUser?.name || 'demo' }}</div>
+                  </div>
+                </div>
+                <div class="hover-actions">
+                  <button class="hover-action-btn" @click="openProfileCenter">个人中心</button>
+                  <button class="hover-action-btn danger" @click="logout">退出登录</button>
+                </div>
               </div>
             </div>
           </div>

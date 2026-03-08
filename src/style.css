@@ -142,12 +142,12 @@ body { margin: 0; background: #f3f4f6; }
   position: absolute;
   right: -4px;
   top: calc(100% + 8px);
-  width: 210px;
+  width: 224px;
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   box-shadow: 0 14px 32px rgba(15, 23, 42, 0.18);
-  padding: 12px;
+  padding: 10px;
   display: none;
   z-index: 40;
 }
@@ -168,10 +168,24 @@ body { margin: 0; background: #f3f4f6; }
   flex-direction: column;
   gap: 10px;
 }
-.hover-title {
-  font-size: 11px;
-  color: #94a3b8;
-  letter-spacing: 0.2px;
+.hover-user-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 2px 8px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.hover-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #dbe2ea;
+  background: #f8fafc;
+}
+.hover-user-meta {
+  min-width: 0;
+  flex: 1;
 }
 .hover-name {
   font-size: 14px;
@@ -179,8 +193,33 @@ body { margin: 0; background: #f3f4f6; }
   font-weight: 600;
   word-break: break-all;
 }
-.hover-logout-btn {
+.hover-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hover-action-btn {
   width: 100%;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #334155;
+  border-radius: 8px;
+  padding: 7px 10px;
+  text-align: left;
+  font-size: 13px;
+  cursor: pointer;
+}
+.hover-action-btn:hover {
+  background: #f8fafc;
+  border-color: #dbe2ea;
+}
+.hover-action-btn.danger {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+.hover-action-btn.danger:hover {
+  background: #feecec;
 }
 .project-select-inline {
   width: 100%;
