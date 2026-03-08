@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowDown, ArrowUp, CopyDocument, Delete, Edit } from '@element-plus/icons-vue'
+import { ArrowDown, ArrowUp, CopyDocument, Delete, Edit, Plus } from '@element-plus/icons-vue'
 import {
   createProject,
   createRole,
@@ -1124,7 +1124,11 @@ onMounted(async () => {
               <div class="left-tree">
                 <div class="tree-header">
                   <el-input size="small" placeholder="请输入模块名称" />
-                  <el-button size="small" @click="openCreateDirectory">新建目录</el-button>
+                  <el-tooltip content="新建目录" placement="top">
+                    <el-button class="tree-icon-btn" size="small" circle @click="openCreateDirectory">
+                      <el-icon><Plus /></el-icon>
+                    </el-button>
+                  </el-tooltip>
                 </div>
                 <div class="tree-list">
                   <div class="tree-item active">
@@ -1142,7 +1146,11 @@ onMounted(async () => {
                     <template #default="{ data }">
                       <div class="tree-node-row">
                         <span>{{ data.name }}</span>
-                        <button class="tree-remove" @click.stop="removeDirectory(data.path)">删除</button>
+                        <el-tooltip content="删除目录" placement="top">
+                          <button class="tree-remove icon" @click.stop="removeDirectory(data.path)">
+                            <el-icon><Delete /></el-icon>
+                          </button>
+                        </el-tooltip>
                       </div>
                     </template>
                   </el-tree>
