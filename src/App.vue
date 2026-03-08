@@ -316,7 +316,7 @@ function submitDirectory() {
   customModulePaths.value.push(nextPath)
   caseForm.modulePath = nextPath
   directoryDialogVisible.value = false
-  ElMessage.success(`目录已创建：${nextPath}`)
+  ElMessage.success('创建成功')
 }
 
 function isPathEqualOrChild(path: string, target: string) {
