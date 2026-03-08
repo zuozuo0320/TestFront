@@ -105,34 +105,58 @@ body { margin: 0; background: #f3f4f6; }
 .user-box {
   display: flex;
   align-items: center;
-  gap: 10px;
   justify-self: end;
-  padding: 6px 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 999px;
-  background: #fff;
+  position: relative;
+}
+.user-avatar-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
 }
 .user-avatar {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   object-fit: cover;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #d1d5db;
   background: #f3f4f6;
+  cursor: pointer;
 }
-.user-meta {
+.user-hover-card {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  min-width: 180px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.14);
+  padding: 10px;
+  display: none;
+  z-index: 30;
+}
+.user-hover-card::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  right: 10px;
+  width: 10px;
+  height: 10px;
+  border-left: 1px solid #e5e7eb;
+  border-top: 1px solid #e5e7eb;
+  background: #fff;
+  transform: rotate(45deg);
+}
+.user-avatar-wrap:hover .user-hover-card {
   display: flex;
   flex-direction: column;
-  line-height: 1.1;
+  gap: 10px;
 }
-.user-name {
+.hover-name {
   font-size: 13px;
   color: #111827;
   font-weight: 600;
-}
-.user-role {
-  font-size: 11px;
-  color: #6b7280;
+  word-break: break-all;
 }
 .project-select-inline {
   width: 100%;

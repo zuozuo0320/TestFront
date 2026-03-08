@@ -151,14 +151,6 @@ const userAvatarUrl = computed(() => {
   return `https://api.dicebear.com/7.x/initials/svg?seed=${seed}`
 })
 
-const userRoleLabel = computed(() => {
-  const role = ((currentUser.value as any)?.role || '').toLowerCase()
-  if (role === 'admin') return '系统管理员'
-  if (role === 'manager') return '项目管理员'
-  if (role === 'tester') return '测试工程师'
-  return role || '演示账号'
-})
-
 function toRow(tc: TestCase): TableRow {
   return {
     id: tc.id,
@@ -818,12 +810,13 @@ onMounted(async () => {
           </div>
 
           <div class="user-box">
-            <img class="user-avatar" :src="userAvatarUrl" alt="avatar" />
-            <div class="user-meta">
-              <span class="user-name">{{ currentUser?.name || 'demo' }}</span>
-              <span class="user-role">{{ userRoleLabel }}</span>
+            <div class="user-avatar-wrap">
+              <img class="user-avatar" :src="userAvatarUrl" alt="avatar" />
+              <div class="user-hover-card">
+                <div class="hover-name">{{ currentUser?.name || 'demo' }}</div>
+                <el-button size="small" type="danger" plain @click="logout">退出登录</el-button>
+              </div>
             </div>
-            <el-button size="small" @click="logout">退出</el-button>
           </div>
         </header>
 
