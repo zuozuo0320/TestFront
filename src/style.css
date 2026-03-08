@@ -657,6 +657,12 @@ body { margin: 0; background: #f3f4f6; }
   color: #0f172a;
 }
 
+.role-cell-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
 .user-cell-sub {
   font-size: 12px;
   color: #64748b;

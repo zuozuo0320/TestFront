@@ -1129,15 +1129,17 @@ onMounted(async () => {
               </table>
             </div>
 
-            <div v-else-if="topMenu === 'system' && activeMenu === 'roles'" class="module-card" v-loading="rolesLoading">
-              <div class="module-toolbar">
+            <div v-else-if="topMenu === 'system' && activeMenu === 'roles'" class="module-card users-card" v-loading="rolesLoading">
+              <div class="module-toolbar users-toolbar">
                 <h3>角色管理</h3>
-                <el-button type="primary" @click="openCreateRole">新建角色</el-button>
+                <div class="toolbar-extra">
+                  <el-tag type="info" effect="plain">共 {{ roles.length }} 个角色</el-tag>
+                  <el-button type="primary" @click="openCreateRole">新建角色</el-button>
+                </div>
               </div>
-              <table class="simple-table">
+              <table class="simple-table users-table">
                 <thead>
                   <tr>
-                    <th>ID</th>
                     <th>角色名称</th>
                     <th>描述</th>
                     <th style="width: 220px">操作</th>
@@ -1145,11 +1147,12 @@ onMounted(async () => {
                 </thead>
                 <tbody>
                   <tr v-if="roles.length === 0">
-                    <td colspan="4" class="empty-td">暂无角色</td>
+                    <td colspan="3" class="empty-td">暂无角色</td>
                   </tr>
                   <tr v-for="r in roles" :key="r.id">
-                    <td>{{ r.id }}</td>
-                    <td>{{ r.name }}</td>
+                    <td>
+                      <div class="role-cell-name">{{ r.name }}</div>
+                    </td>
                     <td>{{ r.description || '-' }}</td>
                     <td>
                       <div class="action-group">
