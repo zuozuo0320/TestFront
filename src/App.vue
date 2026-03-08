@@ -3,15 +3,26 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown, ArrowUp, CopyDocument, Delete, Edit } from '@element-plus/icons-vue'
 import {
+  createRole,
   createTestCase,
+  createUser,
+  deleteRoleById,
   deleteTestCase,
+  deleteUserById,
   listProjects,
+  listRoles,
   listTestCases,
+  listUsers,
   loginByEmail,
+  updateMyProfile,
+  updateRoleById,
   updateTestCase,
+  updateUser,
   type LoginResp,
   type Project,
+  type Role,
   type TestCase,
+  type User,
 } from './api'
 
 type TableRow = {
@@ -32,11 +43,50 @@ type TableRow = {
   priority: string
 }
 
+type UserRow = User & {
+  roleIds: number[]
+  projectIds: number[]
+}
+
 type StepRow = {
   action: string
   expected: string
 }
 
+const activeMenu = ref<'testcases' | 'users' | 'roles' | 'profile'>('testcases')
+const users = ref<UserRow[]>([])
+const roles = ref<Role[]>([])
+const usersLoading = ref(false)
+const rolesLoading = ref(false)
+const userDialogVisible = ref(false)
+const roleDialogVisible = ref(false)
+const editingUserId = ref<number | null>(null)
+const editingRoleId = ref<number | null>(null)
+const savingUser = ref(false)
+const savingRole = ref(false)
+const savingProfile = ref(false)
+
+const userForm = reactive({
+  name: '',
+  email: '',
+  phone: '',
+  avatar: '',
+  roleIds: [] as number[],
+  projectIds: [] as number[],
+  active: true,
+})
+
+const roleForm = reactive({
+  name: '',
+  description: '',
+})
+
+const profileForm = reactive({
+  name: '',
+  email: '',
+  phone: '',
+  avatar: '',
+})
 const loginLoading = ref(false)
 const appLoading = ref(false)
 const saving = ref(false)
@@ -438,6 +488,221 @@ async function onProjectChange() {
   await loadCases()
 }
 
+async function loadUsers() {
+  usersLoading.value = true
+  try {
+    const data = await listUsers()
+    users.value = data
+      .filter((u) => !u.deleted_at)
+      .map((u) => ({ ...u, roleIds: [], projectIds: [] }))
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '加载用户失败')
+  } finally {
+    usersLoading.value = false
+  }
+}
+
+async function loadRoles() {
+  rolesLoading.value = true
+  try {
+    roles.value = await listRoles()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '加载角色失败')
+  } finally {
+    rolesLoading.value = false
+  }
+}
+
+function switchMenu(menu: 'testcases' | 'users' | 'roles' | 'profile') {
+  activeMenu.value = menu
+  if (menu === 'users') {
+    loadUsers()
+    if (roles.value.length === 0) loadRoles()
+  }
+  if (menu === 'roles') loadRoles()
+  if (menu === 'profile') syncProfileForm()
+}
+
+function syncProfileForm() {
+  profileForm.name = currentUser.value?.name || ''
+  profileForm.email = currentUser.value?.email || ''
+  profileForm.phone = (currentUser.value as any)?.phone || ''
+  profileForm.avatar = (currentUser.value as any)?.avatar || ''
+}
+
+function openCreateUser() {
+  editingUserId.value = null
+  userForm.name = ''
+  userForm.email = ''
+  userForm.phone = ''
+  userForm.avatar = ''
+  userForm.roleIds = []
+  userForm.projectIds = selectedProject.value ? [selectedProject.value] : []
+  userForm.active = true
+  userDialogVisible.value = true
+}
+
+function openEditUser(row: UserRow) {
+  editingUserId.value = row.id
+  userForm.name = row.name
+  userForm.email = row.email
+  userForm.phone = row.phone || ''
+  userForm.avatar = row.avatar || ''
+  userForm.roleIds = row.roleIds || []
+  userForm.projectIds = row.projectIds || []
+  userForm.active = row.active
+  userDialogVisible.value = true
+}
+
+async function submitUser() {
+  if (!userForm.name.trim() || !userForm.email.trim()) {
+    ElMessage.warning('姓名和邮箱必填')
+    return
+  }
+  if (userForm.roleIds.length === 0 || userForm.projectIds.length === 0) {
+    ElMessage.warning('角色和项目至少选择一个')
+    return
+  }
+
+  savingUser.value = true
+  try {
+    if (editingUserId.value) {
+      await updateUser(editingUserId.value, {
+        name: userForm.name.trim(),
+        email: userForm.email.trim(),
+        phone: userForm.phone.trim() || undefined,
+        avatar: userForm.avatar.trim() || undefined,
+        active: userForm.active,
+        role_ids: userForm.roleIds,
+        project_ids: userForm.projectIds,
+      })
+      ElMessage.success('用户更新成功')
+    } else {
+      const defaultRoleName = roles.value.find((r) => r.id === userForm.roleIds[0])?.name || 'tester'
+      await createUser({
+        name: userForm.name.trim(),
+        email: userForm.email.trim(),
+        phone: userForm.phone.trim() || undefined,
+        avatar: userForm.avatar.trim() || undefined,
+        role: defaultRoleName,
+        role_ids: userForm.roleIds,
+        project_ids: userForm.projectIds,
+      })
+      ElMessage.success('用户创建成功')
+    }
+
+    userDialogVisible.value = false
+    await loadUsers()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '保存用户失败')
+  } finally {
+    savingUser.value = false
+  }
+}
+
+async function removeUser(row: UserRow) {
+  try {
+    await ElMessageBox.confirm(`确认删除用户【${row.name}】？`, '删除确认', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+
+  try {
+    await deleteUserById(row.id)
+    ElMessage.success('用户已逻辑删除')
+    await loadUsers()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '删除用户失败')
+  }
+}
+
+function openCreateRole() {
+  editingRoleId.value = null
+  roleForm.name = ''
+  roleForm.description = ''
+  roleDialogVisible.value = true
+}
+
+function openEditRole(row: Role) {
+  editingRoleId.value = row.id
+  roleForm.name = row.name
+  roleForm.description = row.description || ''
+  roleDialogVisible.value = true
+}
+
+async function submitRole() {
+  if (!roleForm.name.trim()) {
+    ElMessage.warning('角色名称不能为空')
+    return
+  }
+
+  savingRole.value = true
+  try {
+    if (editingRoleId.value) {
+      await updateRoleById(editingRoleId.value, {
+        name: roleForm.name.trim(),
+        description: roleForm.description.trim(),
+      })
+      ElMessage.success('角色更新成功')
+    } else {
+      await createRole({
+        name: roleForm.name.trim(),
+        description: roleForm.description.trim(),
+      })
+      ElMessage.success('角色创建成功')
+    }
+
+    roleDialogVisible.value = false
+    await loadRoles()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '保存角色失败')
+  } finally {
+    savingRole.value = false
+  }
+}
+
+async function removeRole(row: Role) {
+  try {
+    await ElMessageBox.confirm(`确认删除角色【${row.name}】？`, '删除确认', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+
+  try {
+    await deleteRoleById(row.id)
+    ElMessage.success('角色删除成功')
+    await loadRoles()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '删除角色失败')
+  }
+}
+
+async function saveProfile() {
+  savingProfile.value = true
+  try {
+    const data = await updateMyProfile({
+      name: profileForm.name.trim() || undefined,
+      email: profileForm.email.trim() || undefined,
+      phone: profileForm.phone.trim() || undefined,
+      avatar: profileForm.avatar.trim() || undefined,
+    })
+    currentUser.value = { ...currentUser.value!, ...data }
+    ElMessage.success('个人中心更新成功')
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '个人中心更新失败')
+  } finally {
+    savingProfile.value = false
+  }
+}
+
 function logout() {
   localStorage.removeItem('tp-token')
   localStorage.removeItem('tp-user-id')
@@ -453,6 +718,7 @@ onMounted(async () => {
   if (localStorage.getItem('tp-token')) {
     loggedIn.value = true
     await initAfterLogin()
+    syncProfileForm()
   }
 })
 </script>
@@ -508,15 +774,14 @@ onMounted(async () => {
 
         <div class="main">
           <aside class="main-nav">
-            <div class="main-nav-item">工作台</div>
-            <div class="main-nav-item">项目管理</div>
-            <div class="main-nav-item">测试计划</div>
-            <div class="main-nav-item active">测试用例</div>
-            <div class="main-nav-item">E2E测试</div>
+            <div class="main-nav-item" @click="switchMenu('testcases')" :class="{ active: activeMenu === 'testcases' }">测试用例</div>
+            <div class="main-nav-item" @click="switchMenu('users')" :class="{ active: activeMenu === 'users' }">用户管理</div>
+            <div class="main-nav-item" @click="switchMenu('roles')" :class="{ active: activeMenu === 'roles' }">角色管理</div>
+            <div class="main-nav-item" @click="switchMenu('profile')" :class="{ active: activeMenu === 'profile' }">个人中心</div>
           </aside>
 
           <section class="content-wrap">
-            <div class="case-page">
+            <div v-if="activeMenu === 'testcases'" class="case-page">
               <div class="left-tree">
                 <el-input size="small" placeholder="请输入模块名称" />
                 <div class="tree-list">
@@ -649,9 +914,139 @@ onMounted(async () => {
                 </div>
               </div>
             </div>
+
+            <div v-else-if="activeMenu === 'users'" class="module-card" v-loading="usersLoading">
+              <div class="module-toolbar">
+                <h3>用户管理</h3>
+                <el-button type="primary" @click="openCreateUser">新建用户</el-button>
+              </div>
+              <table class="simple-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>姓名</th>
+                    <th>邮箱</th>
+                    <th>手机号</th>
+                    <th>状态</th>
+                    <th style="width: 220px">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-if="users.length === 0">
+                    <td colspan="6" class="empty-td">暂无用户</td>
+                  </tr>
+                  <tr v-for="u in users" :key="u.id">
+                    <td>{{ u.id }}</td>
+                    <td>{{ u.name }}</td>
+                    <td>{{ u.email }}</td>
+                    <td>{{ u.phone || '-' }}</td>
+                    <td>
+                      <el-tag size="small" :type="u.active ? 'success' : 'info'">{{ u.active ? 'active' : 'frozen' }}</el-tag>
+                    </td>
+                    <td>
+                      <div class="action-group">
+                        <button class="action-btn action-edit" @click="openEditUser(u)">编辑</button>
+                        <button class="action-btn action-delete" @click="removeUser(u)">删除</button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div v-else-if="activeMenu === 'roles'" class="module-card" v-loading="rolesLoading">
+              <div class="module-toolbar">
+                <h3>角色管理</h3>
+                <el-button type="primary" @click="openCreateRole">新建角色</el-button>
+              </div>
+              <table class="simple-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>角色名称</th>
+                    <th>描述</th>
+                    <th style="width: 220px">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-if="roles.length === 0">
+                    <td colspan="4" class="empty-td">暂无角色</td>
+                  </tr>
+                  <tr v-for="r in roles" :key="r.id">
+                    <td>{{ r.id }}</td>
+                    <td>{{ r.name }}</td>
+                    <td>{{ r.description || '-' }}</td>
+                    <td>
+                      <div class="action-group">
+                        <button class="action-btn action-edit" @click="openEditRole(r)">编辑</button>
+                        <button class="action-btn action-delete" @click="removeRole(r)">删除</button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div v-else class="module-card profile-card">
+              <div class="module-toolbar">
+                <h3>个人中心</h3>
+              </div>
+              <el-form label-position="top" class="profile-form">
+                <el-form-item label="头像URL">
+                  <el-input v-model="profileForm.avatar" placeholder="https://..." />
+                </el-form-item>
+                <el-form-item label="姓名">
+                  <el-input v-model="profileForm.name" />
+                </el-form-item>
+                <el-form-item label="邮箱">
+                  <el-input v-model="profileForm.email" />
+                </el-form-item>
+                <el-form-item label="手机号">
+                  <el-input v-model="profileForm.phone" />
+                </el-form-item>
+                <el-button type="primary" :loading="savingProfile" @click="saveProfile">保存资料</el-button>
+              </el-form>
+            </div>
           </section>
         </div>
       </div>
+
+      <el-dialog v-model="userDialogVisible" :title="editingUserId ? '编辑用户' : '新建用户'" width="640px">
+        <el-form label-position="top">
+          <el-form-item label="姓名"><el-input v-model="userForm.name" /></el-form-item>
+          <el-form-item label="邮箱"><el-input v-model="userForm.email" /></el-form-item>
+          <el-form-item label="手机号"><el-input v-model="userForm.phone" /></el-form-item>
+          <el-form-item label="头像URL"><el-input v-model="userForm.avatar" /></el-form-item>
+          <el-form-item label="角色（必选，可多选）">
+            <el-select v-model="userForm.roleIds" multiple filterable placeholder="请选择角色">
+              <el-option v-for="r in roles" :key="r.id" :label="r.name" :value="r.id" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="项目（必选，可多选）">
+            <el-select v-model="userForm.projectIds" multiple filterable placeholder="请选择项目">
+              <el-option v-for="p in projects" :key="p.id" :label="p.name" :value="p.id" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="状态">
+            <el-switch v-model="userForm.active" active-text="active" inactive-text="frozen" />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="userDialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="savingUser" @click="submitUser">保存</el-button>
+        </template>
+      </el-dialog>
+
+      <el-dialog v-model="roleDialogVisible" :title="editingRoleId ? '编辑角色' : '新建角色'" width="520px">
+        <el-form label-position="top">
+          <el-form-item label="角色名称"><el-input v-model="roleForm.name" /></el-form-item>
+          <el-form-item label="角色描述"><el-input v-model="roleForm.description" type="textarea" :rows="3" /></el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="roleDialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="savingRole" @click="submitRole">保存</el-button>
+        </template>
+      </el-dialog>
 
       <el-drawer
         v-model="filterPanelVisible"

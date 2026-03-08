@@ -115,3 +115,81 @@ export async function deleteTestCase(projectId: number, testcaseId: number) {
   const { data } = await apiClient.delete<{ message: string }>(`/projects/${projectId}/testcases/${testcaseId}`)
   return data
 }
+
+export type Role = {
+  id: number
+  name: string
+  description?: string
+}
+
+export type User = {
+  id: number
+  name: string
+  email: string
+  phone?: string
+  avatar?: string
+  role: string
+  active: boolean
+  deleted_at?: string | null
+}
+
+export async function listUsers() {
+  const { data } = await apiClient.get('/users')
+  return (data.users ?? []) as User[]
+}
+
+export async function createUser(payload: {
+  name: string
+  email: string
+  phone?: string
+  avatar?: string
+  role?: string
+  role_ids: number[]
+  project_ids: number[]
+}) {
+  const { data } = await apiClient.post<User>('/users', payload)
+  return data
+}
+
+export async function updateUser(userId: number, payload: {
+  name?: string
+  email?: string
+  phone?: string
+  avatar?: string
+  active?: boolean
+  role_ids?: number[]
+  project_ids?: number[]
+}) {
+  const { data } = await apiClient.put<User>(`/users/${userId}`, payload)
+  return data
+}
+
+export async function deleteUserById(userId: number) {
+  const { data } = await apiClient.delete<{ message: string }>(`/users/${userId}`)
+  return data
+}
+
+export async function listRoles() {
+  const { data } = await apiClient.get('/roles')
+  return (data.roles ?? []) as Role[]
+}
+
+export async function createRole(payload: { name: string; description?: string }) {
+  const { data } = await apiClient.post<Role>('/roles', payload)
+  return data
+}
+
+export async function updateRoleById(roleId: number, payload: { name?: string; description?: string }) {
+  const { data } = await apiClient.put<Role>(`/roles/${roleId}`, payload)
+  return data
+}
+
+export async function deleteRoleById(roleId: number) {
+  const { data } = await apiClient.delete<{ message: string }>(`/roles/${roleId}`)
+  return data
+}
+
+export async function updateMyProfile(payload: { name?: string; email?: string; phone?: string; avatar?: string }) {
+  const { data } = await apiClient.put<User>('/users/me/profile', payload)
+  return data
+}
