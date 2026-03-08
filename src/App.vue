@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowDown, ArrowUp, CopyDocument, Delete, Edit, Plus } from '@element-plus/icons-vue'
+import { ArrowDown, ArrowRight, ArrowUp, CopyDocument, Delete, Edit, Plus } from '@element-plus/icons-vue'
 import {
   createProject,
   createRole,
@@ -1133,7 +1133,7 @@ onMounted(async () => {
                       <span class="tree-root-count">{{ total }}</span>
                       <el-tooltip content="展开/收起目录" placement="top">
                         <button class="tree-icon-btn ghost" @click.stop="treeExpanded = !treeExpanded">
-                          <el-icon><ArrowDown v-if="treeExpanded" /><ArrowUp v-else /></el-icon>
+                          <el-icon><ArrowDown v-if="treeExpanded" /><ArrowRight v-else /></el-icon>
                         </button>
                       </el-tooltip>
                       <el-tooltip content="新建目录" placement="top">
