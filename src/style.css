@@ -114,9 +114,15 @@ body { margin: 0; background: radial-gradient(1200px 500px at 12% -10%, rgba(17,
 }
 .name { font-weight: 600; }
 
-.project-area { display: flex; align-items: center; gap: 10px; justify-content: flex-start; flex-wrap: nowrap; }
+.project-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+}
 .project-inline {
-  width: 190px;
+  width: 228px;
 }
 .user-box {
   display: flex;
@@ -240,14 +246,21 @@ body { margin: 0; background: radial-gradient(1200px 500px at 12% -10%, rgba(17,
 .project-select-inline {
   width: 100%;
 }
-.project-select-inline :deep(.el-input__wrapper) {
-  box-shadow: none;
-  border: 1px solid #dcdfe6;
-  border-radius: 6px;
-  background: #fff;
+.project-select-inline :deep(.el-select__wrapper) {
+  min-height: 34px;
+  border-radius: 9px;
+  border: 1px solid #cfd7e3;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafd 100%);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
 }
-.project-select-inline :deep(.el-input__wrapper.is-focus) {
-  border-color: #111827;
+.project-select-inline :deep(.el-select__wrapper:hover) {
+  border-color: #94a3b8;
+}
+.project-select-inline :deep(.el-select__wrapper.is-focused) {
+  border-color: #374151;
+  box-shadow: 0 0 0 3px rgba(55, 65, 81, 0.12);
+  background: #ffffff;
 }
 .mini-tabs { display: inline-flex; gap: 4px; align-items: center; flex-wrap: nowrap; }
 .mini-tab {
@@ -344,7 +357,22 @@ body { margin: 0; background: radial-gradient(1200px 500px at 12% -10%, rgba(17,
   display: grid;
   grid-template-columns: 1fr;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+}
+.module-search-input :deep(.el-input__wrapper) {
+  border-radius: 9px;
+  border: 1px solid #d6dde8;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafd 100%);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.module-search-input :deep(.el-input__wrapper:hover) {
+  border-color: #9aa7ba;
+}
+.module-search-input :deep(.el-input__wrapper.is-focus),
+.module-search-input :deep(.el-input__wrapper.is-focused) {
+  border-color: #374151;
+  box-shadow: 0 0 0 3px rgba(55, 65, 81, 0.12);
 }
 .tree-icon-btn {
   width: 24px;

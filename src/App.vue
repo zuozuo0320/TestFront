@@ -1239,7 +1239,7 @@ onMounted(async () => {
             <div v-if="topMenu === 'testcases'" class="case-page">
               <div class="left-tree">
                 <div class="tree-header">
-                  <el-input size="small" placeholder="请输入模块名称" />
+                  <el-input size="small" class="module-search-input" placeholder="请输入模块名称" />
                 </div>
                 <div class="tree-list">
                   <div class="tree-item active tree-root-row">
