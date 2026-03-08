@@ -349,24 +349,27 @@ body { margin: 0; background: radial-gradient(1200px 500px at 12% -10%, rgba(17,
 }
 
 .left-tree {
-  border-right: 1px solid #edf2f7;
-  padding: 10px 8px;
-  background: #fbfdff;
+  border-right: 1px solid #e5e7eb;
+  padding: 12px 10px;
+  background: linear-gradient(180deg, #f9fbff 0%, #f6f9fd 100%);
 }
 .tree-header {
   display: grid;
   grid-template-columns: 1fr;
   gap: 8px;
   margin-bottom: 10px;
-  padding: 0 8px;
+  padding: 0;
+}
+.module-search-input {
+  width: 100%;
 }
 .module-search-input :deep(.el-input__wrapper) {
-  min-height: 30px;
-  border-radius: 8px;
-  border: 1px solid #d6dde8;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafd 100%);
+  min-height: 32px;
+  border-radius: 9px;
+  border: 1px solid #cfd8e3;
+  background: #ffffff;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-  padding: 0 8px;
+  padding: 0 10px;
   transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
 .module-search-input :deep(.el-input__inner) {
@@ -399,20 +402,22 @@ body { margin: 0; background: radial-gradient(1200px 500px at 12% -10%, rgba(17,
   background: #f3f7fc;
   border-color: #c6d4e8;
 }
-.tree-list { margin-top: 10px; }
+.tree-list { margin-top: 8px; }
 .tree-item {
-  padding: 10px 10px;
-  border-radius: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
   display: flex;
   justify-content: space-between;
   font-size: 13px;
   color: #475569;
-  border: 1px solid transparent;
-  transition: all 0.18s ease;
+  border: 1px solid #e5eaf2;
+  background: #ffffff;
+  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 .tree-item:hover {
-  background: #f2f6fb;
-  border-color: #d8e1ee;
+  background: #f3f6fa;
+  border-color: #ced7e3;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
 }
 .tree-children {
   margin-top: 6px;
@@ -445,12 +450,13 @@ body { margin: 0; background: radial-gradient(1200px 500px at 12% -10%, rgba(17,
   background: #fee2e2;
 }
 .module-tree {
-  margin-top: 6px;
+  margin-top: 8px;
   background: transparent;
 }
 .module-tree :deep(.el-tree-node__content) {
-  height: 30px;
-  border-radius: 6px;
+  height: 32px;
+  border-radius: 8px;
+  padding-right: 4px;
 }
 .module-tree :deep(.el-tree-node__content:hover) {
   background: #f2f4f7;
@@ -483,15 +489,17 @@ body { margin: 0; background: radial-gradient(1200px 500px at 12% -10%, rgba(17,
 }
 .tree-root-row {
   align-items: center;
-  padding: 6px 8px;
+  padding: 8px 10px;
 }
 .tree-root-title {
   font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.1px;
 }
 .tree-root-actions {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 .recycle {
   margin-top: 12px;
