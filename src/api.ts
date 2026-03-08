@@ -197,8 +197,6 @@ export async function updateMyProfile(payload: { name?: string; phone?: string; 
 export async function uploadMyAvatar(file: File) {
   const form = new FormData()
   form.append('avatar', file)
-  const { data } = await apiClient.post<{ avatar: string }>('/users/me/avatar', form, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
+  const { data } = await apiClient.post<{ avatar: string }>('/users/me/avatar', form)
   return data
 }
