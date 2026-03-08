@@ -67,6 +67,9 @@ const users = ref<UserRow[]>([])
 const roles = ref<Role[]>([])
 const usersLoading = ref(false)
 const rolesLoading = ref(false)
+const userPage = ref(1)
+const userPageSize = ref(10)
+const userPageSizeOptions = [10, 20, 50]
 const userDialogVisible = ref(false)
 const roleDialogVisible = ref(false)
 const profileDialogVisible = ref(false)
@@ -214,6 +217,11 @@ const moduleTree = computed<ModuleTreeNode[]>(() => {
   }
 
   return Array.from(rootMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
+})
+
+const pagedUsers = computed(() => {
+  const start = (userPage.value - 1) * userPageSize.value
+  return users.value.slice(start, start + userPageSize.value)
 })
 
 const creatableRoles = computed(() => roles.value.filter((r) => r.name !== 'admin'))
@@ -714,6 +722,8 @@ async function loadUsers() {
     users.value = data
       .filter((u) => !u.deleted_at)
       .map((u) => ({ ...u, roleIds: [], projectIds: [] }))
+    const maxPage = Math.max(1, Math.ceil(users.value.length / userPageSize.value))
+    if (userPage.value > maxPage) userPage.value = maxPage
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.error || '加载用户失败')
   } finally {
@@ -758,6 +768,15 @@ function syncProfileForm() {
   profileForm.name = currentUser.value?.name || ''
   profileForm.phone = (currentUser.value as any)?.phone || ''
   profileForm.avatar = (currentUser.value as any)?.avatar || ''
+}
+
+function onUserPaginationSizeChange(size: number) {
+  userPageSize.value = size
+  userPage.value = 1
+}
+
+function onUserPaginationCurrentChange(current: number) {
+  userPage.value = current
 }
 
 function openCreateUser() {
@@ -1291,7 +1310,6 @@ onMounted(async () => {
               <div class="module-toolbar users-toolbar">
                 <h3>用户管理</h3>
                 <div class="toolbar-extra">
-                  <el-tag type="info" effect="plain">共 {{ users.length }} 个用户</el-tag>
                   <el-button type="primary" @click="openCreateUser">新建用户</el-button>
                 </div>
               </div>
@@ -1310,7 +1328,7 @@ onMounted(async () => {
                   <tr v-if="users.length === 0">
                     <td colspan="6" class="empty-td">暂无用户</td>
                   </tr>
-                  <tr v-for="u in users" :key="u.id">
+                  <tr v-for="u in pagedUsers" :key="u.id">
                     <td class="mono">#{{ u.id }}</td>
                     <td>
                       <div class="user-cell">
@@ -1335,6 +1353,19 @@ onMounted(async () => {
                   </tr>
                 </tbody>
               </table>
+              <div class="pager">
+                <el-pagination
+                  background
+                  small
+                  :current-page="userPage"
+                  :page-size="userPageSize"
+                  :page-sizes="userPageSizeOptions"
+                  :total="users.length"
+                  layout="total, sizes, prev, pager, next, jumper"
+                  @size-change="onUserPaginationSizeChange"
+                  @current-change="onUserPaginationCurrentChange"
+                />
+              </div>
             </div>
 
             <div v-else-if="topMenu === 'system' && activeMenu === 'roles'" class="module-card users-card" v-loading="rolesLoading">
