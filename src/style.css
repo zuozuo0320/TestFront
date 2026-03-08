@@ -275,8 +275,15 @@ body { margin: 0; background: #f3f4f6; }
 }
 
 .left-tree {
-  border-right: 1px solid #ebeef5;
-  padding: 10px;
+  border-right: 1px solid #e6eaf0;
+  padding: 12px 10px;
+  background: linear-gradient(180deg, #fafcff 0%, #f5f8fc 100%);
+}
+.tree-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 .tree-list { margin-top: 10px; }
 .tree-item {
@@ -675,6 +682,12 @@ body { margin: 0; background: #f3f4f6; }
 .mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   color: #475569;
+}
+
+.directory-tip {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
 }
 
 .project-selected-row {

@@ -65,6 +65,7 @@ const userDialogVisible = ref(false)
 const roleDialogVisible = ref(false)
 const profileDialogVisible = ref(false)
 const projectDialogVisible = ref(false)
+const directoryDialogVisible = ref(false)
 const editingUserId = ref<number | null>(null)
 const editingRoleId = ref<number | null>(null)
 const savingUser = ref(false)
@@ -124,6 +125,7 @@ const execFilter = ref('')
 const filterPanelVisible = ref(false)
 
 const rows = ref<TableRow[]>([])
+const customModulePaths = ref<string[]>([])
 const stepRows = ref<StepRow[]>([{ action: '', expected: '' }])
 const draggingStepIndex = ref<number | null>(null)
 
@@ -140,6 +142,11 @@ const caseForm = reactive({
   priority: 'medium',
 })
 
+const directoryForm = reactive({
+  parentPath: '/未分类',
+  name: '',
+})
+
 const pageSizeOptions = [10, 20, 50]
 
 const activeFilterChips = computed(() => {
@@ -151,7 +158,60 @@ const activeFilterChips = computed(() => {
   return chips
 })
 
+const modulePaths = computed(() => {
+  const set = new Set<string>()
+  rows.value.forEach((r) => {
+    const p = (r.modulePath || '').trim()
+    if (p) set.add(normalizeModulePath(p))
+  })
+  customModulePaths.value.forEach((p) => set.add(normalizeModulePath(p)))
+  if (!set.size) set.add('/未分类')
+  return Array.from(set).sort((a, b) => a.localeCompare(b, 'zh-CN'))
+})
+
 const creatableRoles = computed(() => roles.value.filter((r) => r.name !== 'admin'))
+
+function normalizeModulePath(path: string) {
+  const normalized = `/${path.trim().replace(/^\/+/, '').replace(/\/+$/, '')}`
+  return normalized === '/' ? '/未分类' : normalized
+}
+
+function calcModuleDepth(path: string) {
+  const normalized = normalizeModulePath(path)
+  return normalized.split('/').filter(Boolean).length
+}
+
+function openCreateDirectory() {
+  directoryForm.parentPath = '/未分类'
+  directoryForm.name = ''
+  directoryDialogVisible.value = true
+}
+
+function submitDirectory() {
+  const parent = normalizeModulePath(directoryForm.parentPath || '/未分类')
+  const name = directoryForm.name.trim().replace(/^\/+/, '').replace(/\/+$/, '')
+  if (!name) {
+    ElMessage.warning('目录名称不能为空')
+    return
+  }
+  if (!/^[\u4e00-\u9fa5A-Za-z0-9_-]+$/.test(name)) {
+    ElMessage.warning('目录名称仅支持中文、英文、数字、下划线、中划线')
+    return
+  }
+  const nextPath = normalizeModulePath(`${parent}/${name}`)
+  if (calcModuleDepth(nextPath) > 5) {
+    ElMessage.warning('目录最多支持 5 层')
+    return
+  }
+  if (modulePaths.value.includes(nextPath)) {
+    ElMessage.warning('目录已存在')
+    return
+  }
+  customModulePaths.value.push(nextPath)
+  caseForm.modulePath = nextPath
+  directoryDialogVisible.value = false
+  ElMessage.success(`目录已创建：${nextPath}`)
+}
 
 function resolveAvatarUrl(avatar?: string, fallbackName?: string) {
   const avatarRaw = (avatar || '').trim()
@@ -947,11 +1007,17 @@ onMounted(async () => {
           <section class="content-wrap">
             <div v-if="topMenu === 'testcases'" class="case-page">
               <div class="left-tree">
-                <el-input size="small" placeholder="请输入模块名称" />
+                <div class="tree-header">
+                  <el-input size="small" placeholder="请输入模块名称" />
+                  <el-button size="small" @click="openCreateDirectory">新建目录</el-button>
+                </div>
                 <div class="tree-list">
                   <div class="tree-item active">
                     <span>全部用例</span>
                     <span>{{ total }}</span>
+                  </div>
+                  <div class="tree-item" v-for="p in modulePaths" :key="p">
+                    <span>{{ p }}</span>
                   </div>
                 </div>
               </div>
@@ -1273,6 +1339,24 @@ onMounted(async () => {
         <template #footer>
           <el-button @click="projectDialogVisible = false">取消</el-button>
           <el-button type="primary" :loading="savingProject" @click="submitProject">创建</el-button>
+        </template>
+      </el-dialog>
+
+      <el-dialog v-model="directoryDialogVisible" title="新建目录" width="520px">
+        <el-form label-position="top">
+          <el-form-item label="父级目录">
+            <el-select v-model="directoryForm.parentPath" placeholder="请选择父级目录">
+              <el-option v-for="p in modulePaths" :key="p" :label="p" :value="p" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="目录名称">
+            <el-input v-model="directoryForm.name" maxlength="40" show-word-limit placeholder="例如：登录" />
+          </el-form-item>
+          <div class="directory-tip">规则：最多支持 5 层目录，如 /一级/二级/三级/四级/五级</div>
+        </el-form>
+        <template #footer>
+          <el-button @click="directoryDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="submitDirectory">创建并使用</el-button>
         </template>
       </el-dialog>
 
