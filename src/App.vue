@@ -72,6 +72,7 @@ const roleDialogVisible = ref(false)
 const profileDialogVisible = ref(false)
 const projectDialogVisible = ref(false)
 const directoryDialogVisible = ref(false)
+const treeExpanded = ref(true)
 const editingUserId = ref<number | null>(null)
 const editingRoleId = ref<number | null>(null)
 const savingUser = ref(false)
@@ -1124,19 +1125,26 @@ onMounted(async () => {
               <div class="left-tree">
                 <div class="tree-header">
                   <el-input size="small" placeholder="请输入模块名称" />
-                  <el-tooltip content="新建目录" placement="top">
-                    <el-button class="tree-icon-btn" size="small" circle @click="openCreateDirectory">
-                      <el-icon><Plus /></el-icon>
-                    </el-button>
-                  </el-tooltip>
                 </div>
                 <div class="tree-list">
-                  <div class="tree-item active">
-                    <span>全部用例</span>
-                    <span>{{ total }}</span>
+                  <div class="tree-item active tree-root-row">
+                    <span class="tree-root-title">全部用例</span>
+                    <div class="tree-root-actions">
+                      <span class="tree-root-count">{{ total }}</span>
+                      <el-tooltip content="展开/收起目录" placement="top">
+                        <button class="tree-icon-btn ghost" @click.stop="treeExpanded = !treeExpanded">
+                          <el-icon><ArrowDown v-if="treeExpanded" /><ArrowUp v-else /></el-icon>
+                        </button>
+                      </el-tooltip>
+                      <el-tooltip content="新建目录" placement="top">
+                        <button class="tree-icon-btn ghost" @click.stop="openCreateDirectory">
+                          <el-icon><Plus /></el-icon>
+                        </button>
+                      </el-tooltip>
+                    </div>
                   </div>
                   <el-tree
-                    v-if="moduleTree.length > 0"
+                    v-if="treeExpanded && moduleTree.length > 0"
                     class="module-tree"
                     :data="moduleTree"
                     node-key="path"
