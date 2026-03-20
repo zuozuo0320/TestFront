@@ -1,0 +1,117 @@
+/* ========== 1. Design Tokens / CSS Variables ========== */
+:root {
+  font-family: 'Inter', 'Noto Sans SC', -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  color: rgba(225, 228, 235, 0.9);
+
+  /* Brand Colors — Design B 深蓝灰 + 紫色点缀 */
+  --tp-primary: #7c3aed;
+  --tp-primary-light: #a78bfa;
+  --tp-primary-lighter: rgba(124, 58, 237, 0.12);
+  --tp-primary-dark: #5b21b6;
+  --tp-primary-shadow: rgba(124, 58, 237, 0.25);
+
+  /* Semantic Colors */
+  --tp-success: #10B981;
+  --tp-success-light: rgba(16, 185, 129, 0.15);
+  --tp-warning: #F59E0B;
+  --tp-warning-light: rgba(245, 158, 11, 0.15);
+  --tp-danger: #EF4444;
+  --tp-danger-light: rgba(239, 68, 68, 0.15);
+  --tp-info: #8B95A5;
+  --tp-info-light: rgba(139, 149, 165, 0.15);
+
+  /* Level Colors */
+  --tp-p0: #F87171;
+  --tp-p0-bg: rgba(239, 68, 68, 0.15);
+  --tp-p1: #FBBF24;
+  --tp-p1-bg: rgba(245, 158, 11, 0.15);
+  --tp-p2: #60A5FA;
+  --tp-p2-bg: rgba(59, 130, 246, 0.15);
+  --tp-p3: #9CA3AF;
+  --tp-p3-bg: rgba(107, 114, 128, 0.15);
+
+  /* Neutral — 冷蓝灰色调 (Design B 深海军蓝风格) */
+  --tp-gray-50: #0f1219;
+  --tp-gray-100: #141820;
+  --tp-gray-200: rgba(255, 255, 255, 0.08);
+  --tp-gray-300: rgba(255, 255, 255, 0.12);
+  --tp-gray-400: rgba(200, 210, 225, 0.35);
+  --tp-gray-500: rgba(200, 210, 225, 0.50);
+  --tp-gray-600: rgba(200, 210, 225, 0.65);
+  --tp-gray-700: rgba(215, 222, 235, 0.75);
+  --tp-gray-800: rgba(225, 230, 240, 0.85);
+  --tp-gray-900: rgba(235, 238, 245, 0.92);
+
+  /* 导航专用色 — 深海军蓝 (Design B) */
+  --tp-nav-bg: #0c1017;
+  --tp-nav-bg-light: #131820;
+  --tp-nav-border: rgba(255, 255, 255, 0.06);
+  --tp-nav-text: rgba(200, 210, 225, 0.55);
+  --tp-nav-text-bright: rgba(230, 235, 245, 0.9);
+
+  /* 内容区表面色 — 深海军蓝灰 (Design B) */
+  --tp-surface-base: #111520;
+  --tp-surface-card: #171c28;
+  --tp-surface-elevated: #1c2230;
+  --tp-surface-input: rgba(255, 255, 255, 0.05);
+  --tp-surface-hover: rgba(255, 255, 255, 0.06);
+
+  /* Buttons */
+  --tp-btn-bg: var(--tp-primary);
+  --tp-btn-bg-hover: var(--tp-primary-dark);
+  --tp-btn-text: #ffffff;
+  --tp-btn-border: var(--tp-primary);
+  --tp-btn-plain-bg: rgba(255, 255, 255, 0.05);
+  --tp-btn-plain-text: var(--tp-primary-light);
+  --tp-btn-plain-border: rgba(255, 255, 255, 0.1);
+
+  /* Radius */
+  --tp-radius-sm: 6px;
+  --tp-radius-md: 10px;
+  --tp-radius-lg: 14px;
+  --tp-radius-xl: 20px;
+
+  /* Transitions */
+  --tp-transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Spacing — 4px base system */
+  --tp-space-1: 4px;
+  --tp-space-2: 8px;
+  --tp-space-3: 12px;
+  --tp-space-4: 16px;
+  --tp-space-5: 20px;
+  --tp-space-6: 24px;
+  --tp-space-8: 32px;
+  --tp-space-10: 40px;
+  --tp-space-12: 48px;
+}
+
+/* ========== Element Plus Dark Theme Overrides for Style B ========== */
+html.dark {
+  --el-bg-color: var(--tp-surface-card);
+  --el-bg-color-page: var(--tp-surface-base);
+  --el-bg-color-overlay: var(--tp-surface-elevated);
+
+  --el-text-color-primary: var(--tp-gray-900);
+  --el-text-color-regular: var(--tp-gray-800);
+  --el-text-color-secondary: var(--tp-gray-600);
+  --el-text-color-placeholder: var(--tp-gray-400);
+
+  --el-border-color-darker: var(--tp-gray-300);
+  --el-border-color-dark: var(--tp-gray-200);
+  --el-border-color: var(--tp-gray-200);
+  --el-border-color-light: rgba(255, 255, 255, 0.06);
+  --el-border-color-lighter: rgba(255, 255, 255, 0.04);
+  --el-border-color-extra-light: rgba(255, 255, 255, 0.02);
+
+  --el-fill-color: var(--tp-surface-input);
+  --el-fill-color-light: rgba(255, 255, 255, 0.04);
+  --el-fill-color-lighter: rgba(255, 255, 255, 0.02);
+
+  --el-color-primary: var(--tp-primary);
+  --el-color-primary-light-3: var(--tp-primary-light);
+  --el-color-primary-light-5: rgba(124, 58, 237, 0.5);
+  --el-color-primary-light-7: rgba(124, 58, 237, 0.3);
+  --el-color-primary-light-8: rgba(124, 58, 237, 0.2);
+  --el-color-primary-light-9: var(--tp-primary-lighter);
+}

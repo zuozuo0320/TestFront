@@ -1,0 +1,260 @@
+/* ========== Base Reset ========== */
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  /* 默认黑色 → 防止登录页刷新时白闪 */
+  background: #000;
+}
+
+/* Login page styles → moved to LoginPage.vue <style scoped> */
+
+
+/* ========== Global Element Plus Overrides (Dark) ========== */
+
+/* 全局 El Plus 暗色覆盖 */
+.el-button {
+  border-radius: 8px !important;
+  font-weight: 500;
+  transition: all var(--tp-transition) !important;
+}
+.el-button--primary {
+  --el-button-bg-color: var(--tp-primary) !important;
+  --el-button-border-color: var(--tp-primary) !important;
+  --el-button-text-color: #ffffff !important;
+  --el-button-hover-bg-color: var(--tp-primary-dark) !important;
+  --el-button-hover-border-color: var(--tp-primary-dark) !important;
+  --el-button-active-bg-color: #3730A3 !important;
+  --el-button-active-border-color: #3730A3 !important;
+  background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%) !important;
+  border-color: var(--tp-primary) !important;
+  box-shadow: 0 2px 8px var(--tp-primary-shadow);
+}
+.el-button--primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px var(--tp-primary-shadow);
+}
+/* Default/plain buttons dark */
+.el-button--default {
+  --el-button-bg-color: var(--tp-surface-input) !important;
+  --el-button-border-color: var(--tp-gray-300) !important;
+  --el-button-text-color: var(--tp-gray-700) !important;
+  --el-button-hover-bg-color: var(--tp-surface-hover) !important;
+  --el-button-hover-border-color: var(--tp-primary-light) !important;
+  --el-button-hover-text-color: var(--tp-primary-light) !important;
+}
+
+/* 全局 input/select/textarea 暗色 */
+.el-input__wrapper,
+.el-select__wrapper,
+.el-textarea__inner {
+  background: var(--tp-surface-input) !important;
+  border-color: var(--tp-gray-300) !important;
+  box-shadow: none !important;
+  color: var(--tp-gray-800) !important;
+}
+.el-input__wrapper:hover,
+.el-select__wrapper:hover { border-color: rgba(124, 58, 237, 0.3) !important; }
+.el-input__wrapper.is-focus,
+.el-input__wrapper.is-focused,
+.el-select__wrapper.is-focus,
+.el-select__wrapper.is-focused {
+  border-color: var(--tp-primary) !important;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.15) !important;
+}
+.el-input__inner { color: var(--tp-gray-800) !important; }
+.el-input__inner::placeholder,
+.el-select__placeholder { color: var(--tp-gray-400) !important; }
+.el-select__selected-item { color: var(--tp-gray-800) !important; }
+
+/* 全局 dropdown/popover 暗色 */
+.el-select-dropdown,
+.el-popper.is-light {
+  background: var(--tp-surface-elevated) !important;
+  border-color: var(--tp-gray-200) !important;
+}
+.el-select-dropdown__item {
+  color: var(--tp-gray-600) !important;
+}
+.el-select-dropdown__item:hover,
+.el-select-dropdown__item.hover {
+  background: var(--tp-surface-hover) !important;
+  color: var(--tp-gray-900) !important;
+}
+.el-select-dropdown__item.is-selected {
+  color: var(--tp-primary-light) !important;
+  font-weight: 600;
+}
+.el-popper__arrow::before {
+  background: var(--tp-surface-elevated) !important;
+  border-color: var(--tp-gray-200) !important;
+}
+
+/* 全局 dialog 暗色 */
+.el-dialog {
+  --el-dialog-bg-color: var(--tp-surface-elevated) !important;
+  --el-dialog-border-radius: var(--tp-radius-lg) !important;
+  border: 1px solid var(--tp-gray-200);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5) !important;
+}
+.el-dialog__header { border-bottom: 1px solid var(--tp-gray-200); }
+.el-dialog__title { color: var(--tp-gray-900) !important; }
+.el-dialog__footer { border-top: 1px solid var(--tp-gray-200); }
+.el-form-item__label { color: var(--tp-gray-600) !important; }
+
+/* 全局 drawer 暗色 */
+.el-drawer {
+  --el-drawer-bg-color: var(--tp-surface-elevated) !important;
+}
+.el-drawer__header {
+  color: var(--tp-gray-900) !important;
+  border-bottom: 1px solid var(--tp-gray-200);
+}
+
+/* 全局 tree 暗色 */
+.el-tree {
+  --el-tree-node-hover-bg-color: var(--tp-surface-hover) !important;
+  background: transparent !important;
+  color: var(--tp-gray-700) !important;
+}
+
+/* ========== Pagination ========== */
+
+.pager { margin-top: 12px; display: flex; justify-content: flex-end; align-items: center; }
+.pager .el-pagination {
+  --el-pagination-bg-color: var(--tp-surface-input);
+  --el-pagination-hover-color: var(--tp-primary);
+  --el-pagination-text-color: var(--tp-gray-700);
+  --el-pagination-button-color: var(--tp-gray-600);
+  --el-pagination-button-bg-color: var(--tp-surface-input);
+  --el-pagination-button-disabled-color: var(--tp-gray-400);
+  --el-pagination-button-disabled-bg-color: var(--tp-gray-100);
+  --el-pagination-border-radius: var(--tp-radius-sm);
+  --el-fill-color-blank: var(--tp-surface-card);
+  --el-border-color: var(--tp-gray-300);
+  --el-color-primary: var(--tp-primary);
+}
+.pager .el-pagination .el-select .el-input__wrapper,
+.pager .el-pagination__jump .el-input__wrapper {
+  border: 1px solid var(--tp-gray-300) !important;
+  box-shadow: none !important;
+  background: var(--tp-surface-input) !important;
+}
+.pager .el-pagination .el-select .el-input__wrapper:hover,
+.pager .el-pagination__jump .el-input__wrapper:hover { border-color: var(--tp-gray-400) !important; }
+.pager .el-pagination .el-select .el-input__wrapper.is-focus,
+.pager .el-pagination__jump .el-input__wrapper.is-focus,
+.pager .el-pagination .el-select .el-input__wrapper.is-focused,
+.pager .el-pagination__jump .el-input__wrapper.is-focused { border-color: var(--tp-primary) !important; }
+.pager .el-pagination button,
+.pager .el-pagination .el-pager li { border: 1px solid var(--tp-gray-200); background: var(--tp-surface-input); }
+.pager .el-pagination button:hover,
+.pager .el-pagination .el-pager li:hover { color: var(--tp-primary); border-color: var(--tp-primary-light); }
+.pager .el-pagination.is-background .el-pager li.is-active {
+  background: var(--tp-primary) !important;
+  border-color: var(--tp-primary) !important;
+  color: #fff !important;
+}
+.pager .el-pagination__total,
+.pager .el-pagination__jump { color: var(--tp-gray-600); }
+
+.btn-icon {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+/* ========== Project Select Dropdown (dark header popper) ========== */
+
+.project-select-popper {
+  background: #12122a !important;
+  border: 1px solid rgba(124, 58, 237, 0.15) !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(124, 58, 237, 0.08) !important;
+  border-radius: 12px !important;
+  padding: 6px !important;
+}
+.project-select-popper .el-select-dropdown__list {
+  padding: 0 !important;
+}
+.project-select-popper .el-select-dropdown__item {
+  color: rgba(255, 255, 255, 0.6) !important;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  margin: 2px 0;
+  padding: 10px 14px;
+  transition: all 0.15s ease;
+  height: auto;
+  line-height: 1.4;
+}
+.project-select-popper .el-select-dropdown__item:hover,
+.project-select-popper .el-select-dropdown__item.hover {
+  background: rgba(124, 58, 237, 0.1) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+.project-select-popper .el-select-dropdown__item.is-selected {
+  background: rgba(124, 58, 237, 0.15) !important;
+  color: #a78bfa !important;
+  font-weight: 600;
+}
+.project-select-popper .el-select-dropdown__item.is-selected::after {
+  content: '✓';
+  float: right;
+  color: #a78bfa;
+  font-size: 12px;
+}
+.project-select-popper .el-select-dropdown__empty {
+  color: rgba(255, 255, 255, 0.3) !important;
+}
+.project-select-popper .el-popper__arrow::before {
+  background: #12122a !important;
+  border-color: rgba(124, 58, 237, 0.15) !important;
+}
+
+/* ========== Scrollbar (Dark) ========== */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ========== Mono font ========== */
+.mono {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: var(--tp-gray-600);
+  font-size: 12px;
+}
+
+/* ========== Tech empty state ========== */
+.tech-empty {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--tp-gray-400);
+  font-size: 13px;
+  padding: 40px 20px;
+  text-align: center;
+}
+.tech-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 16px;
+  background: var(--tp-primary);
+  margin-left: 2px;
+  animation: blink 1s step-end infinite;
+  vertical-align: text-bottom;
+}
+@keyframes blink {
+  50% { opacity: 0; }
+}

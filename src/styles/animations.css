@@ -1,0 +1,84 @@
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.85; }
+}
+
+/* ========== 16. Responsive ========== */
+
+/* --- 1200px: Dashboard 2-col --- */
+@media (max-width: 1200px) {
+  .dashboard-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* --- 1280px: Toolbar stacks --- */
+@media (max-width: 1280px) {
+  .toolbar-1 { grid-template-columns: 1fr; }
+  .toolbar-1 .right { justify-content: flex-start; width: 100%; }
+  .query-input { flex: 1 1 280px; min-width: 220px; }
+}
+
+/* --- 900px: Sidebar collapse + toolbar compact --- */
+@media (max-width: 900px) {
+  .main { grid-template-columns: 56px 1fr; }
+  .main-nav { padding: 12px 4px; overflow: hidden; }
+  .main-nav-item { justify-content: center; padding: 10px; gap: 0; font-size: 0; }
+  .main-nav-item .nav-icon { font-size: 18px; margin: 0; }
+  .sub-nav { display: none; }
+  .toolbar-1 .right { gap: 6px; }
+  .query-input { flex-basis: 100%; min-width: 0; width: 100%; }
+  .toolbar-btn { min-width: 72px; }
+  .case-page { grid-template-columns: 1fr; }
+  .left-tree { display: none; }
+}
+
+/* --- 768px: Dashboard 1-col + smaller header --- */
+@media (max-width: 768px) {
+  .dashboard-grid { grid-template-columns: 1fr; }
+  .top-header { grid-template-columns: auto 1fr auto; padding: 0 12px; }
+  .project-inline { width: 160px; }
+  .content-wrap { padding: 12px; }
+}
+
+/* --- 576px: Sidebar hidden, mobile layout --- */
+@media (max-width: 576px) {
+  .main { grid-template-columns: 1fr; }
+  .main-nav { display: none; }
+  .content-wrap { padding: 8px; }
+  .top-header { gap: 8px; }
+  .project-inline { width: 120px; }
+  .mini-tabs { display: none; }
+}
+
+/* ========== 17. Dashboard / Workbench ========== */
+
+.page-transition-enter-active {
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.page-transition-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.page-transition-enter-from {
+  opacity: 0;
+  transform: translateY(16px) scale(0.99);
+}
+.page-transition-leave-to {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.99);
+}
+
+/* ========== 19. Custom Scrollbar ========== */
