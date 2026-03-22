@@ -40,6 +40,24 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/executions',
+      name: 'Executions',
+      component: () => import('../views/ComingSoonPage.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/defects',
+      name: 'Defects',
+      component: () => import('../views/ComingSoonPage.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/analytics',
+      name: 'Analytics',
+      component: () => import('../views/ComingSoonPage.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       // Catch-all: coming soon pages
       path: '/:pathMatch(.*)*',
       name: 'ComingSoon',

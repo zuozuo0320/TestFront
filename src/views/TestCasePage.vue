@@ -1,17 +1,20 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   CaretBottom,
   CaretRight,
   CaretTop,
+  Close,
   CopyDocument,
   Delete,
+  Document,
   Edit,
   FolderAdd,
   Folder,
   FolderOpened,
   CircleCheck,
+  MoreFilled,
   Sort,
   Search,
   Grid,
@@ -22,7 +25,8 @@ import StatusBadge from '../components/StatusBadge.vue'
 import LevelBadge from '../components/LevelBadge.vue'
 import RichTextEditor from '../components/RichTextEditor.vue'
 import FileUploader from '../components/FileUploader.vue'
-import { listProjects } from '../api/project'
+import { Plus as LuPlus, MoreHorizontal as LuMoreHorizontal, Atom as LuAtom } from 'lucide-vue-next'
+import { useProjectStore } from '../stores/project'
 import {
   listTestCases,
   createTestCase,
@@ -67,8 +71,9 @@ type ModuleTreeNode = { name: string; path: string; children: ModuleTreeNode[] }
 
 // ── State ──
 
-const projects = ref<Project[]>([])
-const selectedProject = ref<number | null>(null)
+const projectStore = useProjectStore()
+const projects = computed(() => projectStore.projects)
+const selectedProject = computed(() => projectStore.selectedProjectId)
 const rows = ref<TableRow[]>([])
 const total = ref(0)
 const page = ref(1)
@@ -699,12 +704,15 @@ function onStepDrop(targetIndex: number) {
 }
 function onStepDragEnd() { draggingStepIndex.value = null }
 
+// ── Project switch ──
+function onProjectSwitch(id: number) {
+  projectStore.selectedProjectId = id
+}
+
 // ── Init ──
 
 onMounted(async () => {
-  projects.value = await listProjects()
-  const first = projects.value[0]
-  selectedProject.value = first ? first.id : null
+  await projectStore.fetchProjects()
   if (selectedProject.value) await loadCases()
 })
 
@@ -713,11 +721,26 @@ watch(selectedProject, () => { page.value = 1; loadCases() })
 
 <template>
   <div class="case-page" :class="{ 'panel-collapsed': !treePanelOpen }">
+    <button class="panel-toggle" @click="treePanelOpen = !treePanelOpen" :title="treePanelOpen ? '收起目录' : '展开目录'">
+      {{ treePanelOpen ? '◂' : '▸' }}
+    </button>
     <div class="left-tree" :class="{ collapsed: !treePanelOpen }">
-      <button class="panel-toggle" @click="treePanelOpen = !treePanelOpen" :title="treePanelOpen ? '收起目录' : '展开目录'">
-        {{ treePanelOpen ? '◂' : '▸' }}
-      </button>
-      <div class="tree-content" v-show="treePanelOpen">
+      <div class="tree-content">
+        <!-- Project Switcher -->
+        <div class="tree-project-switcher">
+          <el-select
+            :model-value="selectedProject"
+            class="project-select"
+            popper-class="project-select-popper"
+            @update:model-value="onProjectSwitch"
+          >
+            <template #prefix>
+              <LuAtom :size="16" :stroke-width="1.5" style="color: var(--tp-primary-light)" />
+            </template>
+            <el-option v-for="p in projects" :key="p.id" :label="p.name" :value="p.id" />
+          </el-select>
+        </div>
+        <div class="tree-divider"></div>
         <!-- Search -->
         <div class="tree-header">
           <el-input size="small" class="module-search-input" placeholder="搜索模块...">
@@ -1053,9 +1076,9 @@ watch(selectedProject, () => { page.value = 1; loadCases() })
               <td><span style="color:var(--tp-gray-500);font-size:12px">{{ formatRelativeTime(r.createdAt) }}</span></td>
               <td>
                 <div class="action-group">
-                  <button class="action-btn action-edit" @click="openEdit(r)"><el-icon class="btn-icon"><Edit /></el-icon><span>编辑</span></button>
-                  <button class="action-btn action-clone" @click="onCloneCase(r)"><el-icon class="btn-icon"><CopyDocument /></el-icon><span>复制</span></button>
-                  <button class="action-btn action-delete" @click="onDelete(r)"><el-icon class="btn-icon"><Delete /></el-icon><span>删除</span></button>
+                  <button class="action-btn action-edit icon-only" @click="openEdit(r)"><el-icon class="btn-icon"><Edit /></el-icon><span>编辑</span></button>
+                  <button class="action-btn action-clone icon-only" @click="onCloneCase(r)"><el-icon class="btn-icon"><CopyDocument /></el-icon><span>复制</span></button>
+                  <button class="action-btn action-delete icon-only" @click="onDelete(r)"><el-icon class="btn-icon"><Delete /></el-icon><span>删除</span></button>
                 </div>
               </td>
             </tr>

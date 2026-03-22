@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { listProjects, createProject } from '../api/project'
 import type { Project } from '../api/types'
@@ -44,6 +44,13 @@ export const useProjectStore = defineStore('project', () => {
   const selectedProjectId = ref<number | null>(null)
   const topMenu = ref<TopMenu>(initialNav.topMenu || 'testcases')
   const activeMenu = ref<SystemMenu>(initialNav.activeMenu || 'users')
+
+  // ── 侧边栏折叠状态 ──
+  const sidebarCollapsed = ref(localStorage.getItem('tp-sidebar-collapsed') === 'true')
+
+  watch(sidebarCollapsed, (v) => {
+    localStorage.setItem('tp-sidebar-collapsed', String(v))
+  })
 
   function persistNavState() {
     const payload: NavState = {
@@ -91,6 +98,7 @@ export const useProjectStore = defineStore('project', () => {
     selectedProjectId,
     topMenu,
     activeMenu,
+    sidebarCollapsed,
     persistNavState,
     fetchProjects,
     addProject,

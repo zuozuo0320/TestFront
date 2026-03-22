@@ -13,6 +13,22 @@ export type Project = {
   id: number
   name: string
   description: string
+  status: 'active' | 'archived'
+  archived_at?: string | null
+  created_at?: string
+  updated_at?: string
+  member_count: number
+  testcase_count: number
+}
+
+export type ProjectMember = {
+  id: number
+  project_id: number
+  user_id: number
+  role: 'owner' | 'member'
+  created_at?: string
+  updated_at?: string
+  user: User
 }
 
 export type TestCase = {
@@ -47,7 +63,9 @@ export type TestCaseListResp = {
 export type Role = {
   id: number
   name: string
+  display_name?: string
   description?: string
+  user_count?: number
 }
 
 export type User = {
@@ -58,7 +76,10 @@ export type User = {
   avatar?: string
   role: string
   active: boolean
+  last_login_at?: string | null
   deleted_at?: string | null
+  created_at?: string
+  updated_at?: string
 }
 
 // Module (directory tree node)

@@ -4,15 +4,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import AppHeader from './components/AppHeader.vue'
 import AppSidebar from './components/AppSidebar.vue'
-import { listProjects } from './api/project'
 import { updateMyProfile, uploadMyAvatar, getMyProfile } from './api/user'
-import type { Project, User } from './api/types'
-
-type TopMenu = 'workbench' | 'project' | 'plan' | 'testcases' | 'e2e' | 'system'
-type SystemMenu = 'users' | 'roles' | 'projects'
+import type { User } from './api/types'
+import { useProjectStore } from './stores/project'
+import type { TopMenu, SystemMenu } from './stores/project'
 
 const route = useRoute()
 const router = useRouter()
+const projectStore = useProjectStore()
 
 // ── Auth ──
 
@@ -41,35 +40,26 @@ function logout() {
   router.push('/login')
 }
 
-// ── Projects ──
-
-const projects = ref<Project[]>([])
-const selectedProject = ref<number | null>(null)
-
-async function loadProjects() {
-  try {
-    projects.value = await listProjects()
-    const first = projects.value[0]
-    if (first && !selectedProject.value) {
-      selectedProject.value = first.id
-    }
-  } catch {
-    // silently fail — pages handle their own loading
-  }
-}
-
-function onProjectChange(id: number) {
-  selectedProject.value = id
-}
+// ── Projects（由 TestCasePage 直接使用 store 管理） ──
 
 // ── Navigation ──
 
-const topMenu = ref<TopMenu>('workbench')
-const activeMenu = ref<SystemMenu>('users')
+const topMenu = computed(() => projectStore.topMenu)
+const activeMenu = computed(() => projectStore.activeMenu)
+
+// 侧边栏折叠
+const sidebarCollapsed = computed(() => projectStore.sidebarCollapsed)
+
+function toggleSidebar() {
+  projectStore.sidebarCollapsed = !projectStore.sidebarCollapsed
+}
 
 const routeToMenu: Record<string, TopMenu> = {
   '/': 'workbench',
   '/testcases': 'testcases',
+  '/executions': 'e2e',
+  '/defects': 'project',
+  '/analytics': 'plan',
   '/system/users': 'system',
   '/system/roles': 'system',
   '/system/projects': 'system',
@@ -85,28 +75,31 @@ const routeToSystemMenu: Record<string, SystemMenu> = {
 watch(
   () => route.path,
   (path) => {
-    if (routeToMenu[path]) topMenu.value = routeToMenu[path]
-    if (routeToSystemMenu[path]) activeMenu.value = routeToSystemMenu[path]
+    if (routeToMenu[path]) projectStore.topMenu = routeToMenu[path]
+    if (routeToSystemMenu[path]) projectStore.activeMenu = routeToSystemMenu[path]
+    projectStore.persistNavState()
   },
   { immediate: true },
 )
 
 function switchTopMenu(menu: TopMenu) {
-  topMenu.value = menu
+  projectStore.topMenu = menu
   const menuRoutes: Record<TopMenu, string> = {
     workbench: '/',
     testcases: '/testcases',
-    system: `/system/${activeMenu.value}`,
-    project: '/project',
-    plan: '/plan',
-    e2e: '/e2e',
+    system: `/system/${projectStore.activeMenu}`,
+    project: '/defects',
+    plan: '/analytics',
+    e2e: '/executions',
   }
   router.push(menuRoutes[menu])
+  projectStore.persistNavState()
 }
 
 function switchMenu(menu: SystemMenu) {
-  activeMenu.value = menu
+  projectStore.activeMenu = menu
   router.push(`/system/${menu}`)
+  projectStore.persistNavState()
 }
 
 // ── Profile Dialog ──
@@ -168,9 +161,11 @@ router.isReady().then(() => {
   routerReady.value = true
 })
 
+// 首次加载：从登录页跳转后，重新加载项目和用户信息
 onMounted(async () => {
   if (loggedIn.value) {
-    await loadProjects()
+    await projectStore.fetchProjects()
+    projectStore.restoreProjectFromNav()
     try {
       currentUser.value = await getMyProfile()
     } catch {
@@ -191,21 +186,22 @@ onMounted(async () => {
     <template v-else>
       <div class="layout">
         <AppHeader
-          :projects="projects"
-          :selected-project="selectedProject"
           :user-name="currentUser?.name || ''"
           :avatar-url="userAvatarUrl"
-          @update:selected-project="onProjectChange"
+          :sidebar-collapsed="sidebarCollapsed"
           @open-profile="openProfileCenter"
           @logout="logout"
+          @toggle-sidebar="toggleSidebar"
         />
 
-        <div class="main">
+        <div class="main" :class="{ 'sidebar-hidden': sidebarCollapsed }">
           <AppSidebar
             :top-menu="topMenu"
             :active-menu="activeMenu"
+            :collapsed="sidebarCollapsed"
             @update:top-menu="switchTopMenu"
             @update:active-menu="switchMenu"
+            @toggle-collapse="toggleSidebar"
             @logout="logout"
           />
 

@@ -124,6 +124,29 @@ const editor = useEditor({
       }
       return false
     },
+    handleDrop: (view, event, _slice, moved) => {
+      // Handle drag and drop images directly into the editor
+      if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+        const file = event.dataTransfer.files[0]
+        if (file && file.type.startsWith('image/')) {
+          event.preventDefault()
+          const reader = new FileReader()
+          reader.onload = (e) => {
+            const src = e.target?.result as string
+            const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY })
+            if (coordinates) {
+              editor.value?.chain().focus().insertContentAt(coordinates.pos, {
+                type: 'image',
+                attrs: { src },
+              }).run()
+            }
+          }
+          reader.readAsDataURL(file)
+          return true
+        }
+      }
+      return false
+    },
   },
 })
 
