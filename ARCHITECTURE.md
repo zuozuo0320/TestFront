@@ -1,6 +1,6 @@
 # Aisight Frontend — 系统架构文档
 
-> 版本 2.1 · 2026-03-20 · 工业级测试管理平台前端
+> 版本 2.2 · 2026-03-23 · 工业级测试管理平台前端
 
 ---
 
@@ -15,7 +15,8 @@
 | UI 组件库 | Element Plus | 2.13.x | 企业级 Vue 3 组件（按需导入） |
 | HTTP 客户端 | Axios | 1.13.x | API 请求 + 拦截器 |
 | 路由 | Vue Router | 4.x | SPA 路由管理 |
-| 字体 | Inter + JetBrains Mono | CDN | UI 文字 + 等宽代码字体 |
+| 字体 | Inter + JetBrains Mono + Noto Sans SC | CDN | UI 文字 + 等宽代码 + 中文字体 |
+| 图标 | lucide-vue-next | latest | 侧边栏 / 页面图标 |
 
 ---
 
@@ -50,15 +51,15 @@ src/
 ├── views/                           # 页面级组件
 │   ├── LoginPage.vue                # 登录页
 │   ├── WorkbenchPage.vue            # 工作台仪表盘
-│   ├── TestCasePage.vue             # 用例管理（目录树 + 表格 + 编辑抽屉）
+│   ├── TestCasePage.vue             # 用例管理（项目切换器 + 目录树 + 表格 + 编辑抽屉）
 │   ├── ComingSoonPage.vue           # 占位页
 │   └── system/
 │       ├── UserManagement.vue       # 用户管理
 │       ├── RoleManagement.vue       # 角色管理
 │       └── ProjectManagement.vue    # 项目管理
 ├── components/                      # 通用 UI 组件
-│   ├── AppHeader.vue                # 顶部导航栏（品牌 + 项目切换 + 用户信息）
-│   ├── AppSidebar.vue               # 侧边菜单栏（6 个导航项，含设置）
+│   ├── AppHeader.vue                # 顶部导航栏（品牌LOGO + 侧栏展开 + 通知 + 用户信息）
+│   ├── AppSidebar.vue               # 侧边菜单栏（导航项 + 系统管理 + 折叠按钮，底部固定）
 │   ├── StatusBadge.vue              # 状态标签
 │   ├── LevelBadge.vue               # 优先级标签
 │   ├── EmptyState.vue               # 空态占位

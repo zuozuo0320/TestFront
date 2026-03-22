@@ -1,6 +1,6 @@
 # Aisight Frontend
 
-> 工业级测试管理平台前端 · Vue 3 + TypeScript + Vite
+> 工业级测试管理平台前端 · Vue 3 + TypeScript + Vite · 暗色主题
 
 ---
 
@@ -71,8 +71,8 @@ src/
 │   ├── useParticles.ts              # 粒子动画
 │   └── useLocalStorage.ts           # localStorage 封装
 ├── components/                      # 通用 UI 组件
-│   ├── AppHeader.vue                # 顶部导航栏（品牌 + 项目切换 + 用户信息）
-│   ├── AppSidebar.vue               # 侧边菜单（仪表盘/用例/执行/缺陷/分析/设置）
+│   ├── AppHeader.vue                # 顶部导航栏（品牌LOGO + 侧栏展开 + 通知 + 用户信息）
+│   ├── AppSidebar.vue               # 侧边菜单（仪表盘/用例/执行/缺陷/分析 + 系统管理 + 折叠按钮）
 │   ├── StatusBadge.vue              # 状态标签
 │   ├── LevelBadge.vue               # 优先级标签
 │   ├── EmptyState.vue               # 空态占位
@@ -83,7 +83,7 @@ src/
 ├── views/                           # 页面
 │   ├── LoginPage.vue                # 登录页
 │   ├── WorkbenchPage.vue            # 仪表盘
-│   ├── TestCasePage.vue             # 用例管理（目录树 + 表格 + 编辑抽屉）
+│   ├── TestCasePage.vue             # 用例管理（项目切换器 + 目录树 + 表格 + 编辑抽屉）
 │   ├── ComingSoonPage.vue           # 占位页
 │   └── system/                      # 系统管理
 │       ├── UserManagement.vue       # 用户管理
@@ -115,5 +115,8 @@ src/
 
 - **暗色主题**：深色背景 (#0a0e17) + 高对比文本
 - **品牌色**：紫色系 (#7c3aed / #a78bfa)
-- **字体**：Inter（UI）+ JetBrains Mono（代码）
-- **布局**：顶部导航 + 左侧菜单 + 内容区三栏布局
+- **字体**：Inter（UI）+ JetBrains Mono（代码）+ Noto Sans SC（中文）
+- **布局**：顶部导航 + 左侧菜单（可折叠）+ 内容区三栏布局
+- **品牌LOGO**：科幻电子眼风格图标（`/images/logo.png`）
+- **侧栏折叠**：完全隐藏式折叠，Header 显示展开按钮
+- **项目切换**：位于用例管理页左侧面板顶部，带 Atom 图标
