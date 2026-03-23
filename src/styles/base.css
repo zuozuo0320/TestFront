@@ -117,6 +117,34 @@ body {
   color: var(--tp-gray-700) !important;
 }
 
+/* 全局 table 暗色紧凑 */
+.el-table {
+  --el-table-bg-color: transparent !important;
+  --el-table-header-bg-color: transparent !important;
+  --el-table-tr-bg-color: transparent !important;
+  --el-table-row-hover-bg-color: rgba(124, 58, 237, 0.04) !important;
+  --el-table-border-color: rgba(255, 255, 255, 0.06) !important;
+  --el-table-header-text-color: rgba(255, 255, 255, 0.4) !important;
+  --el-table-text-color: rgba(255, 255, 255, 0.75) !important;
+  font-size: 13px !important;
+}
+.el-table th.el-table__cell {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  padding: 8px 0 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.el-table td.el-table__cell {
+  padding: 6px 0 !important;
+}
+.el-table .el-table__header-wrapper th {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+.el-table--enable-row-hover .el-table__body tr:hover > td {
+  background-color: rgba(124, 58, 237, 0.04) !important;
+}
+
 /* ========== Pagination ========== */
 
 .pager { margin-top: 12px; display: flex; justify-content: flex-end; align-items: center; }

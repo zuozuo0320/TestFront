@@ -239,7 +239,12 @@ const currentProjectName = computed(() => {
   const p = projects.value.find(proj => proj.id === selectedProject.value)
   return p?.name || '选择项目'
 })
-const selectedModulePath = ref('')  // '' = 全部, '/未规划用例' = 未规划, '/xxx' = 特定目录
+const selectedModulePath = ref((() => {
+  try {
+    const saved = localStorage.getItem(`tp-module-path-${selectedProject.value}`)
+    return saved ?? ''
+  } catch { return '' }
+})())  // '' = 全部, '/未规划用例' = 未规划, '/xxx' = 特定目录
 
 const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
@@ -372,6 +377,7 @@ const unplannedCount = computed(() => {
 
 function onModuleClick(path: string) {
   selectedModulePath.value = selectedModulePath.value === path ? '' : path
+  try { localStorage.setItem(`tp-module-path-${selectedProject.value}`, selectedModulePath.value) } catch {}
   page.value = 1
   loadCases()
 }
@@ -761,6 +767,7 @@ function onStepDragEnd() { draggingStepIndex.value = null }
 // ── Project switch ──
 function onProjectSwitch(id: number) {
   projectStore.selectedProjectId = id
+  projectStore.persistNavState()
 }
 
 // ── Init ──
@@ -770,7 +777,13 @@ onMounted(async () => {
   if (selectedProject.value) await loadCases()
 })
 
-watch(selectedProject, () => { page.value = 1; loadCases() })
+watch(selectedProject, (newId) => {
+  page.value = 1
+  try {
+    selectedModulePath.value = localStorage.getItem(`tp-module-path-${newId}`) ?? ''
+  } catch { selectedModulePath.value = '' }
+  loadCases()
+})
 </script>
 
 <template>

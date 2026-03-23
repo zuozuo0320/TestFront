@@ -41,7 +41,7 @@ export const useProjectStore = defineStore('project', () => {
   const initialNav = restoreNavState()
 
   const projects = ref<Project[]>([])
-  const selectedProjectId = ref<number | null>(null)
+  const selectedProjectId = ref<number | null>(initialNav.projectId ?? null)
   const topMenu = ref<TopMenu>(initialNav.topMenu || 'testcases')
   const activeMenu = ref<SystemMenu>(initialNav.activeMenu || 'users')
 

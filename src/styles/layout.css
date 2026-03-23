@@ -365,9 +365,9 @@
   padding: 10px 12px;
   border-radius: var(--tp-radius-md);
   color: var(--tp-nav-text);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.2px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.1px;
   cursor: pointer;
   margin-bottom: 4px;
   background: transparent;
@@ -1323,8 +1323,8 @@
 .metric-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
 .metric-card {
@@ -1333,9 +1333,9 @@
   justify-content: space-between;
   background: rgba(255, 255, 255, 0.035);
   border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 12px;
-  padding: 16px 18px;
-  min-height: 100px;
+  border-radius: 10px;
+  padding: 12px 14px;
+  min-height: 76px;
   transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
   overflow: hidden;
 }
@@ -1374,7 +1374,7 @@
 }
 
 .metric-value {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 700;
   color: #e1e1f2;
   line-height: 1;
@@ -1382,7 +1382,7 @@
 }
 
 .metric-value small {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.5);
   margin-left: 1px;
@@ -1415,8 +1415,8 @@
 
 /* Donut chart — large (for 通过率) */
 .metric-ring-lg {
-  width: 48px;
-  height: 48px;
+  width: 36px;
+  height: 36px;
   flex-shrink: 0;
 }
 
@@ -1444,8 +1444,8 @@
 
 /* Mini bars chart (for 本周新增) */
 .mini-bars {
-  width: 44px;
-  height: 26px;
+  width: 36px;
+  height: 22px;
   flex-shrink: 0;
 }
 
@@ -1460,8 +1460,8 @@
 .filter-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 12px;
   padding: 0;
   background: none;
   border: none;
@@ -1475,10 +1475,10 @@
 .filter-search-input .el-input__wrapper {
   background: rgba(255, 255, 255, 0.04) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 10px !important;
+  border-radius: 8px !important;
   box-shadow: none !important;
-  padding: 6px 16px !important;
-  height: 38px !important;
+  padding: 4px 14px !important;
+  height: 34px !important;
 }
 
 .filter-search-input .el-input__wrapper:hover {
