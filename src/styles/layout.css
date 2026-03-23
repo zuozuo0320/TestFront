@@ -576,37 +576,146 @@
 /* Project Switcher */
 .tree-project-switcher {
   margin-bottom: 8px;
+  position: relative;
 }
 
-.project-select {
-  width: 100% !important;
+.project-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: transparent;
+  border: 1px solid transparent;
+}
+.project-trigger:hover {
+  background: rgba(124, 58, 237, 0.06);
+  border-color: rgba(124, 58, 237, 0.12);
+}
+.project-trigger.active {
+  background: rgba(124, 58, 237, 0.08);
+  border-color: rgba(124, 58, 237, 0.2);
 }
 
-.project-select :deep(.el-select__wrapper) {
-  background: #151a25 !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 8px !important;
-  box-shadow: none !important;
-  height: 36px !important;
-  padding: 0 12px !important;
+.project-trigger-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(99, 102, 241, 0.15));
+  color: #a78bfa;
+  flex-shrink: 0;
 }
 
-.project-select :deep(.el-select__wrapper:hover) {
-  border-color: rgba(255, 255, 255, 0.14) !important;
+.project-trigger-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.project-trigger-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+.project-trigger-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.project-select :deep(.el-select__selected-item) {
-  color: rgba(255, 255, 255, 0.85) !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
+.project-trigger-chevron {
+  color: rgba(255, 255, 255, 0.3);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+.project-trigger-chevron.rotated {
+  transform: rotate(180deg);
 }
 
-.project-select :deep(.el-select__placeholder) {
-  color: rgba(255, 255, 255, 0.4) !important;
+/* Dropdown Panel */
+.project-dropdown-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+}
+.project-dropdown-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: #151a2e;
+  border: 1px solid rgba(124, 58, 237, 0.15);
+  border-radius: 10px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(124, 58, 237, 0.06);
+  padding: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.project-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.project-dropdown-item:hover {
+  background: rgba(124, 58, 237, 0.08);
+}
+.project-dropdown-item.selected {
+  background: rgba(124, 58, 237, 0.12);
+}
+.project-dropdown-item:not(.selected) {
+  padding-left: 23px;
+}
+.project-item-indicator {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #a78bfa;
+  box-shadow: 0 0 6px rgba(167, 139, 250, 0.4);
+  flex-shrink: 0;
+}
+.project-item-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-dropdown-item.selected .project-item-name {
+  color: #a78bfa;
+  font-weight: 600;
+}
+.project-item-check {
+  color: #a78bfa;
+  flex-shrink: 0;
 }
 
-.project-select :deep(.el-select__suffix .el-icon) {
-  color: rgba(255, 255, 255, 0.3) !important;
+/* Dropdown slide transition */
+.dropdown-slide-enter-active,
+.dropdown-slide-leave-active {
+  transition: all 0.2s ease;
+}
+.dropdown-slide-enter-from,
+.dropdown-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 
 /* Divider */
@@ -699,6 +808,8 @@
   font-size: 13px;
   color: rgba(255, 255, 255, 0.65);
   border: none;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
   background: transparent;
   transition: all 0.2s ease;
   position: relative;
@@ -819,6 +930,26 @@
   color: rgba(255, 255, 255, 0.6);
   padding-right: 4px;
   gap: 6px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.tree-node-row:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.tree-node-row.active {
+  color: var(--tp-primary-light);
+}
+
+.tree-node-row.active .tree-node-name {
+  color: var(--tp-primary-light);
+  font-weight: 600;
+}
+
+.tree-node-row.active .tree-node-icon {
+  color: var(--tp-primary-light);
 }
 
 .tree-node-left {
@@ -885,7 +1016,7 @@
 
 .tree-root-row {
   align-items: center;
-  padding: 8px 10px;
+  padding: 8px 12px;
 }
 
 .tree-root-title {
@@ -902,9 +1033,82 @@
 }
 
 .tree-node-count {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.35);
   font-weight: 400;
+  flex-shrink: 0;
+  min-width: 20px;
+  text-align: right;
+}
+
+.tree-node-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* Inline action buttons (MeterSphere style — visible on hover) */
+.tree-node-action {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  border-radius: 4px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  display: none;
+  flex-shrink: 0;
+}
+
+.tree-node-row:hover .tree-node-action,
+.tree-root-row:hover .tree-node-action,
+.module-tree .el-tree-node__content:hover .tree-node-action {
+  display: inline-flex;
+}
+
+.tree-node-action:hover {
+  color: var(--tp-primary-light);
+  background: rgba(124, 58, 237, 0.12);
+}
+
+/* Hide count when actions are visible */
+.tree-node-row:hover .tree-node-count,
+.tree-root-row:hover .tree-node-count,
+.module-tree .el-tree-node__content:hover .tree-node-count {
+  display: none;
+}
+
+/* Unplanned cases row */
+/* Reduce el-tree default indentation to align with unplanned row */
+.tree-list .module-tree .el-tree-node__content {
+  padding-left: 12px !important;
+}
+.tree-list .module-tree .el-tree-node__expand-icon {
+  display: none;
+}
+
+.tree-unplanned {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.tree-unplanned:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.tree-unplanned.active {
+  background: rgba(124, 58, 237, 0.06);
+  color: var(--tp-primary-light);
+}
+
+.tree-unplanned .tree-node-count {
+  color: rgba(255, 255, 255, 0.35);
 }
 
 .recycle {

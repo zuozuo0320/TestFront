@@ -30,13 +30,13 @@ export async function deleteProject(projectId: number) {
 
 /** 归档项目 */
 export async function archiveProject(projectId: number) {
-  const { data } = await apiClient.put<Project>(`/projects/${projectId}`, { status: 'archived' })
+  const { data } = await apiClient.post<Project>(`/projects/${projectId}/archive`)
   return data
 }
 
 /** 恢复项目 */
 export async function unarchiveProject(projectId: number) {
-  const { data } = await apiClient.put<Project>(`/projects/${projectId}`, { status: 'active' })
+  const { data } = await apiClient.post<Project>(`/projects/${projectId}/restore`)
   return data
 }
 

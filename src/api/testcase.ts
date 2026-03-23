@@ -18,6 +18,7 @@ export interface TestCaseListParams {
   updated_before?: string
   sortBy?: 'id' | 'created_at' | 'updated_at'
   sortOrder?: 'asc' | 'desc'
+  module_path?: string
 }
 
 export interface TestCasePayload {

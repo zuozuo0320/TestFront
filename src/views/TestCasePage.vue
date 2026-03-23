@@ -155,6 +155,37 @@ function onDirContextMenu(e: MouseEvent, path: string, name: string) {
   ctxMenu.name = name
 }
 function closeCtxMenu() { ctxMenu.visible = false }
+
+// Inline dropdown menu handler (MeterSphere style)
+async function onNodeMenuCommand(cmd: string, path: string, name: string) {
+  if (cmd === 'rename') {
+    const result = await ElMessageBox.prompt('请输入新目录名称', '目录重命名', {
+      inputValue: name, confirmButtonText: '确定', cancelButtonText: '取消',
+    }).catch(() => null)
+    if (!result || !result.value?.trim()) return
+    const oldPath = path
+    const parentPath = oldPath.substring(0, oldPath.lastIndexOf('/'))
+    const newPath = normalizeDirectoryPath(`${parentPath}/${result.value.trim()}`)
+    customModulePaths.value = customModulePaths.value.map(p => {
+      if (p === oldPath) return newPath
+      if (p.startsWith(`${oldPath}/`)) return newPath + p.substring(oldPath.length)
+      return p
+    })
+    if (selectedProject.value) {
+      for (const r of rows.value) {
+        const rp = normalizeCaseModulePath(r.modulePath || '/未规划用例')
+        if (rp === oldPath || rp.startsWith(`${oldPath}/`)) {
+          const newModPath = newPath + rp.substring(oldPath.length)
+          try { await updateTestCase(selectedProject.value, r.id, { module_path: newModPath }) } catch { /* skip */ }
+        }
+      }
+      await loadCases()
+    }
+    ElMessage.success('重命名成功')
+  } else if (cmd === 'delete') {
+    removeDirectory(path)
+  }
+}
 async function ctxAddSubDir() {
   closeCtxMenu()
   directoryForm.parentPath = ctxMenu.path
@@ -203,6 +234,12 @@ const selectAll = ref(false)
 const customModulePaths = ref<string[]>([])
 const treeExpanded = ref(true)
 const treePanelOpen = ref(true)
+const projectDropdownOpen = ref(false)
+const currentProjectName = computed(() => {
+  const p = projects.value.find(proj => proj.id === selectedProject.value)
+  return p?.name || '选择项目'
+})
+const selectedModulePath = ref('')  // '' = 全部, '/未规划用例' = 未规划, '/xxx' = 特定目录
 
 const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
@@ -310,6 +347,35 @@ const moduleTree = computed<ModuleTreeNode[]>(() => {
   return Array.from(rootMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
 })
 
+// 各目录用例计数（包含子目录）
+const moduleCaseCount = computed(() => {
+  const countMap: Record<string, number> = {}
+  for (const r of rows.value) {
+    const mp = normalizeCaseModulePath((r.modulePath || '').trim())
+    // 累加到自身及所有父目录
+    const parts = mp.split('/').filter(Boolean)
+    let current = ''
+    for (const part of parts) {
+      current += `/${part}`
+      countMap[current] = (countMap[current] || 0) + 1
+    }
+  }
+  return countMap
+})
+
+const unplannedCount = computed(() => {
+  return rows.value.filter(r => {
+    const mp = normalizeCaseModulePath((r.modulePath || '').trim())
+    return mp === '/未规划用例'
+  }).length
+})
+
+function onModuleClick(path: string) {
+  selectedModulePath.value = selectedModulePath.value === path ? '' : path
+  page.value = 1
+  loadCases()
+}
+
 // ── Helpers ──
 
 function formatTime(value?: string) {
@@ -404,6 +470,7 @@ async function loadCases() {
       updated_before: updatedBefore.value || undefined,
       sortBy: sortBy.value,
       sortOrder: sortOrder.value,
+      module_path: selectedModulePath.value || undefined,
     })
     const items = Array.isArray((data as any).items) ? (data as any).items : []
     rows.value = items.map(toRow)
@@ -542,20 +609,7 @@ async function onBatchMove() {
   } catch (e: any) { ElMessage.error(e?.response?.data?.error || '批量移动失败') }
 }
 
-const moduleCaseCount = computed(() => {
-  const map: Record<string, number> = {}
-  rows.value.forEach(r => {
-    const p = normalizeCaseModulePath(r.modulePath || '/未规划用例')
-    // count for each ancestor
-    const parts = p.split('/').filter(Boolean)
-    let cur = ''
-    for (const part of parts) {
-      cur += `/${part}`
-      map[cur] = (map[cur] || 0) + 1
-    }
-  })
-  return map
-})
+
 
 async function onCloneCase(row: TableRow) {
   if (!selectedProject.value) return
@@ -728,22 +782,44 @@ watch(selectedProject, () => { page.value = 1; loadCases() })
       <div class="tree-content">
         <!-- Project Switcher -->
         <div class="tree-project-switcher">
-          <el-select
-            :model-value="selectedProject"
-            class="project-select"
-            popper-class="project-select-popper"
-            @update:model-value="onProjectSwitch"
+          <div
+            class="project-trigger"
+            :class="{ active: projectDropdownOpen }"
+            @click="projectDropdownOpen = !projectDropdownOpen"
           >
-            <template #prefix>
-              <LuAtom :size="16" :stroke-width="1.5" style="color: var(--tp-primary-light)" />
-            </template>
-            <el-option v-for="p in projects" :key="p.id" :label="p.name" :value="p.id" />
-          </el-select>
+            <div class="project-trigger-icon">
+              <LuAtom :size="18" :stroke-width="1.8" />
+            </div>
+            <div class="project-trigger-info">
+              <span class="project-trigger-name">{{ currentProjectName }}</span>
+            </div>
+            <svg class="project-trigger-chevron" :class="{ rotated: projectDropdownOpen }" width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <Transition name="dropdown-slide">
+            <div v-if="projectDropdownOpen" class="project-dropdown-panel">
+              <div
+                v-for="p in projects"
+                :key="p.id"
+                class="project-dropdown-item"
+                :class="{ selected: p.id === selectedProject }"
+                @click="onProjectSwitch(p.id); projectDropdownOpen = false"
+              >
+                <div v-if="p.id === selectedProject" class="project-item-indicator" />
+                <span class="project-item-name">{{ p.name }}</span>
+                <svg v-if="p.id === selectedProject" class="project-item-check" width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <path d="M3 8.5L6.5 12L13 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+            </div>
+          </Transition>
+          <div v-if="projectDropdownOpen" class="project-dropdown-overlay" @click="projectDropdownOpen = false" />
         </div>
         <div class="tree-divider"></div>
         <!-- Search -->
         <div class="tree-header">
-          <el-input size="small" class="module-search-input" placeholder="搜索模块...">
+          <el-input size="small" class="module-search-input" placeholder="请输入模块名称">
             <template #prefix>
               <el-icon><Search /></el-icon>
             </template>
@@ -752,30 +828,53 @@ watch(selectedProject, () => { page.value = 1; loadCases() })
 
         <!-- Tree List -->
         <div class="tree-list">
-          <div class="tree-item active tree-root-row">
+          <div class="tree-item tree-root-row" :class="{ active: selectedModulePath === '' }" @click="onModuleClick('')">
             <div class="tree-node-left">
               <el-icon class="tree-node-icon"><FolderOpened /></el-icon>
-              <span class="tree-root-title">全部用例（{{ total }}）</span>
+              <span class="tree-root-title">全部用例</span>
             </div>
-            <div class="tree-root-actions">
-              <button class="tree-icon-btn ghost" @click.stop="treeExpanded = !treeExpanded">
-                <el-icon><CaretBottom v-if="treeExpanded" /><CaretRight v-else /></el-icon>
+            <div class="tree-node-right">
+              <span class="tree-node-count">{{ total }}</span>
+              <button class="tree-node-action" @click.stop="treeExpanded = !treeExpanded" :title="treeExpanded ? '收起' : '展开'">
+                <el-icon :size="14"><CaretBottom v-if="treeExpanded" /><CaretRight v-else /></el-icon>
               </button>
-              <button class="tree-icon-btn ghost" @click.stop="openCreateDirectory">
-                <el-icon><FolderAdd /></el-icon>
+              <button class="tree-node-action" @click.stop="openCreateDirectory" title="新建目录">
+                <el-icon :size="14"><FolderAdd /></el-icon>
               </button>
             </div>
           </div>
+          <!-- 未规划用例 -->
+          <div v-if="treeExpanded" class="tree-item tree-unplanned" :class="{ active: selectedModulePath === '/未规划用例' }" @click="onModuleClick('/未规划用例')">
+            <div class="tree-node-left">
+              <el-icon class="tree-node-icon"><Document /></el-icon>
+              <span class="tree-node-name">未规划用例</span>
+            </div>
+            <span class="tree-node-count">{{ unplannedCount }}</span>
+          </div>
           <el-tree v-if="treeExpanded && moduleTree.length > 0" class="module-tree" :data="moduleTree" node-key="path" default-expand-all :props="{ label: 'name', children: 'children' }">
             <template #default="{ data }">
-              <div class="tree-node-row" @contextmenu="onDirContextMenu($event, data.path, data.name)">
+              <div class="tree-node-row" :class="{ active: selectedModulePath === data.path }" @click.stop="onModuleClick(data.path)">
                 <div class="tree-node-left">
                   <el-icon class="tree-node-icon"><Folder /></el-icon>
-                  <span class="tree-node-name">{{ data.name }}<span v-if="moduleCaseCount[data.path]" class="tree-node-count"> ({{ moduleCaseCount[data.path] }})</span></span>
+                  <span class="tree-node-name">{{ data.name }}</span>
                 </div>
-                <button class="tree-node-del" @click.stop="removeDirectory(data.path)">
-                  <el-icon><Delete /></el-icon>
-                </button>
+                <div class="tree-node-right">
+                  <span class="tree-node-count">{{ moduleCaseCount[data.path] || 0 }}</span>
+                  <button class="tree-node-action" @click.stop="directoryForm.parentPath = data.path; directoryForm.name = ''; directoryDialogVisible = true" title="新建子目录">
+                    <el-icon :size="14"><Plus /></el-icon>
+                  </button>
+                  <el-dropdown trigger="click" @command="(cmd: string) => onNodeMenuCommand(cmd, data.path, data.name)" @click.stop>
+                    <button class="tree-node-action" @click.stop title="更多操作">
+                      <el-icon :size="14"><MoreFilled /></el-icon>
+                    </button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item command="rename">重命名</el-dropdown-item>
+                        <el-dropdown-item command="delete" divided style="color: #ef4444;">删除</el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                </div>
               </div>
             </template>
           </el-tree>
