@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Edit, Delete, FolderChecked, Refresh, Search, User as UserIcon } from '@element-plus/icons-vue'
+import { Search } from '@element-plus/icons-vue'
 import {
   listProjects,
   createProject,
@@ -42,6 +42,9 @@ const allUsers = ref<User[]>([])
 const addMemberUserId = ref<number | ''>('')
 const addingMember = ref(false)
 
+// ── 卡片成员头像堆叠 ──
+const projectMembers = ref<Record<number, ProjectMember[]>>({})
+
 /** 过滤并排序项目列表：活跃优先，按创建时间降序 */
 const filteredProjects = computed(() => {
   let list = projects.value
@@ -63,9 +66,7 @@ const filteredMembers = computed(() => {
   if (!memberSearch.value.trim()) return members.value
   const kw = memberSearch.value.trim().toLowerCase()
   return members.value.filter(
-    (m) =>
-      m.user?.name?.toLowerCase().includes(kw) ||
-      m.user?.email?.toLowerCase().includes(kw),
+    (m) => m.user?.name?.toLowerCase().includes(kw) || m.user?.email?.toLowerCase().includes(kw),
   )
 })
 
@@ -117,9 +118,32 @@ async function loadProjects() {
   appLoading.value = true
   try {
     projects.value = await listProjects()
+    // 加载所有项目的成员（用于卡片头像展示）
+    await loadAllProjectMembers()
   } finally {
     appLoading.value = false
   }
+}
+
+/** 批量加载所有项目的成员列表（用于卡片头像展示） */
+async function loadAllProjectMembers() {
+  const map: Record<number, ProjectMember[]> = {}
+  await Promise.all(
+    projects.value.map(async (p) => {
+      try {
+        map[p.id] = await listMembers(p.id)
+      } catch {
+        map[p.id] = []
+      }
+    }),
+  )
+  projectMembers.value = map
+}
+
+/** 获取项目卡片展示的成员（最多4个） */
+function getCardMembers(projectId: number) {
+  const all = projectMembers.value[projectId] || []
+  return { visible: all.slice(0, 4), overflow: Math.max(0, all.length - 4) }
 }
 
 // ── 项目 CRUD ──
@@ -206,11 +230,11 @@ async function onRestore(p: Project) {
 /** 删除项目（须已归档+无数据+非种子） */
 async function onDelete(p: Project) {
   try {
-    await ElMessageBox.confirm(
-      `确定要删除项目「${p.name}」吗？此操作不可恢复。`,
-      '删除确认',
-      { confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'error' },
-    )
+    await ElMessageBox.confirm(`确定要删除项目「${p.name}」吗？此操作不可恢复。`, '删除确认', {
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消',
+      type: 'error',
+    })
     await deleteProject(p.id)
     ElMessage.success('项目已删除')
     await loadProjects()
@@ -233,7 +257,7 @@ async function openMemberDialog(p: Project) {
   // 首次打开时加载全部用户列表（用于添加成员选择器）
   if (allUsers.value.length === 0) {
     try {
-      allUsers.value = await listUsers() as any[]
+      allUsers.value = (await listUsers()) as any[]
     } catch {
       // 非 admin 可能无权限，忽略
     }
@@ -271,11 +295,11 @@ async function onAddMember() {
 async function onRemoveMember(m: ProjectMember) {
   if (!memberProject.value) return
   try {
-    await ElMessageBox.confirm(
-      `确认将【${m.user?.name || '用户'}】从项目中移除？`,
-      '移除确认',
-      { confirmButtonText: '移除', cancelButtonText: '取消', type: 'warning' },
-    )
+    await ElMessageBox.confirm(`确认将【${m.user?.name || '用户'}】从项目中移除？`, '移除确认', {
+      confirmButtonText: '移除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
     await removeMember(memberProject.value.id, m.user_id)
     ElMessage.success('成员已移除')
     await loadMembers(memberProject.value.id)
@@ -301,86 +325,176 @@ function formatDate(dateStr?: string) {
   })
 }
 
+/** 根据项目名称生成一致的品牌色（HSL 色轮均匀分布） */
+function getProjectColor(name: string) {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  const hue = Math.abs(hash) % 360
+  return `hsl(${hue}, 55%, 45%)`
+}
+
+/** 卡片下拉菜单操作路由 */
+function onCardAction(cmd: string, p: Project) {
+  switch (cmd) {
+    case 'edit':
+      openEditProject(p)
+      break
+    case 'members':
+      openMemberDialog(p)
+      break
+    case 'archive':
+      onArchive(p)
+      break
+    case 'restore':
+      onRestore(p)
+      break
+    case 'delete':
+      onDelete(p)
+      break
+  }
+}
+
 onMounted(() => loadProjects())
 </script>
 
 <template>
-  <div class="module-card" v-loading="appLoading">
+  <div v-loading="appLoading" class="pm-page">
     <!-- 工具栏 -->
-    <div class="module-toolbar">
-      <h3>项目管理</h3>
-      <div class="toolbar-right">
+    <div class="pm-toolbar">
+      <h2 class="pm-title">项目管理</h2>
+      <div class="pm-toolbar-right">
         <el-input
           v-model="searchKeyword"
           placeholder="搜索项目名称"
           clearable
           :prefix-icon="Search"
-          style="width: 220px"
+          class="pm-search"
         />
-        <el-select v-model="statusFilter" placeholder="全部状态" clearable style="width: 130px">
+        <el-select v-model="statusFilter" placeholder="全部状态" clearable class="pm-filter">
           <el-option label="活跃" value="active" />
           <el-option label="已归档" value="archived" />
         </el-select>
-        <el-button type="primary" @click="openCreateProject">新建项目</el-button>
+        <button class="pm-btn-create" @click="openCreateProject">
+          <span class="pm-btn-plus">+</span>
+          新建项目
+        </button>
       </div>
     </div>
 
-    <!-- 项目表格 -->
-    <el-table :data="filteredProjects" stripe style="width: 100%" empty-text="暂无项目">
-      <el-table-column prop="name" label="项目名称" min-width="180">
-        <template #default="{ row }">
-          <div class="project-name-cell">
-            <span>{{ row.name }}</span>
-            <el-tag v-if="isSeedProject(row)" size="small" type="warning" effect="plain" class="seed-tag">种子</el-tag>
+    <!-- 项目卡片网格 -->
+    <div class="pm-grid">
+      <div
+        v-for="p in filteredProjects"
+        :key="p.id"
+        class="pm-card"
+        :class="{ 'pm-card--archived': p.status !== 'active' }"
+      >
+        <!-- 卡片头部：图标 + 名称 + 操作 -->
+        <div class="pm-card-header">
+          <div class="pm-card-icon" :style="{ background: getProjectColor(p.name) }">
+            {{ p.name.charAt(0).toUpperCase() }}
           </div>
-        </template>
-      </el-table-column>
-      <el-table-column prop="description" label="项目描述" min-width="200" show-overflow-tooltip>
-        <template #default="{ row }">{{ row.description || '-' }}</template>
-      </el-table-column>
-      <el-table-column label="状态" width="100" align="center">
-        <template #default="{ row }">
-          <el-tag :type="row.status === 'active' ? 'success' : 'info'" size="small" effect="dark">
-            {{ row.status === 'active' ? '活跃' : '已归档' }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="成员" width="80" align="center">
-        <template #default="{ row }">{{ row.member_count ?? 0 }}</template>
-      </el-table-column>
-      <el-table-column label="用例" width="80" align="center">
-        <template #default="{ row }">{{ row.testcase_count ?? 0 }}</template>
-      </el-table-column>
-      <el-table-column label="创建时间" width="120" align="center">
-        <template #default="{ row }">{{ formatDate(row.created_at) }}</template>
-      </el-table-column>
-      <el-table-column label="操作" width="260" align="center" fixed="right">
-        <template #default="{ row }">
-          <el-button link :icon="Edit" @click="openEditProject(row)">编辑</el-button>
-          <el-button link :icon="UserIcon" @click="openMemberDialog(row)">成员</el-button>
-          <el-button
-            v-if="row.status === 'active'"
-            link
-            :icon="FolderChecked"
-            :disabled="isSeedProject(row)"
-            @click="onArchive(row)"
-          >归档</el-button>
-          <el-button
-            v-else
-            link
-            :icon="Refresh"
-            @click="onRestore(row)"
-          >恢复</el-button>
-          <el-button
-            link
-            :icon="Delete"
-            type="danger"
-            :disabled="isSeedProject(row) || row.status === 'active'"
-            @click="onDelete(row)"
-          >删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+          <div class="pm-card-title-area">
+            <div class="pm-card-name">
+              {{ p.name }}
+              <el-tag
+                v-if="isSeedProject(p)"
+                size="small"
+                type="warning"
+                effect="plain"
+                class="pm-seed-tag"
+              >
+                种子
+              </el-tag>
+            </div>
+            <span class="pm-card-date">{{ formatDate(p.created_at) }}</span>
+          </div>
+          <el-dropdown trigger="click" @command="(cmd: string) => onCardAction(cmd, p)">
+            <button class="pm-card-menu">⋯</button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="edit">✏️ 编辑</el-dropdown-item>
+                <el-dropdown-item command="members">👥 成员管理</el-dropdown-item>
+                <el-dropdown-item
+                  v-if="p.status === 'active'"
+                  command="archive"
+                  :disabled="isSeedProject(p)"
+                >
+                  📦 归档
+                </el-dropdown-item>
+                <el-dropdown-item v-else command="restore">♻️ 恢复</el-dropdown-item>
+                <el-dropdown-item
+                  command="delete"
+                  :disabled="isSeedProject(p) || p.status === 'active'"
+                  divided
+                >
+                  🗑️ 删除
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
+
+        <!-- 描述 -->
+        <p class="pm-card-desc">{{ p.description || '暂无描述' }}</p>
+
+        <!-- 底部：状态 + 成员头像 + 统计 -->
+        <div class="pm-card-footer">
+          <span
+            class="pm-status"
+            :class="p.status === 'active' ? 'pm-status--active' : 'pm-status--archived'"
+          >
+            <span class="pm-status-dot"></span>
+            {{ p.status === 'active' ? '活跃' : '已归档' }}
+          </span>
+          <div class="pm-card-right">
+            <div v-if="getCardMembers(p.id).visible.length > 0" class="pm-avatar-stack">
+              <img
+                v-for="(m, idx) in getCardMembers(p.id).visible"
+                :key="m.user_id"
+                class="pm-avatar-item"
+                :style="{ zIndex: 10 - idx }"
+                :src="resolveAvatarUrl(m.user?.avatar, m.user?.name)"
+                :title="m.user?.name || ''"
+                @error="
+                  (e: any) => {
+                    e.target.src = resolveAvatarUrl('', m.user?.name)
+                  }
+                "
+              />
+              <span v-if="getCardMembers(p.id).overflow > 0" class="pm-avatar-overflow">
+                +{{ getCardMembers(p.id).overflow }}
+              </span>
+            </div>
+            <span class="pm-stat" title="用例数">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+              </svg>
+              {{ p.testcase_count ?? 0 }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 空态 -->
+      <div v-if="filteredProjects.length === 0" class="pm-empty">
+        <p>暂无项目</p>
+        <button class="pm-btn-create" @click="openCreateProject">
+          <span class="pm-btn-plus">+</span>
+          创建第一个项目
+        </button>
+      </div>
+    </div>
 
     <!-- 创建/编辑项目弹窗 -->
     <el-dialog
@@ -420,163 +534,523 @@ onMounted(() => loadProjects())
     <!-- 成员管理弹窗 -->
     <el-dialog
       v-model="memberDialogVisible"
-      :title="`成员管理 — ${memberProject?.name || ''}`"
-      width="680px"
+      :title="`${memberProject?.name || ''} - 成员管理`"
+      width="900px"
     >
-      <!-- 添加成员 -->
-      <div class="member-add-bar">
-        <el-select
-          v-model="addMemberUserId"
-          filterable
-          placeholder="选择用户添加到项目"
-          style="flex: 1"
-          :disabled="availableUsers.length === 0"
-        >
-          <el-option
-            v-for="u in availableUsers"
-            :key="u.id"
-            :label="`${u.name} (${u.email})`"
-            :value="u.id"
-          />
-        </el-select>
-        <el-button
-          type="primary"
-          :loading="addingMember"
-          :disabled="!addMemberUserId"
-          @click="onAddMember"
-        >
-          添加
-        </el-button>
+      <!-- 搜索 + 添加成员栏 -->
+      <div class="mb-toolbar">
+        <el-input
+          v-model="memberSearch"
+          placeholder="Search members..."
+          clearable
+          :prefix-icon="Search"
+          class="mb-search"
+        />
+        <div class="mb-add-bar">
+          <el-select
+            v-model="addMemberUserId"
+            filterable
+            placeholder="Add user..."
+            class="mb-add-select"
+            :disabled="availableUsers.length === 0"
+          >
+            <el-option
+              v-for="u in availableUsers"
+              :key="u.id"
+              :label="`${u.name} (${u.email})`"
+              :value="u.id"
+            />
+          </el-select>
+          <button
+            class="mb-add-btn"
+            :disabled="!addMemberUserId || addingMember"
+            @click="onAddMember"
+          >
+            Add Member
+          </button>
+        </div>
       </div>
 
-      <!-- 成员搜索 -->
-      <el-input
-        v-model="memberSearch"
-        placeholder="搜索成员姓名 / 邮箱"
-        clearable
-        :prefix-icon="Search"
-        style="margin-bottom: 12px"
-      />
-
-      <!-- 成员列表 -->
-      <el-table :data="filteredMembers" stripe v-loading="membersLoading" empty-text="暂无成员" max-height="400">
-        <el-table-column label="成员" min-width="240">
-          <template #default="{ row }">
-            <div class="member-cell">
-              <img
-                class="member-avatar"
-                :src="resolveAvatarUrl(row.user?.avatar, row.user?.name)"
-                alt="avatar"
-                @error="(e: any) => { e.target.src = resolveAvatarUrl('', row.user?.name) }"
-              />
-              <div class="member-meta">
-                <span class="member-name">{{ row.user?.name || '-' }}</span>
-                <span class="member-email">{{ row.user?.email || '' }}</span>
-              </div>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="角色标签" min-width="220" align="center">
-          <template #default="{ row }">
-            <div class="member-role-tags">
-              <el-tag
-                v-for="(roleName, idx) in getMemberRoleNames(row)"
-                :key="`${row.user_id}-${idx}`"
-                size="small"
-                :type="isProtectedRoleName(roleName) ? 'danger' : 'info'"
-                effect="plain"
-              >
-                {{ roleName }}
-              </el-tag>
-              <span v-if="getMemberRoleNames(row).length === 0">-</span>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="加入时间" width="120" align="center">
-          <template #default="{ row }">{{ formatDate(row.created_at) }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="100" align="center">
-          <template #default="{ row }">
-            <el-tooltip
-              v-if="isProtectedMember(row)"
-              content="admin/manager 角色成员不可移除"
-              placement="top"
+      <!-- 成员网格 -->
+      <div v-loading="membersLoading" class="mb-grid">
+        <div v-for="m in filteredMembers" :key="m.user_id" class="mb-card">
+          <img
+            class="mb-card-avatar"
+            :src="resolveAvatarUrl(m.user?.avatar, m.user?.name)"
+            alt="avatar"
+            @error="
+              (e: any) => {
+                e.target.src = resolveAvatarUrl('', m.user?.name)
+              }
+            "
+          />
+          <span class="mb-card-name">{{ m.user?.name || '-' }}</span>
+          <span class="mb-card-email">{{ m.user?.email || '' }}</span>
+          <div class="mb-card-roles">
+            <span
+              v-for="(roleName, idx) in getMemberRoleNames(m)"
+              :key="`${m.user_id}-${idx}`"
+              class="mb-role-pill"
+              :class="{ 'mb-role-pill--protected': isProtectedRoleName(roleName) }"
             >
-              <el-button link size="small" type="danger" disabled>移除</el-button>
-            </el-tooltip>
-            <el-button
-              v-else
-              link
-              size="small"
-              type="danger"
-              @click="onRemoveMember(row)"
-            >
-              移除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+              {{ roleName }}
+            </span>
+            <span v-if="getMemberRoleNames(m).length === 0" class="mb-role-pill">成员</span>
+          </div>
+          <el-tooltip v-if="isProtectedMember(m)" content="管理员角色不可移除" placement="top">
+            <button class="mb-card-remove mb-card-remove--disabled" disabled>移除</button>
+          </el-tooltip>
+          <button v-else class="mb-card-remove" @click="onRemoveMember(m)">移除</button>
+        </div>
+        <div v-if="filteredMembers.length === 0 && !membersLoading" class="mb-empty">暂无成员</div>
+      </div>
     </el-dialog>
   </div>
 </template>
 
 <style scoped>
-.module-toolbar {
+/* ══════════ 页面 ══════════ */
+.pm-page {
+  padding: 28px 32px;
+}
+
+/* ── 工具栏 ── */
+.pm-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
-.toolbar-right {
+.pm-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #f0f0f5;
+  margin: 0;
+  letter-spacing: 0.3px;
+}
+.pm-toolbar-right {
   display: flex;
   align-items: center;
   gap: 10px;
 }
-.project-name-cell {
+.pm-search {
+  width: 220px;
+}
+.pm-filter {
+  width: 130px;
+}
+:deep(.pm-search .el-input__wrapper),
+:deep(.pm-filter .el-input__wrapper) {
+  border-radius: 8px;
+}
+:deep(.pm-filter .el-select__wrapper) {
+  border-radius: 8px;
+}
+.pm-btn-create {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 20px;
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.pm-btn-create:hover {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.35);
+  transform: translateY(-1px);
+}
+.pm-btn-plus {
+  font-size: 16px;
+  font-weight: 300;
+  line-height: 1;
+}
+
+/* ══════════ 卡片网格 ══════════ */
+.pm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.pm-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.25s ease;
+  cursor: default;
+}
+.pm-card:hover {
+  border-color: rgba(124, 58, 237, 0.3);
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+  transform: translateY(-2px);
+}
+.pm-card--archived {
+  opacity: 0.55;
+}
+.pm-card--archived:hover {
+  opacity: 0.75;
+}
+
+/* ── 卡片头部 ── */
+.pm-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.pm-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+.pm-card-title-area {
+  flex: 1;
+  min-width: 0;
+}
+.pm-card-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f0f0f5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.seed-tag {
+.pm-seed-tag {
   flex-shrink: 0;
+  font-size: 10px;
 }
-.member-add-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-.member-cell {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.member-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.06);
-}
-.member-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.member-name {
-  font-weight: 500;
-  font-size: 13px;
-}
-.member-email {
+.pm-card-date {
   font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
+  margin-top: 2px;
+  display: block;
+}
+.pm-card-menu {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  letter-spacing: 2px;
+}
+.pm-card-menu:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* ── 描述 ── */
+.pm-card-desc {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.4);
+  line-height: 1.5;
+  margin: 0 0 16px 0;
+  flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── 底部状态与统计 ── */
+.pm-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+.pm-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+.pm-status--active {
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.1);
+}
+.pm-status--archived {
+  color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.04);
+}
+.pm-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.pm-stats {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.pm-card-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.pm-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
   color: rgba(255, 255, 255, 0.4);
 }
-.member-role-tags {
+.pm-stat svg {
+  opacity: 0.5;
+}
+
+/* ── 头像堆叠 ── */
+.pm-avatar-stack {
+  display: flex;
+  align-items: center;
+}
+.pm-avatar-item {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #0d1117;
+  margin-left: -8px;
+  position: relative;
+  background: rgba(255, 255, 255, 0.08);
+  transition: transform 0.15s;
+}
+.pm-avatar-item:first-child {
+  margin-left: 0;
+}
+.pm-avatar-item:hover {
+  transform: scale(1.15);
+  z-index: 20 !important;
+}
+.pm-avatar-overflow {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(124, 58, 237, 0.25);
+  border: 2px solid #0d1117;
+  margin-left: -8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: #a78bfa;
+  position: relative;
+}
+
+/* ── 空态 ── */
+.pm-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+  color: rgba(255, 255, 255, 0.3);
+  gap: 16px;
+}
+.pm-empty p {
+  font-size: 15px;
+  margin: 0;
+}
+
+/* ══════════ 成员弹窗 ══════════ */
+.mb-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.mb-search {
+  flex: 3;
+  min-width: 0;
+}
+:deep(.mb-search .el-input__wrapper) {
+  border-radius: 8px;
+}
+.mb-add-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 3;
+  min-width: 0;
+}
+.mb-add-select {
+  flex: 1;
+  min-width: 0;
+}
+:deep(.mb-add-select .el-select__wrapper) {
+  border-radius: 8px;
+}
+.mb-add-btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+.mb-add-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.3);
+}
+.mb-add-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── 成员网格 4列 ── */
+.mb-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  max-height: 480px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.mb-grid::-webkit-scrollbar {
+  width: 4px;
+}
+.mb-grid::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.mb-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 2px solid rgba(124, 58, 237, 0.4);
+  border-radius: 10px;
+  padding: 16px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+}
+.mb-card:hover {
+  border-color: rgba(124, 58, 237, 0.5);
+  border-top-color: rgba(124, 58, 237, 0.7);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 24px rgba(124, 58, 237, 0.12);
+}
+
+.mb-card-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.06);
+  border: 2px solid rgba(124, 58, 237, 0.25);
+  margin-bottom: 6px;
+}
+.mb-card-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f0f0f5;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.mb-card-email {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.28);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  margin-bottom: 4px;
+}
+.mb-card-roles {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
+  margin-top: 2px;
+}
+.mb-role-pill {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.mb-role-pill--protected {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.2);
+}
+.mb-card-remove {
+  margin-top: 6px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.25);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 3px 10px;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+.mb-card-remove:hover {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.1);
+}
+.mb-card-remove--disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.mb-card-remove--disabled:hover {
+  color: rgba(255, 255, 255, 0.25);
+  background: none;
+}
+.mb-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px 0;
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 14px;
 }
 </style>

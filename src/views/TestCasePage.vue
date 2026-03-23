@@ -104,18 +104,18 @@ const isExecFail = (v: string) => ['不通过', '失败'].includes(v)
 const isReviewPass = (v: string) => ['已通过', '通过'].includes(v)
 const metricPassRate = computed(() => {
   if (rows.value.length === 0) return 0
-  const passed = rows.value.filter(r => isExecPass(r.execResult)).length
+  const passed = rows.value.filter((r) => isExecPass(r.execResult)).length
   return Math.round((passed / rows.value.length) * 100)
 })
 const metricCoverage = computed(() => {
   if (rows.value.length === 0) return 0
-  const executed = rows.value.filter(r => r.execResult && r.execResult !== '未执行').length
+  const executed = rows.value.filter((r) => r.execResult && r.execResult !== '未执行').length
   return Math.round((executed / rows.value.length) * 100)
 })
 const metricWeeklyNew = computed(() => {
   const oneWeekAgo = new Date()
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
-  return rows.value.filter(r => {
+  return rows.value.filter((r) => {
     if (!r.createdAt) return false
     return new Date(r.createdAt) >= oneWeekAgo
   }).length
@@ -123,10 +123,32 @@ const metricWeeklyNew = computed(() => {
 
 // Kanban grouped data
 const kanbanColumns = computed(() => [
-  { key: 'pending', label: '待评审', color: '#94a3b8', items: rows.value.filter(r => !r.reviewResult || r.reviewResult === '未评审') },
-  { key: 'running', label: '进行中', color: '#06b6d4', items: rows.value.filter(r => isReviewPass(r.reviewResult) && (!r.execResult || r.execResult === '未执行')) },
-  { key: 'passed', label: '已通过', color: '#10b981', items: rows.value.filter(r => isExecPass(r.execResult)) },
-  { key: 'failed', label: '已失败', color: '#ef4444', items: rows.value.filter(r => isExecFail(r.execResult)) },
+  {
+    key: 'pending',
+    label: '待评审',
+    color: '#94a3b8',
+    items: rows.value.filter((r) => !r.reviewResult || r.reviewResult === '未评审'),
+  },
+  {
+    key: 'running',
+    label: '进行中',
+    color: '#06b6d4',
+    items: rows.value.filter(
+      (r) => isReviewPass(r.reviewResult) && (!r.execResult || r.execResult === '未执行'),
+    ),
+  },
+  {
+    key: 'passed',
+    label: '已通过',
+    color: '#10b981',
+    items: rows.value.filter((r) => isExecPass(r.execResult)),
+  },
+  {
+    key: 'failed',
+    label: '已失败',
+    color: '#ef4444',
+    items: rows.value.filter((r) => isExecFail(r.execResult)),
+  },
 ])
 
 // Flat module paths for filter dropdown
@@ -145,19 +167,23 @@ const batchMoveTarget = ref('/未规划用例')
 
 // Directory context menu
 const ctxMenu = reactive({ visible: false, x: 0, y: 0, path: '', name: '' })
-function closeCtxMenu() { ctxMenu.visible = false }
+function closeCtxMenu() {
+  ctxMenu.visible = false
+}
 
 // Inline dropdown menu handler (MeterSphere style)
 async function onNodeMenuCommand(cmd: string, path: string, name: string) {
   if (cmd === 'rename') {
     const result = await ElMessageBox.prompt('请输入新目录名称', '目录重命名', {
-      inputValue: name, confirmButtonText: '确定', cancelButtonText: '取消',
+      inputValue: name,
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
     }).catch(() => null)
     if (!result || !result.value?.trim()) return
     const oldPath = path
     const parentPath = oldPath.substring(0, oldPath.lastIndexOf('/'))
     const newPath = normalizeDirectoryPath(`${parentPath}/${result.value.trim()}`)
-    customModulePaths.value = customModulePaths.value.map(p => {
+    customModulePaths.value = customModulePaths.value.map((p) => {
       if (p === oldPath) return newPath
       if (p.startsWith(`${oldPath}/`)) return newPath + p.substring(oldPath.length)
       return p
@@ -167,7 +193,11 @@ async function onNodeMenuCommand(cmd: string, path: string, name: string) {
         const rp = normalizeCaseModulePath(r.modulePath || '/未规划用例')
         if (rp === oldPath || rp.startsWith(`${oldPath}/`)) {
           const newModPath = newPath + rp.substring(oldPath.length)
-          try { await updateTestCase(selectedProject.value, r.id, { module_path: newModPath }) } catch { /* skip */ }
+          try {
+            await updateTestCase(selectedProject.value, r.id, { module_path: newModPath })
+          } catch {
+            /* skip */
+          }
         }
       }
       await loadCases()
@@ -186,14 +216,16 @@ async function ctxAddSubDir() {
 async function ctxRename() {
   closeCtxMenu()
   const result = await ElMessageBox.prompt('请输入新目录名称', '目录重命名', {
-    inputValue: ctxMenu.name, confirmButtonText: '确定', cancelButtonText: '取消',
+    inputValue: ctxMenu.name,
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
   }).catch(() => null)
   if (!result || !result.value?.trim()) return
   const oldPath = ctxMenu.path
   const parentPath = oldPath.substring(0, oldPath.lastIndexOf('/'))
   const newPath = normalizeDirectoryPath(`${parentPath}/${result.value.trim()}`)
   // rename in customModulePaths
-  customModulePaths.value = customModulePaths.value.map(p => {
+  customModulePaths.value = customModulePaths.value.map((p) => {
     if (p === oldPath) return newPath
     if (p.startsWith(`${oldPath}/`)) return newPath + p.substring(oldPath.length)
     return p
@@ -204,7 +236,11 @@ async function ctxRename() {
       const rp = normalizeCaseModulePath(r.modulePath || '/未规划用例')
       if (rp === oldPath || rp.startsWith(`${oldPath}/`)) {
         const newModPath = newPath + rp.substring(oldPath.length)
-        try { await updateTestCase(selectedProject.value, r.id, { module_path: newModPath }) } catch { /* skip */ }
+        try {
+          await updateTestCase(selectedProject.value, r.id, { module_path: newModPath })
+        } catch {
+          /* skip */
+        }
       }
     }
     await loadCases()
@@ -224,18 +260,22 @@ const treeExpanded = ref(true)
 const treePanelOpen = ref(true)
 const projectDropdownOpen = ref(false)
 const selectedProjectMeta = computed(() => {
-  return projects.value.find(proj => proj.id === selectedProject.value) || null
+  return projects.value.find((proj) => proj.id === selectedProject.value) || null
 })
 const selectedProjectArchived = computed(() => selectedProjectMeta.value?.status === 'archived')
 const currentProjectName = computed(() => {
   return selectedProjectMeta.value?.name || '选择项目'
 })
-const selectedModulePath = ref((() => {
-  try {
-    const saved = localStorage.getItem(`tp-module-path-${selectedProject.value}`)
-    return saved ?? ''
-  } catch { return '' }
-})())  // '' = 全部, '/未规划用例' = 未规划, '/xxx' = 特定目录
+const selectedModulePath = ref(
+  (() => {
+    try {
+      const saved = localStorage.getItem(`tp-module-path-${selectedProject.value}`)
+      return saved ?? ''
+    } catch {
+      return ''
+    }
+  })(),
+) // '' = 全部, '/未规划用例' = 未规划, '/xxx' = 特定目录
 
 const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
@@ -360,7 +400,7 @@ const moduleCaseCount = computed(() => {
 })
 
 const unplannedCount = computed(() => {
-  return rows.value.filter(r => {
+  return rows.value.filter((r) => {
     const mp = normalizeCaseModulePath((r.modulePath || '').trim())
     return mp === '/未规划用例'
   }).length
@@ -368,7 +408,9 @@ const unplannedCount = computed(() => {
 
 function onModuleClick(path: string) {
   selectedModulePath.value = selectedModulePath.value === path ? '' : path
-  try { localStorage.setItem(`tp-module-path-${selectedProject.value}`, selectedModulePath.value) } catch {}
+  try {
+    localStorage.setItem(`tp-module-path-${selectedProject.value}`, selectedModulePath.value)
+  } catch {}
   page.value = 1
   loadCases()
 }
@@ -414,11 +456,15 @@ function toRow(tc: TestCase): TableRow {
 }
 
 function parseStepsToRows(text: string): StepRow[] {
-  const raw = (text || '').split('\n').map((s) => s.trim()).filter(Boolean)
+  const raw = (text || '')
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean)
   if (raw.length === 0) return [{ action: '', expected: '' }]
   const result = raw.map((line) => {
     const parts = line.split('|')
-    if (parts.length >= 2) return { action: (parts[0] ?? '').trim(), expected: parts.slice(1).join('|').trim() }
+    if (parts.length >= 2)
+      return { action: (parts[0] ?? '').trim(), expected: parts.slice(1).join('|').trim() }
     return { action: line, expected: '' }
   })
   return result.length > 0 ? result : [{ action: '', expected: '' }]
@@ -486,29 +532,74 @@ async function loadCases() {
 
 // ── Filters & Pagination ──
 
-function onSearch() { page.value = 1; loadCases() }
-function onResetSearch() { keyword.value = ''; levelFilter.value = ''; reviewFilter.value = ''; execFilter.value = ''; tagsFilter.value = ''; creatorFilter.value = ''; updaterFilter.value = ''; createdAfter.value = ''; createdBefore.value = ''; updatedAfter.value = ''; updatedBefore.value = ''; page.value = 1; loadCases() }
-function onPaginationSizeChange(size: number) { pageSize.value = size; page.value = 1; loadCases() }
-function onPaginationCurrentChange(current: number) { page.value = current; loadCases() }
+function onSearch() {
+  page.value = 1
+  loadCases()
+}
+function onResetSearch() {
+  keyword.value = ''
+  levelFilter.value = ''
+  reviewFilter.value = ''
+  execFilter.value = ''
+  tagsFilter.value = ''
+  creatorFilter.value = ''
+  updaterFilter.value = ''
+  createdAfter.value = ''
+  createdBefore.value = ''
+  updatedAfter.value = ''
+  updatedBefore.value = ''
+  page.value = 1
+  loadCases()
+}
+function onPaginationSizeChange(size: number) {
+  pageSize.value = size
+  page.value = 1
+  loadCases()
+}
+function onPaginationCurrentChange(current: number) {
+  page.value = current
+  loadCases()
+}
 function toggleSort(field: 'id' | 'created_at' | 'updated_at') {
-  if (sortBy.value === field) { sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc' }
-  else { sortBy.value = field; sortOrder.value = 'desc' }
-  page.value = 1; loadCases()
+  if (sortBy.value === field) {
+    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortBy.value = field
+    sortOrder.value = 'desc'
+  }
+  page.value = 1
+  loadCases()
 }
 function clearOneFilter(kind: 'keyword' | 'level' | 'review' | 'exec') {
   if (kind === 'keyword') keyword.value = ''
   if (kind === 'level') levelFilter.value = ''
   if (kind === 'review') reviewFilter.value = ''
   if (kind === 'exec') execFilter.value = ''
-  page.value = 1; loadCases()
+  page.value = 1
+  loadCases()
 }
-function applyAdvancedFilters() { filterPanelVisible.value = false; page.value = 1; loadCases() }
+function applyAdvancedFilters() {
+  filterPanelVisible.value = false
+  page.value = 1
+  loadCases()
+}
 
 // ── CRUD ──
 
 function openCreate() {
   editingId.value = null
-  Object.assign(caseForm, { title: '', level: 'P1', reviewResult: '未评审', execResult: '未执行', modulePath: '/未规划用例', tags: '', precondition: '', steps: '', remark: '', priority: 'medium' })
+  Object.assign(caseForm, {
+    title: '',
+    level: 'P1',
+    reviewResult: '未评审',
+    execResult: '未执行',
+    modulePath: '/未规划用例',
+    tags: '',
+    precondition: '',
+    steps: '',
+    remark: '',
+    priority: 'medium',
+  })
   stepRows.value = [{ action: '', expected: '' }]
   caseAttachments.value = []
   dialogVisible.value = true
@@ -516,20 +607,35 @@ function openCreate() {
 
 async function openEdit(row: TableRow) {
   editingId.value = row.id
-  Object.assign(caseForm, { title: row.title, level: row.level || 'P1', reviewResult: row.reviewResult || '未评审', execResult: row.execResult || '未执行', modulePath: row.modulePath || '/未规划用例', tags: row.tags || '', precondition: row.precondition || '', steps: row.steps, remark: row.remark || '', priority: row.priority || 'medium' })
+  Object.assign(caseForm, {
+    title: row.title,
+    level: row.level || 'P1',
+    reviewResult: row.reviewResult || '未评审',
+    execResult: row.execResult || '未执行',
+    modulePath: row.modulePath || '/未规划用例',
+    tags: row.tags || '',
+    precondition: row.precondition || '',
+    steps: row.steps,
+    remark: row.remark || '',
+    priority: row.priority || 'medium',
+  })
   stepRows.value = parseStepsToRows(row.steps)
   // Load attachments
   if (selectedProject.value && row.id) {
     try {
       const resp = await listAttachments(selectedProject.value, row.id)
       caseAttachments.value = Array.isArray(resp) ? resp : []
-    } catch { caseAttachments.value = [] }
+    } catch {
+      caseAttachments.value = []
+    }
     // Load history
     try {
       const resp = await listCaseHistory(selectedProject.value, row.id)
       const items = (resp as any)?.items || resp
       caseHistory.value = Array.isArray(items) ? items : []
-    } catch { caseHistory.value = [] }
+    } catch {
+      caseHistory.value = []
+    }
   } else {
     caseAttachments.value = []
     caseHistory.value = []
@@ -539,24 +645,47 @@ async function openEdit(row: TableRow) {
 
 async function submitCase() {
   if (!selectedProject.value) return
-  if (!caseForm.title.trim()) { ElMessage.warning('用例名称不能为空'); return }
+  if (!caseForm.title.trim()) {
+    ElMessage.warning('用例名称不能为空')
+    return
+  }
   saving.value = true
   try {
     const stepsText = rowsToStepsText(stepRows.value)
-    const payload = { title: caseForm.title.trim(), level: caseForm.level, review_result: caseForm.reviewResult, exec_result: caseForm.execResult, module_path: caseForm.modulePath.trim(), tags: caseForm.tags.trim(), precondition: caseForm.precondition, steps: stepsText, remark: caseForm.remark, priority: caseForm.priority }
-    if (editingId.value) { await updateTestCase(selectedProject.value, editingId.value, payload); ElMessage.success('修改成功') }
-    else { await createTestCase(selectedProject.value, payload); ElMessage.success('新增成功'); page.value = 1 }
+    const payload = {
+      title: caseForm.title.trim(),
+      level: caseForm.level,
+      review_result: caseForm.reviewResult,
+      exec_result: caseForm.execResult,
+      module_path: caseForm.modulePath.trim(),
+      tags: caseForm.tags.trim(),
+      precondition: caseForm.precondition,
+      steps: stepsText,
+      remark: caseForm.remark,
+      priority: caseForm.priority,
+    }
+    if (editingId.value) {
+      await updateTestCase(selectedProject.value, editingId.value, payload)
+      ElMessage.success('修改成功')
+    } else {
+      await createTestCase(selectedProject.value, payload)
+      ElMessage.success('新增成功')
+      page.value = 1
+    }
     dialogVisible.value = false
     await loadCases()
-  } catch (e: any) { ElMessage.error(e?.response?.data?.error || '保存失败') }
-  finally { saving.value = false }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '保存失败')
+  } finally {
+    saving.value = false
+  }
 }
 
 // ── Batch Operations ──
 
 function toggleSelectAll() {
   if (selectAll.value) {
-    selectedIds.value = rows.value.map(r => r.id)
+    selectedIds.value = rows.value.map((r) => r.id)
   } else {
     selectedIds.value = []
   }
@@ -572,15 +701,23 @@ function toggleSelectRow(id: number) {
 async function onBatchDelete() {
   if (!selectedProject.value || selectedIds.value.length === 0) return
   try {
-    await ElMessageBox.confirm(`确认批量删除 ${selectedIds.value.length} 条用例？`, '批量删除', { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' })
-  } catch { return }
+    await ElMessageBox.confirm(`确认批量删除 ${selectedIds.value.length} 条用例？`, '批量删除', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
   try {
     await batchDeleteTestCases(selectedProject.value, selectedIds.value)
     ElMessage.success(`已删除 ${selectedIds.value.length} 条用例`)
     selectedIds.value = []
     selectAll.value = false
     await loadCases()
-  } catch (e: any) { ElMessage.error(e?.response?.data?.error || '批量删除失败') }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '批量删除失败')
+  }
 }
 
 async function onBatchUpdateLevel(level: string) {
@@ -591,7 +728,9 @@ async function onBatchUpdateLevel(level: string) {
     selectedIds.value = []
     selectAll.value = false
     await loadCases()
-  } catch (e: any) { ElMessage.error(e?.response?.data?.error || '批量修改失败') }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '批量修改失败')
+  }
 }
 
 async function onBatchMove() {
@@ -603,10 +742,10 @@ async function onBatchMove() {
     selectAll.value = false
     batchMoveVisible.value = false
     await loadCases()
-  } catch (e: any) { ElMessage.error(e?.response?.data?.error || '批量移动失败') }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '批量移动失败')
+  }
 }
-
-
 
 async function onCloneCase(row: TableRow) {
   if (!selectedProject.value) return
@@ -614,7 +753,9 @@ async function onCloneCase(row: TableRow) {
     await cloneTestCase(selectedProject.value, row.id)
     ElMessage.success('复制成功')
     await loadCases()
-  } catch (e: any) { ElMessage.error(e?.response?.data?.error || '复制失败') }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '复制失败')
+  }
 }
 
 function copyIdToClipboard(id: number) {
@@ -648,7 +789,9 @@ async function onUploadAttachment(file: File) {
     const att = await uploadAttachment(selectedProject.value, editingId.value, file)
     if (att) caseAttachments.value.push(att as any)
     ElMessage.success('附件上传成功')
-  } catch (e: any) { ElMessage.error(e?.response?.data?.error || '上传失败') }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '上传失败')
+  }
 }
 
 async function onRemoveAttachment(index: number) {
@@ -658,7 +801,9 @@ async function onRemoveAttachment(index: number) {
     await deleteAttachment(selectedProject.value, att.id)
     caseAttachments.value.splice(index, 1)
     ElMessage.success('附件已删除')
-  } catch (e: any) { ElMessage.error(e?.response?.data?.error || '删除附件失败') }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '删除附件失败')
+  }
 }
 
 // ── Import / Export ──
@@ -676,34 +821,63 @@ async function onImportXlsx(e: Event) {
     const skipped = (resp as any)?.skipped || 0
     ElMessage.success(`导入完成：成功 ${created} 条，跳过 ${skipped} 条`)
     await loadCases()
-  } catch (e: any) { ElMessage.error(e?.response?.data?.error || '导入失败') }
-  finally { appLoading.value = false }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '导入失败')
+  } finally {
+    appLoading.value = false
+  }
 }
 
 async function onDelete(row: TableRow) {
   if (!selectedProject.value) return
-  try { await ElMessageBox.confirm(`确认删除用例【${row.title}】？`, '删除确认', { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' }) } catch { return }
+  try {
+    await ElMessageBox.confirm(`确认删除用例【${row.title}】？`, '删除确认', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
   try {
     await deleteTestCase(selectedProject.value, row.id)
     ElMessage.success('删除成功')
     const maxAfterDelete = Math.max(1, Math.ceil((total.value - 1) / pageSize.value))
     if (page.value > maxAfterDelete) page.value = maxAfterDelete
     await loadCases()
-  } catch (e: any) { ElMessage.error(e?.response?.data?.error || '删除失败') }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '删除失败')
+  }
 }
 
 // ── Directory ──
 
-function openCreateDirectory() { directoryForm.parentPath = '/'; directoryForm.name = ''; directoryDialogVisible.value = true }
+function openCreateDirectory() {
+  directoryForm.parentPath = '/'
+  directoryForm.name = ''
+  directoryDialogVisible.value = true
+}
 
 function submitDirectory() {
   const parent = normalizeDirectoryPath(directoryForm.parentPath || '/')
   const name = directoryForm.name.trim().replace(/^\/+/, '').replace(/\/+$/, '')
-  if (!name) { ElMessage.warning('目录名称不能为空'); return }
-  if (!/^[\u4e00-\u9fa5A-Za-z0-9_-]+$/.test(name)) { ElMessage.warning('目录名称仅支持中文、英文、数字、下划线、中划线'); return }
+  if (!name) {
+    ElMessage.warning('目录名称不能为空')
+    return
+  }
+  if (!/^[\u4e00-\u9fa5A-Za-z0-9_-]+$/.test(name)) {
+    ElMessage.warning('目录名称仅支持中文、英文、数字、下划线、中划线')
+    return
+  }
   const nextPath = normalizeDirectoryPath(`${parent}/${name}`)
-  if (calcModuleDepth(nextPath) > 5) { ElMessage.warning('目录最多支持 5 层'); return }
-  if (modulePaths.value.includes(nextPath)) { ElMessage.warning('目录已存在'); return }
+  if (calcModuleDepth(nextPath) > 5) {
+    ElMessage.warning('目录最多支持 5 层')
+    return
+  }
+  if (modulePaths.value.includes(nextPath)) {
+    ElMessage.warning('目录已存在')
+    return
+  }
   customModulePaths.value.push(nextPath)
   caseForm.modulePath = nextPath
   directoryDialogVisible.value = false
@@ -712,38 +886,94 @@ function submitDirectory() {
 
 async function removeDirectory(path: string) {
   const target = normalizeDirectoryPath(path)
-  if (target === '/') { ElMessage.warning('根目录不可删除'); return }
-  if (!selectedProject.value) { ElMessage.warning('请先选择项目'); return }
+  if (target === '/') {
+    ElMessage.warning('根目录不可删除')
+    return
+  }
+  if (!selectedProject.value) {
+    ElMessage.warning('请先选择项目')
+    return
+  }
   const childDirs = modulePaths.value.filter((p) => p !== target && p.startsWith(`${target}/`))
-  if (childDirs.length > 0) { ElMessage.warning('仅支持从最下级目录开始删除，请先删除子目录'); return }
-  const boundCases = rows.value.filter((r) => isPathEqualOrChild(r.modulePath || '/未规划用例', target))
-  try { await ElMessageBox.confirm(`确认删除目录 ${target}（含 ${boundCases.length} 条用例）？`, '删除确认', { confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'warning' }) } catch { return }
+  if (childDirs.length > 0) {
+    ElMessage.warning('仅支持从最下级目录开始删除，请先删除子目录')
+    return
+  }
+  const boundCases = rows.value.filter((r) =>
+    isPathEqualOrChild(r.modulePath || '/未规划用例', target),
+  )
+  try {
+    await ElMessageBox.confirm(
+      `确认删除目录 ${target}（含 ${boundCases.length} 条用例）？`,
+      '删除确认',
+      { confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
   try {
     for (const tc of boundCases) await deleteTestCase(selectedProject.value, tc.id)
     customModulePaths.value = customModulePaths.value.filter((p) => !isPathEqualOrChild(p, target))
-    if (isPathEqualOrChild(caseForm.modulePath || '/未规划用例', target)) caseForm.modulePath = '/未规划用例'
-    const maxAfterDelete = Math.max(1, Math.ceil((total.value - boundCases.length) / pageSize.value))
+    if (isPathEqualOrChild(caseForm.modulePath || '/未规划用例', target))
+      caseForm.modulePath = '/未规划用例'
+    const maxAfterDelete = Math.max(
+      1,
+      Math.ceil((total.value - boundCases.length) / pageSize.value),
+    )
     if (page.value > maxAfterDelete) page.value = maxAfterDelete
     await loadCases()
     ElMessage.success(`删除成功（${boundCases.length} 条）`)
-  } catch (e: any) { ElMessage.error(e?.response?.data?.error || '删除目录失败') }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '删除目录失败')
+  }
 }
 
 // ── Steps ──
 
-function addStepRow() { stepRows.value.push({ action: '', expected: '' }) }
-function removeStepRow(index: number) { if (stepRows.value.length <= 1) { stepRows.value = [{ action: '', expected: '' }]; return }; stepRows.value.splice(index, 1) }
-function copyStepRow(index: number) { const src = stepRows.value[index]; if (!src) return; stepRows.value.splice(index + 1, 0, { action: src.action, expected: src.expected }) }
-function insertStepAbove(index: number) { stepRows.value.splice(index, 0, { action: '', expected: '' }) }
-function insertStepBelow(index: number) { stepRows.value.splice(index + 1, 0, { action: '', expected: '' }) }
-function onStepDragStart(index: number) { draggingStepIndex.value = index }
+function addStepRow() {
+  stepRows.value.push({ action: '', expected: '' })
+}
+function removeStepRow(index: number) {
+  if (stepRows.value.length <= 1) {
+    stepRows.value = [{ action: '', expected: '' }]
+    return
+  }
+  stepRows.value.splice(index, 1)
+}
+function copyStepRow(index: number) {
+  const src = stepRows.value[index]
+  if (!src) return
+  stepRows.value.splice(index + 1, 0, { action: src.action, expected: src.expected })
+}
+function insertStepAbove(index: number) {
+  stepRows.value.splice(index, 0, { action: '', expected: '' })
+}
+function insertStepBelow(index: number) {
+  stepRows.value.splice(index + 1, 0, { action: '', expected: '' })
+}
+function onStepDragStart(index: number) {
+  draggingStepIndex.value = index
+}
 function onStepDrop(targetIndex: number) {
   const from = draggingStepIndex.value
-  if (from === null || from === targetIndex) { draggingStepIndex.value = null; return }
-  const arr = stepRows.value; const item = arr[from]; if (!item) { draggingStepIndex.value = null; return }
-  arr.splice(from, 1); const insertAt = from < targetIndex ? targetIndex - 1 : targetIndex; arr.splice(insertAt, 0, item); draggingStepIndex.value = null
+  if (from === null || from === targetIndex) {
+    draggingStepIndex.value = null
+    return
+  }
+  const arr = stepRows.value
+  const item = arr[from]
+  if (!item) {
+    draggingStepIndex.value = null
+    return
+  }
+  arr.splice(from, 1)
+  const insertAt = from < targetIndex ? targetIndex - 1 : targetIndex
+  arr.splice(insertAt, 0, item)
+  draggingStepIndex.value = null
 }
-function onStepDragEnd() { draggingStepIndex.value = null }
+function onStepDragEnd() {
+  draggingStepIndex.value = null
+}
 
 // ── Project switch ──
 /** 切换当前项目；若点击归档项目则给出只读提示，不切换编辑上下文。 */
@@ -769,14 +999,20 @@ watch(selectedProject, (newId) => {
   page.value = 1
   try {
     selectedModulePath.value = localStorage.getItem(`tp-module-path-${newId}`) ?? ''
-  } catch { selectedModulePath.value = '' }
+  } catch {
+    selectedModulePath.value = ''
+  }
   loadCases()
 })
 </script>
 
 <template>
   <div class="case-page" :class="{ 'panel-collapsed': !treePanelOpen }">
-    <button class="panel-toggle" @click="treePanelOpen = !treePanelOpen" :title="treePanelOpen ? '收起目录' : '展开目录'">
+    <button
+      class="panel-toggle"
+      :title="treePanelOpen ? '收起目录' : '展开目录'"
+      @click="treePanelOpen = !treePanelOpen"
+    >
       {{ treePanelOpen ? '◂' : '▸' }}
     </button>
     <div class="left-tree" :class="{ collapsed: !treePanelOpen }">
@@ -794,8 +1030,21 @@ watch(selectedProject, (newId) => {
             <div class="project-trigger-info">
               <span class="project-trigger-name">{{ currentProjectName }}</span>
             </div>
-            <svg class="project-trigger-chevron" :class="{ rotated: projectDropdownOpen }" width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <svg
+              class="project-trigger-chevron"
+              :class="{ rotated: projectDropdownOpen }"
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+            >
+              <path
+                d="M4 6L8 10L12 6"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
             </svg>
           </div>
           <Transition name="dropdown-slide">
@@ -805,19 +1054,46 @@ watch(selectedProject, (newId) => {
                 :key="p.id"
                 class="project-dropdown-item"
                 :class="{ selected: p.id === selectedProject, archived: p.status === 'archived' }"
-                :title="p.status === 'archived' ? '归档项目仅支持查看，无法切换为当前编辑项目' : undefined"
+                :title="
+                  p.status === 'archived' ? '归档项目仅支持查看，无法切换为当前编辑项目' : undefined
+                "
                 @click="onProjectSwitch(p)"
               >
                 <div v-if="p.id === selectedProject" class="project-item-indicator" />
                 <span class="project-item-name">{{ p.name }}</span>
-                <el-tag v-if="p.status === 'archived'" size="small" type="info" effect="plain" style="margin-left: 6px; font-size: 10px;">已归档</el-tag>
-                <svg v-if="p.id === selectedProject" class="project-item-check" width="14" height="14" viewBox="0 0 16 16" fill="none">
-                  <path d="M3 8.5L6.5 12L13 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <el-tag
+                  v-if="p.status === 'archived'"
+                  size="small"
+                  type="info"
+                  effect="plain"
+                  style="margin-left: 6px; font-size: 10px"
+                >
+                  已归档
+                </el-tag>
+                <svg
+                  v-if="p.id === selectedProject"
+                  class="project-item-check"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                >
+                  <path
+                    d="M3 8.5L6.5 12L13 4"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
                 </svg>
               </div>
             </div>
           </Transition>
-          <div v-if="projectDropdownOpen" class="project-dropdown-overlay" @click="projectDropdownOpen = false" />
+          <div
+            v-if="projectDropdownOpen"
+            class="project-dropdown-overlay"
+            @click="projectDropdownOpen = false"
+          />
           <div v-if="selectedProjectArchived" class="project-readonly-hint">
             当前项目已归档，当前页面仅建议查看；如需继续编辑，请先到项目管理中恢复项目。
           </div>
@@ -834,49 +1110,90 @@ watch(selectedProject, (newId) => {
 
         <!-- Tree List -->
         <div class="tree-list">
-          <div class="tree-item tree-root-row" :class="{ active: selectedModulePath === '' }" @click="onModuleClick('')">
+          <div
+            class="tree-item tree-root-row"
+            :class="{ active: selectedModulePath === '' }"
+            @click="onModuleClick('')"
+          >
             <div class="tree-node-left">
               <el-icon class="tree-node-icon"><FolderOpened /></el-icon>
               <span class="tree-root-title">全部用例</span>
             </div>
             <div class="tree-node-right">
               <span class="tree-node-count">{{ total }}</span>
-              <button class="tree-node-action" @click.stop="treeExpanded = !treeExpanded" :title="treeExpanded ? '收起' : '展开'">
-                <el-icon :size="14"><CaretBottom v-if="treeExpanded" /><CaretRight v-else /></el-icon>
+              <button
+                class="tree-node-action"
+                :title="treeExpanded ? '收起' : '展开'"
+                @click.stop="treeExpanded = !treeExpanded"
+              >
+                <el-icon :size="14">
+                  <CaretBottom v-if="treeExpanded" />
+                  <CaretRight v-else />
+                </el-icon>
               </button>
-              <button class="tree-node-action" @click.stop="openCreateDirectory" title="新建目录">
+              <button class="tree-node-action" title="新建目录" @click.stop="openCreateDirectory">
                 <el-icon :size="14"><FolderAdd /></el-icon>
               </button>
             </div>
           </div>
           <!-- 未规划用例 -->
-          <div v-if="treeExpanded" class="tree-item tree-unplanned" :class="{ active: selectedModulePath === '/未规划用例' }" @click="onModuleClick('/未规划用例')">
+          <div
+            v-if="treeExpanded"
+            class="tree-item tree-unplanned"
+            :class="{ active: selectedModulePath === '/未规划用例' }"
+            @click="onModuleClick('/未规划用例')"
+          >
             <div class="tree-node-left">
               <el-icon class="tree-node-icon"><Document /></el-icon>
               <span class="tree-node-name">未规划用例</span>
             </div>
             <span class="tree-node-count">{{ unplannedCount }}</span>
           </div>
-          <el-tree v-if="treeExpanded && moduleTree.length > 0" class="module-tree" :data="moduleTree" node-key="path" default-expand-all :props="{ label: 'name', children: 'children' }">
+          <el-tree
+            v-if="treeExpanded && moduleTree.length > 0"
+            class="module-tree"
+            :data="moduleTree"
+            node-key="path"
+            default-expand-all
+            :props="{ label: 'name', children: 'children' }"
+          >
             <template #default="{ data }">
-              <div class="tree-node-row" :class="{ active: selectedModulePath === data.path }" @click.stop="onModuleClick(data.path)">
+              <div
+                class="tree-node-row"
+                :class="{ active: selectedModulePath === data.path }"
+                @click.stop="onModuleClick(data.path)"
+              >
                 <div class="tree-node-left">
                   <el-icon class="tree-node-icon"><Folder /></el-icon>
                   <span class="tree-node-name">{{ data.name }}</span>
                 </div>
                 <div class="tree-node-right">
                   <span class="tree-node-count">{{ moduleCaseCount[data.path] || 0 }}</span>
-                  <button class="tree-node-action" @click.stop="directoryForm.parentPath = data.path; directoryForm.name = ''; directoryDialogVisible = true" title="新建子目录">
+                  <button
+                    class="tree-node-action"
+                    title="新建子目录"
+                    @click.stop="
+                      directoryForm.parentPath = data.path
+                      directoryForm.name = ''
+                      directoryDialogVisible = true
+                    "
+                  >
                     <el-icon :size="14"><Plus /></el-icon>
                   </button>
-                  <el-dropdown trigger="click" @command="(cmd: string) => onNodeMenuCommand(cmd, data.path, data.name)" @click.stop>
-                    <button class="tree-node-action" @click.stop title="更多操作">
+                  <el-dropdown
+                    trigger="click"
+                    @command="(cmd: string) => onNodeMenuCommand(cmd, data.path, data.name)"
+                    @click.stop
+                  >
+                    <button class="tree-node-action" title="更多操作" @click.stop>
                       <el-icon :size="14"><MoreFilled /></el-icon>
                     </button>
                     <template #dropdown>
                       <el-dropdown-menu>
                         <el-dropdown-item command="rename">重命名</el-dropdown-item>
-                        <el-dropdown-item command="delete" divided style="color: #ef4444;">删除</el-dropdown-item>
+                        <el-dropdown-item command="delete" divided style="color: #ef4444">
+                          删除
+                        </el-dropdown-item>
                       </el-dropdown-menu>
                     </template>
                   </el-dropdown>
@@ -890,8 +1207,17 @@ watch(selectedProject, (newId) => {
 
     <!-- Directory context menu -->
     <Teleport to="body">
-      <div v-if="ctxMenu.visible" class="ctx-menu-overlay" @click="closeCtxMenu" @contextmenu.prevent="closeCtxMenu">
-        <div class="ctx-menu" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }" @click.stop>
+      <div
+        v-if="ctxMenu.visible"
+        class="ctx-menu-overlay"
+        @click="closeCtxMenu"
+        @contextmenu.prevent="closeCtxMenu"
+      >
+        <div
+          class="ctx-menu"
+          :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }"
+          @click.stop
+        >
           <div class="ctx-menu-item" @click="ctxAddSubDir">新建子目录</div>
           <div class="ctx-menu-item" @click="ctxRename">重命名</div>
           <div class="ctx-menu-divider"></div>
@@ -911,9 +1237,10 @@ watch(selectedProject, (newId) => {
         </div>
         <div class="content-tabs-right">
           <el-button type="primary" class="btn-new-case" @click="openCreate">
-            <el-icon><Plus /></el-icon> 新建用例
+            <el-icon><Plus /></el-icon>
+            新建用例
           </el-button>
-          <input type="file" accept=".xlsx" style="display:none" @change="onImportXlsx" />
+          <input type="file" accept=".xlsx" style="display: none" @change="onImportXlsx" />
         </div>
       </div>
 
@@ -923,10 +1250,21 @@ watch(selectedProject, (newId) => {
         <div class="metric-card">
           <div class="metric-card-row">
             <span class="metric-label">总用例</span>
-            <div class="metric-icon" style="background: rgba(124, 58, 237, 0.18); color: #a78bfa;">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <div class="metric-icon" style="background: rgba(124, 58, 237, 0.18); color: #a78bfa">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                <path
+                  d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
+                ></path>
                 <path d="M12 11h4"></path>
                 <path d="M12 16h4"></path>
                 <path d="M8 11h.01"></path>
@@ -944,20 +1282,41 @@ watch(selectedProject, (newId) => {
         <div class="metric-card">
           <div class="metric-card-row">
             <span class="metric-label">通过率</span>
-            <div class="metric-icon" style="background: rgba(59, 130, 246, 0.18); color: #60a5fa;">
+            <div class="metric-icon" style="background: rgba(59, 130, 246, 0.18); color: #60a5fa">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"></path>
+                <path
+                  d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"
+                ></path>
               </svg>
             </div>
           </div>
           <div class="metric-card-row metric-card-bottom">
-            <span class="metric-value">{{ metricPassRate }}<small>%</small></span>
+            <span class="metric-value">
+              {{ metricPassRate }}
+              <small>%</small>
+            </span>
             <div class="metric-ring-lg">
               <svg viewBox="0 0 48 48" class="donut-lg">
-                <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="4" />
-                <circle cx="24" cy="24" r="20" fill="none" stroke="#3b82f6" stroke-width="4"
-                  stroke-dasharray="125.7" :stroke-dashoffset="125.7 - (125.7 * metricPassRate / 100)" stroke-linecap="round"
-                  style="transform: rotate(-90deg); transform-origin: center;" />
+                <circle
+                  cx="24"
+                  cy="24"
+                  r="20"
+                  fill="none"
+                  stroke="rgba(255,255,255,0.06)"
+                  stroke-width="4"
+                />
+                <circle
+                  cx="24"
+                  cy="24"
+                  r="20"
+                  fill="none"
+                  stroke="#3b82f6"
+                  stroke-width="4"
+                  stroke-dasharray="125.7"
+                  :stroke-dashoffset="125.7 - (125.7 * metricPassRate) / 100"
+                  stroke-linecap="round"
+                  style="transform: rotate(-90deg); transform-origin: center"
+                />
               </svg>
             </div>
           </div>
@@ -967,7 +1326,7 @@ watch(selectedProject, (newId) => {
         <div class="metric-card">
           <div class="metric-card-row">
             <span class="metric-label">执行覆盖</span>
-            <div class="metric-icon" style="background: rgba(245, 158, 11, 0.18); color: #fbbf24;">
+            <div class="metric-icon" style="background: rgba(245, 158, 11, 0.18); color: #fbbf24">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                 <rect x="16" y="6" width="4" height="14" rx="1"></rect>
                 <rect x="10" y="10" width="4" height="10" rx="1"></rect>
@@ -988,9 +1347,11 @@ watch(selectedProject, (newId) => {
         <div class="metric-card">
           <div class="metric-card-row">
             <span class="metric-label">本周新增</span>
-            <div class="metric-icon" style="background: rgba(236, 72, 153, 0.18); color: #f472b6;">
+            <div class="metric-icon" style="background: rgba(236, 72, 153, 0.18); color: #f472b6">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M23 12l-2.44-2.78.34-3.68-3.61-.82-1.89-3.18L12 3 8.6 1.54 6.71 4.72l-3.61.81.34 3.68L1 12l2.44 2.78-.34 3.69 3.61.82 1.89 3.18L12 21l3.4 1.46 1.89-3.18 3.61-.82-.34-3.68L23 12zm-13 5l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"></path>
+                <path
+                  d="M23 12l-2.44-2.78.34-3.68-3.61-.82-1.89-3.18L12 3 8.6 1.54 6.71 4.72l-3.61.81.34 3.68L1 12l2.44 2.78-.34 3.69 3.61.82 1.89 3.18L12 21l3.4 1.46 1.89-3.18 3.61-.82-.34-3.68L23 12zm-13 5l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"
+                ></path>
               </svg>
             </div>
           </div>
@@ -1022,36 +1383,91 @@ watch(selectedProject, (newId) => {
           />
         </div>
         <div class="filter-bar-selects">
-          <el-select v-model="levelFilter" placeholder="优先级" clearable size="default" class="filter-dropdown" @change="onSearch">
+          <el-select
+            v-model="levelFilter"
+            placeholder="优先级"
+            clearable
+            size="default"
+            class="filter-dropdown"
+            @change="onSearch"
+          >
             <el-option label="P0" value="P0" />
             <el-option label="P1" value="P1" />
             <el-option label="P2" value="P2" />
             <el-option label="P3" value="P3" />
           </el-select>
-          <el-select v-model="execFilter" placeholder="状态" clearable size="default" class="filter-dropdown" @change="onSearch">
+          <el-select
+            v-model="execFilter"
+            placeholder="状态"
+            clearable
+            size="default"
+            class="filter-dropdown"
+            @change="onSearch"
+          >
             <el-option label="未执行" value="未执行" />
             <el-option label="已通过" value="已通过" />
             <el-option label="已失败" value="已失败" />
           </el-select>
-          <el-select v-model="reviewFilter" placeholder="所属模块" clearable size="default" class="filter-dropdown" @change="onSearch">
+          <el-select
+            v-model="reviewFilter"
+            placeholder="所属模块"
+            clearable
+            size="default"
+            class="filter-dropdown"
+            @change="onSearch"
+          >
             <el-option v-for="m in flatModules" :key="m" :label="m" :value="m" />
           </el-select>
-          <button class="filter-icon-btn" @click="filterPanelVisible = true" title="高级筛选">
+          <button class="filter-icon-btn" title="高级筛选" @click="filterPanelVisible = true">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <line x1="2" y1="4" x2="14" y2="4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-              <line x1="4" y1="8" x2="12" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-              <line x1="6" y1="12" x2="10" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              <line
+                x1="2"
+                y1="4"
+                x2="14"
+                y2="4"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              />
+              <line
+                x1="4"
+                y1="8"
+                x2="12"
+                y2="8"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              />
+              <line
+                x1="6"
+                y1="12"
+                x2="10"
+                y2="12"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              />
             </svg>
           </button>
         </div>
       </div>
 
       <!-- View Toggle (kept from Style C, positioned in filter bar) -->
-      <div class="view-toggle" style="position: absolute; right: 0; top: 0; display: none;">
-        <button class="view-toggle-btn" :class="{ active: viewMode === 'table' }" @click="viewMode = 'table'" title="表格视图">
+      <div class="view-toggle" style="position: absolute; right: 0; top: 0; display: none">
+        <button
+          class="view-toggle-btn"
+          :class="{ active: viewMode === 'table' }"
+          title="表格视图"
+          @click="viewMode = 'table'"
+        >
           <el-icon :size="16"><List /></el-icon>
         </button>
-        <button class="view-toggle-btn" :class="{ active: viewMode === 'kanban' }" @click="viewMode = 'kanban'" title="看板视图">
+        <button
+          class="view-toggle-btn"
+          :class="{ active: viewMode === 'kanban' }"
+          title="看板视图"
+          @click="viewMode = 'kanban'"
+        >
           <el-icon :size="16"><Grid /></el-icon>
         </button>
       </div>
@@ -1090,27 +1506,42 @@ watch(selectedProject, (newId) => {
                 <el-icon><Delete /></el-icon>
                 <span>批量删除</span>
               </button>
-              <button class="batch-float-close" @click="selectedIds = []; selectAll = false">×</button>
+              <button
+                class="batch-float-close"
+                @click="
+                  selectedIds = []
+                  selectAll = false
+                "
+              >
+                ×
+              </button>
             </div>
           </div>
         </Transition>
       </Teleport>
 
-      <div class="filter-chips" v-if="activeFilterChips.length > 0">
-        <div class="chip" v-for="f in activeFilterChips" :key="f.key">
+      <div v-if="activeFilterChips.length > 0" class="filter-chips">
+        <div v-for="f in activeFilterChips" :key="f.key" class="chip">
           <span>{{ f.label }}: {{ f.value }}</span>
           <button class="chip-close" @click="clearOneFilter(f.key)">×</button>
         </div>
         <button class="chip-clear-all" @click="onResetSearch">清空筛选</button>
       </div>
 
-      <div class="table-shell" v-if="viewMode === 'table'" v-loading="appLoading">
+      <div v-if="viewMode === 'table'" v-loading="appLoading" class="table-shell">
         <div v-if="appLoading" class="table-skeleton">
-          <div class="skeleton-row" v-for="i in 8" :key="i">
-            <span class="sk sk-id"></span><span class="sk sk-name"></span>
-            <span class="sk"></span><span class="sk"></span><span class="sk"></span>
-            <span class="sk"></span><span class="sk"></span><span class="sk"></span>
-            <span class="sk"></span><span class="sk"></span><span class="sk"></span>
+          <div v-for="i in 8" :key="i" class="skeleton-row">
+            <span class="sk sk-id"></span>
+            <span class="sk sk-name"></span>
+            <span class="sk"></span>
+            <span class="sk"></span>
+            <span class="sk"></span>
+            <span class="sk"></span>
+            <span class="sk"></span>
+            <span class="sk"></span>
+            <span class="sk"></span>
+            <span class="sk"></span>
+            <span class="sk"></span>
             <span class="sk sk-op"></span>
           </div>
         </div>
@@ -1118,9 +1549,21 @@ watch(selectedProject, (newId) => {
         <table v-else>
           <thead>
             <tr>
-              <th style="width: 40px"><input type="checkbox" :checked="selectAll" @change="selectAll = !selectAll; toggleSelectAll()" /></th>
+              <th style="width: 40px">
+                <input
+                  type="checkbox"
+                  :checked="selectAll"
+                  @change="
+                    selectAll = !selectAll
+                    toggleSelectAll()
+                  "
+                />
+              </th>
               <th style="width: 80px" class="sortable" @click="toggleSort('id')">
-                ID <span class="sort-flag" :class="{ active: sortBy === 'id' }">{{ sortBy === 'id' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                ID
+                <span class="sort-flag" :class="{ active: sortBy === 'id' }">
+                  {{ sortBy === 'id' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕' }}
+                </span>
               </th>
               <th>用例名称</th>
               <th style="width: 80px">优先级</th>
@@ -1130,60 +1573,117 @@ watch(selectedProject, (newId) => {
               <th style="width: 120px">标签</th>
               <th style="width: 110px">负责人</th>
               <th style="width: 100px" class="sortable" @click="toggleSort('updated_at')">
-                更新时间 <span class="sort-flag" :class="{ active: sortBy === 'updated_at' }">{{ sortBy === 'updated_at' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                更新时间
+                <span class="sort-flag" :class="{ active: sortBy === 'updated_at' }">
+                  {{ sortBy === 'updated_at' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕' }}
+                </span>
               </th>
               <th style="width: 110px">创建人</th>
               <th style="width: 100px" class="sortable" @click="toggleSort('created_at')">
-                创建时间 <span class="sort-flag" :class="{ active: sortBy === 'created_at' }">{{ sortBy === 'created_at' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                创建时间
+                <span class="sort-flag" :class="{ active: sortBy === 'created_at' }">
+                  {{ sortBy === 'created_at' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕' }}
+                </span>
               </th>
               <th style="width: 140px">操作</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-if="loadError"><td colspan="13" class="empty-td">{{ loadError }} <el-button size="small" @click="loadCases" style="margin-left: 10px">重试</el-button></td></tr>
-            <tr v-else-if="rows.length === 0">
-              <td colspan="13" class="empty-td testcase-empty-cell">
-                <div class="testcase-empty-wrap"><el-empty description="暂无数据" :image-size="140"><el-button type="primary" plain @click="openCreate">去新建</el-button></el-empty></div>
+            <tr v-if="loadError">
+              <td colspan="13" class="empty-td">
+                {{ loadError }}
+                <el-button size="small" style="margin-left: 10px" @click="loadCases">
+                  重试
+                </el-button>
               </td>
             </tr>
-            <tr v-else v-for="r in rows" :key="r.id" :class="{ 'row-selected': selectedIds.includes(r.id) }">
-              <td><input type="checkbox" :checked="selectedIds.includes(r.id)" @change="toggleSelectRow(r.id)" /></td>
-              <td class="id" @click="copyIdToClipboard(r.id)" style="cursor:pointer" title="点击复制 ID">{{ r.id }}</td>
-              <td class="name" :title="r.title"><strong>{{ r.title }}</strong></td>
+            <tr v-else-if="rows.length === 0">
+              <td colspan="13" class="empty-td testcase-empty-cell">
+                <div class="testcase-empty-wrap">
+                  <el-empty description="暂无数据" :image-size="140">
+                    <el-button type="primary" plain @click="openCreate">去新建</el-button>
+                  </el-empty>
+                </div>
+              </td>
+            </tr>
+            <tr
+              v-for="r in rows"
+              v-else
+              :key="r.id"
+              :class="{ 'row-selected': selectedIds.includes(r.id) }"
+            >
+              <td>
+                <input
+                  type="checkbox"
+                  :checked="selectedIds.includes(r.id)"
+                  @change="toggleSelectRow(r.id)"
+                />
+              </td>
+              <td
+                class="id"
+                style="cursor: pointer"
+                title="点击复制 ID"
+                @click="copyIdToClipboard(r.id)"
+              >
+                {{ r.id }}
+              </td>
+              <td class="name" :title="r.title">
+                <strong>{{ r.title }}</strong>
+              </td>
               <td><LevelBadge :level="r.level" /></td>
               <td>
-                <span style="display:inline-flex;align-items:center;gap:6px">
-                  <el-icon style="color:rgba(255,255,255,0.3)"><Folder /></el-icon>
-                  {{ r.modulePath }}
-                </span>
+                {{ (r.modulePath || '').split('/').filter(Boolean).pop() || '未分类' }}
               </td>
               <td><StatusBadge :value="r.reviewResult" /></td>
               <td><StatusBadge :value="r.execResult" /></td>
               <td :title="r.tags || '-'">
-                <div style="display:flex;gap:4px;flex-wrap:wrap" v-if="r.tags">
-                  <span class="table-tag" v-for="t in r.tags.split(',')" :key="t">{{ t.trim() }}</span>
+                <div v-if="r.tags" style="display: flex; gap: 4px; flex-wrap: wrap">
+                  <span v-for="t in r.tags.split(',')" :key="t" class="table-tag">
+                    {{ t.trim() }}
+                  </span>
                 </div>
-                <span v-else style="color:var(--tp-gray-500)">-</span>
+                <span v-else style="color: var(--tp-gray-500)">-</span>
               </td>
               <td>
                 <div class="table-user">
-                  <div class="table-user-avatar">{{ r.updatedByName ? r.updatedByName.substring(0, 1).toUpperCase() : 'U' }}</div>
+                  <div class="table-user-avatar">
+                    {{ r.updatedByName ? r.updatedByName.substring(0, 1).toUpperCase() : 'U' }}
+                  </div>
                   <span class="table-user-name">{{ r.updatedByName }}</span>
                 </div>
               </td>
-              <td><span style="color:var(--tp-gray-500);font-size:12px">{{ formatRelativeTime(r.updatedAt) }}</span></td>
+              <td>
+                <span style="color: var(--tp-gray-500); font-size: 12px">
+                  {{ formatRelativeTime(r.updatedAt) }}
+                </span>
+              </td>
               <td>
                 <div class="table-user">
-                  <div class="table-user-avatar">{{ r.createdByName ? r.createdByName.substring(0, 1).toUpperCase() : 'C' }}</div>
+                  <div class="table-user-avatar">
+                    {{ r.createdByName ? r.createdByName.substring(0, 1).toUpperCase() : 'C' }}
+                  </div>
                   <span class="table-user-name">{{ r.createdByName }}</span>
                 </div>
               </td>
-              <td><span style="color:var(--tp-gray-500);font-size:12px">{{ formatRelativeTime(r.createdAt) }}</span></td>
+              <td>
+                <span style="color: var(--tp-gray-500); font-size: 12px">
+                  {{ formatRelativeTime(r.createdAt) }}
+                </span>
+              </td>
               <td>
                 <div class="action-group">
-                  <button class="action-btn action-edit icon-only" @click="openEdit(r)"><el-icon class="btn-icon"><Edit /></el-icon><span>编辑</span></button>
-                  <button class="action-btn action-clone icon-only" @click="onCloneCase(r)"><el-icon class="btn-icon"><CopyDocument /></el-icon><span>复制</span></button>
-                  <button class="action-btn action-delete icon-only" @click="onDelete(r)"><el-icon class="btn-icon"><Delete /></el-icon><span>删除</span></button>
+                  <button class="action-btn action-edit icon-only" @click="openEdit(r)">
+                    <el-icon class="btn-icon"><Edit /></el-icon>
+                    <span>编辑</span>
+                  </button>
+                  <button class="action-btn action-clone icon-only" @click="onCloneCase(r)">
+                    <el-icon class="btn-icon"><CopyDocument /></el-icon>
+                    <span>复制</span>
+                  </button>
+                  <button class="action-btn action-delete icon-only" @click="onDelete(r)">
+                    <el-icon class="btn-icon"><Delete /></el-icon>
+                    <span>删除</span>
+                  </button>
                 </div>
               </td>
             </tr>
@@ -1191,8 +1691,18 @@ watch(selectedProject, (newId) => {
         </table>
       </div>
 
-      <div class="pager" v-if="viewMode === 'table'">
-        <el-pagination background size="small" :current-page="page" :page-size="pageSize" :page-sizes="pageSizeOptions" :total="total" layout="total, sizes, prev, pager, next, jumper" @size-change="onPaginationSizeChange" @current-change="onPaginationCurrentChange" />
+      <div v-if="viewMode === 'table'" class="pager">
+        <el-pagination
+          background
+          size="small"
+          :current-page="page"
+          :page-size="pageSize"
+          :page-sizes="pageSizeOptions"
+          :total="total"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="onPaginationSizeChange"
+          @current-change="onPaginationCurrentChange"
+        />
       </div>
 
       <!-- Kanban View (Style C) -->
@@ -1205,7 +1715,12 @@ watch(selectedProject, (newId) => {
           </div>
           <div class="kanban-cards">
             <div v-if="col.items.length === 0" class="kanban-empty">暂无用例</div>
-            <div v-for="item in col.items" :key="item.id" class="kanban-card" @click="openEdit(item)">
+            <div
+              v-for="item in col.items"
+              :key="item.id"
+              class="kanban-card"
+              @click="openEdit(item)"
+            >
               <div class="kanban-card-top">
                 <LevelBadge :level="item.level" />
                 <span class="kanban-card-id">TC-{{ item.id }}</span>
@@ -1214,8 +1729,10 @@ watch(selectedProject, (newId) => {
               <div class="kanban-card-meta">
                 <span class="kanban-card-module">📁 {{ item.modulePath || '未分类' }}</span>
               </div>
-              <div class="kanban-card-tags" v-if="item.tags">
-                <span class="kanban-tag" v-for="t in item.tags.split(',').slice(0, 3)" :key="t">{{ t.trim() }}</span>
+              <div v-if="item.tags" class="kanban-card-tags">
+                <span v-for="t in item.tags.split(',').slice(0, 3)" :key="t" class="kanban-tag">
+                  {{ t.trim() }}
+                </span>
               </div>
               <div class="kanban-card-footer">
                 <span class="kanban-card-avatar">{{ (item.updatedByName || 'U').charAt(0) }}</span>
@@ -1228,22 +1745,40 @@ watch(selectedProject, (newId) => {
     </div>
 
     <!-- Advanced filter drawer -->
-    <el-drawer v-model="filterPanelVisible" title="高级筛选" size="360px" direction="rtl" class="advanced-filter-drawer">
+    <el-drawer
+      v-model="filterPanelVisible"
+      title="高级筛选"
+      size="360px"
+      direction="rtl"
+      class="advanced-filter-drawer"
+    >
       <div class="advanced-filter-form">
         <el-form label-position="top">
           <el-form-item label="用例等级">
             <el-select v-model="levelFilter" placeholder="全部" clearable>
-              <el-option label="全部" value="" /><el-option label="P0" value="P0" /><el-option label="P1" value="P1" /><el-option label="P2" value="P2" /><el-option label="P3" value="P3" />
+              <el-option label="全部" value="" />
+              <el-option label="P0" value="P0" />
+              <el-option label="P1" value="P1" />
+              <el-option label="P2" value="P2" />
+              <el-option label="P3" value="P3" />
             </el-select>
           </el-form-item>
           <el-form-item label="评审结果">
             <el-select v-model="reviewFilter" placeholder="全部" clearable>
-              <el-option label="全部" value="" /><el-option label="未评审" value="未评审" /><el-option label="已通过" value="已通过" /><el-option label="不通过" value="不通过" /><el-option label="重新提审" value="重新提审" />
+              <el-option label="全部" value="" />
+              <el-option label="未评审" value="未评审" />
+              <el-option label="已通过" value="已通过" />
+              <el-option label="不通过" value="不通过" />
+              <el-option label="重新提审" value="重新提审" />
             </el-select>
           </el-form-item>
           <el-form-item label="执行结果">
             <el-select v-model="execFilter" placeholder="全部" clearable>
-              <el-option label="全部" value="" /><el-option label="未执行" value="未执行" /><el-option label="成功" value="成功" /><el-option label="失败" value="失败" /><el-option label="阻塞" value="阻塞" />
+              <el-option label="全部" value="" />
+              <el-option label="未执行" value="未执行" />
+              <el-option label="成功" value="成功" />
+              <el-option label="失败" value="失败" />
+              <el-option label="阻塞" value="阻塞" />
             </el-select>
           </el-form-item>
           <el-form-item label="标签">
@@ -1256,17 +1791,45 @@ watch(selectedProject, (newId) => {
             <el-input v-model="updaterFilter" placeholder="输入更新人ID" clearable />
           </el-form-item>
           <el-form-item label="创建时间">
-            <div style="display:flex; gap:8px; align-items:center;">
-              <el-date-picker v-model="createdAfter" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" clearable style="flex:1;" />
-              <span style="color:rgba(255,255,255,0.3);">~</span>
-              <el-date-picker v-model="createdBefore" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" clearable style="flex:1;" />
+            <div style="display: flex; gap: 8px; align-items: center">
+              <el-date-picker
+                v-model="createdAfter"
+                type="date"
+                value-format="YYYY-MM-DD"
+                placeholder="开始日期"
+                clearable
+                style="flex: 1"
+              />
+              <span style="color: rgba(255, 255, 255, 0.3)">~</span>
+              <el-date-picker
+                v-model="createdBefore"
+                type="date"
+                value-format="YYYY-MM-DD"
+                placeholder="结束日期"
+                clearable
+                style="flex: 1"
+              />
             </div>
           </el-form-item>
           <el-form-item label="更新时间">
-            <div style="display:flex; gap:8px; align-items:center;">
-              <el-date-picker v-model="updatedAfter" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" clearable style="flex:1;" />
-              <span style="color:rgba(255,255,255,0.3);">~</span>
-              <el-date-picker v-model="updatedBefore" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" clearable style="flex:1;" />
+            <div style="display: flex; gap: 8px; align-items: center">
+              <el-date-picker
+                v-model="updatedAfter"
+                type="date"
+                value-format="YYYY-MM-DD"
+                placeholder="开始日期"
+                clearable
+                style="flex: 1"
+              />
+              <span style="color: rgba(255, 255, 255, 0.3)">~</span>
+              <el-date-picker
+                v-model="updatedBefore"
+                type="date"
+                value-format="YYYY-MM-DD"
+                placeholder="结束日期"
+                clearable
+                style="flex: 1"
+              />
             </div>
           </el-form-item>
         </el-form>
@@ -1282,7 +1845,7 @@ watch(selectedProject, (newId) => {
     <el-dialog v-model="batchMoveVisible" title="批量移动" width="400px" :append-to-body="true">
       <el-form label-position="top">
         <el-form-item label="目标目录">
-          <el-select v-model="batchMoveTarget" style="width:100%;">
+          <el-select v-model="batchMoveTarget" style="width: 100%">
             <el-option label="/未规划用例" value="/未规划用例" />
             <el-option v-for="p in modulePaths" :key="p" :label="p" :value="p" />
           </el-select>
@@ -1290,31 +1853,70 @@ watch(selectedProject, (newId) => {
       </el-form>
       <template #footer>
         <el-button @click="batchMoveVisible = false">取消</el-button>
-        <el-button type="primary" @click="onBatchMove">确认移动 ({{ selectedIds.length }} 条)</el-button>
+        <el-button type="primary" @click="onBatchMove">
+          确认移动 ({{ selectedIds.length }} 条)
+        </el-button>
       </template>
     </el-dialog>
 
     <!-- Case editor drawer -->
-    <el-drawer v-model="dialogVisible" :title="editingId ? '编辑用例' : '新建用例'" size="74%" direction="rtl" class="case-editor-drawer">
+    <el-drawer
+      v-model="dialogVisible"
+      :title="editingId ? '编辑用例' : '新建用例'"
+      size="74%"
+      direction="rtl"
+      class="case-editor-drawer"
+    >
       <div class="case-editor">
         <div class="case-editor-head">
-          <div class="head-left"><div class="case-tag">TEST CASE</div><h3>{{ editingId ? '编辑测试用例' : '新建测试用例' }}</h3></div>
-          <div class="head-right"><el-button @click="dialogVisible = false">取消</el-button><el-button type="primary" :loading="saving" @click="submitCase">保存</el-button></div>
+          <div class="head-left">
+            <div class="case-tag">TEST CASE</div>
+            <h3>{{ editingId ? '编辑测试用例' : '新建测试用例' }}</h3>
+          </div>
+          <div class="head-right">
+            <el-button @click="dialogVisible = false">取消</el-button>
+            <el-button type="primary" :loading="saving" @click="submitCase">保存</el-button>
+          </div>
         </div>
         <el-form label-position="top" class="case-editor-form">
           <section class="editor-block">
             <div class="block-title">基础信息</div>
             <div class="block-grid block-grid-2">
-              <el-form-item label="用例名称"><el-input v-model="caseForm.title" placeholder="请输入用例名称" /></el-form-item>
-              <el-form-item label="用例等级"><el-select v-model="caseForm.level"><el-option label="P0" value="P0" /><el-option label="P1" value="P1" /><el-option label="P2" value="P2" /><el-option label="P3" value="P3" /></el-select></el-form-item>
-              <el-form-item label="标签" class="block-col-span-2"><el-input v-model="caseForm.tags" placeholder="多个标签以逗号分隔" /></el-form-item>
+              <el-form-item label="用例名称">
+                <el-input v-model="caseForm.title" placeholder="请输入用例名称" />
+              </el-form-item>
+              <el-form-item label="用例等级">
+                <el-select v-model="caseForm.level">
+                  <el-option label="P0" value="P0" />
+                  <el-option label="P1" value="P1" />
+                  <el-option label="P2" value="P2" />
+                  <el-option label="P3" value="P3" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="标签" class="block-col-span-2">
+                <el-input v-model="caseForm.tags" placeholder="多个标签以逗号分隔" />
+              </el-form-item>
             </div>
           </section>
           <section class="editor-block">
             <div class="block-title">评审与执行</div>
             <div class="block-grid block-grid-2">
-              <el-form-item label="评审结果"><el-select v-model="caseForm.reviewResult"><el-option label="未评审" value="未评审" /><el-option label="已通过" value="已通过" /><el-option label="不通过" value="不通过" /><el-option label="重新提审" value="重新提审" /></el-select></el-form-item>
-              <el-form-item label="执行结果"><el-select v-model="caseForm.execResult"><el-option label="未执行" value="未执行" /><el-option label="成功" value="成功" /><el-option label="失败" value="失败" /><el-option label="阻塞" value="阻塞" /></el-select></el-form-item>
+              <el-form-item label="评审结果">
+                <el-select v-model="caseForm.reviewResult">
+                  <el-option label="未评审" value="未评审" />
+                  <el-option label="已通过" value="已通过" />
+                  <el-option label="不通过" value="不通过" />
+                  <el-option label="重新提审" value="重新提审" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="执行结果">
+                <el-select v-model="caseForm.execResult">
+                  <el-option label="未执行" value="未执行" />
+                  <el-option label="成功" value="成功" />
+                  <el-option label="失败" value="失败" />
+                  <el-option label="阻塞" value="阻塞" />
+                </el-select>
+              </el-form-item>
             </div>
           </section>
           <section class="editor-block">
@@ -1323,25 +1925,64 @@ watch(selectedProject, (newId) => {
           </section>
           <section class="editor-block">
             <div class="block-title">步骤描述</div>
-            <div class="steps-grid-head"><div>步骤</div><div>预期结果</div><div>操作</div></div>
-            <div class="steps-grid-row" v-for="(s, idx) in stepRows" :key="idx" draggable="true" @dragstart="onStepDragStart(idx)" @dragover.prevent @drop="onStepDrop(idx)" @dragend="onStepDragEnd">
+            <div class="steps-grid-head">
+              <div>步骤</div>
+              <div>预期结果</div>
+              <div>操作</div>
+            </div>
+            <div
+              v-for="(s, idx) in stepRows"
+              :key="idx"
+              class="steps-grid-row"
+              draggable="true"
+              @dragstart="onStepDragStart(idx)"
+              @dragover.prevent
+              @drop="onStepDrop(idx)"
+              @dragend="onStepDragEnd"
+            >
               <el-input v-model="s.action" placeholder="请输入步骤" />
               <el-input v-model="s.expected" placeholder="请输入预期结果" />
               <div class="step-ops">
-                <el-dropdown trigger="click" @command="(cmd: string) => { if (cmd === 'copy') copyStepRow(idx); else if (cmd === 'insertAbove') insertStepAbove(idx); else if (cmd === 'insertBelow') insertStepBelow(idx); else if (cmd === 'delete') removeStepRow(idx); }">
-                  <button type="button" class="step-op" title="操作"><el-icon class="btn-icon"><Edit /></el-icon></button>
+                <el-dropdown
+                  trigger="click"
+                  @command="
+                    (cmd: string) => {
+                      if (cmd === 'copy') copyStepRow(idx)
+                      else if (cmd === 'insertAbove') insertStepAbove(idx)
+                      else if (cmd === 'insertBelow') insertStepBelow(idx)
+                      else if (cmd === 'delete') removeStepRow(idx)
+                    }
+                  "
+                >
+                  <button type="button" class="step-op" title="操作">
+                    <el-icon class="btn-icon"><Edit /></el-icon>
+                  </button>
                   <template #dropdown>
                     <el-dropdown-menu>
-                      <el-dropdown-item command="copy"><el-icon><CopyDocument /></el-icon>复制</el-dropdown-item>
-                      <el-dropdown-item command="insertAbove"><el-icon><CaretTop /></el-icon>在上方插入</el-dropdown-item>
-                      <el-dropdown-item command="insertBelow"><el-icon><CaretBottom /></el-icon>在下方插入</el-dropdown-item>
-                      <el-dropdown-item command="delete" divided><el-icon><Delete /></el-icon>删除</el-dropdown-item>
+                      <el-dropdown-item command="copy">
+                        <el-icon><CopyDocument /></el-icon>
+                        复制
+                      </el-dropdown-item>
+                      <el-dropdown-item command="insertAbove">
+                        <el-icon><CaretTop /></el-icon>
+                        在上方插入
+                      </el-dropdown-item>
+                      <el-dropdown-item command="insertBelow">
+                        <el-icon><CaretBottom /></el-icon>
+                        在下方插入
+                      </el-dropdown-item>
+                      <el-dropdown-item command="delete" divided>
+                        <el-icon><Delete /></el-icon>
+                        删除
+                      </el-dropdown-item>
                     </el-dropdown-menu>
                   </template>
                 </el-dropdown>
               </div>
             </div>
-            <div class="steps-grid-actions"><el-button @click="addStepRow">新增步骤</el-button></div>
+            <div class="steps-grid-actions">
+              <el-button @click="addStepRow">新增步骤</el-button>
+            </div>
           </section>
           <section class="editor-block">
             <div class="block-title">备注</div>
@@ -1349,17 +1990,31 @@ watch(selectedProject, (newId) => {
           </section>
           <section class="editor-block">
             <div class="block-title">附件</div>
-            <FileUploader :files="caseAttachments" :project-id="selectedProject ?? undefined" @upload="onUploadAttachment" @remove="onRemoveAttachment" />
+            <FileUploader
+              :files="caseAttachments"
+              :project-id="selectedProject ?? undefined"
+              @upload="onUploadAttachment"
+              @remove="onRemoveAttachment"
+            />
             <div v-if="!editingId" class="attachment-hint">请先保存用例后再上传附件</div>
           </section>
           <section v-if="editingId && caseHistory.length > 0" class="editor-block">
-            <div class="block-title" style="cursor:pointer; user-select:none;" @click="historyExpanded = !historyExpanded">
-              编辑历史 ({{ caseHistory.length }}) <span style="font-size:11px; color:var(--tp-gray-500);">{{ historyExpanded ? '▼' : '▶' }}</span>
+            <div
+              class="block-title"
+              style="cursor: pointer; user-select: none"
+              @click="historyExpanded = !historyExpanded"
+            >
+              编辑历史 ({{ caseHistory.length }})
+              <span style="font-size: 11px; color: var(--tp-gray-500)">
+                {{ historyExpanded ? '▼' : '▶' }}
+              </span>
             </div>
             <div v-if="historyExpanded" class="history-list">
               <div v-for="h in caseHistory" :key="h.id" class="history-item">
-                <span class="history-action">{{ h.action === 'update' ? '修改' : h.action === 'create' ? '创建' : h.action }}</span>
-                <span class="history-field" v-if="h.field_name">{{ h.field_name }}</span>
+                <span class="history-action">
+                  {{ h.action === 'update' ? '修改' : h.action === 'create' ? '创建' : h.action }}
+                </span>
+                <span v-if="h.field_name" class="history-field">{{ h.field_name }}</span>
                 <span class="history-time">{{ formatTime(h.created_at) }}</span>
               </div>
             </div>
