@@ -199,6 +199,7 @@ onMounted(async () => {
             :top-menu="topMenu"
             :active-menu="activeMenu"
             :collapsed="sidebarCollapsed"
+            :user-role="currentUser?.role"
             @update:top-menu="switchTopMenu"
             @update:active-menu="switchMenu"
             @toggle-collapse="toggleSidebar"

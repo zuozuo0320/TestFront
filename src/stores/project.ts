@@ -37,6 +37,18 @@ function restoreNavState(): Partial<NavState> {
   }
 }
 
+/**
+ * 从项目列表中选出更合适的当前项目。
+ * 优先使用仍然存在的历史项目；若历史项目失效，则默认回落到首个活跃项目。
+ */
+function pickPreferredProjectId(projects: Project[], preferredId?: number | null) {
+  if (typeof preferredId === 'number' && projects.some((p) => p.id === preferredId)) {
+    return preferredId
+  }
+  const firstActive = projects.find((p) => p.status === 'active')
+  return firstActive?.id ?? projects[0]?.id ?? null
+}
+
 export const useProjectStore = defineStore('project', () => {
   const initialNav = restoreNavState()
 
@@ -61,15 +73,10 @@ export const useProjectStore = defineStore('project', () => {
     localStorage.setItem(NAV_STATE_KEY, JSON.stringify(payload))
   }
 
+  /** 加载项目列表，并在历史项目失效时优先回落到活跃项目。 */
   async function fetchProjects() {
     projects.value = await listProjects()
-    const first = projects.value[0]
-    if (first) {
-      const exists = projects.value.some((p) => p.id === selectedProjectId.value)
-      if (!exists) selectedProjectId.value = first.id
-    } else {
-      selectedProjectId.value = null
-    }
+    selectedProjectId.value = pickPreferredProjectId(projects.value, selectedProjectId.value)
   }
 
   async function addProject(payload: { name: string; description?: string }) {
@@ -78,19 +85,12 @@ export const useProjectStore = defineStore('project', () => {
     return project
   }
 
+  /** 从导航缓存恢复当前项目；若缓存项目已失效，则优先使用活跃项目。 */
   function restoreProjectFromNav() {
     const restored = restoreNavState()
     if (restored.topMenu) topMenu.value = restored.topMenu
     if (restored.activeMenu) activeMenu.value = restored.activeMenu
-    if (
-      typeof restored.projectId === 'number' &&
-      projects.value.some((p) => p.id === restored.projectId)
-    ) {
-      selectedProjectId.value = restored.projectId
-    } else {
-      const first = projects.value[0]
-      selectedProjectId.value = first ? first.id : null
-    }
+    selectedProjectId.value = pickPreferredProjectId(projects.value, restored.projectId)
   }
 
   return {

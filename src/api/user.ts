@@ -9,12 +9,13 @@ export async function listUsers() {
   return (Array.isArray(data) ? data : data.users ?? []) as User[]
 }
 
-/** 创建用户 */
+/** 创建用户（含初始密码） */
 export async function createUser(payload: {
   name: string
   email: string
   phone?: string
   avatar?: string
+  password: string
   role?: string
   role_ids: number[]
   project_ids: number[]
@@ -46,9 +47,9 @@ export async function deleteUserById(userId: number) {
   return data
 }
 
-/** 重置用户密码 */
+/** 管理员重置用户密码 */
 export async function resetUserPassword(userId: number, newPassword: string) {
-  const { data } = await apiClient.put(`/users/${userId}/password`, { password: newPassword })
+  const { data } = await apiClient.put(`/users/${userId}/reset-password`, { new_password: newPassword })
   return data
 }
 
@@ -61,7 +62,7 @@ export async function listRoles() {
 }
 
 /** 创建角色 */
-export async function createRole(payload: { name: string; description?: string }) {
+export async function createRole(payload: { name: string; display_name?: string; description?: string }) {
   const { data } = await apiClient.post<Role>('/roles', payload)
   return data
 }
@@ -69,7 +70,7 @@ export async function createRole(payload: { name: string; description?: string }
 /** 更新角色 */
 export async function updateRoleById(
   roleId: number,
-  payload: { name?: string; description?: string },
+  payload: { name?: string; display_name?: string; description?: string },
 ) {
   const { data } = await apiClient.put<Role>(`/roles/${roleId}`, payload)
   return data

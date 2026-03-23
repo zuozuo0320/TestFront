@@ -18,7 +18,7 @@ const descMap: Record<string, string> = {
 
 const pathKey = String(route.params.pathMatch || 'e2e')
   .replace(/^\//, '')
-  .split('/')[0]
+  .split('/')[0] || 'e2e'
 const title = titleMap[pathKey] || '功能模块'
 const desc = descMap[pathKey] || '该功能'
 </script>

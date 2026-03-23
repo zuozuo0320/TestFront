@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref, watch, toRef } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   CaretBottom,
   CaretRight,
   CaretTop,
-  Close,
   CopyDocument,
   Delete,
   Document,
@@ -25,7 +24,7 @@ import StatusBadge from '../components/StatusBadge.vue'
 import LevelBadge from '../components/LevelBadge.vue'
 import RichTextEditor from '../components/RichTextEditor.vue'
 import FileUploader from '../components/FileUploader.vue'
-import { Plus as LuPlus, MoreHorizontal as LuMoreHorizontal, Atom as LuAtom } from 'lucide-vue-next'
+import { Atom as LuAtom } from 'lucide-vue-next'
 import { useProjectStore } from '../stores/project'
 import {
   listTestCases,
@@ -39,7 +38,7 @@ import {
   listCaseHistory,
 } from '../api/testcase'
 import { uploadAttachment, listAttachments, deleteAttachment } from '../api/attachment'
-import { exportTestCases, importTestCases } from '../api/xlsx'
+import { importTestCases } from '../api/xlsx'
 import type { Project, TestCase, CaseAttachment } from '../api/types'
 
 // ── Types ──
@@ -146,14 +145,6 @@ const batchMoveTarget = ref('/未规划用例')
 
 // Directory context menu
 const ctxMenu = reactive({ visible: false, x: 0, y: 0, path: '', name: '' })
-function onDirContextMenu(e: MouseEvent, path: string, name: string) {
-  e.preventDefault()
-  ctxMenu.visible = true
-  ctxMenu.x = e.clientX
-  ctxMenu.y = e.clientY
-  ctxMenu.path = path
-  ctxMenu.name = name
-}
 function closeCtxMenu() { ctxMenu.visible = false }
 
 // Inline dropdown menu handler (MeterSphere style)
@@ -225,9 +216,6 @@ function ctxDelete() {
   removeDirectory(ctxMenu.path)
 }
 
-// Import/Export
-const importFileInput = ref<HTMLInputElement | null>(null)
-
 // Batch selection
 const selectedIds = ref<number[]>([])
 const selectAll = ref(false)
@@ -235,9 +223,12 @@ const customModulePaths = ref<string[]>([])
 const treeExpanded = ref(true)
 const treePanelOpen = ref(true)
 const projectDropdownOpen = ref(false)
+const selectedProjectMeta = computed(() => {
+  return projects.value.find(proj => proj.id === selectedProject.value) || null
+})
+const selectedProjectArchived = computed(() => selectedProjectMeta.value?.status === 'archived')
 const currentProjectName = computed(() => {
-  const p = projects.value.find(proj => proj.id === selectedProject.value)
-  return p?.name || '选择项目'
+  return selectedProjectMeta.value?.name || '选择项目'
 })
 const selectedModulePath = ref((() => {
   try {
@@ -672,16 +663,6 @@ async function onRemoveAttachment(index: number) {
 
 // ── Import / Export ──
 
-async function onExportXlsx() {
-  if (!selectedProject.value) { ElMessage.warning('请先选择项目'); return }
-  try {
-    appLoading.value = true
-    await exportTestCases(selectedProject.value)
-    ElMessage.success('导出成功')
-  } catch (e: any) { ElMessage.error(e?.response?.data?.error || '导出失败') }
-  finally { appLoading.value = false }
-}
-
 async function onImportXlsx(e: Event) {
   const input = e.target as HTMLInputElement
   if (!input.files?.length || !selectedProject.value) return
@@ -765,9 +746,16 @@ function onStepDrop(targetIndex: number) {
 function onStepDragEnd() { draggingStepIndex.value = null }
 
 // ── Project switch ──
-function onProjectSwitch(id: number) {
-  projectStore.selectedProjectId = id
+/** 切换当前项目；若点击归档项目则给出只读提示，不切换编辑上下文。 */
+function onProjectSwitch(project: Project) {
+  if (project.status === 'archived') {
+    projectDropdownOpen.value = false
+    ElMessage.warning(`项目「${project.name}」已归档，仅支持查看，请先恢复后再切换`)
+    return
+  }
+  projectStore.selectedProjectId = project.id
   projectStore.persistNavState()
+  projectDropdownOpen.value = false
 }
 
 // ── Init ──
@@ -816,11 +804,13 @@ watch(selectedProject, (newId) => {
                 v-for="p in projects"
                 :key="p.id"
                 class="project-dropdown-item"
-                :class="{ selected: p.id === selectedProject }"
-                @click="onProjectSwitch(p.id); projectDropdownOpen = false"
+                :class="{ selected: p.id === selectedProject, archived: p.status === 'archived' }"
+                :title="p.status === 'archived' ? '归档项目仅支持查看，无法切换为当前编辑项目' : undefined"
+                @click="onProjectSwitch(p)"
               >
                 <div v-if="p.id === selectedProject" class="project-item-indicator" />
                 <span class="project-item-name">{{ p.name }}</span>
+                <el-tag v-if="p.status === 'archived'" size="small" type="info" effect="plain" style="margin-left: 6px; font-size: 10px;">已归档</el-tag>
                 <svg v-if="p.id === selectedProject" class="project-item-check" width="14" height="14" viewBox="0 0 16 16" fill="none">
                   <path d="M3 8.5L6.5 12L13 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
@@ -828,6 +818,9 @@ watch(selectedProject, (newId) => {
             </div>
           </Transition>
           <div v-if="projectDropdownOpen" class="project-dropdown-overlay" @click="projectDropdownOpen = false" />
+          <div v-if="selectedProjectArchived" class="project-readonly-hint">
+            当前项目已归档，当前页面仅建议查看；如需继续编辑，请先到项目管理中恢复项目。
+          </div>
         </div>
         <div class="tree-divider"></div>
         <!-- Search -->
@@ -920,7 +913,7 @@ watch(selectedProject, (newId) => {
           <el-button type="primary" class="btn-new-case" @click="openCreate">
             <el-icon><Plus /></el-icon> 新建用例
           </el-button>
-          <input ref="importFileInput" type="file" accept=".xlsx" style="display:none" @change="onImportXlsx" />
+          <input type="file" accept=".xlsx" style="display:none" @change="onImportXlsx" />
         </div>
       </div>
 

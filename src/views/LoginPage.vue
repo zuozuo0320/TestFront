@@ -93,6 +93,7 @@ function initBg() {
     ctx.lineWidth = 0.5
     for (let i = 0; i < count; i++) {
       const p = dots[i]
+      if (!p) continue
       p.x += p.vx; p.y += p.vy
       if (p.x < 0 || p.x > w) p.vx *= -1
       if (p.y < 0 || p.y > h) p.vy *= -1
@@ -102,6 +103,7 @@ function initBg() {
       // 连线
       for (let j = i + 1; j < count; j++) {
         const q = dots[j]
+        if (!q) continue
         const dx = p.x - q.x, dy = p.y - q.y
         const d = Math.sqrt(dx * dx + dy * dy)
         if (d < 140) {

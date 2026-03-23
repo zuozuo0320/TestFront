@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import {
   LayoutDashboard,
   ListChecks,
@@ -12,10 +13,14 @@ import {
 type TopMenu = 'workbench' | 'project' | 'plan' | 'testcases' | 'e2e' | 'system'
 type SystemMenu = 'users' | 'roles' | 'projects'
 
-defineProps<{
+/** 无权访问系统管理的角色集合（FR-02-22） */
+const NO_SYSTEM_ROLES = new Set(['readonly', 'developer', 'reviewer'])
+
+const props = defineProps<{
   topMenu: TopMenu
   activeMenu: SystemMenu
   collapsed?: boolean
+  userRole?: string
 }>()
 
 defineEmits<{
@@ -24,6 +29,12 @@ defineEmits<{
   (e: 'toggle-collapse'): void
   (e: 'logout'): void
 }>()
+
+/** 根据用户角色判断是否显示系统管理菜单 */
+const showSystemMenu = computed(() => {
+  if (!props.userRole) return true // 角色未加载时默认显示
+  return !NO_SYSTEM_ROLES.has(props.userRole.toLowerCase())
+})
 
 const navItems: { key: TopMenu; label: string; icon: any }[] = [
   { key: 'workbench', label: '仪表盘', icon: LayoutDashboard },
@@ -60,34 +71,37 @@ const systemNavItems: { key: SystemMenu; label: string }[] = [
 
     <!-- Bottom group: system + collapse -->
     <div class="nav-bottom-group">
-      <div
-        class="main-nav-item"
-        :class="{ active: topMenu === 'system' }"
-        role="button"
-        tabindex="0"
-        :title="collapsed ? '系统管理' : undefined"
-        @click="$emit('update:topMenu', 'system')"
-        @keydown.enter="$emit('update:topMenu', 'system')"
-      >
-        <Settings :size="18" class="nav-icon" />
-        <span v-if="!collapsed" class="nav-label">系统管理</span>
-      </div>
-
-      <div v-if="topMenu === 'system' && !collapsed" class="sub-nav">
+      <!-- 系统管理：readonly/developer/reviewer 角色不可见 -->
+      <template v-if="showSystemMenu">
         <div
-          v-for="sub in systemNavItems"
-          :key="sub.key"
-          class="sub-nav-item"
-          :class="{ active: activeMenu === sub.key }"
+          class="main-nav-item"
+          :class="{ active: topMenu === 'system' }"
           role="button"
           tabindex="0"
-          :aria-current="activeMenu === sub.key ? 'page' : undefined"
-          @click="$emit('update:activeMenu', sub.key)"
-          @keydown.enter="$emit('update:activeMenu', sub.key)"
+          :title="collapsed ? '系统管理' : undefined"
+          @click="$emit('update:topMenu', 'system')"
+          @keydown.enter="$emit('update:topMenu', 'system')"
         >
-          {{ sub.label }}
+          <Settings :size="18" class="nav-icon" />
+          <span v-if="!collapsed" class="nav-label">系统管理</span>
         </div>
-      </div>
+
+        <div v-if="topMenu === 'system' && !collapsed" class="sub-nav">
+          <div
+            v-for="sub in systemNavItems"
+            :key="sub.key"
+            class="sub-nav-item"
+            :class="{ active: activeMenu === sub.key }"
+            role="button"
+            tabindex="0"
+            :aria-current="activeMenu === sub.key ? 'page' : undefined"
+            @click="$emit('update:activeMenu', sub.key)"
+            @keydown.enter="$emit('update:activeMenu', sub.key)"
+          >
+            {{ sub.label }}
+          </div>
+        </div>
+      </template>
 
       <div class="nav-collapse-btn" @click="$emit('toggle-collapse')" :title="collapsed ? '展开侧栏' : '收起侧栏'">
         <PanelLeftClose :size="18" class="nav-icon" :style="{ transform: collapsed ? 'rotate(180deg)' : 'none' }" />
@@ -96,3 +110,4 @@ const systemNavItems: { key: SystemMenu; label: string }[] = [
     </div>
   </aside>
 </template>
+

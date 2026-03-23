@@ -75,6 +75,7 @@ export type User = {
   phone?: string
   avatar?: string
   role: string
+  role_names?: string[]
   active: boolean
   last_login_at?: string | null
   deleted_at?: string | null
