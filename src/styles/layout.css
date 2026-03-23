@@ -401,10 +401,10 @@
 }
 
 .main-nav-item.active {
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
   font-weight: 700;
-  box-shadow: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
 .main-nav-item.active .nav-icon {
@@ -420,7 +420,7 @@
 .main-nav-item.active:active,
 .main-nav-item.active:focus,
 .main-nav-item.active:focus-visible {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .main-nav-item.active::before {
@@ -431,7 +431,8 @@
   bottom: 8px;
   width: 3px;
   border-radius: 0 2px 2px 0;
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.15);
 }
 
 /* Sub-navigation */
@@ -574,7 +575,7 @@
 
 /* Project Switcher */
 .tree-project-switcher {
-  margin-bottom: 0;
+  margin-bottom: 8px;
 }
 
 .project-select {
@@ -612,7 +613,7 @@
 .tree-divider {
   height: 1px;
   background: rgba(255, 255, 255, 0.06);
-  margin: 12px 0;
+  margin: 10px 0;
 }
 
 /* Search */
@@ -923,25 +924,29 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  flex: 1;
 }
 
 .table-shell {
   flex: 1;
-  min-height: 0;
+  min-height: 300px;
   display: flex;
   flex-direction: column;
 }
 
 .table-shell .el-table {
   flex: 1;
+  min-height: 0;
 }
 
 .pager {
   margin-top: auto;
-  padding: 12px 0 0;
+  padding: 14px 0 4px;
   display: flex;
   justify-content: flex-end;
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
 }
 
 .toolbar-1 {
@@ -1114,17 +1119,19 @@
 .metric-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
+  gap: 16px;
   margin-bottom: 16px;
 }
 
 .metric-card {
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   background: rgba(255, 255, 255, 0.035);
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 12px;
-  padding: 14px 18px;
+  padding: 16px 18px;
+  min-height: 100px;
   transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
   overflow: hidden;
 }
@@ -1249,7 +1256,7 @@
 .filter-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 16px;
   padding: 0;
   background: none;
@@ -1264,10 +1271,10 @@
 .filter-search-input .el-input__wrapper {
   background: rgba(255, 255, 255, 0.04) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 12px !important;
+  border-radius: 10px !important;
   box-shadow: none !important;
   padding: 6px 16px !important;
-  height: 40px !important;
+  height: 38px !important;
 }
 
 .filter-search-input .el-input__wrapper:hover {
