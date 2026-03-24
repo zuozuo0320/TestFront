@@ -71,7 +71,7 @@ const filteredUsers = computed(() => {
     )
   }
   // 角色筛选
-  if (filterRoleId.value !== '') {
+  if (filterRoleId.value != null && filterRoleId.value !== '') {
     list = list.filter((u) => u.role_ids.includes(filterRoleId.value as number))
   }
   // 状态筛选
@@ -336,6 +336,55 @@ function onUserPaginationCurrentChange(current: number) {
   userPage.value = current
 }
 
+/* ── Design C: 统计数据计算 ── */
+
+/** 角色主题色映射 */
+const ROLE_COLORS: Record<string, string> = {
+  admin: '#ef4444',
+  manager: '#f59e0b',
+  tester: '#3b82f6',
+  reviewer: '#22c55e',
+  readonly: '#6b7280',
+  developer: '#8b5cf6',
+}
+const DEFAULT_COLOR = '#6366f1'
+
+/** 根据用户的首个角色返回对应的主题色（用于左侧彩色条） */
+function getRoleAccentColor(u: UserRow) {
+  if (u.role && ROLE_COLORS[u.role.toLowerCase()]) {
+    return ROLE_COLORS[u.role.toLowerCase()]
+  }
+  // 如果没有 role 字段，尝试从 role_ids 找到对应角色名
+  for (const rid of u.role_ids) {
+    const r = roles.value.find((role) => role.id === rid)
+    if (r && ROLE_COLORS[r.name.toLowerCase()]) {
+      return ROLE_COLORS[r.name.toLowerCase()]
+    }
+  }
+  return DEFAULT_COLOR
+}
+
+/** 活跃用户数 */
+const activeUserCount = computed(() => users.value.filter((u) => u.active).length)
+
+/** 角色分布统计 */
+const roleDistribution = computed(() => {
+  const counts: Record<number, number> = {}
+  users.value.forEach((u) => {
+    u.role_ids.forEach((rid) => {
+      counts[rid] = (counts[rid] || 0) + 1
+    })
+  })
+  const maxCount = Math.max(...Object.values(counts), 1)
+  return roles.value.map((r) => ({
+    name: r.name,
+    displayName: r.display_name || r.name,
+    count: counts[r.id] || 0,
+    percent: ((counts[r.id] || 0) / maxCount) * 100,
+    color: ROLE_COLORS[r.name.toLowerCase()] || DEFAULT_COLOR,
+  }))
+})
+
 /** 初始化：先加载角色和项目（用于 roleNameMap），再加载用户 */
 onMounted(async () => {
   await Promise.all([loadRoles(), loadProjects()])
@@ -344,24 +393,24 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="module-card users-card" v-loading="usersLoading">
-    <!-- 工具栏：标题 + 搜索/筛选 + 新建按钮 -->
-    <div class="module-toolbar users-toolbar">
-      <h3>用户管理</h3>
-      <div class="toolbar-right">
+  <div class="um-root" v-loading="usersLoading">
+    <!-- 页面顶栏 -->
+    <div class="um-header">
+      <h2 class="um-title">用户管理</h2>
+      <div class="um-header-actions">
         <el-input
           v-model="searchKeyword"
           placeholder="搜索姓名 / 邮箱"
           clearable
           :prefix-icon="Search"
-          style="width: 200px"
+          class="um-search"
           @input="userPage = 1"
         />
         <el-select
           v-model="filterRoleId"
           placeholder="全部角色"
           clearable
-          style="width: 140px"
+          class="um-filter"
           @change="userPage = 1"
         >
           <el-option
@@ -375,99 +424,150 @@ onMounted(async () => {
           v-model="filterStatus"
           placeholder="全部状态"
           clearable
-          style="width: 120px"
+          class="um-filter-sm"
           @change="userPage = 1"
         >
           <el-option label="启用" value="active" />
           <el-option label="冻结" value="disabled" />
         </el-select>
-        <el-button type="primary" @click="openCreateUser">新建用户</el-button>
+        <el-button type="primary" class="um-create-btn" @click="openCreateUser">
+          + 新建用户
+        </el-button>
       </div>
     </div>
 
-    <!-- 用户表格 -->
-    <el-table :data="pagedUsers" stripe style="width: 100%" empty-text="暂无用户">
-      <el-table-column label="姓名" min-width="200">
-        <template #default="{ row }">
-          <div class="user-cell">
-            <img
-              class="user-cell-avatar"
-              :src="resolveAvatarUrl(row.avatar, row.name)"
-              alt="avatar"
-              @error="(e: any) => { e.target.src = resolveAvatarUrl('', row.name) }"
-            />
-            <div class="user-cell-meta">
-              <div class="user-cell-name">{{ row.name }}</div>
-              <div class="user-cell-sub">{{ row.email }}</div>
+    <!-- 主内容区：列表 + 侧栏 -->
+    <div class="um-body">
+      <!-- 左侧用户列表 -->
+      <div class="um-list">
+        <div
+          v-for="u in pagedUsers"
+          :key="u.id"
+          class="um-user-item"
+          :style="{ '--accent': getRoleAccentColor(u) }"
+        >
+          <div class="um-user-accent"></div>
+          <img
+            class="um-user-avatar"
+            :src="resolveAvatarUrl(u.avatar, u.name)"
+            alt="avatar"
+            @error="(e: any) => { e.target.src = resolveAvatarUrl('', u.name) }"
+          />
+          <div class="um-user-content">
+            <div class="um-user-top">
+              <span class="um-user-name">{{ u.name }}</span>
+              <span class="um-user-email">{{ u.email }}</span>
+            </div>
+            <div class="um-user-bottom">
+              <el-tag
+                v-for="(name, idx) in u.role_names"
+                :key="idx"
+                size="small"
+                :type="name === '系统管理员' || u.role === 'admin' ? 'danger' : 'info'"
+                effect="plain"
+                class="um-role-tag"
+              >
+                {{ name }}
+              </el-tag>
+              <span v-if="!u.role_names.length" class="um-no-role">未分配</span>
             </div>
           </div>
-        </template>
-      </el-table-column>
-      <el-table-column label="角色" min-width="180">
-        <template #default="{ row }">
-          <div class="role-tags">
-            <el-tag
-              v-for="(name, idx) in row.role_names"
-              :key="idx"
-              size="small"
-              :type="name === '系统管理员' || row.role === 'admin' ? 'danger' : 'info'"
-              effect="plain"
-              class="role-tag"
-            >
-              {{ name }}
-            </el-tag>
-            <span v-if="!row.role_names.length" class="no-role">未分配</span>
+          <div class="um-user-status">
+            <span class="um-status-dot" :class="u.active ? 'um-status-dot--active' : 'um-status-dot--disabled'"></span>
+            <span class="um-status-text">{{ u.active ? '活跃' : '冻结' }}</span>
           </div>
-        </template>
-      </el-table-column>
-      <el-table-column label="项目数" width="80" align="center">
-        <template #default="{ row }">{{ row.project_ids.length }}</template>
-      </el-table-column>
-      <el-table-column label="手机号" width="130">
-        <template #default="{ row }">{{ row.phone || '-' }}</template>
-      </el-table-column>
-      <el-table-column label="状态" width="80" align="center">
-        <template #default="{ row }">
-          <el-tag size="small" :type="row.active ? 'success' : 'info'" effect="dark">
-            {{ row.active ? '启用' : '冻结' }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="最后登录" width="120" align="center">
-        <template #default="{ row }">
-          <span class="time-text">{{ formatTime(row.last_login_at) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="200" align="center" fixed="right">
-        <template #default="{ row }">
-          <el-button link size="small" @click="openEditUser(row)">编辑</el-button>
-          <el-button link size="small" @click="openResetPwd(row)">重置密码</el-button>
-          <el-button
-            link
-            size="small"
-            type="danger"
-            :disabled="isAdmin(row)"
-            @click="removeUser(row)"
-          >
-            删除
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+          <div class="um-user-actions">
+            <button class="um-action-btn um-action-edit" @click="openEditUser(u)">编辑</button>
+            <button class="um-action-btn um-action-pwd" @click="openResetPwd(u)">重置密码</button>
+            <button
+              class="um-action-btn um-action-delete"
+              :disabled="isAdmin(u)"
+              @click="removeUser(u)"
+            >
+              删除
+            </button>
+          </div>
+        </div>
 
-    <!-- 分页 -->
-    <div class="pager">
-      <el-pagination
-        background
-        small
-        :current-page="userPage"
-        :page-size="userPageSize"
-        :page-sizes="userPageSizeOptions"
-        :total="filteredUsers.length"
-        layout="total, sizes, prev, pager, next, jumper"
-        @size-change="onUserPaginationSizeChange"
-        @current-change="onUserPaginationCurrentChange"
-      />
+        <!-- 空状态 -->
+        <div v-if="!usersLoading && filteredUsers.length === 0" class="um-empty">暂无用户</div>
+
+        <!-- 分页 -->
+        <div v-if="filteredUsers.length > 0" class="um-pager">
+          <el-pagination
+            background
+            small
+            :current-page="userPage"
+            :page-size="userPageSize"
+            :page-sizes="userPageSizeOptions"
+            :total="filteredUsers.length"
+            layout="total, sizes, prev, pager, next"
+            @size-change="onUserPaginationSizeChange"
+            @current-change="onUserPaginationCurrentChange"
+          />
+        </div>
+      </div>
+
+      <!-- 右侧统计面板 -->
+      <div class="um-sidebar">
+        <!-- 用户概览 -->
+        <div class="um-stat-card">
+          <div class="um-stat-title">用户概览</div>
+          <div class="um-ring-wrapper">
+            <svg viewBox="0 0 120 120" class="um-ring-svg">
+              <circle cx="60" cy="60" r="48" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="12" />
+              <circle
+                cx="60" cy="60" r="48"
+                fill="none"
+                stroke="url(#userRingGrad)"
+                stroke-width="12"
+                stroke-linecap="round"
+                :stroke-dasharray="`${activeUserCount / Math.max(users.length, 1) * 301.6} 301.6`"
+                transform="rotate(-90 60 60)"
+              />
+              <defs>
+                <linearGradient id="userRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#22c55e" />
+                  <stop offset="100%" stop-color="#3b82f6" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="um-ring-center">
+              <span class="um-ring-number">{{ users.length }}</span>
+              <span class="um-ring-label">总用户</span>
+            </div>
+          </div>
+          <div class="um-stat-rows">
+            <div class="um-stat-row">
+              <span class="um-stat-dot" style="background: #22c55e"></span>
+              <span class="um-stat-key">活跃用户</span>
+              <span class="um-stat-val">{{ activeUserCount }}</span>
+            </div>
+            <div class="um-stat-row">
+              <span class="um-stat-dot" style="background: #6b7280"></span>
+              <span class="um-stat-key">已冻结</span>
+              <span class="um-stat-val">{{ users.length - activeUserCount }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 角色分布 -->
+        <div class="um-stat-card">
+          <div class="um-stat-title">角色分布</div>
+          <div class="um-role-bars">
+            <div v-for="rd in roleDistribution" :key="rd.name" class="um-role-bar-row">
+              <span class="um-role-bar-name">{{ rd.displayName }}</span>
+              <div class="um-role-bar-track">
+                <div
+                  class="um-role-bar-fill"
+                  :style="{ width: rd.percent + '%', background: rd.color }"
+                ></div>
+              </div>
+              <span class="um-role-bar-count">{{ rd.count }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 创建/编辑用户弹窗 -->
@@ -551,62 +651,346 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.users-toolbar {
+/* ── 页面根容器 ── */
+.um-root {
+  padding: 28px 32px;
+  min-height: 100%;
+}
+
+/* ── 顶栏 ── */
+.um-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
 }
-.toolbar-right {
+.um-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+.um-header-actions {
   display: flex;
   align-items: center;
   gap: 10px;
 }
-.user-cell {
+.um-search {
+  width: 200px;
+}
+.um-filter {
+  width: 140px;
+}
+.um-filter-sm {
+  width: 120px;
+}
+.um-create-btn {
+  border-radius: 8px;
+  font-weight: 600;
+}
+.um-search :deep(.el-input__wrapper),
+.um-filter :deep(.el-input__wrapper),
+.um-filter-sm :deep(.el-input__wrapper) {
+  border-radius: 8px;
+}
+
+/* ── 主内容区 ── */
+.um-body {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+/* ── 左侧用户列表 ── */
+.um-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  min-height: calc(100vh - 180px);
+}
+
+.um-user-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 14px 18px;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
 }
-.user-cell-avatar {
-  width: 32px;
-  height: 32px;
+.um-user-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* 左侧彩色条 */
+.um-user-accent {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--accent);
+  border-radius: 4px 0 0 4px;
+}
+
+/* 头像 */
+.um-user-avatar {
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
+  margin-left: 4px;
 }
-.user-cell-meta {
-  overflow: hidden;
+
+/* 用户主内容 */
+.um-user-content {
+  flex: 1;
+  min-width: 0;
 }
-.user-cell-name {
-  font-weight: 500;
-  font-size: 13px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.user-cell-sub {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.role-tags {
+.um-user-top {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+.um-user-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+}
+.um-user-email {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.35);
+}
+.um-user-bottom {
+  display: flex;
+  align-items: center;
   gap: 4px;
+  flex-wrap: wrap;
 }
-.role-tag {
+.um-role-tag {
   border-radius: 4px;
+  font-size: 10px;
 }
-.no-role {
+.um-no-role {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.3);
 }
-.time-text {
+
+/* 状态 */
+.um-user-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  min-width: 56px;
+}
+.um-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.um-status-dot--active {
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+}
+.um-status-dot--disabled {
+  background: #6b7280;
+}
+.um-status-text {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.5);
 }
+
+/* 操作按钮 */
+.um-user-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.um-action-btn {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.um-action-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.um-action-edit:hover {
+  border-color: rgba(139, 92, 246, 0.4);
+  color: #a78bfa;
+}
+.um-action-pwd:hover {
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #60a5fa;
+}
+.um-action-delete:hover {
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+.um-action-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.um-action-btn:disabled:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.6);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* 空状态 */
+.um-empty {
+  text-align: center;
+  padding: 48px 0;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 14px;
+}
+
+/* 分页 */
+.um-pager {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+  padding-top: 16px;
+}
+
+/* ── 右侧统计面板 ── */
+.um-sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.um-stat-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 20px;
+}
+.um-stat-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 16px;
+}
+
+/* 环形图 */
+.um-ring-wrapper {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 16px;
+}
+.um-ring-svg {
+  width: 100%;
+  height: 100%;
+}
+.um-ring-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.um-ring-number {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+.um-ring-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 2px;
+}
+
+/* 统计行 */
+.um-stat-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.um-stat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.um-stat-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.um-stat-key {
+  flex: 1;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+}
+.um-stat-val {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* 角色分布条形图 */
+.um-role-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.um-role-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.um-role-bar-name {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+  width: 72px;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.um-role-bar-track {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.um-role-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+  min-width: 2px;
+}
+.um-role-bar-count {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  width: 20px;
+  text-align: right;
+}
 </style>
+

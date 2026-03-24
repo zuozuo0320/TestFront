@@ -412,10 +412,9 @@ onMounted(() => loadProjects())
           <el-option label="活跃" value="active" />
           <el-option label="已归档" value="archived" />
         </el-select>
-        <button class="pm-btn-create" @click="openCreateProject">
-          <span class="pm-btn-plus">+</span>
-          新建项目
-        </button>
+        <el-button type="primary" class="pm-btn-create" @click="openCreateProject">
+          + 新建项目
+        </el-button>
       </div>
     </div>
 
@@ -530,10 +529,9 @@ onMounted(() => loadProjects())
       <!-- 空态 -->
       <div v-if="filteredProjects.length === 0" class="pm-empty">
         <p>暂无项目</p>
-        <button class="pm-btn-create" @click="openCreateProject">
-          <span class="pm-btn-plus">+</span>
-          创建第一个项目
-        </button>
+        <el-button type="primary" class="pm-btn-create" @click="openCreateProject">
+          + 创建第一个项目
+        </el-button>
       </div>
     </div>
 
@@ -705,29 +703,8 @@ onMounted(() => loadProjects())
   border-radius: 8px;
 }
 .pm-btn-create {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 20px;
-  background: linear-gradient(135deg, #7c3aed, #6d28d9);
-  color: #fff;
-  border: none;
   border-radius: 8px;
-  font-size: 13px;
   font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-.pm-btn-create:hover {
-  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.35);
-  transform: translateY(-1px);
-}
-.pm-btn-plus {
-  font-size: 16px;
-  font-weight: 300;
-  line-height: 1;
 }
 
 /* ══════════ 卡片网格 ══════════ */
