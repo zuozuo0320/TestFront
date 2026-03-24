@@ -1172,11 +1172,7 @@ watch(selectedProject, (newId) => {
                   <button
                     class="tree-node-action"
                     title="新建子目录"
-                    @click.stop="
-                      directoryForm.parentPath = data.path
-                      directoryForm.name = ''
-                      directoryDialogVisible = true
-                    "
+                    @click.stop="directoryForm.parentPath = data.path; directoryForm.name = ''; directoryDialogVisible = true"
                   >
                     <el-icon :size="14"><Plus /></el-icon>
                   </button>
@@ -1508,10 +1504,7 @@ watch(selectedProject, (newId) => {
               </button>
               <button
                 class="batch-float-close"
-                @click="
-                  selectedIds = []
-                  selectAll = false
-                "
+                @click="selectedIds = []; selectAll = false"
               >
                 ×
               </button>
@@ -1553,10 +1546,7 @@ watch(selectedProject, (newId) => {
                 <input
                   type="checkbox"
                   :checked="selectAll"
-                  @change="
-                    selectAll = !selectAll
-                    toggleSelectAll()
-                  "
+                  @change="selectAll = !selectAll; toggleSelectAll()"
                 />
               </th>
               <th style="width: 80px" class="sortable" @click="toggleSort('id')">

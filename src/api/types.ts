@@ -13,6 +13,7 @@ export type Project = {
   id: number
   name: string
   description: string
+  avatar?: string
   status: 'active' | 'archived'
   archived_at?: string | null
   created_at?: string

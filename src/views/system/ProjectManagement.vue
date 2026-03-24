@@ -9,6 +9,7 @@ import {
   deleteProject,
   archiveProject,
   unarchiveProject,
+  uploadProjectAvatar,
 } from '../../api/project'
 import { listMembers, addMember, removeMember } from '../../api/projectMember'
 import { listUsers } from '../../api/user'
@@ -31,6 +32,9 @@ const dialogMode = ref<'create' | 'edit'>('create')
 const editingProjectId = ref<number | null>(null)
 const savingProject = ref(false)
 const projectForm = reactive({ name: '', description: '' })
+const avatarFile = ref<File | null>(null)
+const avatarPreview = ref('')
+const avatarInputRef = ref<HTMLInputElement | null>(null)
 
 // ── 成员管理弹窗 ──
 const memberDialogVisible = ref(false)
@@ -154,6 +158,8 @@ function openCreateProject() {
   editingProjectId.value = null
   projectForm.name = ''
   projectForm.description = ''
+  avatarFile.value = null
+  avatarPreview.value = ''
   dialogVisible.value = true
 }
 
@@ -163,7 +169,28 @@ function openEditProject(p: Project) {
   editingProjectId.value = p.id
   projectForm.name = p.name
   projectForm.description = p.description || ''
+  avatarFile.value = null
+  avatarPreview.value = p.avatar ? resolveAvatarUrl(p.avatar) : ''
   dialogVisible.value = true
+}
+
+/** 触发头像文件选择 */
+function triggerAvatarInput() {
+  avatarInputRef.value?.click()
+}
+
+/** 处理头像文件选择 */
+function onAvatarSelected(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  if (file.size > 2 * 1024 * 1024) {
+    ElMessage.warning('头像文件不能超过 2MB')
+    return
+  }
+  avatarFile.value = file
+  avatarPreview.value = URL.createObjectURL(file)
+  input.value = ''
 }
 
 /** 提交创建/编辑项目 */
@@ -175,18 +202,29 @@ async function submitProject() {
   }
   savingProject.value = true
   try {
+    let projectId: number
     if (dialogMode.value === 'create') {
-      await createProject({
+      const created = await createProject({
         name,
         description: projectForm.description.trim() || undefined,
       })
+      projectId = created.id
       ElMessage.success('项目创建成功')
     } else {
-      await updateProject(editingProjectId.value!, {
+      projectId = editingProjectId.value!
+      await updateProject(projectId, {
         name,
         description: projectForm.description.trim() || undefined,
       })
       ElMessage.success('项目更新成功')
+    }
+    // 如果选择了新头像，上传
+    if (avatarFile.value) {
+      try {
+        await uploadProjectAvatar(projectId, avatarFile.value)
+      } catch {
+        ElMessage.warning('头像上传失败，项目已保存')
+      }
     }
     dialogVisible.value = false
     await loadProjects()
@@ -391,7 +429,10 @@ onMounted(() => loadProjects())
       >
         <!-- 卡片头部：图标 + 名称 + 操作 -->
         <div class="pm-card-header">
-          <div class="pm-card-icon" :style="{ background: getProjectColor(p.name) }">
+          <div v-if="p.avatar" class="pm-card-icon pm-card-icon--img">
+            <img :src="resolveAvatarUrl(p.avatar)" class="pm-card-icon-img" />
+          </div>
+          <div v-else class="pm-card-icon" :style="{ background: getProjectColor(p.name) }">
             {{ p.name.charAt(0).toUpperCase() }}
           </div>
           <div class="pm-card-title-area">
@@ -413,22 +454,22 @@ onMounted(() => loadProjects())
             <button class="pm-card-menu">⋯</button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="edit">✏️ 编辑</el-dropdown-item>
-                <el-dropdown-item command="members">👥 成员管理</el-dropdown-item>
+                <el-dropdown-item command="edit">编辑</el-dropdown-item>
+                <el-dropdown-item command="members">成员管理</el-dropdown-item>
                 <el-dropdown-item
                   v-if="p.status === 'active'"
                   command="archive"
                   :disabled="isSeedProject(p)"
                 >
-                  📦 归档
+                  归档
                 </el-dropdown-item>
-                <el-dropdown-item v-else command="restore">♻️ 恢复</el-dropdown-item>
+                <el-dropdown-item v-else command="restore">恢复</el-dropdown-item>
                 <el-dropdown-item
                   command="delete"
                   :disabled="isSeedProject(p) || p.status === 'active'"
                   divided
                 >
-                  🗑️ 删除
+                  删除
                 </el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -503,6 +544,23 @@ onMounted(() => loadProjects())
       width="520px"
     >
       <el-form label-position="top">
+        <el-form-item label="项目头像">
+          <div class="pm-avatar-upload" @click="triggerAvatarInput">
+            <img v-if="avatarPreview" :src="avatarPreview" class="pm-avatar-preview" />
+            <div v-else class="pm-avatar-placeholder">
+              <span class="pm-avatar-placeholder-icon">+</span>
+              <span class="pm-avatar-placeholder-text">点击上传</span>
+            </div>
+            <input
+              ref="avatarInputRef"
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp"
+              style="display: none"
+              @change="onAvatarSelected"
+            />
+          </div>
+          <span class="pm-avatar-hint">支持 PNG/JPG/GIF/WebP，最大 2MB</span>
+        </el-form-item>
         <el-form-item label="项目名称">
           <el-input
             v-model="projectForm.name"
@@ -541,7 +599,7 @@ onMounted(() => loadProjects())
       <div class="mb-toolbar">
         <el-input
           v-model="memberSearch"
-          placeholder="Search members..."
+          placeholder="搜索成员..."
           clearable
           :prefix-icon="Search"
           class="mb-search"
@@ -550,7 +608,7 @@ onMounted(() => loadProjects())
           <el-select
             v-model="addMemberUserId"
             filterable
-            placeholder="Add user..."
+            placeholder="选择用户..."
             class="mb-add-select"
             :disabled="availableUsers.length === 0"
           >
@@ -566,7 +624,7 @@ onMounted(() => loadProjects())
             :disabled="!addMemberUserId || addingMember"
             @click="onAddMember"
           >
-            Add Member
+            添加成员
           </button>
         </div>
       </div>
@@ -721,6 +779,59 @@ onMounted(() => loadProjects())
   color: #fff;
   flex-shrink: 0;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+.pm-card-icon--img {
+  overflow: hidden;
+  padding: 0;
+}
+.pm-card-icon-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── 头像上传组件 ── */
+.pm-avatar-upload {
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
+  border: 2px dashed rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pm-avatar-upload:hover {
+  border-color: rgba(124, 58, 237, 0.5);
+  background: rgba(124, 58, 237, 0.06);
+}
+.pm-avatar-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pm-avatar-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.pm-avatar-placeholder-icon {
+  font-size: 22px;
+  color: rgba(255, 255, 255, 0.3);
+  line-height: 1;
+}
+.pm-avatar-placeholder-text {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.3);
+}
+.pm-avatar-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
+  margin-top: 6px;
+  display: block;
 }
 .pm-card-title-area {
   flex: 1;

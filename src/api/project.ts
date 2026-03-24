@@ -60,3 +60,15 @@ export async function removeProjectMember(projectId: number, userId: number) {
   const { data } = await apiClient.delete(`/projects/${projectId}/members/${userId}`)
   return data
 }
+
+/** 上传项目头像 */
+export async function uploadProjectAvatar(projectId: number, file: File) {
+  const form = new FormData()
+  form.append('avatar', file)
+  const { data } = await apiClient.post<{ avatar: string }>(
+    `/projects/${projectId}/avatar`,
+    form,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  )
+  return data
+}
