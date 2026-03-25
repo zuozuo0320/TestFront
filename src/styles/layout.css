@@ -1,12 +1,11 @@
-/* ========== 3. Layout / Top Header ========== */
 .layout {
   min-height: 100vh;
-  background: #080808;
+  background: var(--tp-surface-base);
 }
 
 .top-header {
   height: 56px;
-  background: var(--tp-surface-base);
+  background: transparent;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   display: grid;
   grid-template-columns: auto 1fr;
@@ -298,13 +297,16 @@
 
 .main {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 280px 1fr;
   min-height: calc(100vh - 56px);
-  transition: grid-template-columns 0.3s ease;
+  padding: 20px;
+  gap: 20px;
+  background: var(--tp-surface-base);
+  transition: grid-template-columns 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .main.sidebar-hidden {
-  grid-template-columns: 0px 1fr;
+  grid-template-columns: 64px 1fr;
 }
 
 /* ========== 5. Sidebar Navigation ========== */
@@ -523,43 +525,29 @@
 }
 
 .main-nav {
-  background: var(--tp-surface-base);
-  border-right: none;
-  padding: 24px 16px;
+  background: var(--tp-surface-card);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px 12px;
   display: flex;
   flex-direction: column;
-  width: 260px;
-  overflow: hidden;
-  transition: width 0.3s ease, padding 0.3s ease, opacity 0.2s ease;
+  width: 100%;
+  height: calc(100vh - 56px - 40px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   font-weight: 300;
   letter-spacing: -0.01em;
-  box-shadow: var(--tp-shadow-md);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
   position: relative;
 }
 
 .main-nav::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgba(124, 58, 237, 0.15) 20%,
-    rgba(124, 58, 237, 0.2) 50%,
-    rgba(124, 58, 237, 0.15) 80%,
-    transparent 100%
-  );
+  display: none;
 }
 
 .main-nav.collapsed {
-  width: 0;
-  padding: 0;
-  border-right: none;
-  opacity: 0;
-  pointer-events: none;
+  padding: 16px 8px;
 }
 
 .nav-bottom-group {
@@ -749,10 +737,17 @@
 /* ========== 6. Content Area ========== */
 
 .content-wrap {
-  padding: 12px;
   animation: contentSlideIn 0.35s ease-out;
-  overflow: auto;
+  background: var(--tp-surface-card);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  position: relative;
+  height: calc(100vh - 56px - 40px);
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
   min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 @keyframes contentSlideIn {
@@ -767,16 +762,12 @@
   }
 }
 
-/* ========== 7. Test Case Page ========== */
 .case-page {
-  background: var(--tp-surface-card);
-  border: 1px solid rgba(124, 58, 237, 0.08);
-  border-radius: var(--tp-radius-lg);
-  min-height: calc(100vh - 88px);
+  height: 100%;
   display: flex;
   overflow: hidden;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(124, 58, 237, 0.05);
   position: relative;
+  width: 100%;
 }
 
 /* Panel toggle button — repositioned relative to case-page */
@@ -824,9 +815,9 @@
 .left-tree {
   width: 260px;
   min-width: 260px;
-  border-right: 1px solid rgba(124, 58, 237, 0.08);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
   padding: 16px 14px;
-  background: #0d0d12;
+  background: transparent;
   transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.35s cubic-bezier(0.4, 0, 0.2, 1), padding 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   position: relative;
@@ -2178,7 +2169,6 @@
   background: var(--tp-gray-50);
 }
 
-/* ========== 8. Data Table (Style B Detached Row Cards) ========== */
 
 .table-shell {
   margin-top: 14px;
@@ -3580,4 +3570,213 @@ tr.row-selected td {
   color: var(--tp-gray-500);
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
+}
+
+/* ==========================================================
+   Navigation Tree (Sidebar Module Tree)
+   ========================================================== */
+
+.nav-tree-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 24px 0 16px;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.nav-tree-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  margin-bottom: 8px;
+}
+
+.nav-tree-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(149, 141, 161, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+}
+
+.nav-tree-add-btn {
+  background: transparent;
+  border: none;
+  color: var(--tp-gray-600);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: var(--tp-transition);
+}
+
+.nav-tree-add-btn:hover {
+  color: var(--tp-gray-900);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.nav-tree-scroll {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 4px;
+}
+
+.nav-tree-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.nav-tree-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.nav-tree-item, .nav-tree-node-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: rgba(204, 195, 216, 0.7) !important;
+  font-size: 12px;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.nav-tree-item:hover, .nav-tree-node-row:hover {
+  background: rgba(39, 41, 53, 0.8);
+  color: rgba(225, 225, 242, 0.9) !important;
+}
+
+.nav-tree-item.active, .nav-tree-node-row.active {
+  background: rgba(124, 58, 237, 0.12) !important;
+  color: #d2bbff !important;
+}
+
+.nav-tree-item-left, .nav-tree-node-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.nav-tree-icon {
+  font-size: 16px;
+  color: rgba(149, 141, 161, 0.5);
+  transition: all 0.15s ease;
+}
+
+.nav-tree-item:hover .nav-tree-icon, .nav-tree-node-row:hover .nav-tree-icon {
+  color: rgba(204, 195, 216, 0.8);
+}
+
+.nav-tree-item.active .nav-tree-icon, .nav-tree-node-row.active .nav-tree-icon {
+  color: rgba(173, 198, 255, 0.8) !important;
+}
+
+.nav-tree-count {
+  font-size: 10px;
+  color: rgba(149, 141, 161, 0.4);
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-weight: 400;
+  margin-left: 8px;
+  transition: all 0.15s ease;
+}
+
+.nav-tree-item:hover .nav-tree-count,
+.nav-tree-node-row:hover .nav-tree-count {
+  color: rgba(149, 141, 161, 0.8);
+}
+
+.nav-tree-item.active .nav-tree-count, .nav-tree-node-row.active .nav-tree-count {
+  background: none;
+  color: rgba(210, 187, 255, 0.6);
+}
+
+.nav-module-tree {
+  background: transparent !important;
+  color: inherit !important;
+}
+
+.nav-module-tree .el-tree-node__content {
+  background: transparent !important;
+  height: auto !important;
+  padding: 0 !important;
+}
+
+/* 子级节点添加左侧竖线缩进 */
+.nav-module-tree > .el-tree-node > .el-tree-node__children {
+  position: relative;
+}
+
+.nav-module-tree > .el-tree-node > .el-tree-node__children::before {
+  content: '';
+  position: absolute;
+  left: 20px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(74, 68, 85, 0.25);
+}
+
+.nav-module-tree .el-tree-node__children .nav-tree-node-left {
+  padding-left: 4px;
+  border-left: 1px solid rgba(74, 68, 85, 0.2);
+}
+
+.nav-module-tree .el-tree-node__expand-icon {
+  color: rgba(149, 141, 161, 0.4);
+  font-size: 14px;
+  padding: 4px;
+  transition: color 0.15s ease;
+}
+.nav-module-tree .el-tree-node__expand-icon:hover {
+  color: rgba(204, 195, 216, 0.8);
+}
+.nav-module-tree .el-tree-node__expand-icon.is-leaf {
+  color: transparent !important;
+}
+
+.nav-module-tree .el-tree-node:focus > .el-tree-node__content {
+  background: transparent !important;
+}
+
+.nav-tree-node-row {
+  width: 100%;
+}
+
+.nav-tree-node-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-tree-node-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nav-tree-more {
+  font-size: 16px;
+  color: var(--tp-gray-600);
+  opacity: 0;
+  transition: var(--tp-transition);
+}
+
+.nav-tree-node-row:hover .nav-tree-more {
+  opacity: 1;
+}
+
+.nav-tree-more:hover {
+  color: var(--tp-gray-900);
 }

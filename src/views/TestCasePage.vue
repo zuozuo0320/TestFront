@@ -24,6 +24,14 @@ import StatusBadge from '../components/StatusBadge.vue'
 import LevelBadge from '../components/LevelBadge.vue'
 import RichTextEditor from '../components/RichTextEditor.vue'
 import FileUploader from '../components/FileUploader.vue'
+import {
+  globalModuleTree,
+  globalModuleCaseCount,
+  globalUnplannedCount,
+  globalSelectedModulePath,
+  globalTreeExpanded,
+  globalTreeActions
+} from '../composables/useTestCaseTree'
 
 import { useProjectStore } from '../stores/project'
 import {
@@ -74,6 +82,7 @@ const projectStore = useProjectStore()
 
 const selectedProject = computed(() => projectStore.selectedProjectId)
 const rows = ref<TableRow[]>([])
+const treeRows = ref<TableRow[]>([])  // 独立的全量数据源，用于构建目录树（不受 module_path 过滤影响）
 const total = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
@@ -333,7 +342,7 @@ function calcModuleDepth(path: string) {
 
 const modulePaths = computed(() => {
   const set = new Set<string>()
-  rows.value.forEach((r) => {
+  treeRows.value.forEach((r) => {
     const normalized = normalizeCaseModulePath((r.modulePath || '').trim())
     if (normalized !== '/未规划用例') set.add(normalized)
   })
@@ -376,10 +385,10 @@ const moduleTree = computed<ModuleTreeNode[]>(() => {
   return Array.from(rootMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
 })
 
-// 各目录用例计数（包含子目录）
+// 各目录用例计数（包含子目录）— 基于全量 treeRows 计算
 const moduleCaseCount = computed(() => {
   const countMap: Record<string, number> = {}
-  for (const r of rows.value) {
+  for (const r of treeRows.value) {
     const mp = normalizeCaseModulePath((r.modulePath || '').trim())
     // 累加到自身及所有父目录
     const parts = mp.split('/').filter(Boolean)
@@ -393,7 +402,7 @@ const moduleCaseCount = computed(() => {
 })
 
 const unplannedCount = computed(() => {
-  return rows.value.filter((r) => {
+  return treeRows.value.filter((r) => {
     const mp = normalizeCaseModulePath((r.modulePath || '').trim())
     return mp === '/未规划用例'
   }).length
@@ -405,8 +414,52 @@ function onModuleClick(path: string) {
     localStorage.setItem(`tp-module-path-${selectedProject.value}`, selectedModulePath.value)
   } catch {}
   page.value = 1
-  loadCases()
+  loadCases({ skipTree: true })  // 目录切换只刷新表格，不重载树
 }
+
+// Bind to global test case tree state
+watch(moduleTree, (val) => {
+  globalModuleTree.value = val
+}, { immediate: true })
+
+watch(moduleCaseCount, (val) => {
+  globalModuleCaseCount.value = val
+}, { immediate: true })
+
+watch(unplannedCount, (val) => {
+  globalUnplannedCount.value = val
+}, { immediate: true })
+
+watch(selectedModulePath, (val) => {
+  globalSelectedModulePath.value = val
+}, { immediate: true })
+
+watch(treeExpanded, (val) => {
+  globalTreeExpanded.value = val
+}, { immediate: true })
+
+globalTreeActions.onModuleClick = onModuleClick
+globalTreeActions.openCreateDirectory = () => {
+  directoryForm.parentPath = '/'
+  directoryForm.name = ''
+  directoryDialogVisible.value = true
+}
+globalTreeActions.openRenameDialog = (path, name) => {
+  onNodeMenuCommand('rename', path, name)
+}
+globalTreeActions.deleteDirectory = (path) => {
+  removeDirectory(path)
+}
+globalTreeActions.onNodeMenuCommand = (cmd, path, name) => {
+  if (cmd === 'add') {
+    directoryForm.parentPath = path
+    directoryForm.name = ''
+    directoryDialogVisible.value = true
+  } else {
+    onNodeMenuCommand(cmd, path, name)
+  }
+}
+
 
 // ── Helpers ──
 
@@ -480,12 +533,31 @@ function isPathEqualOrChild(path: string, target: string) {
 
 // ── Data Loading ──
 
-async function loadCases() {
+/** 加载全量用例数据用于构建目录树（不带 module_path 过滤） */
+async function loadTreeData() {
+  if (!selectedProject.value) {
+    treeRows.value = []
+    return
+  }
+  try {
+    const data = await listTestCases(selectedProject.value, {
+      page: 1,
+      pageSize: 9999,
+    })
+    const items = Array.isArray((data as any).items) ? (data as any).items : []
+    treeRows.value = items.map(toRow)
+  } catch {
+    // 树数据加载失败不影响主流程
+  }
+}
+
+async function loadCases(opts?: { skipTree?: boolean }) {
   loadError.value = ''
   if (!selectedProject.value) {
     rows.value = []
     total.value = 0
     page.value = 1
+    treeRows.value = []
     return
   }
   appLoading.value = true
@@ -515,6 +587,10 @@ async function loadCases() {
     selectedIds.value = []
     selectAll.value = false
     pageSize.value = Number((data as any).pageSize) || pageSize.value
+    // 仅在非纯目录切换时刷新树数据
+    if (!opts?.skipTree) {
+      await loadTreeData()
+    }
   } catch (e: any) {
     loadError.value = e?.response?.data?.error || '加载用例失败，请重试'
     ElMessage.error(loadError.value)
@@ -989,138 +1065,8 @@ watch(selectedProject, (newId) => {
 </script>
 
 <template>
-  <div class="case-page" :class="{ 'panel-collapsed': !treePanelOpen }">
-    <button
-      class="panel-toggle"
-      :title="treePanelOpen ? '收起目录' : '展开目录'"
-      @click="treePanelOpen = !treePanelOpen"
-    >
-      {{ treePanelOpen ? '◂' : '▸' }}
-    </button>
-    <div class="left-tree" :class="{ collapsed: !treePanelOpen }">
-      <div class="tree-content">
-        <!-- Search -->
-        <div class="tree-header">
-          <el-input size="small" class="module-search-input" placeholder="请输入模块名称">
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
-        </div>
-
-        <!-- Tree List -->
-        <div class="tree-list">
-          <div
-            class="tree-item tree-root-row"
-            :class="{ active: selectedModulePath === '' }"
-            @click="onModuleClick('')"
-          >
-            <div class="tree-node-left">
-              <el-icon class="tree-node-icon"><FolderOpened /></el-icon>
-              <span class="tree-root-title">全部用例</span>
-            </div>
-            <div class="tree-node-right">
-              <span class="tree-node-count">{{ total }}</span>
-              <button
-                class="tree-node-action"
-                :title="treeExpanded ? '收起' : '展开'"
-                @click.stop="treeExpanded = !treeExpanded"
-              >
-                <el-icon :size="14">
-                  <CaretBottom v-if="treeExpanded" />
-                  <CaretRight v-else />
-                </el-icon>
-              </button>
-              <button class="tree-node-action" title="新建目录" @click.stop="openCreateDirectory">
-                <el-icon :size="14"><FolderAdd /></el-icon>
-              </button>
-            </div>
-          </div>
-          <!-- 未规划用例 -->
-          <div
-            v-if="treeExpanded"
-            class="tree-item tree-unplanned"
-            :class="{ active: selectedModulePath === '/未规划用例' }"
-            @click="onModuleClick('/未规划用例')"
-          >
-            <div class="tree-node-left">
-              <el-icon class="tree-node-icon"><Document /></el-icon>
-              <span class="tree-node-name">未规划用例</span>
-            </div>
-            <span class="tree-node-count">{{ unplannedCount }}</span>
-          </div>
-          <el-tree
-            v-if="treeExpanded && moduleTree.length > 0"
-            class="module-tree"
-            :data="moduleTree"
-            node-key="path"
-            default-expand-all
-            :props="{ label: 'name', children: 'children' }"
-          >
-            <template #default="{ data }">
-              <div
-                class="tree-node-row"
-                :class="{ active: selectedModulePath === data.path }"
-                @click.stop="onModuleClick(data.path)"
-              >
-                <div class="tree-node-left">
-                  <el-icon class="tree-node-icon"><Folder /></el-icon>
-                  <span class="tree-node-name">{{ data.name }}</span>
-                </div>
-                <div class="tree-node-right">
-                  <span class="tree-node-count">{{ moduleCaseCount[data.path] || 0 }}</span>
-                  <button
-                    class="tree-node-action"
-                    title="新建子目录"
-                    @click.stop="directoryForm.parentPath = data.path; directoryForm.name = ''; directoryDialogVisible = true"
-                  >
-                    <el-icon :size="14"><Plus /></el-icon>
-                  </button>
-                  <el-dropdown
-                    trigger="click"
-                    @command="(cmd: string) => onNodeMenuCommand(cmd, data.path, data.name)"
-                    @click.stop
-                  >
-                    <button class="tree-node-action" title="更多操作" @click.stop>
-                      <el-icon :size="14"><MoreFilled /></el-icon>
-                    </button>
-                    <template #dropdown>
-                      <el-dropdown-menu>
-                        <el-dropdown-item command="rename">重命名</el-dropdown-item>
-                        <el-dropdown-item command="delete" divided style="color: #ef4444">
-                          删除
-                        </el-dropdown-item>
-                      </el-dropdown-menu>
-                    </template>
-                  </el-dropdown>
-                </div>
-              </div>
-            </template>
-          </el-tree>
-        </div>
-      </div>
-    </div>
-
-    <!-- Directory context menu -->
-    <Teleport to="body">
-      <div
-        v-if="ctxMenu.visible"
-        class="ctx-menu-overlay"
-        @click="closeCtxMenu"
-        @contextmenu.prevent="closeCtxMenu"
-      >
-        <div
-          class="ctx-menu"
-          :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }"
-          @click.stop
-        >
-          <div class="ctx-menu-item" @click="ctxAddSubDir">新建子目录</div>
-          <div class="ctx-menu-item" @click="ctxRename">重命名</div>
-          <div class="ctx-menu-divider"></div>
-          <div class="ctx-menu-item ctx-danger" @click="ctxDelete">删除</div>
-        </div>
-      </div>
-    </Teleport>
+  <div class="case-page">
+    <!-- The left-tree has been migrated to AppSidebar.vue to be globally accessible under the Navigation -->
 
     <div class="right-table">
       <!-- Tab Navigation (Style B) -->

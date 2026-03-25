@@ -49,15 +49,15 @@
   --tp-nav-text: rgba(200, 210, 225, 0.55);
   --tp-nav-text-bright: rgba(230, 235, 245, 0.9);
 
-  /* 内容区表面色 — 深海军蓝灰 (Design B) */
-  --tp-surface-base: #0a0a0a;
-  --tp-surface-card: #111111;
-  --tp-surface-elevated: #1a1a1a;
-  --tp-surface-input: rgba(255, 255, 255, 0.04);
-  --tp-surface-hover: rgba(255, 255, 255, 0.06);
+  /* 内容区表面色 — 深空极致暗黑底色 (Design B) */
+  --tp-surface-base: #050505;
+  --tp-surface-card: #131317;
+  --tp-surface-elevated: #1c1c22;
+  --tp-surface-input: rgba(255, 255, 255, 0.05);
+  --tp-surface-hover: rgba(255, 255, 255, 0.08);
 
   /* Shadows */
-  --tp-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --tp-shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.5);
   --tp-shadow-md: 0 8px 30px rgba(0, 0, 0, 0.5);
   --tp-shadow-glow: 0 0 15px rgba(124, 58, 237, 0.2);
   --tp-btn-bg: var(--tp-primary);

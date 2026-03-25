@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { useProjectStore } from '../stores/project'
+import {
+  globalModuleTree,
+  globalModuleCaseCount,
+  globalUnplannedCount,
+  globalSelectedModulePath,
+  globalTreeActions
+} from '../composables/useTestCaseTree'
 
 type TopMenu = 'workbench' | 'project' | 'plan' | 'testcases' | 'e2e' | 'system'
 type SystemMenu = 'users' | 'roles' | 'projects'
@@ -171,6 +178,87 @@ const systemNavItems: { key: SystemMenu; label: string }[] = [
           <span v-if="!collapsed" class="nav-label">{{ item.label }}</span>
         </a>
       </nav>
+
+      <!-- Test Cases Directory Tree (Visible only when TEST SUITES is active) -->
+      <div v-if="topMenu === 'testcases' && !collapsed" class="nav-tree-section">
+        <div class="nav-tree-header">
+          <span class="nav-tree-title">目录树</span>
+          <button class="nav-tree-add-btn" title="新建目录" @click="globalTreeActions.openCreateDirectory">
+            <span class="material-symbols-outlined" style="font-size: 16px;">create_new_folder</span>
+          </button>
+        </div>
+        
+        <div class="nav-tree-scroll">
+          <!-- 全部用例 -->
+          <div
+            class="nav-tree-item"
+            :class="{ active: globalSelectedModulePath === '' }"
+            @click="globalTreeActions.onModuleClick('')"
+          >
+            <div class="nav-tree-item-left">
+              <span class="material-symbols-outlined nav-tree-icon" style="font-variation-settings: 'FILL' 1;">grid_view</span>
+              <span>全部用例</span>
+            </div>
+          </div>
+
+          <!-- 未规划用例 -->
+          <div
+            class="nav-tree-item"
+            :class="{ active: globalSelectedModulePath === '/未规划用例' }"
+            @click="globalTreeActions.onModuleClick('/未规划用例')"
+          >
+            <div class="nav-tree-item-left">
+              <span class="material-symbols-outlined nav-tree-icon" style="font-variation-settings: 'FILL' 1;">description</span>
+              <span>未规划用例</span>
+            </div>
+            <span class="nav-tree-count">{{ globalUnplannedCount }}</span>
+          </div>
+
+          <!-- Module Tree -->
+          <el-tree
+            v-if="globalModuleTree.length > 0"
+            class="nav-module-tree"
+            :data="globalModuleTree"
+            node-key="path"
+            default-expand-all
+            :expand-on-click-node="false"
+            :props="{ label: 'name', children: 'children' }"
+          >
+            <template #default="{ data }">
+              <div
+                class="nav-tree-node-row"
+                :class="{ active: globalSelectedModulePath === data.path }"
+                @click.stop="globalTreeActions.onModuleClick(data.path)"
+              >
+                <div class="nav-tree-node-left">
+                  <span class="material-symbols-outlined nav-tree-icon" style="font-variation-settings: 'FILL' 1;">folder</span>
+                  <span class="nav-tree-node-name">{{ data.name }}</span>
+                </div>
+                <div class="nav-tree-node-right">
+                  <span class="nav-tree-count">{{ globalModuleCaseCount[data.path] || 0 }}</span>
+                  <el-dropdown
+                    trigger="click"
+                    placement="bottom-end"
+                    @command="(cmd: string) => globalTreeActions.onNodeMenuCommand(cmd, data.path, data.name)"
+                    @click.stop
+                  >
+                    <span class="material-symbols-outlined nav-tree-more">more_vert</span>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item command="add">新建子目录</el-dropdown-item>
+                        <el-dropdown-item command="rename">重命名</el-dropdown-item>
+                        <el-dropdown-item command="delete" divided style="color: #ef4444">
+                          删除
+                        </el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                </div>
+              </div>
+            </template>
+          </el-tree>
+        </div>
+      </div>
 
       <!-- Bottom group -->
       <div class="nav-bottom-group">
