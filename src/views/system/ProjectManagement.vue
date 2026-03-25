@@ -363,14 +363,6 @@ function formatDate(dateStr?: string) {
   })
 }
 
-/** 根据项目名称生成一致的品牌色（HSL 色轮均匀分布） */
-function getProjectColor(name: string) {
-  let hash = 0
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  const hue = Math.abs(hash) % 360
-  return `hsl(${hue}, 55%, 45%)`
-}
-
 /** 卡片下拉菜单操作路由 */
 function onCardAction(cmd: string, p: Project) {
   switch (cmd) {
@@ -431,8 +423,8 @@ onMounted(() => loadProjects())
           <div v-if="p.avatar" class="pm-card-icon pm-card-icon--img">
             <img :src="resolveAvatarUrl(p.avatar)" class="pm-card-icon-img" />
           </div>
-          <div v-else class="pm-card-icon" :style="{ background: getProjectColor(p.name) }">
-            {{ p.name.charAt(0).toUpperCase() }}
+          <div v-else class="pm-card-icon pm-card-icon--rocket">
+            <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1; font-size: 20px; color: #fff;">rocket_launch</span>
           </div>
           <div class="pm-card-title-area">
             <div class="pm-card-name">
@@ -760,6 +752,10 @@ onMounted(() => loadProjects())
 .pm-card-icon--img {
   overflow: hidden;
   padding: 0;
+}
+.pm-card-icon--rocket {
+  background: linear-gradient(135deg, #7c3aed, #0566d9);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
 }
 .pm-card-icon-img {
   width: 100%;

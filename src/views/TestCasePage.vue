@@ -24,7 +24,7 @@ import StatusBadge from '../components/StatusBadge.vue'
 import LevelBadge from '../components/LevelBadge.vue'
 import RichTextEditor from '../components/RichTextEditor.vue'
 import FileUploader from '../components/FileUploader.vue'
-import { Atom as LuAtom } from 'lucide-vue-next'
+
 import { useProjectStore } from '../stores/project'
 import {
   listTestCases,
@@ -39,7 +39,7 @@ import {
 } from '../api/testcase'
 import { uploadAttachment, listAttachments, deleteAttachment } from '../api/attachment'
 import { importTestCases } from '../api/xlsx'
-import type { Project, TestCase, CaseAttachment } from '../api/types'
+import type { TestCase, CaseAttachment } from '../api/types'
 
 // ── Types ──
 
@@ -71,7 +71,7 @@ type ModuleTreeNode = { name: string; path: string; children: ModuleTreeNode[] }
 // ── State ──
 
 const projectStore = useProjectStore()
-const projects = computed(() => projectStore.projects)
+
 const selectedProject = computed(() => projectStore.selectedProjectId)
 const rows = ref<TableRow[]>([])
 const total = ref(0)
@@ -258,14 +258,7 @@ const selectAll = ref(false)
 const customModulePaths = ref<string[]>([])
 const treeExpanded = ref(true)
 const treePanelOpen = ref(true)
-const projectDropdownOpen = ref(false)
-const selectedProjectMeta = computed(() => {
-  return projects.value.find((proj) => proj.id === selectedProject.value) || null
-})
-const selectedProjectArchived = computed(() => selectedProjectMeta.value?.status === 'archived')
-const currentProjectName = computed(() => {
-  return selectedProjectMeta.value?.name || '选择项目'
-})
+
 const selectedModulePath = ref(
   (() => {
     try {
@@ -975,18 +968,7 @@ function onStepDragEnd() {
   draggingStepIndex.value = null
 }
 
-// ── Project switch ──
-/** 切换当前项目；若点击归档项目则给出只读提示，不切换编辑上下文。 */
-function onProjectSwitch(project: Project) {
-  if (project.status === 'archived') {
-    projectDropdownOpen.value = false
-    ElMessage.warning(`项目「${project.name}」已归档，仅支持查看，请先恢复后再切换`)
-    return
-  }
-  projectStore.selectedProjectId = project.id
-  projectStore.persistNavState()
-  projectDropdownOpen.value = false
-}
+
 
 // ── Init ──
 
@@ -1017,88 +999,6 @@ watch(selectedProject, (newId) => {
     </button>
     <div class="left-tree" :class="{ collapsed: !treePanelOpen }">
       <div class="tree-content">
-        <!-- Project Switcher -->
-        <div class="tree-project-switcher">
-          <div
-            class="project-trigger"
-            :class="{ active: projectDropdownOpen }"
-            @click="projectDropdownOpen = !projectDropdownOpen"
-          >
-            <div class="project-trigger-icon">
-              <LuAtom :size="18" :stroke-width="1.8" />
-            </div>
-            <div class="project-trigger-info">
-              <span class="project-trigger-name">{{ currentProjectName }}</span>
-            </div>
-            <svg
-              class="project-trigger-chevron"
-              :class="{ rotated: projectDropdownOpen }"
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-            >
-              <path
-                d="M4 6L8 10L12 6"
-                stroke="currentColor"
-                stroke-width="1.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-          </div>
-          <Transition name="dropdown-slide">
-            <div v-if="projectDropdownOpen" class="project-dropdown-panel">
-              <div
-                v-for="p in projects"
-                :key="p.id"
-                class="project-dropdown-item"
-                :class="{ selected: p.id === selectedProject, archived: p.status === 'archived' }"
-                :title="
-                  p.status === 'archived' ? '归档项目仅支持查看，无法切换为当前编辑项目' : undefined
-                "
-                @click="onProjectSwitch(p)"
-              >
-                <div v-if="p.id === selectedProject" class="project-item-indicator" />
-                <span class="project-item-name">{{ p.name }}</span>
-                <el-tag
-                  v-if="p.status === 'archived'"
-                  size="small"
-                  type="info"
-                  effect="plain"
-                  style="margin-left: 6px; font-size: 10px"
-                >
-                  已归档
-                </el-tag>
-                <svg
-                  v-if="p.id === selectedProject"
-                  class="project-item-check"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                >
-                  <path
-                    d="M3 8.5L6.5 12L13 4"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-              </div>
-            </div>
-          </Transition>
-          <div
-            v-if="projectDropdownOpen"
-            class="project-dropdown-overlay"
-            @click="projectDropdownOpen = false"
-          />
-          <div v-if="selectedProjectArchived" class="project-readonly-hint">
-            当前项目已归档，当前页面仅建议查看；如需继续编辑，请先到项目管理中恢复项目。
-          </div>
-        </div>
-        <div class="tree-divider"></div>
         <!-- Search -->
         <div class="tree-header">
           <el-input size="small" class="module-search-input" placeholder="请输入模块名称">

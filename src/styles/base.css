@@ -5,10 +5,23 @@ body {
   /* 默认黑色 → 防止登录页刷新时白闪 */
   background: #000;
 }
+/* ========== Global Scrollbar ========== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
 
 /* Login page styles → moved to LoginPage.vue <style scoped> */
-
-
 /* ========== Global Element Plus Overrides (Dark) ========== */
 
 /* 全局 El Plus 暗色覆盖 */
@@ -47,21 +60,28 @@ body {
 .el-input__wrapper,
 .el-select__wrapper,
 .el-textarea__inner {
-  background: var(--tp-surface-input) !important;
-  border-color: var(--tp-gray-300) !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
   box-shadow: none !important;
-  color: var(--tp-gray-800) !important;
+  color: #fff !important;
+  transition: all var(--tp-transition) !important;
 }
 .el-input__wrapper:hover,
-.el-select__wrapper:hover { border-color: rgba(124, 58, 237, 0.3) !important; }
+.el-select__wrapper:hover,
+.el-textarea__inner:hover {
+  border-color: rgba(124, 58, 237, 0.5) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+}
 .el-input__wrapper.is-focus,
 .el-input__wrapper.is-focused,
 .el-select__wrapper.is-focus,
-.el-select__wrapper.is-focused {
+.el-select__wrapper.is-focused,
+.el-textarea__inner:focus {
   border-color: var(--tp-primary) !important;
-  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.15) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2) !important;
 }
-.el-input__inner { color: var(--tp-gray-800) !important; }
+.el-input__inner { color: #fff !important; }
 .el-input__inner::placeholder,
 .el-select__placeholder { color: var(--tp-gray-400) !important; }
 .el-select__selected-item { color: var(--tp-gray-800) !important; }
@@ -69,8 +89,11 @@ body {
 /* 全局 dropdown/popover 暗色 */
 .el-select-dropdown,
 .el-popper.is-light {
-  background: var(--tp-surface-elevated) !important;
-  border-color: var(--tp-gray-200) !important;
+  background: rgba(17, 17, 17, 0.9) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: var(--tp-shadow-md) !important;
 }
 .el-select-dropdown__item {
   color: var(--tp-gray-600) !important;
@@ -85,29 +108,31 @@ body {
   font-weight: 600;
 }
 .el-popper__arrow::before {
-  background: var(--tp-surface-elevated) !important;
-  border-color: var(--tp-gray-200) !important;
+  background: rgba(17, 17, 17, 0.95) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 /* 全局 dialog 暗色 */
 .el-dialog {
-  --el-dialog-bg-color: var(--tp-surface-elevated) !important;
+  --el-dialog-bg-color: rgba(17, 17, 17, 0.9) !important;
   --el-dialog-border-radius: var(--tp-radius-lg) !important;
-  border: 1px solid var(--tp-gray-200);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: var(--tp-shadow-md), 0 0 0 1px rgba(124, 58, 237, 0.05) !important;
 }
-.el-dialog__header { border-bottom: 1px solid var(--tp-gray-200); }
+.el-dialog__header { border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
 .el-dialog__title { color: var(--tp-gray-900) !important; }
-.el-dialog__footer { border-top: 1px solid var(--tp-gray-200); }
-.el-form-item__label { color: var(--tp-gray-600) !important; }
+.el-dialog__footer { border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.el-form-item__label { color: rgba(255, 255, 255, 0.7) !important; }
 
 /* 全局 drawer 暗色 */
 .el-drawer {
-  --el-drawer-bg-color: var(--tp-surface-elevated) !important;
+  --el-drawer-bg-color: #0a0a0a !important;
 }
 .el-drawer__header {
-  color: var(--tp-gray-900) !important;
-  border-bottom: 1px solid var(--tp-gray-200);
+  color: #fff !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* 全局 tree 暗色 */
@@ -120,29 +145,32 @@ body {
 /* 全局 table 暗色紧凑 */
 .el-table {
   --el-table-bg-color: transparent !important;
-  --el-table-header-bg-color: transparent !important;
+  --el-table-header-bg-color: rgba(255, 255, 255, 0.02) !important;
   --el-table-tr-bg-color: transparent !important;
-  --el-table-row-hover-bg-color: rgba(124, 58, 237, 0.04) !important;
+  --el-table-row-hover-bg-color: rgba(124, 58, 237, 0.06) !important;
   --el-table-border-color: rgba(255, 255, 255, 0.06) !important;
-  --el-table-header-text-color: rgba(255, 255, 255, 0.4) !important;
-  --el-table-text-color: rgba(255, 255, 255, 0.75) !important;
+  --el-table-header-text-color: rgba(255, 255, 255, 0.55) !important;
+  --el-table-text-color: rgba(255, 255, 255, 0.8) !important;
   font-size: 13px !important;
 }
 .el-table th.el-table__cell {
-  font-size: 12px !important;
-  font-weight: 600 !important;
-  padding: 8px 0 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  padding: 10px 0 !important;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.5px;
 }
 .el-table td.el-table__cell {
-  padding: 6px 0 !important;
+  padding: 8px 0 !important;
 }
 .el-table .el-table__header-wrapper th {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 .el-table--enable-row-hover .el-table__body tr:hover > td {
-  background-color: rgba(124, 58, 237, 0.04) !important;
+  background-color: rgba(124, 58, 237, 0.06) !important;
+}
+.el-table--enable-row-hover .el-table__body tr {
+  transition: background-color 0.15s ease;
 }
 
 /* ========== Pagination ========== */
