@@ -1088,16 +1088,14 @@ watch(selectedProject, (newId) => {
               </span>
               导出报告
             </button>
-            <!-- Keep the new case button available, as it was in the header before -->
-            <el-button
-              type="primary"
+            <button
               class="insights-btn-primary"
-              style="margin-left: 12px; height: 36px; padding: 0 16px; gap: 6px; box-shadow: none"
+              style="margin-left: 12px; height: 36px; padding: 0 16px; gap: 6px;"
               @click="openCreate"
             >
               <el-icon><Plus /></el-icon>
               新建用例
-            </el-button>
+            </button>
             <input
               ref="importInput"
               type="file"
