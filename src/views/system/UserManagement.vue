@@ -71,7 +71,7 @@ const filteredUsers = computed(() => {
     )
   }
   // 角色筛选
-  if (filterRoleId.value != null && filterRoleId.value !== '') {
+  if (filterRoleId.value !== null && filterRoleId.value !== '') {
     list = list.filter((u) => u.role_ids.includes(filterRoleId.value as number))
   }
   // 状态筛选
@@ -310,21 +310,10 @@ async function submitResetPwd() {
 
 /** 判断用户是否拥有 admin 角色（用于禁用删除按钮） */
 function isAdmin(u: UserRow) {
-  return u.role_names.some((n) => n.toLowerCase() === 'admin' || n === '系统管理员')
-    || u.role === 'admin'
-}
-
-/** 格式化最后登录时间 */
-function formatTime(value?: string | null) {
-  if (!value) return '从未登录'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return value
-  return d.toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return (
+    u.role_names.some((n) => n.toLowerCase() === 'admin' || n === '系统管理员') ||
+    u.role === 'admin'
+  )
 }
 
 function onUserPaginationSizeChange(size: number) {
@@ -393,7 +382,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="um-root" v-loading="usersLoading">
+  <div v-loading="usersLoading" class="um-root">
     <!-- 页面顶栏 -->
     <div class="um-header">
       <h2 class="um-title">用户管理</h2>
@@ -451,7 +440,11 @@ onMounted(async () => {
             class="um-user-avatar"
             :src="resolveAvatarUrl(u.avatar, u.name)"
             alt="avatar"
-            @error="(e: any) => { e.target.src = resolveAvatarUrl('', u.name) }"
+            @error="
+              (e: any) => {
+                e.target.src = resolveAvatarUrl('', u.name)
+              }
+            "
           />
           <div class="um-user-content">
             <div class="um-user-top">
@@ -473,7 +466,10 @@ onMounted(async () => {
             </div>
           </div>
           <div class="um-user-status">
-            <span class="um-status-dot" :class="u.active ? 'um-status-dot--active' : 'um-status-dot--disabled'"></span>
+            <span
+              class="um-status-dot"
+              :class="u.active ? 'um-status-dot--active' : 'um-status-dot--disabled'"
+            ></span>
             <span class="um-status-text">{{ u.active ? '活跃' : '冻结' }}</span>
           </div>
           <div class="um-user-actions">
@@ -515,14 +511,23 @@ onMounted(async () => {
           <div class="um-stat-title">用户概览</div>
           <div class="um-ring-wrapper">
             <svg viewBox="0 0 120 120" class="um-ring-svg">
-              <circle cx="60" cy="60" r="48" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="12" />
               <circle
-                cx="60" cy="60" r="48"
+                cx="60"
+                cy="60"
+                r="48"
+                fill="none"
+                stroke="rgba(255,255,255,0.06)"
+                stroke-width="12"
+              />
+              <circle
+                cx="60"
+                cy="60"
+                r="48"
                 fill="none"
                 stroke="url(#userRingGrad)"
                 stroke-width="12"
                 stroke-linecap="round"
-                :stroke-dasharray="`${activeUserCount / Math.max(users.length, 1) * 301.6} 301.6`"
+                :stroke-dasharray="`${(activeUserCount / Math.max(users.length, 1)) * 301.6} 301.6`"
                 transform="rotate(-90 60 60)"
               />
               <defs>
@@ -599,9 +604,15 @@ onMounted(async () => {
           <el-input v-model="userForm.phone" placeholder="选填" />
         </el-form-item>
         <el-form-item label="角色（必选，可多选）">
-          <el-select v-model="userForm.roleIds" multiple filterable placeholder="请选择角色" style="width: 100%">
+          <el-select
+            v-model="userForm.roleIds"
+            multiple
+            filterable
+            placeholder="请选择角色"
+            style="width: 100%"
+          >
             <el-option
-              v-for="r in (editingUserId ? roles : creatableRoles)"
+              v-for="r in editingUserId ? roles : creatableRoles"
               :key="r.id"
               :label="r.display_name || r.name"
               :value="r.id"
@@ -609,7 +620,13 @@ onMounted(async () => {
           </el-select>
         </el-form-item>
         <el-form-item label="项目（必选，可多选）">
-          <el-select v-model="userForm.projectIds" multiple filterable placeholder="请选择项目" style="width: 100%">
+          <el-select
+            v-model="userForm.projectIds"
+            multiple
+            filterable
+            placeholder="请选择项目"
+            style="width: 100%"
+          >
             <el-option v-for="p in projects" :key="p.id" :label="p.name" :value="p.id" />
           </el-select>
         </el-form-item>
@@ -624,12 +641,8 @@ onMounted(async () => {
     </el-dialog>
 
     <!-- 重置密码弹窗 -->
-    <el-dialog
-      v-model="resetPwdDialogVisible"
-      title="重置密码"
-      width="440px"
-    >
-      <p style="margin-bottom: 12px; color: rgba(255,255,255,0.6); font-size: 13px;">
+    <el-dialog v-model="resetPwdDialogVisible" title="重置密码" width="440px">
+      <p style="margin-bottom: 12px; color: rgba(255, 255, 255, 0.6); font-size: 13px">
         为用户【{{ resetPwdUserName }}】设置新密码
       </p>
       <el-form label-position="top">
@@ -644,7 +657,9 @@ onMounted(async () => {
       </el-form>
       <template #footer>
         <el-button @click="resetPwdDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="resettingPwd" @click="submitResetPwd">确认重置</el-button>
+        <el-button type="primary" :loading="resettingPwd" @click="submitResetPwd">
+          确认重置
+        </el-button>
       </template>
     </el-dialog>
   </div>
@@ -993,4 +1008,3 @@ onMounted(async () => {
   text-align: right;
 }
 </style>
-

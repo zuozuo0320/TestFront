@@ -2,18 +2,10 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox, ElImageViewer } from 'element-plus'
 import {
-  CaretBottom,
-  CaretRight,
-  CaretTop,
   CopyDocument,
   Delete,
-  Document,
   Edit,
-  FolderAdd,
-  Folder,
-  FolderOpened,
   CircleCheck,
-  MoreFilled,
   Sort,
   Search,
   Grid,
@@ -22,7 +14,7 @@ import {
 } from '@element-plus/icons-vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import LevelBadge from '../components/LevelBadge.vue'
-import RichTextEditor from '../components/RichTextEditor.vue'
+
 import FileUploader from '../components/FileUploader.vue'
 import {
   globalModuleTree,
@@ -30,7 +22,7 @@ import {
   globalUnplannedCount,
   globalSelectedModulePath,
   globalTreeExpanded,
-  globalTreeActions
+  globalTreeActions,
 } from '../composables/useTestCaseTree'
 
 import { useProjectStore } from '../stores/project'
@@ -83,7 +75,7 @@ const projectStore = useProjectStore()
 
 const selectedProject = computed(() => projectStore.selectedProjectId)
 const rows = ref<TableRow[]>([])
-const treeRows = ref<TableRow[]>([])  // 独立的全量数据源，用于构建目录树（不受 module_path 过滤影响）
+const treeRows = ref<TableRow[]>([]) // 独立的全量数据源，用于构建目录树（不受 module_path 过滤影响）
 const total = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
@@ -116,19 +108,6 @@ const metricPassRate = computed(() => {
   if (rows.value.length === 0) return 0
   const passed = rows.value.filter((r) => isExecPass(r.execResult)).length
   return Math.round((passed / rows.value.length) * 100)
-})
-const metricCoverage = computed(() => {
-  if (rows.value.length === 0) return 0
-  const executed = rows.value.filter((r) => r.execResult && r.execResult !== '未执行').length
-  return Math.round((executed / rows.value.length) * 100)
-})
-const metricWeeklyNew = computed(() => {
-  const oneWeekAgo = new Date()
-  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
-  return rows.value.filter((r) => {
-    if (!r.createdAt) return false
-    return new Date(r.createdAt) >= oneWeekAgo
-  }).length
 })
 
 // Kanban grouped data
@@ -175,12 +154,6 @@ const flatModules = computed(() => collectModulePaths(moduleTree.value))
 const batchMoveVisible = ref(false)
 const batchMoveTarget = ref('/未规划用例')
 
-// Directory context menu
-const ctxMenu = reactive({ visible: false, x: 0, y: 0, path: '', name: '' })
-function closeCtxMenu() {
-  ctxMenu.visible = false
-}
-
 // Inline dropdown menu handler (MeterSphere style)
 async function onNodeMenuCommand(cmd: string, path: string, name: string) {
   if (cmd === 'rename') {
@@ -217,57 +190,12 @@ async function onNodeMenuCommand(cmd: string, path: string, name: string) {
     removeDirectory(path)
   }
 }
-async function ctxAddSubDir() {
-  closeCtxMenu()
-  directoryForm.parentPath = ctxMenu.path
-  directoryForm.name = ''
-  directoryDialogVisible.value = true
-}
-async function ctxRename() {
-  closeCtxMenu()
-  const result = await ElMessageBox.prompt('请输入新目录名称', '目录重命名', {
-    inputValue: ctxMenu.name,
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-  }).catch(() => null)
-  if (!result || !result.value?.trim()) return
-  const oldPath = ctxMenu.path
-  const parentPath = oldPath.substring(0, oldPath.lastIndexOf('/'))
-  const newPath = normalizeDirectoryPath(`${parentPath}/${result.value.trim()}`)
-  // rename in customModulePaths
-  customModulePaths.value = customModulePaths.value.map((p) => {
-    if (p === oldPath) return newPath
-    if (p.startsWith(`${oldPath}/`)) return newPath + p.substring(oldPath.length)
-    return p
-  })
-  // rename in case module paths via API
-  if (selectedProject.value) {
-    for (const r of rows.value) {
-      const rp = normalizeCaseModulePath(r.modulePath || '/未规划用例')
-      if (rp === oldPath || rp.startsWith(`${oldPath}/`)) {
-        const newModPath = newPath + rp.substring(oldPath.length)
-        try {
-          await updateTestCase(selectedProject.value, r.id, { module_path: newModPath })
-        } catch {
-          /* skip */
-        }
-      }
-    }
-    await loadCases()
-  }
-  ElMessage.success('重命名成功')
-}
-function ctxDelete() {
-  closeCtxMenu()
-  removeDirectory(ctxMenu.path)
-}
 
 // Batch selection
 const selectedIds = ref<number[]>([])
 const selectAll = ref(false)
 const customModulePaths = ref<string[]>([])
 const treeExpanded = ref(true)
-const treePanelOpen = ref(true)
 
 const selectedModulePath = ref(
   (() => {
@@ -304,7 +232,6 @@ const caseForm = reactive({
 // Attachments
 const caseAttachments = ref<CaseAttachment[]>([])
 const caseHistory = ref<any[]>([])
-const historyExpanded = ref(false)
 
 const directoryForm = reactive({ parentPath: '/', name: '' })
 
@@ -415,29 +342,49 @@ function onModuleClick(path: string) {
     localStorage.setItem(`tp-module-path-${selectedProject.value}`, selectedModulePath.value)
   } catch {}
   page.value = 1
-  loadCases({ skipTree: true })  // 目录切换只刷新表格，不重载树
+  loadCases({ skipTree: true }) // 目录切换只刷新表格，不重载树
 }
 
 // Bind to global test case tree state
-watch(moduleTree, (val) => {
-  globalModuleTree.value = val
-}, { immediate: true })
+watch(
+  moduleTree,
+  (val) => {
+    globalModuleTree.value = val
+  },
+  { immediate: true },
+)
 
-watch(moduleCaseCount, (val) => {
-  globalModuleCaseCount.value = val
-}, { immediate: true })
+watch(
+  moduleCaseCount,
+  (val) => {
+    globalModuleCaseCount.value = val
+  },
+  { immediate: true },
+)
 
-watch(unplannedCount, (val) => {
-  globalUnplannedCount.value = val
-}, { immediate: true })
+watch(
+  unplannedCount,
+  (val) => {
+    globalUnplannedCount.value = val
+  },
+  { immediate: true },
+)
 
-watch(selectedModulePath, (val) => {
-  globalSelectedModulePath.value = val
-}, { immediate: true })
+watch(
+  selectedModulePath,
+  (val) => {
+    globalSelectedModulePath.value = val
+  },
+  { immediate: true },
+)
 
-watch(treeExpanded, (val) => {
-  globalTreeExpanded.value = val
-}, { immediate: true })
+watch(
+  treeExpanded,
+  (val) => {
+    globalTreeExpanded.value = val
+  },
+  { immediate: true },
+)
 
 globalTreeActions.onModuleClick = onModuleClick
 globalTreeActions.openCreateDirectory = () => {
@@ -460,7 +407,6 @@ globalTreeActions.onNodeMenuCommand = (cmd, path, name) => {
     onNodeMenuCommand(cmd, path, name)
   }
 }
-
 
 // ── Helpers ──
 
@@ -874,9 +820,16 @@ function getFileIconName(filename: string) {
   const ext = (filename || '').split('.').pop()?.toLowerCase() || ''
   const map: Record<string, string> = {
     pdf: 'picture_as_pdf',
-    doc: 'description', docx: 'description', txt: 'description', md: 'description',
-    xls: 'table_view', xlsx: 'table_view', csv: 'table_view',
-    zip: 'folder_zip', rar: 'folder_zip', '7z': 'folder_zip',
+    doc: 'description',
+    docx: 'description',
+    txt: 'description',
+    md: 'description',
+    xls: 'table_view',
+    xlsx: 'table_view',
+    csv: 'table_view',
+    zip: 'folder_zip',
+    rar: 'folder_zip',
+    '7z': 'folder_zip',
   }
   return map[ext] || 'draft'
 }
@@ -899,7 +852,7 @@ async function onRemoveAttachment(id: number) {
   if (!selectedProject.value) return
   try {
     await deleteAttachment(selectedProject.value, id)
-    caseAttachments.value = caseAttachments.value.filter(a => a.id !== id)
+    caseAttachments.value = caseAttachments.value.filter((a) => a.id !== id)
     ElMessage.success('附件已删除')
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.error || '删除附件失败')
@@ -913,9 +866,9 @@ const previewImages = ref<string[]>([])
 const previewIndex = ref(0)
 
 function openImagePreview(att: CaseAttachment) {
-  const imageAttachments = caseAttachments.value.filter(a => isImageAttachment(a))
-  previewImages.value = imageAttachments.map(a => getAttachmentUrl(a))
-  const idx = imageAttachments.findIndex(a => a.id === att.id)
+  const imageAttachments = caseAttachments.value.filter((a) => isImageAttachment(a))
+  previewImages.value = imageAttachments.map((a) => getAttachmentUrl(a))
+  const idx = imageAttachments.findIndex((a) => a.id === att.id)
   previewIndex.value = idx >= 0 ? idx : 0
   showImageViewer.value = true
 }
@@ -986,12 +939,6 @@ async function onDelete(row: TableRow) {
 }
 
 // ── Directory ──
-
-function openCreateDirectory() {
-  directoryForm.parentPath = '/'
-  directoryForm.name = ''
-  directoryDialogVisible.value = true
-}
 
 function submitDirectory() {
   const parent = normalizeDirectoryPath(directoryForm.parentPath || '/')
@@ -1075,17 +1022,7 @@ function removeStepRow(index: number) {
   }
   stepRows.value.splice(index, 1)
 }
-function copyStepRow(index: number) {
-  const src = stepRows.value[index]
-  if (!src) return
-  stepRows.value.splice(index + 1, 0, { action: src.action, expected: src.expected })
-}
-function insertStepAbove(index: number) {
-  stepRows.value.splice(index, 0, { action: '', expected: '' })
-}
-function insertStepBelow(index: number) {
-  stepRows.value.splice(index + 1, 0, { action: '', expected: '' })
-}
+
 function onStepDragStart(index: number) {
   draggingStepIndex.value = index
 }
@@ -1110,8 +1047,6 @@ function onStepDragEnd() {
   draggingStepIndex.value = null
 }
 
-
-
 // ── Init ──
 
 onMounted(async () => {
@@ -1135,144 +1070,134 @@ watch(selectedProject, (newId) => {
     <!-- The left-tree has been migrated to AppSidebar.vue to be globally accessible under the Navigation -->
 
     <div class="right-table">
-      <!-- Tab Navigation (Style B) -->
-      <div class="content-tabs">
-        <div class="content-tabs-left">
-          <button class="content-tab active">用例列表</button>
-          <button class="content-tab">思维导图</button>
-          <button class="content-tab">需求覆盖</button>
-          <button class="content-tab">执行统计</button>
-        </div>
-        <div class="content-tabs-right">
-          <el-button type="primary" class="btn-new-case" @click="openCreate">
-            <el-icon><Plus /></el-icon>
-            新建用例
-          </el-button>
-          <input type="file" accept=".xlsx" style="display: none" @change="onImportXlsx" />
-        </div>
-      </div>
-
-      <!-- Metric Dashboard Cards (Style B — exact match) -->
-      <div class="metric-cards">
-        <!-- Card 1: 总用例 -->
-        <div class="metric-card">
-          <div class="metric-card-row">
-            <span class="metric-label">总用例</span>
-            <div class="metric-icon" style="background: rgba(124, 58, 237, 0.18); color: #a78bfa">
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                <path
-                  d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
-                ></path>
-                <path d="M12 11h4"></path>
-                <path d="M12 16h4"></path>
-                <path d="M8 11h.01"></path>
-                <path d="M8 16h.01"></path>
-              </svg>
-            </div>
+      <!-- Intelligent Insights Layout -->
+      <div class="insights-section">
+        <div class="insights-header">
+          <div class="insights-title-area">
+            <h2 class="insights-title">智能洞察 (Intelligent Insights)</h2>
+            <p class="insights-desc">实时监控项目质量指标与测试进度。</p>
           </div>
-          <div class="metric-card-row metric-card-bottom">
-            <span class="metric-value">{{ metricTotal }}</span>
-            <span class="metric-trend-badge metric-trend-up">↗ +8%</span>
+          <div class="insights-actions">
+            <button class="insights-btn-secondary">
+              <span class="material-symbols-outlined shrink-0" style="font-size: 18px">
+                calendar_today
+              </span>
+              最近 7 天
+            </button>
+            <button class="insights-btn-primary">
+              <span class="material-symbols-outlined shrink-0" style="font-size: 18px">
+                download
+              </span>
+              导出报告
+            </button>
+            <!-- Keep the new case button available, as it was in the header before -->
+            <el-button
+              type="primary"
+              class="insights-btn-primary"
+              style="margin-left: 12px; height: 36px; padding: 0 16px; gap: 6px; box-shadow: none"
+              @click="openCreate"
+            >
+              <el-icon><Plus /></el-icon>
+              新建用例
+            </el-button>
+            <input
+              ref="importInput"
+              type="file"
+              accept=".xlsx"
+              style="display: none"
+              @change="onImportXlsx"
+            />
           </div>
         </div>
 
-        <!-- Card 2: 通过率 -->
-        <div class="metric-card">
-          <div class="metric-card-row">
-            <span class="metric-label">通过率</span>
-            <div class="metric-icon" style="background: rgba(59, 130, 246, 0.18); color: #60a5fa">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path
-                  d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"
-                ></path>
-              </svg>
+        <div class="insights-cards">
+          <!-- Card 1: 总用例数 -->
+          <div class="insight-card">
+            <div class="insight-left">
+              <div class="insight-icon-wrap icon-purple">
+                <span class="material-symbols-outlined">inventory_2</span>
+              </div>
+              <div class="insight-trend trend-grey">+24 本周</div>
+            </div>
+            <div class="insight-right">
+              <div class="insight-label">总用例数</div>
+              <div class="insight-value">{{ metricTotal }}</div>
+              <div class="insight-chart">
+                <div class="bar" style="height: 40%; background: #a78bfa"></div>
+                <div class="bar" style="height: 60%; background: #8b5cf6"></div>
+                <div class="bar" style="height: 80%; background: #7c3aed"></div>
+                <div class="bar" style="height: 50%; background: #6d28d9"></div>
+                <div class="bar" style="height: 100%; background: #c4b5fd"></div>
+              </div>
             </div>
           </div>
-          <div class="metric-card-row metric-card-bottom">
-            <span class="metric-value">
-              {{ metricPassRate }}
-              <small>%</small>
-            </span>
-            <div class="metric-ring-lg">
-              <svg viewBox="0 0 48 48" class="donut-lg">
-                <circle
-                  cx="24"
-                  cy="24"
-                  r="20"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.06)"
-                  stroke-width="4"
-                />
-                <circle
-                  cx="24"
-                  cy="24"
-                  r="20"
-                  fill="none"
-                  stroke="#3b82f6"
-                  stroke-width="4"
-                  stroke-dasharray="125.7"
-                  :stroke-dashoffset="125.7 - (125.7 * metricPassRate) / 100"
-                  stroke-linecap="round"
-                  style="transform: rotate(-90deg); transform-origin: center"
-                />
-              </svg>
-            </div>
-          </div>
-        </div>
 
-        <!-- Card 3: 执行覆盖 -->
-        <div class="metric-card">
-          <div class="metric-card-row">
-            <span class="metric-label">执行覆盖</span>
-            <div class="metric-icon" style="background: rgba(245, 158, 11, 0.18); color: #fbbf24">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="16" y="6" width="4" height="14" rx="1"></rect>
-                <rect x="10" y="10" width="4" height="10" rx="1"></rect>
-                <rect x="4" y="14" width="4" height="6" rx="1"></rect>
-              </svg>
+          <!-- Card 2: 通过率 -->
+          <div class="insight-card">
+            <div class="insight-left">
+              <div class="insight-icon-wrap icon-blue">
+                <span class="material-symbols-outlined">verified</span>
+              </div>
+              <div class="insight-trend trend-green">↑ 1.2% 较上周</div>
+            </div>
+            <div class="insight-right">
+              <div class="insight-label">通过率</div>
+              <div class="insight-value">
+                {{ metricPassRate }}
+                <span style="font-size: 16px; font-weight: 500; margin-left: 2px">%</span>
+              </div>
+              <div class="insight-chart">
+                <div class="bar" style="height: 30%; background: #60a5fa"></div>
+                <div class="bar" style="height: 50%; background: #3b82f6"></div>
+                <div class="bar" style="height: 90%; background: #2563eb"></div>
+                <div class="bar" style="height: 70%; background: #93c5fd"></div>
+                <div class="bar" style="height: 60%; background: #1d4ed8"></div>
+              </div>
             </div>
           </div>
-          <div class="metric-card-row metric-card-bottom">
-            <span class="metric-value-sm">{{ metricCoverage }}%</span>
-            <span class="metric-target">Target 90%</span>
-          </div>
-          <div class="metric-progress-wide">
-            <div class="metric-progress-bar-wide" :style="{ width: metricCoverage + '%' }"></div>
-          </div>
-        </div>
 
-        <!-- Card 4: 本周新增 -->
-        <div class="metric-card">
-          <div class="metric-card-row">
-            <span class="metric-label">本周新增</span>
-            <div class="metric-icon" style="background: rgba(236, 72, 153, 0.18); color: #f472b6">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path
-                  d="M23 12l-2.44-2.78.34-3.68-3.61-.82-1.89-3.18L12 3 8.6 1.54 6.71 4.72l-3.61.81.34 3.68L1 12l2.44 2.78-.34 3.69 3.61.82 1.89 3.18L12 21l3.4 1.46 1.89-3.18 3.61-.82-.34-3.68L23 12zm-13 5l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"
-                ></path>
-              </svg>
+          <!-- Card 3: 活动缺陷 -->
+          <div class="insight-card">
+            <div class="insight-left">
+              <div class="insight-icon-wrap icon-red">
+                <span class="material-symbols-outlined">bug_report</span>
+              </div>
+              <div class="insight-trend trend-red">↓ 3 待修复</div>
+            </div>
+            <div class="insight-right">
+              <div class="insight-label">活动缺陷</div>
+              <div class="insight-value">12</div>
+              <div class="insight-chart">
+                <div class="bar" style="height: 80%; background: #f87171"></div>
+                <div class="bar" style="height: 40%; background: #ef4444"></div>
+                <div class="bar" style="height: 60%; background: #b91c1c"></div>
+                <div class="bar" style="height: 30%; background: #fca5a5"></div>
+                <div class="bar" style="height: 50%; background: #dc2626"></div>
+              </div>
             </div>
           </div>
-          <div class="metric-card-row metric-card-bottom">
-            <span class="metric-value">{{ metricWeeklyNew }}</span>
-            <div class="mini-bars">
-              <svg viewBox="0 0 40 24" class="mini-bars-svg">
-                <rect x="2" y="14" width="4" height="10" rx="1" fill="#7c3aed" opacity="0.5" />
-                <rect x="9" y="8" width="4" height="16" rx="1" fill="#7c3aed" opacity="0.6" />
-                <rect x="16" y="4" width="4" height="20" rx="1" fill="#7c3aed" opacity="0.7" />
-                <rect x="23" y="10" width="4" height="14" rx="1" fill="#7c3aed" opacity="0.8" />
-                <rect x="30" y="2" width="4" height="22" rx="1" fill="#a78bfa" />
-              </svg>
+
+          <!-- Card 4: 平均执行时间 -->
+          <div class="insight-card">
+            <div class="insight-left">
+              <div class="insight-icon-wrap icon-orange">
+                <span class="material-symbols-outlined">timer</span>
+              </div>
+              <div class="insight-trend trend-grey">稳步下降中</div>
+            </div>
+            <div class="insight-right">
+              <div class="insight-label">平均执行时间</div>
+              <div class="insight-value">
+                14
+                <span style="font-size: 16px; font-weight: 500; margin-left: 2px">m</span>
+              </div>
+              <div class="insight-chart">
+                <div class="bar" style="height: 100%; background: #fb923c"></div>
+                <div class="bar" style="height: 80%; background: #f97316"></div>
+                <div class="bar" style="height: 60%; background: #fdba74"></div>
+                <div class="bar" style="height: 40%; background: #ea580c"></div>
+                <div class="bar" style="height: 30%; background: #c2410c"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -1416,7 +1341,10 @@ watch(selectedProject, (newId) => {
               </button>
               <button
                 class="batch-float-close"
-                @click="selectedIds = []; selectAll = false"
+                @click="
+                  selectedIds = []
+                  selectAll = false
+                "
               >
                 ×
               </button>
@@ -1458,7 +1386,10 @@ watch(selectedProject, (newId) => {
                 <input
                   type="checkbox"
                   :checked="selectAll"
-                  @change="selectAll = !selectAll; toggleSelectAll()"
+                  @change="
+                    selectAll = !selectAll
+                    toggleSelectAll()
+                  "
                 />
               </th>
               <th style="width: 80px" class="sortable" @click="toggleSort('id')">
@@ -1776,13 +1707,19 @@ watch(selectedProject, (newId) => {
             <nav class="stitch-breadcrumb">
               <a href="#">项目管理</a>
               <span class="material-symbols-outlined breadcrumb-icon">chevron_right</span>
-              <a href="#">{{ projectStore.projects.find(p => p.id === selectedProject)?.name || '未知项目' }}</a>
+              <a href="#">
+                {{
+                  projectStore.projects.find((p) => p.id === selectedProject)?.name || '未知项目'
+                }}
+              </a>
               <span class="material-symbols-outlined breadcrumb-icon">chevron_right</span>
               <template v-if="caseForm.modulePath && caseForm.modulePath !== '/未规划用例'">
                 <a href="#">{{ caseForm.modulePath }}</a>
                 <span class="material-symbols-outlined breadcrumb-icon">chevron_right</span>
               </template>
-              <span class="breadcrumb-active">{{ editingId ? '编辑测试用例' : '新建测试用例' }}</span>
+              <span class="breadcrumb-active">
+                {{ editingId ? '编辑测试用例' : '新建测试用例' }}
+              </span>
             </nav>
             <h1 class="stitch-title">
               <template v-if="editingId">
@@ -1803,7 +1740,6 @@ watch(selectedProject, (newId) => {
         <div class="stitch-grid">
           <!-- Left Column: Core Editor -->
           <div class="stitch-col-left">
-
             <!-- Section 1: Basic Information -->
             <section class="stitch-panel relative stitch-panel-accent overflow-hidden">
               <div class="stitch-panel-accent-bar"></div>
@@ -1811,19 +1747,24 @@ watch(selectedProject, (newId) => {
                 <span class="material-symbols-outlined">info</span>
                 基本信息
               </h3>
-              
+
               <div class="stitch-form-grid">
                 <!-- Use Case Name -->
                 <div class="stitch-form-item col-span-full">
                   <label>用例名称</label>
-                  <input type="text" class="stitch-input" v-model="caseForm.title" placeholder="请输入用例名称" />
+                  <input
+                    v-model="caseForm.title"
+                    type="text"
+                    class="stitch-input"
+                    placeholder="请输入用例名称"
+                  />
                 </div>
-                
+
                 <!-- Priority / Level -->
                 <div class="stitch-form-item">
                   <label>优先级</label>
                   <div class="stitch-select-wrapper">
-                    <select class="stitch-select" v-model="caseForm.level">
+                    <select v-model="caseForm.level" class="stitch-select">
                       <option value="P0">P0 - 紧急</option>
                       <option value="P1">P1 - 高</option>
                       <option value="P2">P2 - 中</option>
@@ -1837,7 +1778,7 @@ watch(selectedProject, (newId) => {
                 <div class="stitch-form-item">
                   <label>所属模块</label>
                   <div class="stitch-select-wrapper">
-                    <select class="stitch-select" v-model="caseForm.modulePath">
+                    <select v-model="caseForm.modulePath" class="stitch-select">
                       <option value="/未规划用例">/未规划用例</option>
                       <option v-for="p in modulePaths" :key="p" :value="p">{{ p }}</option>
                     </select>
@@ -1849,7 +1790,7 @@ watch(selectedProject, (newId) => {
                 <div class="stitch-form-item">
                   <label>评审状态</label>
                   <div class="stitch-select-wrapper">
-                    <select class="stitch-select" v-model="caseForm.reviewResult">
+                    <select v-model="caseForm.reviewResult" class="stitch-select">
                       <option value="未评审">未评审</option>
                       <option value="已通过">已通过</option>
                       <option value="不通过">不通过</option>
@@ -1863,7 +1804,7 @@ watch(selectedProject, (newId) => {
                 <div class="stitch-form-item">
                   <label>执行状态</label>
                   <div class="stitch-select-wrapper">
-                    <select class="stitch-select" v-model="caseForm.execResult">
+                    <select v-model="caseForm.execResult" class="stitch-select">
                       <option value="未执行">未执行</option>
                       <option value="成功">成功</option>
                       <option value="失败">失败</option>
@@ -1876,7 +1817,12 @@ watch(selectedProject, (newId) => {
                 <!-- Tags -->
                 <div class="stitch-form-item col-span-full">
                   <label>标签</label>
-                  <input type="text" class="stitch-input" v-model="caseForm.tags" placeholder="多个标签以逗号分隔，如: smoke, core" />
+                  <input
+                    v-model="caseForm.tags"
+                    type="text"
+                    class="stitch-input"
+                    placeholder="多个标签以逗号分隔，如: smoke, core"
+                  />
                 </div>
 
                 <!-- Rich text for condition (Actually precondition) -->
@@ -1891,15 +1837,27 @@ watch(selectedProject, (newId) => {
                   <span class="material-symbols-outlined">login</span>
                   前置条件
                 </h3>
-                <textarea class="stitch-textarea" v-model="caseForm.precondition" rows="3" placeholder="请输入前置条件..."></textarea>
+                <textarea
+                  v-model="caseForm.precondition"
+                  class="stitch-textarea"
+                  rows="3"
+                  placeholder="请输入前置条件..."
+                ></textarea>
               </section>
               <section class="stitch-panel">
                 <h3 class="stitch-panel-title">
                   <span class="material-symbols-outlined">logout</span>
                   后置条件
                 </h3>
-                <textarea class="stitch-textarea" rows="3" disabled placeholder="后端暂不支持后置条件，展示占位用。">1. 跳转至首页仪表盘
-2. 本地 Token 已持久化存储</textarea>
+                <textarea
+                  class="stitch-textarea"
+                  rows="3"
+                  disabled
+                  placeholder="后端暂不支持后置条件，展示占位用。"
+                >
+1. 跳转至首页仪表盘
+2. 本地 Token 已持久化存储</textarea
+                >
               </section>
             </div>
 
@@ -1915,7 +1873,7 @@ watch(selectedProject, (newId) => {
                   添加步骤
                 </button>
               </div>
-              
+
               <div class="stitch-steps-body">
                 <table class="stitch-table">
                   <thead>
@@ -1927,8 +1885,8 @@ watch(selectedProject, (newId) => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr 
-                      v-for="(st, idx) in stepRows" 
+                    <tr
+                      v-for="(st, idx) in stepRows"
                       :key="idx"
                       class="stitch-step-row group"
                       draggable="true"
@@ -1942,10 +1900,20 @@ watch(selectedProject, (newId) => {
                         {{ (idx + 1).toString().padStart(2, '0') }}
                       </td>
                       <td class="col-desc">
-                        <textarea class="stitch-table-input" v-model="st.action" rows="1" placeholder="输入操作描述..."></textarea>
+                        <textarea
+                          v-model="st.action"
+                          class="stitch-table-input"
+                          rows="1"
+                          placeholder="输入操作描述..."
+                        ></textarea>
                       </td>
                       <td class="col-expect">
-                        <textarea class="stitch-table-input" v-model="st.expected" rows="1" placeholder="输入预期结果..."></textarea>
+                        <textarea
+                          v-model="st.expected"
+                          class="stitch-table-input"
+                          rows="1"
+                          placeholder="输入预期结果..."
+                        ></textarea>
                       </td>
                       <td class="col-op text-center">
                         <button class="stitch-btn-del" @click="removeStepRow(idx)">
@@ -1966,12 +1934,23 @@ watch(selectedProject, (newId) => {
               </h3>
               <div class="stitch-textarea-wrap">
                 <div class="stitch-textarea-toolbar">
-                  <button class="format-btn"><span class="material-symbols-outlined">format_quote</span></button>
-                  <button class="format-btn"><span class="material-symbols-outlined">code</span></button>
-                  <button class="format-btn"><span class="material-symbols-outlined">attachment</span></button>
+                  <button class="format-btn">
+                    <span class="material-symbols-outlined">format_quote</span>
+                  </button>
+                  <button class="format-btn">
+                    <span class="material-symbols-outlined">code</span>
+                  </button>
+                  <button class="format-btn">
+                    <span class="material-symbols-outlined">attachment</span>
+                  </button>
                 </div>
                 <!-- Binding remark here -->
-                <textarea class="stitch-textarea no-border" v-model="caseForm.remark" rows="4" placeholder="添加补充备注信息，如测试账号、特定设备说明等..."></textarea>
+                <textarea
+                  v-model="caseForm.remark"
+                  class="stitch-textarea no-border"
+                  rows="4"
+                  placeholder="添加补充备注信息，如测试账号、特定设备说明等..."
+                ></textarea>
               </div>
             </section>
           </div>
@@ -1997,11 +1976,13 @@ watch(selectedProject, (newId) => {
                   <span class="meta-label">更新于</span>
                   <span class="meta-value">2023-10-24 14:30</span>
                 </div>
-                
+
                 <div class="stitch-meta-divider"></div>
 
                 <div class="stitch-meta-row">
-                  <div class="meta-label" style="font-size:10px;text-transform:uppercase;">历史缺陷关联</div>
+                  <div class="meta-label" style="font-size: 10px; text-transform: uppercase">
+                    历史缺陷关联
+                  </div>
                   <div class="meta-tags-wrap mt-2">
                     <span class="meta-tag tag-error">BUG-4012</span>
                     <span class="meta-tag tag-secondary">BUG-3921</span>
@@ -2014,39 +1995,86 @@ watch(selectedProject, (newId) => {
             <section class="stitch-panel">
               <h3 class="stitch-subtitle">视觉辅助/附件</h3>
               <div class="stitch-assets-grid">
-                
                 <!-- Dynamic Image Previews -->
-                <div v-for="att in caseAttachments.filter(a => isImageAttachment(a))" :key="att.id" class="asset-item image-preview group">
+                <div
+                  v-for="att in caseAttachments.filter((a) => isImageAttachment(a))"
+                  :key="att.id"
+                  class="asset-item image-preview group"
+                >
                   <img :src="getAttachmentUrl(att)" :alt="att.file_name" />
                   <div class="asset-overlay">
                     <button class="icon-only" title="预览图片" @click="openImagePreview(att)">
-                      <span class="material-symbols-outlined" style="color: white; font-size: 20px;">visibility</span>
+                      <span class="material-symbols-outlined" style="color: white; font-size: 20px">
+                        visibility
+                      </span>
                     </button>
-                    <button class="icon-only" title="下载" @click="downloadAttachment(att)" style="margin-left: 8px;">
-                      <span class="material-symbols-outlined" style="color: white; font-size: 20px;">download</span>
+                    <button
+                      class="icon-only"
+                      title="下载"
+                      style="margin-left: 8px"
+                      @click="downloadAttachment(att)"
+                    >
+                      <span class="material-symbols-outlined" style="color: white; font-size: 20px">
+                        download
+                      </span>
                     </button>
-                    <button class="icon-only" title="删除" @click.stop="onRemoveAttachment(att.id)" style="margin-left: 8px;">
-                      <span class="material-symbols-outlined" style="color: #ff5252; font-size: 20px;">delete</span>
+                    <button
+                      class="icon-only"
+                      title="删除"
+                      style="margin-left: 8px"
+                      @click.stop="onRemoveAttachment(att.id)"
+                    >
+                      <span
+                        class="material-symbols-outlined"
+                        style="color: #ff5252; font-size: 20px"
+                      >
+                        delete
+                      </span>
                     </button>
                   </div>
                 </div>
 
                 <!-- Dynamic File Previews -->
-                <div v-for="att in caseAttachments.filter(a => !isImageAttachment(a))" :key="att.id" class="asset-item file-preview group">
-                  <span class="material-symbols-outlined text-outline" style="font-size: 32px; margin-bottom: 8px;">
+                <div
+                  v-for="att in caseAttachments.filter((a) => !isImageAttachment(a))"
+                  :key="att.id"
+                  class="asset-item file-preview group"
+                >
+                  <span
+                    class="material-symbols-outlined text-outline"
+                    style="font-size: 32px; margin-bottom: 8px"
+                  >
                     {{ getFileIconName(att.file_name) }}
                   </span>
-                  <span class="file-name text-center w-full truncate" :title="att.file_name" style="font-size: 12px;">{{ att.file_name }}</span>
+                  <span
+                    class="file-name text-center w-full truncate"
+                    :title="att.file_name"
+                    style="font-size: 12px"
+                  >
+                    {{ att.file_name }}
+                  </span>
                   <div class="asset-overlay">
                     <button class="icon-only" title="下载" @click="downloadAttachment(att)">
-                      <span class="material-symbols-outlined" style="color: white; font-size: 20px;">download</span>
+                      <span class="material-symbols-outlined" style="color: white; font-size: 20px">
+                        download
+                      </span>
                     </button>
-                    <button class="icon-only" title="删除" @click.stop="onRemoveAttachment(att.id)" style="margin-left: 8px;">
-                      <span class="material-symbols-outlined" style="color: #ff5252; font-size: 20px;">delete</span>
+                    <button
+                      class="icon-only"
+                      title="删除"
+                      style="margin-left: 8px"
+                      @click.stop="onRemoveAttachment(att.id)"
+                    >
+                      <span
+                        class="material-symbols-outlined"
+                        style="color: #ff5252; font-size: 20px"
+                      >
+                        delete
+                      </span>
                     </button>
                   </div>
                 </div>
-                
+
                 <div class="upload-area col-span-full mt-1">
                   <!-- FileUploader replaces the click area but keeps original functionality. We pass [] to hide its internal list -->
                   <FileUploader
@@ -2055,7 +2083,15 @@ watch(selectedProject, (newId) => {
                     @upload="onUploadAttachment"
                   />
                   <!-- fallback text just in case -->
-                  <div v-if="!editingId" style="font-size: 10px; color:rgba(255,255,255,0.4);text-align:center;padding:10px;">
+                  <div
+                    v-if="!editingId"
+                    style="
+                      font-size: 10px;
+                      color: rgba(255, 255, 255, 0.4);
+                      text-align: center;
+                      padding: 10px;
+                    "
+                  >
                     请先保存用例后再上传附件
                   </div>
                 </div>
@@ -2067,14 +2103,15 @@ watch(selectedProject, (newId) => {
               <h3 class="stitch-subtitle">最新动态</h3>
               <div class="stitch-timeline">
                 <div class="timeline-line"></div>
-                
+
                 <div class="timeline-item flex gap-4 relative">
                   <div class="timeline-icon bg-secondary z-10 shrink-0">
                     <span class="material-symbols-outlined text-white text-sm">edit</span>
                   </div>
                   <div class="timeline-content flex-1">
                     <p class="text-xs leading-tight">
-                      <span class="font-bold text-secondary">李薇</span> 更新了预期结果
+                      <span class="font-bold text-secondary">李薇</span>
+                      更新了预期结果
                     </p>
                     <p class="time italic">10 分钟前</p>
                   </div>
@@ -2086,7 +2123,8 @@ watch(selectedProject, (newId) => {
                   </div>
                   <div class="timeline-content flex-1">
                     <p class="text-xs leading-tight">
-                      <span class="font-bold text-white">张强</span> 添加了视觉辅助截图
+                      <span class="font-bold text-white">张强</span>
+                      添加了视觉辅助截图
                     </p>
                     <p class="time italic">1 小时前</p>
                   </div>
@@ -2098,7 +2136,10 @@ watch(selectedProject, (newId) => {
                   </div>
                   <div class="timeline-content flex-1">
                     <p class="text-xs leading-tight">
-                      版本自 <span class="font-mono bg-white-5">v1.4.1</span> 升至 <span class="font-mono bg-white-5">v1.4.2</span>
+                      版本自
+                      <span class="font-mono bg-white-5">v1.4.1</span>
+                      升至
+                      <span class="font-mono bg-white-5">v1.4.2</span>
                     </p>
                     <p class="time italic">昨天 16:45</p>
                   </div>
@@ -2112,26 +2153,32 @@ watch(selectedProject, (newId) => {
             <!-- AI Bot -->
             <section class="stitch-ai-panel rounded-xl p-6 relative">
               <div class="ai-header flex items-center gap-3 mb-4">
-                <div class="ai-icon w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                <div
+                  class="ai-icon w-8 h-8 rounded-full bg-primary flex items-center justify-center"
+                >
                   <span class="material-symbols-outlined text-white text-sm">smart_toy</span>
                 </div>
                 <div>
                   <h4 class="text-sm font-bold text-white leading-none">AI 智检助手</h4>
-                  <span class="text-xs text-primary-dim uppercase tracking-wider">智能审计可用</span>
+                  <span class="text-xs text-primary-dim uppercase tracking-wider">
+                    智能审计可用
+                  </span>
                 </div>
               </div>
               <p class="text-xs text-variant leading-relaxed mb-4">
-                我已分析您的测试步骤。发现步骤 02 可能存在冗余，是否需要自动优化步骤逻辑以提高执行效率？
+                我已分析您的测试步骤。发现步骤 02
+                可能存在冗余，是否需要自动优化步骤逻辑以提高执行效率？
               </p>
-              <button class="ai-btn w-full py-2 bg-white-10 hover:bg-white-20 text-xs font-bold text-primary-dim rounded-lg transition-all border border-white-10">
+              <button
+                class="ai-btn w-full py-2 bg-white-10 hover:bg-white-20 text-xs font-bold text-primary-dim rounded-lg transition-all border border-white-10"
+              >
                 执行智能优化
               </button>
             </section>
-
           </div>
         </div>
-        
-        <div style="height: 48px;"></div>
+
+        <div style="height: 48px"></div>
       </div>
     </el-drawer>
 
@@ -2155,12 +2202,12 @@ watch(selectedProject, (newId) => {
     </el-dialog>
 
     <!-- Image Viewer Modal -->
-    <el-image-viewer
+    <ElImageViewer
       v-if="showImageViewer"
       :url-list="previewImages"
       :initial-index="previewIndex"
-      @close="showImageViewer = false"
       hide-on-click-modal
+      @close="showImageViewer = false"
     />
   </div>
 </template>
