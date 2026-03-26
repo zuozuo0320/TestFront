@@ -1341,10 +1341,7 @@ watch(selectedProject, (newId) => {
               </button>
               <button
                 class="batch-float-close"
-                @click="
-                  selectedIds = []
-                  selectAll = false
-                "
+                @click="selectedIds = []; selectAll = false"
               >
                 ×
               </button>
@@ -1386,10 +1383,7 @@ watch(selectedProject, (newId) => {
                 <input
                   type="checkbox"
                   :checked="selectAll"
-                  @change="
-                    selectAll = !selectAll
-                    toggleSelectAll()
-                  "
+                  @change="selectAll = !selectAll; toggleSelectAll()"
                 />
               </th>
               <th style="width: 80px" class="sortable" @click="toggleSort('id')">
