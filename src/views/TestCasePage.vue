@@ -45,6 +45,7 @@ import {
   cloneTestCase,
   listCaseHistory,
 } from '../api/testcase'
+import { apiClient } from '../api/client'
 import { uploadAttachment, listAttachments, deleteAttachment } from '../api/attachment'
 import { importTestCases } from '../api/xlsx'
 import type { TestCase, CaseAttachment } from '../api/types'
@@ -849,6 +850,37 @@ function formatRelativeTime(dateStr: string): string {
 
 // ── Attachments ──
 
+const apiBaseUrl = apiClient.defaults.baseURL || 'http://localhost:8080/api/v1'
+const serverUrl = apiBaseUrl.replace(/\/api\/v1\/?$/, '')
+
+function getAttachmentUrl(file: CaseAttachment) {
+  let path = (file.file_path || '').replace(/\\/g, '/')
+  if (!path.startsWith('/')) {
+    path = '/' + path
+  }
+  if (!path.startsWith('/uploads/')) {
+    path = '/uploads' + path
+  }
+  return `${serverUrl}${path}`
+}
+
+function isImageAttachment(file: CaseAttachment) {
+  if (file.mime_type && file.mime_type.startsWith('image/')) return true
+  const ext = (file.file_name || '').split('.').pop()?.toLowerCase() || ''
+  return ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(ext)
+}
+
+function getFileIconName(filename: string) {
+  const ext = (filename || '').split('.').pop()?.toLowerCase() || ''
+  const map: Record<string, string> = {
+    pdf: 'picture_as_pdf',
+    doc: 'description', docx: 'description', txt: 'description', md: 'description',
+    xls: 'table_view', xlsx: 'table_view', csv: 'table_view',
+    zip: 'folder_zip', rar: 'folder_zip', '7z': 'folder_zip',
+  }
+  return map[ext] || 'draft'
+}
+
 async function onUploadAttachment(file: File) {
   if (!selectedProject.value || !editingId.value) {
     ElMessage.warning('请先保存用例后再上传附件')
@@ -863,15 +895,35 @@ async function onUploadAttachment(file: File) {
   }
 }
 
-async function onRemoveAttachment(index: number) {
-  const att = caseAttachments.value[index]
-  if (!att || !selectedProject.value) return
+async function onRemoveAttachment(id: number) {
+  if (!selectedProject.value) return
   try {
-    await deleteAttachment(selectedProject.value, att.id)
-    caseAttachments.value.splice(index, 1)
+    await deleteAttachment(selectedProject.value, id)
+    caseAttachments.value = caseAttachments.value.filter(a => a.id !== id)
     ElMessage.success('附件已删除')
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.error || '删除附件失败')
+  }
+}
+
+async function downloadAttachment(file: CaseAttachment) {
+  if (!selectedProject.value || !file.id) return
+  try {
+    const resp = await apiClient.get(
+      `/projects/${selectedProject.value}/attachments/${file.id}/download`,
+      { responseType: 'blob' },
+    )
+    const blob = new Blob([resp.data])
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = file.file_name || 'download'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch {
+    ElMessage.error('下载失败')
   }
 }
 
@@ -1695,167 +1747,369 @@ watch(selectedProject, (newId) => {
       </template>
     </el-dialog>
 
-    <!-- Case editor drawer -->
+    <!-- Case editor drawer (Stitch Redesign) -->
     <el-drawer
       v-model="dialogVisible"
-      :title="editingId ? '编辑用例' : '新建用例'"
-      size="74%"
+      :with-header="false"
+      size="92%"
       direction="rtl"
-      class="case-editor-drawer"
+      class="stitch-case-drawer"
     >
-      <div class="case-editor">
-        <div class="case-editor-head">
-          <div class="head-left">
-            <div class="case-tag">TEST CASE</div>
-            <h3>{{ editingId ? '编辑测试用例' : '新建测试用例' }}</h3>
+      <div class="stitch-drawer-wrapper">
+        <!-- Header / Breadcrumbs -->
+        <div class="stitch-header">
+          <div class="stitch-header-left">
+            <nav class="stitch-breadcrumb">
+              <a href="#">项目管理</a>
+              <span class="material-symbols-outlined breadcrumb-icon">chevron_right</span>
+              <a href="#">移动端应用 Alpha</a>
+              <span class="material-symbols-outlined breadcrumb-icon">chevron_right</span>
+              <span class="breadcrumb-active">{{ editingId ? '编辑测试用例' : '新建测试用例' }}</span>
+            </nav>
+            <h1 class="stitch-title">
+              {{ editingId ? '编辑测试用例: ' : '新建测试用例' }}
+              <span v-if="editingId" class="stitch-id-highlight">TC-{{ editingId }}</span>
+              {{ caseForm.title || '' }}
+            </h1>
           </div>
-          <div class="head-right">
-            <el-button @click="dialogVisible = false">取消</el-button>
-            <el-button type="primary" :loading="saving" @click="submitCase">保存</el-button>
+          <div class="stitch-header-right">
+            <button class="stitch-btn-cancel" @click="dialogVisible = false">取消</button>
+            <button class="stitch-btn-save" :class="{ 'is-loading': saving }" @click="submitCase">
+              保存用例
+            </button>
           </div>
         </div>
-        <el-form label-position="top" class="case-editor-form">
-          <section class="editor-block">
-            <div class="block-title">基础信息</div>
-            <div class="block-grid block-grid-2">
-              <el-form-item label="用例名称">
-                <el-input v-model="caseForm.title" placeholder="请输入用例名称" />
-              </el-form-item>
-              <el-form-item label="用例等级">
-                <el-select v-model="caseForm.level">
-                  <el-option label="P0" value="P0" />
-                  <el-option label="P1" value="P1" />
-                  <el-option label="P2" value="P2" />
-                  <el-option label="P3" value="P3" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="标签" class="block-col-span-2">
-                <el-input v-model="caseForm.tags" placeholder="多个标签以逗号分隔" />
-              </el-form-item>
-            </div>
-          </section>
-          <section class="editor-block">
-            <div class="block-title">评审与执行</div>
-            <div class="block-grid block-grid-2">
-              <el-form-item label="评审结果">
-                <el-select v-model="caseForm.reviewResult">
-                  <el-option label="未评审" value="未评审" />
-                  <el-option label="已通过" value="已通过" />
-                  <el-option label="不通过" value="不通过" />
-                  <el-option label="重新提审" value="重新提审" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="执行结果">
-                <el-select v-model="caseForm.execResult">
-                  <el-option label="未执行" value="未执行" />
-                  <el-option label="成功" value="成功" />
-                  <el-option label="失败" value="失败" />
-                  <el-option label="阻塞" value="阻塞" />
-                </el-select>
-              </el-form-item>
-            </div>
-          </section>
-          <section class="editor-block">
-            <div class="block-title">前置条件</div>
-            <RichTextEditor v-model="caseForm.precondition" placeholder="请输入前置条件…" />
-          </section>
-          <section class="editor-block">
-            <div class="block-title">步骤描述</div>
-            <div class="steps-grid-head">
-              <div>步骤</div>
-              <div>预期结果</div>
-              <div>操作</div>
-            </div>
-            <div
-              v-for="(s, idx) in stepRows"
-              :key="idx"
-              class="steps-grid-row"
-              draggable="true"
-              @dragstart="onStepDragStart(idx)"
-              @dragover.prevent
-              @drop="onStepDrop(idx)"
-              @dragend="onStepDragEnd"
-            >
-              <el-input v-model="s.action" placeholder="请输入步骤" />
-              <el-input v-model="s.expected" placeholder="请输入预期结果" />
-              <div class="step-ops">
-                <el-dropdown
-                  trigger="click"
-                  @command="
-                    (cmd: string) => {
-                      if (cmd === 'copy') copyStepRow(idx)
-                      else if (cmd === 'insertAbove') insertStepAbove(idx)
-                      else if (cmd === 'insertBelow') insertStepBelow(idx)
-                      else if (cmd === 'delete') removeStepRow(idx)
-                    }
-                  "
-                >
-                  <button type="button" class="step-op" title="操作">
-                    <el-icon class="btn-icon"><Edit /></el-icon>
-                  </button>
-                  <template #dropdown>
-                    <el-dropdown-menu>
-                      <el-dropdown-item command="copy">
-                        <el-icon><CopyDocument /></el-icon>
-                        复制
-                      </el-dropdown-item>
-                      <el-dropdown-item command="insertAbove">
-                        <el-icon><CaretTop /></el-icon>
-                        在上方插入
-                      </el-dropdown-item>
-                      <el-dropdown-item command="insertBelow">
-                        <el-icon><CaretBottom /></el-icon>
-                        在下方插入
-                      </el-dropdown-item>
-                      <el-dropdown-item command="delete" divided>
-                        <el-icon><Delete /></el-icon>
-                        删除
-                      </el-dropdown-item>
-                    </el-dropdown-menu>
-                  </template>
-                </el-dropdown>
+
+        <!-- Main Layout: Bento Style -->
+        <div class="stitch-grid">
+          <!-- Left Column: Core Editor -->
+          <div class="stitch-col-left">
+
+            <!-- Section 1: Basic Information -->
+            <section class="stitch-panel relative stitch-panel-accent overflow-hidden">
+              <div class="stitch-panel-accent-bar"></div>
+              <h3 class="stitch-panel-title">
+                <span class="material-symbols-outlined">info</span>
+                基本信息
+              </h3>
+              
+              <div class="stitch-form-grid">
+                <!-- Use Case Name -->
+                <div class="stitch-form-item col-span-full">
+                  <label>用例名称</label>
+                  <input type="text" class="stitch-input" v-model="caseForm.title" placeholder="请输入用例名称" />
+                </div>
+                
+                <!-- Priority / Level -->
+                <div class="stitch-form-item">
+                  <label>优先级</label>
+                  <div class="stitch-select-wrapper">
+                    <select class="stitch-select" v-model="caseForm.level">
+                      <option value="P0">P0 - 紧急</option>
+                      <option value="P1">P1 - 高</option>
+                      <option value="P2">P2 - 中</option>
+                      <option value="P3">P3 - 低</option>
+                    </select>
+                    <span class="material-symbols-outlined select-icon">expand_more</span>
+                  </div>
+                </div>
+
+                <!-- Module Path -->
+                <div class="stitch-form-item">
+                  <label>所属模块</label>
+                  <div class="stitch-select-wrapper">
+                    <select class="stitch-select" v-model="caseForm.modulePath">
+                      <option value="/未规划用例">/未规划用例</option>
+                      <option v-for="p in modulePaths" :key="p" :value="p">{{ p }}</option>
+                    </select>
+                    <span class="material-symbols-outlined select-icon">account_tree</span>
+                  </div>
+                </div>
+
+                <!-- Review Status -->
+                <div class="stitch-form-item">
+                  <label>评审状态</label>
+                  <div class="stitch-select-wrapper">
+                    <select class="stitch-select" v-model="caseForm.reviewResult">
+                      <option value="未评审">未评审</option>
+                      <option value="已通过">已通过</option>
+                      <option value="不通过">不通过</option>
+                      <option value="重新提审">重新提审</option>
+                    </select>
+                    <span class="material-symbols-outlined select-icon">expand_more</span>
+                  </div>
+                </div>
+
+                <!-- Exec Status -->
+                <div class="stitch-form-item">
+                  <label>执行状态</label>
+                  <div class="stitch-select-wrapper">
+                    <select class="stitch-select" v-model="caseForm.execResult">
+                      <option value="未执行">未执行</option>
+                      <option value="成功">成功</option>
+                      <option value="失败">失败</option>
+                      <option value="阻塞">阻塞</option>
+                    </select>
+                    <span class="material-symbols-outlined select-icon">expand_more</span>
+                  </div>
+                </div>
+
+                <!-- Tags -->
+                <div class="stitch-form-item col-span-full">
+                  <label>标签</label>
+                  <input type="text" class="stitch-input" v-model="caseForm.tags" placeholder="多个标签以逗号分隔，如: smoke, core" />
+                </div>
+
+                <!-- Rich text for condition (Actually precondition) -->
+                <!-- The mock had Description at the end of basic info, we will omit in favor of precond further down if no desc -->
               </div>
+            </section>
+
+            <!-- Section 2: Pre/Post Conditions -->
+            <div class="stitch-conditions-grid">
+              <section class="stitch-panel">
+                <h3 class="stitch-panel-title">
+                  <span class="material-symbols-outlined">login</span>
+                  前置条件
+                </h3>
+                <textarea class="stitch-textarea" v-model="caseForm.precondition" rows="3" placeholder="请输入前置条件..."></textarea>
+              </section>
+              <section class="stitch-panel">
+                <h3 class="stitch-panel-title">
+                  <span class="material-symbols-outlined">logout</span>
+                  后置条件
+                </h3>
+                <textarea class="stitch-textarea" rows="3" disabled placeholder="后端暂不支持后置条件，展示占位用。">1. 跳转至首页仪表盘
+2. 本地 Token 已持久化存储</textarea>
+              </section>
             </div>
-            <div class="steps-grid-actions">
-              <el-button @click="addStepRow">新增步骤</el-button>
-            </div>
-          </section>
-          <section class="editor-block">
-            <div class="block-title">备注</div>
-            <RichTextEditor v-model="caseForm.remark" placeholder="请输入备注信息…" />
-          </section>
-          <section class="editor-block">
-            <div class="block-title">附件</div>
-            <FileUploader
-              :files="caseAttachments"
-              :project-id="selectedProject ?? undefined"
-              @upload="onUploadAttachment"
-              @remove="onRemoveAttachment"
-            />
-            <div v-if="!editingId" class="attachment-hint">请先保存用例后再上传附件</div>
-          </section>
-          <section v-if="editingId && caseHistory.length > 0" class="editor-block">
-            <div
-              class="block-title"
-              style="cursor: pointer; user-select: none"
-              @click="historyExpanded = !historyExpanded"
-            >
-              编辑历史 ({{ caseHistory.length }})
-              <span style="font-size: 11px; color: var(--tp-gray-500)">
-                {{ historyExpanded ? '▼' : '▶' }}
-              </span>
-            </div>
-            <div v-if="historyExpanded" class="history-list">
-              <div v-for="h in caseHistory" :key="h.id" class="history-item">
-                <span class="history-action">
-                  {{ h.action === 'update' ? '修改' : h.action === 'create' ? '创建' : h.action }}
-                </span>
-                <span v-if="h.field_name" class="history-field">{{ h.field_name }}</span>
-                <span class="history-time">{{ formatTime(h.created_at) }}</span>
+
+            <!-- Section 3: Test Steps -->
+            <section class="stitch-panel stitch-steps-panel">
+              <div class="stitch-steps-header">
+                <h3 class="stitch-panel-title m-0">
+                  <span class="material-symbols-outlined">list_alt</span>
+                  测试步骤
+                </h3>
+                <button class="stitch-btn-text" @click="addStepRow">
+                  <span class="material-symbols-outlined">add_circle</span>
+                  添加步骤
+                </button>
               </div>
-            </div>
-          </section>
-        </el-form>
+              
+              <div class="stitch-steps-body">
+                <table class="stitch-table">
+                  <thead>
+                    <tr>
+                      <th class="w-num">#</th>
+                      <th class="w-desc">操作描述</th>
+                      <th class="w-expect">预期结果</th>
+                      <th class="w-op text-center">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr 
+                      v-for="(st, idx) in stepRows" 
+                      :key="idx"
+                      class="stitch-step-row group"
+                      draggable="true"
+                      @dragstart="onStepDragStart(idx)"
+                      @dragover.prevent
+                      @drop="onStepDrop(idx)"
+                      @dragend="onStepDragEnd"
+                    >
+                      <td class="col-num relative">
+                        <span class="material-symbols-outlined drag-handle">drag_indicator</span>
+                        {{ (idx + 1).toString().padStart(2, '0') }}
+                      </td>
+                      <td class="col-desc">
+                        <textarea class="stitch-table-input" v-model="st.action" rows="1" placeholder="输入操作描述..."></textarea>
+                      </td>
+                      <td class="col-expect">
+                        <textarea class="stitch-table-input" v-model="st.expected" rows="1" placeholder="输入预期结果..."></textarea>
+                      </td>
+                      <td class="col-op text-center">
+                        <button class="stitch-btn-del" @click="removeStepRow(idx)">
+                          <span class="material-symbols-outlined">delete</span>
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!-- Section 4: Notes -->
+            <section class="stitch-panel">
+              <h3 class="stitch-panel-title">
+                <span class="material-symbols-outlined">description</span>
+                备注
+              </h3>
+              <div class="stitch-textarea-wrap">
+                <div class="stitch-textarea-toolbar">
+                  <button class="format-btn"><span class="material-symbols-outlined">format_quote</span></button>
+                  <button class="format-btn"><span class="material-symbols-outlined">code</span></button>
+                  <button class="format-btn"><span class="material-symbols-outlined">attachment</span></button>
+                </div>
+                <!-- Binding remark here -->
+                <textarea class="stitch-textarea no-border" v-model="caseForm.remark" rows="4" placeholder="添加补充备注信息，如测试账号、特定设备说明等..."></textarea>
+              </div>
+            </section>
+          </div>
+
+          <!-- Right Column: Sidebar Metadata -->
+          <div class="stitch-col-right">
+            <!-- Version Metadata -->
+            <section class="stitch-panel">
+              <h3 class="stitch-subtitle">版本追踪</h3>
+              <div class="stitch-meta-list">
+                <div class="stitch-meta-row flex-between">
+                  <span class="meta-label">当前版本</span>
+                  <span class="meta-value bold primary">v1.4.2</span>
+                </div>
+                <div class="stitch-meta-row flex-between">
+                  <span class="meta-label">维护者</span>
+                  <div class="meta-user">
+                    <div class="meta-avatar">{{ caseForm.title ? 'L' : '管' }}</div>
+                    <span>林语</span>
+                  </div>
+                </div>
+                <div class="stitch-meta-row flex-between">
+                  <span class="meta-label">更新于</span>
+                  <span class="meta-value">2023-10-24 14:30</span>
+                </div>
+                
+                <div class="stitch-meta-divider"></div>
+
+                <div class="stitch-meta-row">
+                  <div class="meta-label" style="font-size:10px;text-transform:uppercase;">历史缺陷关联</div>
+                  <div class="meta-tags-wrap mt-2">
+                    <span class="meta-tag tag-error">BUG-4012</span>
+                    <span class="meta-tag tag-secondary">BUG-3921</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Assets -->
+            <section class="stitch-panel">
+              <h3 class="stitch-subtitle">视觉辅助/附件</h3>
+              <div class="stitch-assets-grid">
+                
+                <!-- Dynamic Image Previews -->
+                <div v-for="att in caseAttachments.filter(a => isImageAttachment(a))" :key="att.id" class="asset-item image-preview group">
+                  <img :src="getAttachmentUrl(att)" :alt="att.file_name" />
+                  <div class="asset-overlay">
+                    <button class="icon-only" title="在新标签页查看" @click="downloadAttachment(att)">
+                      <span class="material-symbols-outlined" style="color: white; font-size: 20px;">visibility</span>
+                    </button>
+                    <button class="icon-only" title="删除" @click.stop="onRemoveAttachment(att.id)" style="margin-left: 8px;">
+                      <span class="material-symbols-outlined" style="color: #ff5252; font-size: 20px;">delete</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Dynamic File Previews -->
+                <div v-for="att in caseAttachments.filter(a => !isImageAttachment(a))" :key="att.id" class="asset-item file-preview group">
+                  <span class="material-symbols-outlined text-outline" style="font-size: 32px; margin-bottom: 8px;">
+                    {{ getFileIconName(att.file_name) }}
+                  </span>
+                  <span class="file-name text-center w-full truncate" :title="att.file_name" style="font-size: 12px;">{{ att.file_name }}</span>
+                  <div class="asset-overlay">
+                    <button class="icon-only" title="下载" @click="downloadAttachment(att)">
+                      <span class="material-symbols-outlined" style="color: white; font-size: 20px;">download</span>
+                    </button>
+                    <button class="icon-only" title="删除" @click.stop="onRemoveAttachment(att.id)" style="margin-left: 8px;">
+                      <span class="material-symbols-outlined" style="color: #ff5252; font-size: 20px;">delete</span>
+                    </button>
+                  </div>
+                </div>
+                
+                <div class="upload-area col-span-full mt-1">
+                  <!-- FileUploader replaces the click area but keeps original functionality. We pass [] to hide its internal list -->
+                  <FileUploader
+                    :files="[]"
+                    :project-id="selectedProject ?? undefined"
+                    @upload="onUploadAttachment"
+                  />
+                  <!-- fallback text just in case -->
+                  <div v-if="!editingId" style="font-size: 10px; color:rgba(255,255,255,0.4);text-align:center;padding:10px;">
+                    请先保存用例后再上传附件
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Recent Activity -->
+            <section class="stitch-panel">
+              <h3 class="stitch-subtitle">最新动态</h3>
+              <div class="stitch-timeline">
+                <div class="timeline-line"></div>
+                
+                <div class="timeline-item flex gap-4 relative">
+                  <div class="timeline-icon bg-secondary z-10 shrink-0">
+                    <span class="material-symbols-outlined text-white text-sm">edit</span>
+                  </div>
+                  <div class="timeline-content flex-1">
+                    <p class="text-xs leading-tight">
+                      <span class="font-bold text-secondary">李薇</span> 更新了预期结果
+                    </p>
+                    <p class="time italic">10 分钟前</p>
+                  </div>
+                </div>
+
+                <div class="timeline-item flex gap-4 relative">
+                  <div class="timeline-icon bg-normal border-outline z-10 shrink-0">
+                    <span class="material-symbols-outlined text-outline text-sm">add</span>
+                  </div>
+                  <div class="timeline-content flex-1">
+                    <p class="text-xs leading-tight">
+                      <span class="font-bold text-white">张强</span> 添加了视觉辅助截图
+                    </p>
+                    <p class="time italic">1 小时前</p>
+                  </div>
+                </div>
+
+                <div class="timeline-item flex gap-4 relative">
+                  <div class="timeline-icon bg-primary z-10 shrink-0">
+                    <span class="material-symbols-outlined text-white text-sm">history</span>
+                  </div>
+                  <div class="timeline-content flex-1">
+                    <p class="text-xs leading-tight">
+                      版本自 <span class="font-mono bg-white-5">v1.4.1</span> 升至 <span class="font-mono bg-white-5">v1.4.2</span>
+                    </p>
+                    <p class="time italic">昨天 16:45</p>
+                  </div>
+                </div>
+              </div>
+              <button class="stitch-btn-link w-full mt-6 text-center text-outline">
+                查看完整审计日志
+              </button>
+            </section>
+
+            <!-- AI Bot -->
+            <section class="stitch-ai-panel rounded-xl p-6 relative">
+              <div class="ai-header flex items-center gap-3 mb-4">
+                <div class="ai-icon w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                  <span class="material-symbols-outlined text-white text-sm">smart_toy</span>
+                </div>
+                <div>
+                  <h4 class="text-sm font-bold text-white leading-none">AI 智检助手</h4>
+                  <span class="text-xs text-primary-dim uppercase tracking-wider">智能审计可用</span>
+                </div>
+              </div>
+              <p class="text-xs text-variant leading-relaxed mb-4">
+                我已分析您的测试步骤。发现步骤 02 可能存在冗余，是否需要自动优化步骤逻辑以提高执行效率？
+              </p>
+              <button class="ai-btn w-full py-2 bg-white-10 hover:bg-white-20 text-xs font-bold text-primary-dim rounded-lg transition-all border border-white-10">
+                执行智能优化
+              </button>
+            </section>
+
+          </div>
+        </div>
+        
+        <div style="height: 48px;"></div>
       </div>
     </el-drawer>
 
@@ -1879,3 +2133,7 @@ watch(selectedProject, (newId) => {
     </el-dialog>
   </div>
 </template>
+
+<style scoped>
+@import '../styles/testcase-drawer.css';
+</style>
