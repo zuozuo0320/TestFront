@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, ElImageViewer } from 'element-plus'
 import {
   CaretBottom,
   CaretRight,
@@ -906,6 +906,20 @@ async function onRemoveAttachment(id: number) {
   }
 }
 
+// ── Image Preview ──
+
+const showImageViewer = ref(false)
+const previewImages = ref<string[]>([])
+const previewIndex = ref(0)
+
+function openImagePreview(att: CaseAttachment) {
+  const imageAttachments = caseAttachments.value.filter(a => isImageAttachment(a))
+  previewImages.value = imageAttachments.map(a => getAttachmentUrl(a))
+  const idx = imageAttachments.findIndex(a => a.id === att.id)
+  previewIndex.value = idx >= 0 ? idx : 0
+  showImageViewer.value = true
+}
+
 async function downloadAttachment(file: CaseAttachment) {
   if (!selectedProject.value || !file.id) return
   try {
@@ -1762,14 +1776,19 @@ watch(selectedProject, (newId) => {
             <nav class="stitch-breadcrumb">
               <a href="#">项目管理</a>
               <span class="material-symbols-outlined breadcrumb-icon">chevron_right</span>
-              <a href="#">移动端应用 Alpha</a>
+              <a href="#">{{ projectStore.projects.find(p => p.id === selectedProject)?.name || '未知项目' }}</a>
               <span class="material-symbols-outlined breadcrumb-icon">chevron_right</span>
+              <template v-if="caseForm.modulePath && caseForm.modulePath !== '/未规划用例'">
+                <a href="#">{{ caseForm.modulePath }}</a>
+                <span class="material-symbols-outlined breadcrumb-icon">chevron_right</span>
+              </template>
               <span class="breadcrumb-active">{{ editingId ? '编辑测试用例' : '新建测试用例' }}</span>
             </nav>
             <h1 class="stitch-title">
-              {{ editingId ? '编辑测试用例: ' : '新建测试用例' }}
-              <span v-if="editingId" class="stitch-id-highlight">TC-{{ editingId }}</span>
-              {{ caseForm.title || '' }}
+              <template v-if="editingId">
+                {{ caseForm.title || '' }}
+              </template>
+              <template v-else>新建测试用例</template>
             </h1>
           </div>
           <div class="stitch-header-right">
@@ -2000,8 +2019,11 @@ watch(selectedProject, (newId) => {
                 <div v-for="att in caseAttachments.filter(a => isImageAttachment(a))" :key="att.id" class="asset-item image-preview group">
                   <img :src="getAttachmentUrl(att)" :alt="att.file_name" />
                   <div class="asset-overlay">
-                    <button class="icon-only" title="在新标签页查看" @click="downloadAttachment(att)">
+                    <button class="icon-only" title="预览图片" @click="openImagePreview(att)">
                       <span class="material-symbols-outlined" style="color: white; font-size: 20px;">visibility</span>
+                    </button>
+                    <button class="icon-only" title="下载" @click="downloadAttachment(att)" style="margin-left: 8px;">
+                      <span class="material-symbols-outlined" style="color: white; font-size: 20px;">download</span>
                     </button>
                     <button class="icon-only" title="删除" @click.stop="onRemoveAttachment(att.id)" style="margin-left: 8px;">
                       <span class="material-symbols-outlined" style="color: #ff5252; font-size: 20px;">delete</span>
@@ -2131,6 +2153,15 @@ watch(selectedProject, (newId) => {
         <el-button type="primary" @click="submitDirectory">创建并使用</el-button>
       </template>
     </el-dialog>
+
+    <!-- Image Viewer Modal -->
+    <el-image-viewer
+      v-if="showImageViewer"
+      :url-list="previewImages"
+      :initial-index="previewIndex"
+      @close="showImageViewer = false"
+      hide-on-click-modal
+    />
   </div>
 </template>
 
