@@ -5,8 +5,6 @@ import {
   CopyDocument,
   Delete,
   Edit,
-  CircleCheck,
-  Sort,
   Search,
   Grid,
   List,
@@ -1310,21 +1308,27 @@ watch(selectedProject, (newId) => {
         <Transition name="batch-slide">
           <div v-if="selectedIds.length > 0" class="batch-float-overlay">
             <div class="batch-float-bar">
-              <div class="batch-float-item batch-float-check">
-                <el-icon><CircleCheck /></el-icon>
-                <span>批量操作</span>
+              <div class="batch-left">
+                <div class="batch-count-badge">{{ selectedIds.length }}</div>
+                <div class="batch-text">
+                  <div class="batch-text-title">已选 {{ selectedIds.length }} 项用例</div>
+                  <div class="batch-text-sub">批量操作模式已启用</div>
+                </div>
               </div>
-              <div class="batch-float-divider"></div>
-              <button class="batch-float-item" @click="batchMoveVisible = true">
-                <el-icon><Sort /></el-icon>
-                <span>批量移动</span>
-              </button>
-              <button class="batch-float-item">
+              <div class="batch-actions">
+                <button class="batch-action-item">
+                  <span class="material-symbols-outlined" style="color: #60a5fa">play_circle</span>
+                  <span>批量执行</span>
+                </button>
+                <button class="batch-action-item">
+                  <span class="material-symbols-outlined" style="color: #a78bfa">person_add</span>
+                  <span>分配负责人</span>
+                </button>
                 <el-dropdown trigger="click" @command="onBatchUpdateLevel">
-                  <span class="batch-float-inner">
-                    <el-icon><Edit /></el-icon>
-                    <span>批量编辑</span>
-                  </span>
+                  <button class="batch-action-item">
+                    <span class="material-symbols-outlined" style="color: #fcd34d">checklist</span>
+                    <span>修改优先级</span>
+                  </button>
                   <template #dropdown>
                     <el-dropdown-menu>
                       <el-dropdown-item command="P0">P0</el-dropdown-item>
@@ -1334,17 +1338,23 @@ watch(selectedProject, (newId) => {
                     </el-dropdown-menu>
                   </template>
                 </el-dropdown>
-              </button>
-              <button class="batch-float-item batch-float-danger" @click="onBatchDelete">
-                <el-icon><Delete /></el-icon>
-                <span>批量删除</span>
-              </button>
-              <button
-                class="batch-float-close"
-                @click="selectedIds = []; selectAll = false"
-              >
-                ×
-              </button>
+                <button class="batch-action-item">
+                  <span class="material-symbols-outlined" style="color: #34d399">label</span>
+                  <span>打标签</span>
+                </button>
+                <button class="batch-action-item" @click="batchMoveVisible = true">
+                  <span class="material-symbols-outlined" style="color: #94a3b8">drive_file_move</span>
+                  <span>批量移动</span>
+                </button>
+                <button class="batch-action-item batch-action-danger" @click="onBatchDelete">
+                  <span class="material-symbols-outlined">delete</span>
+                  <span>批量删除</span>
+                </button>
+                <div class="batch-divider"></div>
+                <button class="batch-close" @click="selectedIds = []; selectAll = false">
+                  <span class="material-symbols-outlined">close</span>
+                </button>
+              </div>
             </div>
           </div>
         </Transition>

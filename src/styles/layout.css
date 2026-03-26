@@ -3084,99 +3084,124 @@
   pointer-events: auto;
   display: inline-flex;
   align-items: center;
-  gap: 0;
-  background: rgba(20, 20, 45, 0.94);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(124, 58, 237, 0.25);
-  border-radius: 10px;
-  padding: 4px 6px;
-  box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(255, 255, 255, 0.04),
-    inset 0 0 30px rgba(124, 58, 237, 0.03);
+  justify-content: space-between;
+  gap: 40px;
+  background: #111116;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  padding: 16px 24px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
-.batch-float-item {
-  display: inline-flex;
+.batch-left {
+  display: flex;
   align-items: center;
+  gap: 16px;
+}
+
+.batch-count-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(124, 58, 237, 0.2);
+  color: #c4b5fd;
+  font-size: 20px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.batch-text {
+  display: flex;
+  flex-direction: column;
   gap: 4px;
-  padding: 6px 12px;
-  border: none;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  border-radius: 6px;
-  transition:
-    background 0.15s,
-    color 0.15s;
-  white-space: nowrap;
 }
 
-.batch-float-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+.batch-text-title {
+  font-size: 15px;
+  font-weight: 600;
   color: #fff;
+  line-height: 1.2;
 }
 
-.batch-float-check {
-  color: var(--tp-primary-light, #a78bfa);
-  cursor: default;
+.batch-text-sub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  line-height: 1.2;
 }
 
-.batch-float-check .el-icon {
-  color: var(--tp-primary, #7c3aed);
-  background: rgba(124, 58, 237, 0.15);
-  border-radius: 4px;
-  padding: 2px;
+.batch-actions {
+  display: flex;
+  align-items: center;
+  gap: 24px;
 }
 
-.batch-float-divider {
-  width: 1px;
-  height: 18px;
-  background: rgba(255, 255, 255, 0.08);
-  margin: 0 2px;
+.batch-action-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
 }
 
-.batch-float-danger {
-  color: #f87171 !important;
-  background: rgba(239, 68, 68, 0.12);
-  border-radius: 8px;
+.batch-action-item:hover {
+  color: #fff;
+  transform: translateY(-2px);
 }
 
-.batch-float-danger:hover {
-  background: rgba(239, 68, 68, 0.25) !important;
+.batch-action-item .material-symbols-outlined {
+  font-size: 24px;
+}
+
+.batch-action-item span:not(.material-symbols-outlined) {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.batch-action-danger {
+  color: #ef4444 !important;
+}
+
+.batch-action-danger .material-symbols-outlined {
+  color: #ef4444;
+}
+
+.batch-action-danger:hover {
   color: #fca5a5 !important;
 }
 
-.batch-float-inner {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: inherit;
-  cursor: pointer;
+.batch-divider {
+  width: 1px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 8px;
 }
 
-.batch-float-close {
-  display: inline-flex;
+.batch-close {
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border: none;
   background: transparent;
+  border: none;
   color: rgba(255, 255, 255, 0.4);
-  font-size: 14px;
   cursor: pointer;
-  border-radius: 4px;
-  margin-left: 2px;
-  transition:
-    background 0.15s,
-    color 0.15s;
+  padding: 4px;
+  border-radius: 8px;
+  transition: all 0.2s;
 }
 
-.batch-float-close:hover {
-  background: rgba(255, 255, 255, 0.08);
+.batch-close .material-symbols-outlined {
+  font-size: 20px;
+}
+
+.batch-close:hover {
+  background: rgba(255, 255, 255, 0.1);
   color: #fff;
 }
 
