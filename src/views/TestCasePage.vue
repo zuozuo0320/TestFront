@@ -8,7 +8,6 @@ import {
   Search,
   Grid,
   List,
-  Plus,
 } from '@element-plus/icons-vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import LevelBadge from '../components/LevelBadge.vue'
@@ -1083,18 +1082,12 @@ watch(selectedProject, (newId) => {
               最近 7 天
             </button>
             <button class="insights-btn-primary">
-              <span class="material-symbols-outlined shrink-0" style="font-size: 18px">
-                download
-              </span>
-              导出报告
+              <span class="material-symbols-outlined shrink-0">download</span>
+              <span>导出报告</span>
             </button>
-            <button
-              class="insights-btn-primary"
-              style="margin-left: 12px; height: 36px; padding: 0 16px; gap: 6px;"
-              @click="openCreate"
-            >
-              <el-icon><Plus /></el-icon>
-              新建用例
+            <button class="insights-btn-primary" @click="openCreate">
+              <span class="material-symbols-outlined shrink-0">add</span>
+              <span>新建用例</span>
             </button>
             <input
               ref="importInput"
