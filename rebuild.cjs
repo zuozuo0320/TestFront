@@ -1,10 +1,24 @@
-<template>
+const fs = require('fs');
+const file = 'd:/ai_project/TestFront/src/views/system/UserManagement.vue';
+let content = fs.readFileSync(file, 'utf8');
+
+const tplStart = content.indexOf('<template>');
+const styleEnd = content.lastIndexOf('</style>') + 8;
+
+const before = content.substring(0, tplStart);
+
+const newTpl = `<template>
   <div v-loading="usersLoading" class="um-root">
 
-    <div class="um-top-header" style="border-bottom: none; background: transparent; backdrop-filter: none; padding-bottom: 0px; margin-bottom: 16px;">
-      <div class="insights-title-area">
-        <h2 class="insights-title">用户管理 (User Management)</h2>
-        <p class="insights-desc">管理系统用户、角色权限与安全审计状态。</p>
+    <div class="um-top-header">
+      <div class="um-th-left">
+        <h2 class="um-title">User Management</h2>
+        <nav class="um-nav">
+          <a class="um-nav-item active">All Users</a>
+          <a class="um-nav-item">Roles</a>
+          <a class="um-nav-item">Permissions</a>
+          <a class="um-nav-item">Audit Logs</a>
+        </nav>
       </div>
       <div class="um-th-right">
         <div class="um-search-box">
@@ -21,13 +35,13 @@
             <img class="um-admin-avatar" src="https://api.dicebear.com/7.x/initials/svg?seed=Admin" alt="Admin" />
           </div>
         </div>
-        <button class="um-add-btn" @click="openCreateUser">添加用户</button>
+        <button class="um-add-btn" @click="openCreateUser">ADD USER</button>
       </div>
     </div>
 
     <div class="um-dashboard-bento">
       <div class="um-bento-card">
-        <div class="um-bento-bg-icon group-hover-icon"><el-icon><UserIcon /></el-icon></div>
+        <div class="um-bento-bg-icon group-hover-icon"><el-icon><IconUser /></el-icon></div>
         <p class="um-bento-label">总用户量</p>
         <div class="um-bento-value-row">
           <h3 class="um-bento-value text-white">{{ users.length.toLocaleString() }}</h3>
@@ -44,7 +58,7 @@
       </div>
       <div class="um-bento-card col-span-2 flex-card">
         <div class="um-role-dist-wrapper">
-          <p class="um-bento-label mb-md">角色分布</p>
+          <p class="um-bento-label mb-md">角色分布 (Role Distribution)</p>
           <div class="um-role-bar">
             <div v-for="rd in roleDistribution" :key="rd.name" class="um-role-segment" :style="{ width: rd.percent + '%', background: rd.color }"></div>
           </div>
@@ -63,7 +77,7 @@
       <div class="um-list-header">
         <div class="um-list-h-left">
           <h4 class="um-list-title">所有用户</h4>
-          <span class="um-live-badge">实时更新</span>
+          <span class="um-live-badge">LIVE UPDATE</span>
         </div>
         <div class="um-list-h-right">
           <button class="um-action-btn"><el-icon><Filter /></el-icon></button>
@@ -96,7 +110,7 @@
                 </div>
               </td>
               <td>
-                <span class="um-role-badge" :style="{ color: getRoleAccentColor(u), backgroundColor: `${getRoleAccentColor(u)}1A`, borderColor: `${getRoleAccentColor(u)}33` }">
+                <span class="um-role-badge" :style="{ color: getRoleAccentColor(u), backgroundColor: \`\${getRoleAccentColor(u)}1A\`, borderColor: \`\${getRoleAccentColor(u)}33\` }">
                   {{ u.role_names[0] || u.role || '未分配' }}
                 </span>
               </td>
@@ -115,7 +129,7 @@
                   <button class="um-act hover-white" title="Edit" @click="openEditUser(u)"><el-icon><Edit /></el-icon></button>
                   <button class="um-act hover-secondary" title="Reset Password" @click="openResetPwd(u)"><el-icon><Clock /></el-icon></button>
                   <button class="um-act" :class="u.active ? 'hover-error' : 'hover-success'" :title="u.active ? 'Disable' : 'Enable'" :disabled="isAdmin(u)" @click="!isAdmin(u) && removeUser(u)">
-                    <el-icon><CircleClose v-if="u.active" /><CircleCheck v-else /></el-icon>
+                    <el-icon><CircleClose v-if="u.active" /><IconSelect v-else /></el-icon>
                   </button>
                 </div>
               </td>
@@ -125,7 +139,8 @@
         <div v-if="!usersLoading && filteredUsers.length === 0" class="um-empty">暂无用户</div>
       </div>
 
-      <div v-if="filteredUsers.length > 0" class="um-pagination" style="justify-content: flex-end;">
+      <div v-if="filteredUsers.length > 0" class="um-pagination">
+        <div>显示 {{ (userPage - 1) * userPageSize + 1 }} - {{ Math.min(userPage * userPageSize, filteredUsers.length) }} 的 {{ filteredUsers.length.toLocaleString() }} 名用户</div>
         <el-pagination
           background
           small
@@ -223,397 +238,6 @@
   </div>
 </template>
 
-<script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Bell, Grid, User as UserIcon, UserFilled, Filter, Download, Edit, Clock, CircleClose, CircleCheck } from '@element-plus/icons-vue'
-import {
-  listUsers,
-  createUser,
-  updateUser,
-  deleteUserById,
-  resetUserPassword,
-  listRoles,
-} from '../../api/user'
-import { listProjects } from '../../api/project'
-import type { User, Role, Project } from '../../api/types'
-
-/** 用户行类型，扩展了角色/项目关联 ID 和角色名称列表 */
-type UserRow = User & { role_ids: number[]; project_ids: number[]; role_names: string[] }
-
-const users = ref<UserRow[]>([])
-const roles = ref<Role[]>([])
-const projects = ref<Project[]>([])
-const usersLoading = ref(false)
-
-// ── 分页 ──
-const userPage = ref(1)
-const userPageSize = ref(10)
-const userPageSizeOptions = [10, 20, 50]
-
-// ── 筛选 ──
-const searchKeyword = ref('')
-
-const sysLogs = ref([
-  { id: 1, type: 'danger', title: '多地登录尝试拦截', desc: '用户 ID #9210 (na.li) 尝试从非法 IP 登录。', time: '2023-11-24 14:32:11' },
-  { id: 2, type: 'primary', title: '角色变更提醒', desc: '管理员 伟杰 将用户提升为 [QA 工程师]。', time: '2023-11-24 12:05:54' }
-]);
-const getMockRelativeTime = (id: number) => id % 2 === 0 ? '2分钟前' : '3天前';
-const getMockIp = (id: number) => id % 2 === 0 ? '192.168.1.45' : '18.23.4.192';
-
-const filterRoleId = ref<number | ''>('')
-const filterStatus = ref<'' | 'active' | 'disabled'>('')
-
-// ── 弹窗 ──
-const userDialogVisible = ref(false)
-const editingUserId = ref<number | null>(null)
-const savingUser = ref(false)
-const resetPwdDialogVisible = ref(false)
-const resetPwdUserId = ref<number | null>(null)
-const resetPwdUserName = ref('')
-const resetPwdForm = reactive({ newPassword: '' })
-const resettingPwd = ref(false)
-
-const userForm = reactive({
-  name: '',
-  email: '',
-  phone: '',
-  password: '',
-  roleIds: [] as number[],
-  projectIds: [] as number[],
-  active: true,
-})
-
-/** 构建角色 ID → 名称的映射表，用于快速查找 */
-const roleNameMap = computed(() => {
-  const map: Record<number, string> = {}
-  roles.value.forEach((r) => {
-    map[r.id] = r.display_name || r.name
-  })
-  return map
-})
-
-/** 根据筛选条件过滤用户列表 */
-const filteredUsers = computed(() => {
-  let list = users.value
-  // 关键词搜索（姓名/邮箱）
-  if (searchKeyword.value.trim()) {
-    const kw = searchKeyword.value.trim().toLowerCase()
-    list = list.filter(
-      (u) => u.name.toLowerCase().includes(kw) || u.email.toLowerCase().includes(kw),
-    )
-  }
-  // 角色筛选
-  if (filterRoleId.value !== null && filterRoleId.value !== '') {
-    list = list.filter((u) => u.role_ids.includes(filterRoleId.value as number))
-  }
-  // 状态筛选
-  if (filterStatus.value === 'active') {
-    list = list.filter((u) => u.active)
-  } else if (filterStatus.value === 'disabled') {
-    list = list.filter((u) => !u.active)
-  }
-  return list
-})
-
-/** 当前分页数据 */
-const pagedUsers = computed(() => {
-  const start = (userPage.value - 1) * userPageSize.value
-  return filteredUsers.value.slice(start, start + userPageSize.value)
-})
-
-/** 创建时排除 admin 角色（仅编辑时可授予 admin） */
-const creatableRoles = computed(() => roles.value.filter((r) => r.name !== 'admin'))
-
-/** 根据头像字段或用户名生成头像 URL */
-function resolveAvatarUrl(avatar?: string, fallbackName?: string) {
-  const avatarRaw = (avatar || '').trim()
-  if (avatarRaw) {
-    if (/^https?:\/\//i.test(avatarRaw)) return avatarRaw
-    const envBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
-    if (envBase && /^https?:\/\//i.test(envBase)) {
-      const origin = envBase.replace(/\/api\/v1\/?$/, '')
-      return `${origin}${avatarRaw.startsWith('/') ? '' : '/'}${avatarRaw}`
-    }
-    return `http://localhost:8080${avatarRaw.startsWith('/') ? '' : '/'}${avatarRaw}`
-  }
-  const seed = encodeURIComponent((fallbackName || 'Aisight').trim() || 'Aisight')
-  return `https://api.dicebear.com/7.x/initials/svg?seed=${seed}`
-}
-
-/** 加载用户列表，解析后端返回的 role_ids / project_ids，并补充 role_names */
-async function loadUsers() {
-  usersLoading.value = true
-  try {
-    const data = await listUsers()
-    users.value = (data as any[]).map((u: any) => {
-      const roleIds: number[] = u.role_ids ?? []
-      const projectIds: number[] = u.project_ids ?? []
-      return {
-        ...u,
-        role_ids: roleIds,
-        project_ids: projectIds,
-        role_names: roleIds.map((id: number) => roleNameMap.value[id] || `ID:${id}`),
-      }
-    })
-  } finally {
-    usersLoading.value = false
-  }
-}
-
-async function loadRoles() {
-  roles.value = await listRoles()
-}
-
-async function loadProjects() {
-  projects.value = await listProjects()
-}
-
-// ── 校验函数 ──
-
-function isValidName(name: string) {
-  const value = name.trim()
-  if (value.length < 2 || value.length > 40) return false
-  return /^[\u4e00-\u9fa5A-Za-z0-9\s·_-]+$/.test(value)
-}
-
-function isValidEmail(email: string) {
-  const value = email.trim().toLowerCase()
-  if (!value || value.length > 120) return false
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
-}
-
-function isValidPhone(phone: string) {
-  const value = phone.trim()
-  if (!value) return true
-  return /^1\d{10}$/.test(value)
-}
-
-/** 密码强度校验：≥8位，含大写+小写+数字 */
-function isValidPassword(pwd: string) {
-  if (pwd.length < 8) return false
-  return /[A-Z]/.test(pwd) && /[a-z]/.test(pwd) && /[0-9]/.test(pwd)
-}
-
-// ── CRUD 操作 ──
-
-/** 打开创建用户弹窗，重置表单 */
-function openCreateUser() {
-  editingUserId.value = null
-  userForm.name = ''
-  userForm.email = ''
-  userForm.phone = ''
-  userForm.password = ''
-  userForm.roleIds = []
-  userForm.projectIds = []
-  userForm.active = true
-  userDialogVisible.value = true
-}
-
-/** 打开编辑用户弹窗，回填已有数据 */
-function openEditUser(u: UserRow) {
-  editingUserId.value = u.id
-  userForm.name = u.name
-  userForm.email = u.email
-  userForm.phone = u.phone || ''
-  userForm.password = ''
-  userForm.roleIds = [...u.role_ids]
-  userForm.projectIds = [...u.project_ids]
-  userForm.active = u.active
-  userDialogVisible.value = true
-}
-
-/** 提交创建/编辑用户表单 */
-async function submitUser() {
-  const name = userForm.name.trim()
-  const email = userForm.email.trim()
-  const phone = userForm.phone.trim()
-
-  if (!isValidName(name)) {
-    ElMessage.warning('姓名格式不正确（2-40字符，支持中文/英文/数字）')
-    return
-  }
-  if (!editingUserId.value && !isValidEmail(email)) {
-    ElMessage.warning('邮箱格式不正确')
-    return
-  }
-  if (!isValidPhone(phone)) {
-    ElMessage.warning('手机号需为11位')
-    return
-  }
-  if (userForm.roleIds.length === 0) {
-    ElMessage.warning('请选择至少一个角色')
-    return
-  }
-  if (userForm.projectIds.length === 0) {
-    ElMessage.warning('请选择至少一个项目')
-    return
-  }
-  // 创建时密码必填
-  if (!editingUserId.value) {
-    if (!userForm.password) {
-      ElMessage.warning('请输入初始密码')
-      return
-    }
-    if (!isValidPassword(userForm.password)) {
-      ElMessage.warning('密码需≥8位，且包含大写字母、小写字母和数字')
-      return
-    }
-  }
-
-  savingUser.value = true
-  try {
-    if (editingUserId.value) {
-      await updateUser(editingUserId.value, {
-        name,
-        phone: phone || undefined,
-        active: userForm.active,
-        role_ids: userForm.roleIds,
-        project_ids: userForm.projectIds,
-      })
-      ElMessage.success('用户更新成功')
-    } else {
-      const defaultRoleName =
-        roles.value.find((r) => r.id === userForm.roleIds[0])?.name || 'tester'
-      await createUser({
-        name,
-        email,
-        phone: phone || undefined,
-        password: userForm.password,
-        role: defaultRoleName,
-        role_ids: userForm.roleIds,
-        project_ids: userForm.projectIds,
-      })
-      ElMessage.success('用户创建成功')
-    }
-    userDialogVisible.value = false
-    await loadUsers()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '保存用户失败')
-  } finally {
-    savingUser.value = false
-  }
-}
-
-/** 删除用户（逻辑删除） */
-async function removeUser(row: UserRow) {
-  try {
-    await ElMessageBox.confirm(`确认删除用户【${row.name}】？`, '删除确认', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      type: 'warning',
-    })
-  } catch {
-    return
-  }
-  try {
-    await deleteUserById(row.id)
-    ElMessage.success('用户已删除')
-    await loadUsers()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '删除用户失败')
-  }
-}
-
-/** 打开重置密码弹窗 */
-function openResetPwd(u: UserRow) {
-  resetPwdUserId.value = u.id
-  resetPwdUserName.value = u.name
-  resetPwdForm.newPassword = ''
-  resetPwdDialogVisible.value = true
-}
-
-/** 提交重置密码 */
-async function submitResetPwd() {
-  if (!isValidPassword(resetPwdForm.newPassword)) {
-    ElMessage.warning('密码需≥8位，且包含大写字母、小写字母和数字')
-    return
-  }
-  resettingPwd.value = true
-  try {
-    await resetUserPassword(resetPwdUserId.value!, resetPwdForm.newPassword)
-    ElMessage.success('密码重置成功')
-    resetPwdDialogVisible.value = false
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '重置密码失败')
-  } finally {
-    resettingPwd.value = false
-  }
-}
-
-/** 判断用户是否拥有 admin 角色（用于禁用删除按钮） */
-function isAdmin(u: UserRow) {
-  return (
-    u.role_names.some((n) => n.toLowerCase() === 'admin' || n === '系统管理员') ||
-    u.role === 'admin'
-  )
-}
-
-function onUserPaginationSizeChange(size: number) {
-  userPageSize.value = size
-  userPage.value = 1
-}
-
-function onUserPaginationCurrentChange(current: number) {
-  userPage.value = current
-}
-
-/* ── Design C: 统计数据计算 ── */
-
-/** 角色主题色映射 */
-const ROLE_COLORS: Record<string, string> = {
-  admin: '#ef4444',
-  manager: '#f59e0b',
-  tester: '#3b82f6',
-  reviewer: '#22c55e',
-  readonly: '#6b7280',
-  developer: '#8b5cf6',
-}
-const DEFAULT_COLOR = '#6366f1'
-
-/** 根据用户的首个角色返回对应的主题色（用于左侧彩色条） */
-function getRoleAccentColor(u: UserRow) {
-  if (u.role && ROLE_COLORS[u.role.toLowerCase()]) {
-    return ROLE_COLORS[u.role.toLowerCase()]
-  }
-  // 如果没有 role 字段，尝试从 role_ids 找到对应角色名
-  for (const rid of u.role_ids) {
-    const r = roles.value.find((role) => role.id === rid)
-    if (r && ROLE_COLORS[r.name.toLowerCase()]) {
-      return ROLE_COLORS[r.name.toLowerCase()]
-    }
-  }
-  return DEFAULT_COLOR
-}
-
-/** 活跃用户数 */
-const activeUserCount = computed(() => users.value.filter((u) => u.active).length)
-
-/** 角色分布统计 */
-const roleDistribution = computed(() => {
-  const counts: Record<number, number> = {}
-  users.value.forEach((u) => {
-    u.role_ids.forEach((rid) => {
-      counts[rid] = (counts[rid] || 0) + 1
-    })
-  })
-  const maxCount = Math.max(...Object.values(counts), 1)
-  return roles.value.map((r) => ({
-    name: r.name,
-    displayName: r.display_name || r.name,
-    count: counts[r.id] || 0,
-    percent: ((counts[r.id] || 0) / maxCount) * 100,
-    color: ROLE_COLORS[r.name.toLowerCase()] || DEFAULT_COLOR,
-  }))
-})
-
-/** 初始化：先加载角色和项目（用于 roleNameMap），再加载用户 */
-onMounted(async () => {
-  await Promise.all([loadRoles(), loadProjects()])
-  await loadUsers()
-})
-</script>
-
 <style scoped>
 /* ── Typography & Variables ── */
 .um-root {
@@ -637,7 +261,7 @@ onMounted(async () => {
   color: var(--text-on-surface);
   line-height: 1.5;
   min-height: 100vh;
-  padding: 16px 20px;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 32px;
@@ -663,9 +287,11 @@ onMounted(async () => {
 }
 .um-th-left { display: flex; align-items: center; gap: 32px; }
 .um-title {
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 600;
-  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-slate);
   margin: 0;
 }
 .um-nav { display: flex; gap: 24px; }
@@ -728,7 +354,7 @@ onMounted(async () => {
 .um-icon-btn:hover { color: #fff; }
 .um-notify { position: relative; }
 .um-notify-dot {
-  position: absolute;
+  absolute: true;
   right: -2px;
   top: -2px;
   width: 8px;
@@ -1099,3 +725,5 @@ onMounted(async () => {
 .um-dialog :deep(.el-dialog) { background: #1e1e2d; border-radius: 12px; }
 .um-dialog :deep(.el-dialog__title) { color: #fff; }
 </style>
+`;
+fs.writeFileSync(file, before + newTpl);

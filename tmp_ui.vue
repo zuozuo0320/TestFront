@@ -1,232 +1,7 @@
-<template>
-  <div v-loading="usersLoading" class="um-root">
-
-    <div class="um-top-header" style="border-bottom: none; background: transparent; backdrop-filter: none; padding-bottom: 0px; margin-bottom: 16px;">
-      <div class="insights-title-area">
-        <h2 class="insights-title">用户管理 (User Management)</h2>
-        <p class="insights-desc">管理系统用户、角色权限与安全审计状态。</p>
-      </div>
-      <div class="um-th-right">
-        <div class="um-search-box">
-          <el-icon class="um-search-icon"><Search /></el-icon>
-          <input type="text" class="um-search-input" placeholder="搜索用户..." v-model="searchKeyword" />
-        </div>
-        <div class="um-toolbar-icons">
-          <button class="um-icon-btn um-notify">
-            <el-icon><Bell /></el-icon>
-            <span class="um-notify-dot"></span>
-          </button>
-          <button class="um-icon-btn"><el-icon><Grid /></el-icon></button>
-          <div class="um-avatar-border">
-            <img class="um-admin-avatar" src="https://api.dicebear.com/7.x/initials/svg?seed=Admin" alt="Admin" />
-          </div>
-        </div>
-        <button class="um-add-btn" @click="openCreateUser">添加用户</button>
-      </div>
-    </div>
-
-    <div class="um-dashboard-bento">
-      <div class="um-bento-card">
-        <div class="um-bento-bg-icon group-hover-icon"><el-icon><UserIcon /></el-icon></div>
-        <p class="um-bento-label">总用户量</p>
-        <div class="um-bento-value-row">
-          <h3 class="um-bento-value text-white">{{ users.length.toLocaleString() }}</h3>
-          <span class="um-bento-trend success">↑ 12%</span>
-        </div>
-      </div>
-      <div class="um-bento-card">
-        <div class="um-bento-bg-icon group-hover-icon"><el-icon><UserFilled /></el-icon></div>
-        <p class="um-bento-label">活跃用户</p>
-        <div class="um-bento-value-row">
-          <h3 class="um-bento-value text-secondary">{{ activeUserCount.toLocaleString() }}</h3>
-          <span class="um-bento-trend faint">76.6% 转化率</span>
-        </div>
-      </div>
-      <div class="um-bento-card col-span-2 flex-card">
-        <div class="um-role-dist-wrapper">
-          <p class="um-bento-label mb-md">角色分布</p>
-          <div class="um-role-bar">
-            <div v-for="rd in roleDistribution" :key="rd.name" class="um-role-segment" :style="{ width: rd.percent + '%', background: rd.color }"></div>
-          </div>
-          <div class="um-role-legends">
-            <span v-for="rd in roleDistribution" :key="rd.name" class="um-role-legend">
-              <span class="um-legend-dot" :style="{ background: rd.color }"></span>
-              {{ rd.displayName }} ({{ Math.round(rd.percent) }}%)
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- User List Panel -->
-    <div class="um-list-panel">
-      <div class="um-list-header">
-        <div class="um-list-h-left">
-          <h4 class="um-list-title">所有用户</h4>
-          <span class="um-live-badge">实时更新</span>
-        </div>
-        <div class="um-list-h-right">
-          <button class="um-action-btn"><el-icon><Filter /></el-icon></button>
-          <button class="um-action-btn"><el-icon><Download /></el-icon></button>
-        </div>
-      </div>
-
-      <div class="um-table-wrapper">
-        <table class="um-table">
-          <thead>
-            <tr>
-              <th>用户信息</th>
-              <th>角色级别</th>
-              <th>最后登录</th>
-              <th>状态</th>
-              <th class="text-right">管理操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="u in pagedUsers" :key="u.id" class="um-tr">
-              <td>
-                <div class="um-user-cell">
-                  <div class="um-avatar-glass">
-                    <img :src="resolveAvatarUrl(u.avatar, u.name)" />
-                  </div>
-                  <div class="um-user-text">
-                    <p class="um-name">{{ u.name }}</p>
-                    <p class="um-email">{{ u.email }}</p>
-                  </div>
-                </div>
-              </td>
-              <td>
-                <span class="um-role-badge" :style="{ color: getRoleAccentColor(u), backgroundColor: `${getRoleAccentColor(u)}1A`, borderColor: `${getRoleAccentColor(u)}33` }">
-                  {{ u.role_names[0] || u.role || '未分配' }}
-                </span>
-              </td>
-              <td>
-                <p class="um-time">{{ getMockRelativeTime(u.id) }}</p>
-                <p class="um-ip">IP: {{ getMockIp(u.id) }}</p>
-              </td>
-              <td>
-                <div class="um-status-cell">
-                  <span class="um-status-dot" :class="u.active ? 'active' : 'disabled'"></span>
-                  <span class="um-status-text" :class="u.active ? 'text-success' : 'text-error'">{{ u.active ? '在线' : '禁用' }}</span>
-                </div>
-              </td>
-              <td class="text-right">
-                <div class="um-actions-cell">
-                  <button class="um-act hover-white" title="Edit" @click="openEditUser(u)"><el-icon><Edit /></el-icon></button>
-                  <button class="um-act hover-secondary" title="Reset Password" @click="openResetPwd(u)"><el-icon><Clock /></el-icon></button>
-                  <button class="um-act" :class="u.active ? 'hover-error' : 'hover-success'" :title="u.active ? 'Disable' : 'Enable'" :disabled="isAdmin(u)" @click="!isAdmin(u) && removeUser(u)">
-                    <el-icon><CircleClose v-if="u.active" /><CircleCheck v-else /></el-icon>
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <div v-if="!usersLoading && filteredUsers.length === 0" class="um-empty">暂无用户</div>
-      </div>
-
-      <div v-if="filteredUsers.length > 0" class="um-pagination" style="justify-content: flex-end;">
-        <el-pagination
-          background
-          small
-          :current-page="userPage"
-          :page-size="userPageSize"
-          :total="filteredUsers.length"
-          layout="prev, pager, next"
-          @current-change="onUserPaginationCurrentChange"
-        />
-      </div>
-    </div>
-
-    <!-- Security Cards -->
-    <div class="um-security-section">
-      <div class="um-sec-panel sys-logs">
-        <div class="um-sec-header">
-          <h5 class="um-sec-title">系统安全日志</h5>
-          <button class="um-sec-link">查看全部</button>
-        </div>
-        <div class="um-log-list">
-          <div v-for="log in sysLogs" :key="log.id" class="um-log-row group">
-            <div class="um-log-dot" :class="log.type"></div>
-            <div class="um-log-content">
-              <p class="um-log-desc"><span class="text-white">{{ log.title }}:</span> {{ log.desc }}</p>
-              <span class="um-log-time">{{ log.time }}</span>
-            </div>
-            <button class="um-log-link"><el-icon><Edit /></el-icon></button> <!-- Fake external icon -->
-          </div>
-        </div>
-      </div>
-
-      <div class="um-sec-panel audit-status">
-        <el-icon class="um-audit-bg-icon"><Clock /></el-icon>
-        <h6 class="um-sec-title white-text mb-md">安全审查状态</h6>
-        <div class="um-audit-progress">
-          <div class="um-audit-bar-track">
-            <div class="um-audit-bar-fill"></div>
-          </div>
-          <span class="um-audit-pct">92%</span>
-        </div>
-        <p class="um-audit-desc">您的系统安全等级为“优”。当前有 12 个账号未开启多因素认证 (MFA)，建议立即执行审查。</p>
-        <button class="um-audit-btn">启动全员审查</button>
-      </div>
-    </div>
-
-    <!-- Dialogs -->
-    <el-dialog v-model="userDialogVisible" :title="editingUserId ? '编辑用户' : '新建用户'" width="640px" class="um-dialog">
-      <el-form label-position="top">
-        <el-form-item label="姓名">
-          <el-input v-model="userForm.name" placeholder="2-40字符" />
-        </el-form-item>
-        <el-form-item label="邮箱">
-          <el-input v-model="userForm.email" :disabled="!!editingUserId" placeholder="登录邮箱（创建后不可修改）" />
-        </el-form-item>
-        <el-form-item v-if="!editingUserId" label="初始密码">
-          <el-input v-model="userForm.password" type="password" show-password placeholder="≥8位，含大写+小写+数字" />
-        </el-form-item>
-        <el-form-item label="手机号">
-          <el-input v-model="userForm.phone" placeholder="选填" />
-        </el-form-item>
-        <el-form-item label="角色（必选，可多选）">
-          <el-select v-model="userForm.roleIds" multiple filterable placeholder="请选择角色" style="width: 100%">
-            <el-option v-for="r in editingUserId ? roles : creatableRoles" :key="r.id" :label="r.display_name || r.name" :value="r.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="项目（必选，可多选）">
-          <el-select v-model="userForm.projectIds" multiple filterable placeholder="请选择项目" style="width: 100%">
-            <el-option v-for="p in projects" :key="p.id" :label="p.name" :value="p.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-switch v-model="userForm.active" active-text="启用" inactive-text="冻结" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="userDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="savingUser" @click="submitUser">保存</el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog v-model="resetPwdDialogVisible" title="重置密码" width="440px" class="um-dialog">
-      <p style="margin-bottom: 12px; color: rgba(255, 255, 255, 0.6); font-size: 13px">
-        为用户【{{ resetPwdUserName }}】设置新密码
-      </p>
-      <el-form label-position="top">
-        <el-form-item label="新密码">
-          <el-input v-model="resetPwdForm.newPassword" type="password" show-password placeholder="≥8位，含大写+小写+数字" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="resetPwdDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="resettingPwd" @click="submitResetPwd">确认重置</el-button>
-      </template>
-    </el-dialog>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Bell, Grid, User as UserIcon, UserFilled, Filter, Download, Edit, Clock, CircleClose, CircleCheck } from '@element-plus/icons-vue'
+import { Search, Bell, Grid, Plus, Edit, Clock, CircleClose, Select as IconSelect, Filter, Download, User as IconUser, UserFilled } from '@element-plus/icons-vue'
 import {
   listUsers,
   createUser,
@@ -253,14 +28,6 @@ const userPageSizeOptions = [10, 20, 50]
 
 // ── 筛选 ──
 const searchKeyword = ref('')
-
-const sysLogs = ref([
-  { id: 1, type: 'danger', title: '多地登录尝试拦截', desc: '用户 ID #9210 (na.li) 尝试从非法 IP 登录。', time: '2023-11-24 14:32:11' },
-  { id: 2, type: 'primary', title: '角色变更提醒', desc: '管理员 伟杰 将用户提升为 [QA 工程师]。', time: '2023-11-24 12:05:54' }
-]);
-const getMockRelativeTime = (id: number) => id % 2 === 0 ? '2分钟前' : '3天前';
-const getMockIp = (id: number) => id % 2 === 0 ? '192.168.1.45' : '18.23.4.192';
-
 const filterRoleId = ref<number | ''>('')
 const filterStatus = ref<'' | 'active' | 'disabled'>('')
 
@@ -597,15 +364,30 @@ const roleDistribution = computed(() => {
       counts[rid] = (counts[rid] || 0) + 1
     })
   })
-  const maxCount = Math.max(...Object.values(counts), 1)
+  const totalCount = Math.max(Object.values(counts).reduce((a, b) => a + b, 0), 1)
   return roles.value.map((r) => ({
     name: r.name,
     displayName: r.display_name || r.name,
     count: counts[r.id] || 0,
-    percent: ((counts[r.id] || 0) / maxCount) * 100,
+    percent: ((counts[r.id] || 0) / totalCount) * 100,
     color: ROLE_COLORS[r.name.toLowerCase()] || DEFAULT_COLOR,
-  }))
+  })).filter(r => r.count > 0)
 })
+
+const sysLogs = ref([
+  { id: 1, type: 'danger', title: '多地登录尝试拦截', desc: '用户 ID #9210 (na.li) 尝试从非法 IP 212.x.x.x 登录。', time: '2023-11-24 14:32:11' },
+  { id: 2, type: 'primary', title: '角色变更提醒', desc: '管理员 陈作杰 将 用户 #3312 的权限提升为 [QA 工程师]。', time: '2023-11-24 12:05:54' }
+])
+
+function getMockRelativeTime(id: number) {
+  const times = ['2分钟前', '45分钟前', '3天前', '12小时前']
+  return times[id % times.length]
+}
+
+function getMockIp(id: number) {
+  const ips = ['192.168.1.45', '210.12.55.101', '10.23.4.192', '未知']
+  return ips[id % ips.length]
+}
 
 /** 初始化：先加载角色和项目（用于 roleNameMap），再加载用户 */
 onMounted(async () => {
@@ -613,6 +395,237 @@ onMounted(async () => {
   await loadUsers()
 })
 </script>
+
+<template>
+  <div v-loading="usersLoading" class="um-root">
+
+    <div class="um-top-header">
+      <div class="um-th-left">
+        <h2 class="um-title">User Management</h2>
+        <nav class="um-nav">
+          <a class="um-nav-item active">All Users</a>
+          <a class="um-nav-item">Roles</a>
+          <a class="um-nav-item">Permissions</a>
+          <a class="um-nav-item">Audit Logs</a>
+        </nav>
+      </div>
+      <div class="um-th-right">
+        <div class="um-search-box">
+          <el-icon class="um-search-icon"><Search /></el-icon>
+          <input type="text" class="um-search-input" placeholder="搜索用户..." v-model="searchKeyword" />
+        </div>
+        <div class="um-toolbar-icons">
+          <button class="um-icon-btn um-notify">
+            <el-icon><Bell /></el-icon>
+            <span class="um-notify-dot"></span>
+          </button>
+          <button class="um-icon-btn"><el-icon><Grid /></el-icon></button>
+          <div class="um-avatar-border">
+            <img class="um-admin-avatar" src="https://api.dicebear.com/7.x/initials/svg?seed=Admin" alt="Admin" />
+          </div>
+        </div>
+        <button class="um-add-btn" @click="openCreateUser">ADD USER</button>
+      </div>
+    </div>
+
+    <div class="um-dashboard-bento">
+      <div class="um-bento-card">
+        <div class="um-bento-bg-icon group-hover-icon"><el-icon><IconUser /></el-icon></div>
+        <p class="um-bento-label">总用户量</p>
+        <div class="um-bento-value-row">
+          <h3 class="um-bento-value text-white">{{ users.length.toLocaleString() }}</h3>
+          <span class="um-bento-trend success">↑ 12%</span>
+        </div>
+      </div>
+      <div class="um-bento-card">
+        <div class="um-bento-bg-icon group-hover-icon"><el-icon><UserFilled /></el-icon></div>
+        <p class="um-bento-label">活跃用户</p>
+        <div class="um-bento-value-row">
+          <h3 class="um-bento-value text-secondary">{{ activeUserCount.toLocaleString() }}</h3>
+          <span class="um-bento-trend faint">76.6% 转化率</span>
+        </div>
+      </div>
+      <div class="um-bento-card col-span-2 flex-card">
+        <div class="um-role-dist-wrapper">
+          <p class="um-bento-label mb-md">角色分布 (Role Distribution)</p>
+          <div class="um-role-bar">
+            <div v-for="rd in roleDistribution" :key="rd.name" class="um-role-segment" :style="{ width: rd.percent + '%', background: rd.color }"></div>
+          </div>
+          <div class="um-role-legends">
+            <span v-for="rd in roleDistribution" :key="rd.name" class="um-role-legend">
+              <span class="um-legend-dot" :style="{ background: rd.color }"></span>
+              {{ rd.displayName }} ({{ Math.round(rd.percent) }}%)
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- User List Panel -->
+    <div class="um-list-panel">
+      <div class="um-list-header">
+        <div class="um-list-h-left">
+          <h4 class="um-list-title">所有用户</h4>
+          <span class="um-live-badge">LIVE UPDATE</span>
+        </div>
+        <div class="um-list-h-right">
+          <button class="um-action-btn"><el-icon><Filter /></el-icon></button>
+          <button class="um-action-btn"><el-icon><Download /></el-icon></button>
+        </div>
+      </div>
+
+      <div class="um-table-wrapper">
+        <table class="um-table">
+          <thead>
+            <tr>
+              <th>用户信息</th>
+              <th>角色级别</th>
+              <th>最后登录</th>
+              <th>状态</th>
+              <th class="text-right">管理操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="u in pagedUsers" :key="u.id" class="um-tr">
+              <td>
+                <div class="um-user-cell">
+                  <div class="um-avatar-glass">
+                    <img :src="resolveAvatarUrl(u.avatar, u.name)" />
+                  </div>
+                  <div class="um-user-text">
+                    <p class="um-name">{{ u.name }}</p>
+                    <p class="um-email">{{ u.email }}</p>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span class="um-role-badge" :style="{ color: getRoleAccentColor(u), backgroundColor: `${getRoleAccentColor(u)}1A`, borderColor: `${getRoleAccentColor(u)}33` }">
+                  {{ u.role_names[0] || u.role || '未分配' }}
+                </span>
+              </td>
+              <td>
+                <p class="um-time">{{ getMockRelativeTime(u.id) }}</p>
+                <p class="um-ip">IP: {{ getMockIp(u.id) }}</p>
+              </td>
+              <td>
+                <div class="um-status-cell">
+                  <span class="um-status-dot" :class="u.active ? 'active' : 'disabled'"></span>
+                  <span class="um-status-text" :class="u.active ? 'text-success' : 'text-error'">{{ u.active ? '在线' : '禁用' }}</span>
+                </div>
+              </td>
+              <td class="text-right">
+                <div class="um-actions-cell">
+                  <button class="um-act hover-white" title="Edit" @click="openEditUser(u)"><el-icon><Edit /></el-icon></button>
+                  <button class="um-act hover-secondary" title="Reset Password" @click="openResetPwd(u)"><el-icon><Clock /></el-icon></button>
+                  <button class="um-act" :class="u.active ? 'hover-error' : 'hover-success'" :title="u.active ? 'Disable' : 'Enable'" :disabled="isAdmin(u)" @click="!isAdmin(u) && removeUser(u)">
+                    <el-icon><CircleClose v-if="u.active" /><IconSelect v-else /></el-icon>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-if="!usersLoading && filteredUsers.length === 0" class="um-empty">暂无用户</div>
+      </div>
+
+      <div v-if="filteredUsers.length > 0" class="um-pagination">
+        <div>显示 {{ (userPage - 1) * userPageSize + 1 }} - {{ Math.min(userPage * userPageSize, filteredUsers.length) }} 的 {{ filteredUsers.length.toLocaleString() }} 名用户</div>
+        <el-pagination
+          background
+          small
+          :current-page="userPage"
+          :page-size="userPageSize"
+          :total="filteredUsers.length"
+          layout="prev, pager, next"
+          @current-change="onUserPaginationCurrentChange"
+        />
+      </div>
+    </div>
+
+    <!-- Security Cards -->
+    <div class="um-security-section">
+      <div class="um-sec-panel sys-logs">
+        <div class="um-sec-header">
+          <h5 class="um-sec-title">系统安全日志</h5>
+          <button class="um-sec-link">查看全部</button>
+        </div>
+        <div class="um-log-list">
+          <div v-for="log in sysLogs" :key="log.id" class="um-log-row group">
+            <div class="um-log-dot" :class="log.type"></div>
+            <div class="um-log-content">
+              <p class="um-log-desc"><span class="text-white">{{ log.title }}:</span> {{ log.desc }}</p>
+              <span class="um-log-time">{{ log.time }}</span>
+            </div>
+            <button class="um-log-link"><el-icon><Edit /></el-icon></button> <!-- Fake external icon -->
+          </div>
+        </div>
+      </div>
+
+      <div class="um-sec-panel audit-status">
+        <el-icon class="um-audit-bg-icon"><Clock /></el-icon>
+        <h6 class="um-sec-title white-text mb-md">安全审查状态</h6>
+        <div class="um-audit-progress">
+          <div class="um-audit-bar-track">
+            <div class="um-audit-bar-fill"></div>
+          </div>
+          <span class="um-audit-pct">92%</span>
+        </div>
+        <p class="um-audit-desc">您的系统安全等级为“优”。当前有 12 个账号未开启多因素认证 (MFA)，建议立即执行审查。</p>
+        <button class="um-audit-btn">启动全员审查</button>
+      </div>
+    </div>
+
+    <!-- Dialogs -->
+    <el-dialog v-model="userDialogVisible" :title="editingUserId ? '编辑用户' : '新建用户'" width="640px" class="um-dialog">
+      <el-form label-position="top">
+        <el-form-item label="姓名">
+          <el-input v-model="userForm.name" placeholder="2-40字符" />
+        </el-form-item>
+        <el-form-item label="邮箱">
+          <el-input v-model="userForm.email" :disabled="!!editingUserId" placeholder="登录邮箱（创建后不可修改）" />
+        </el-form-item>
+        <el-form-item v-if="!editingUserId" label="初始密码">
+          <el-input v-model="userForm.password" type="password" show-password placeholder="≥8位，含大写+小写+数字" />
+        </el-form-item>
+        <el-form-item label="手机号">
+          <el-input v-model="userForm.phone" placeholder="选填" />
+        </el-form-item>
+        <el-form-item label="角色（必选，可多选）">
+          <el-select v-model="userForm.roleIds" multiple filterable placeholder="请选择角色" style="width: 100%">
+            <el-option v-for="r in editingUserId ? roles : creatableRoles" :key="r.id" :label="r.display_name || r.name" :value="r.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="项目（必选，可多选）">
+          <el-select v-model="userForm.projectIds" multiple filterable placeholder="请选择项目" style="width: 100%">
+            <el-option v-for="p in projects" :key="p.id" :label="p.name" :value="p.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-switch v-model="userForm.active" active-text="启用" inactive-text="冻结" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="userDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="savingUser" @click="submitUser">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="resetPwdDialogVisible" title="重置密码" width="440px" class="um-dialog">
+      <p style="margin-bottom: 12px; color: rgba(255, 255, 255, 0.6); font-size: 13px">
+        为用户【{{ resetPwdUserName }}】设置新密码
+      </p>
+      <el-form label-position="top">
+        <el-form-item label="新密码">
+          <el-input v-model="resetPwdForm.newPassword" type="password" show-password placeholder="≥8位，含大写+小写+数字" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="resetPwdDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="resettingPwd" @click="submitResetPwd">确认重置</el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
 
 <style scoped>
 /* ── Typography & Variables ── */
@@ -637,7 +650,7 @@ onMounted(async () => {
   color: var(--text-on-surface);
   line-height: 1.5;
   min-height: 100vh;
-  padding: 16px 20px;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 32px;
@@ -663,9 +676,11 @@ onMounted(async () => {
 }
 .um-th-left { display: flex; align-items: center; gap: 32px; }
 .um-title {
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 600;
-  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-slate);
   margin: 0;
 }
 .um-nav { display: flex; gap: 24px; }
@@ -728,7 +743,7 @@ onMounted(async () => {
 .um-icon-btn:hover { color: #fff; }
 .um-notify { position: relative; }
 .um-notify-dot {
-  position: absolute;
+  absolute: true;
   right: -2px;
   top: -2px;
   width: 8px;
