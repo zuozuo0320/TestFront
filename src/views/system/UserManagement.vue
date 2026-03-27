@@ -1,27 +1,27 @@
 <template>
   <div v-loading="usersLoading" class="um-root">
 
-    <div class="um-top-header" style="border-bottom: none; background: transparent; backdrop-filter: none; padding-bottom: 0px; margin-bottom: 16px;">
-      <div class="insights-title-area">
-        <h2 class="insights-title">用户管理 (User Management)</h2>
-        <p class="insights-desc">管理系统用户、角色权限与安全审计状态。</p>
+    <div class="um-top-header">
+      <div class="um-header-left">
+        <h2 class="um-title">用户管理</h2>
+        <p class="um-subtitle">管理系统用户、角色权限与安全审计状态。</p>
       </div>
-      <div class="um-th-right">
-        <div class="um-search-box">
-          <el-icon class="um-search-icon"><Search /></el-icon>
-          <input type="text" class="um-search-input" placeholder="搜索用户..." v-model="searchKeyword" />
-        </div>
-        <div class="um-toolbar-icons">
-          <button class="um-icon-btn um-notify">
-            <el-icon><Bell /></el-icon>
-            <span class="um-notify-dot"></span>
-          </button>
-          <button class="um-icon-btn"><el-icon><Grid /></el-icon></button>
-          <div class="um-avatar-border">
-            <img class="um-admin-avatar" src="https://api.dicebear.com/7.x/initials/svg?seed=Admin" alt="Admin" />
+      <div class="um-header-right">
+        <div class="um-stats-panel">
+          <div class="um-stat-item">
+            <span class="um-stat-label">总用户</span>
+            <span class="um-stat-number um-stat-primary">{{ users.length }}</span>
           </div>
+          <div class="um-stat-divider"></div>
+          <div class="um-stat-item">
+            <span class="um-stat-label">活跃用户</span>
+            <span class="um-stat-number um-stat-secondary">{{ activeUserCount }}</span>
+          </div>
+          <button class="um-add-btn" @click="openCreateUser">
+            <span class="um-add-icon">+</span>
+            添加用户
+          </button>
         </div>
-        <button class="um-add-btn" @click="openCreateUser">添加用户</button>
       </div>
     </div>
 
@@ -226,7 +226,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Bell, Grid, User as UserIcon, UserFilled, Filter, Download, Edit, Clock, CircleClose, CircleCheck } from '@element-plus/icons-vue'
+import { User as UserIcon, UserFilled, Filter, Download, Edit, Clock, CircleClose, CircleCheck } from '@element-plus/icons-vue'
 import {
   listUsers,
   createUser,
@@ -650,115 +650,75 @@ onMounted(async () => {
 .text-error { color: var(--error); }
 .mb-md { margin-bottom: 16px; }
 
-/* ── Top Header ── */
+/* ── Top Header (与角色管理统一) ── */
 .um-top-header {
   display: flex;
   justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.um-header-left { flex: 1; min-width: 200px; }
+.um-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: #e1e1f2;
+  margin: 0 0 6px 0;
+  letter-spacing: -0.5px;
+}
+.um-subtitle {
+  font-size: 14px;
+  color: #ccc3d8;
+  margin: 0;
+  font-weight: 300;
+}
+.um-header-right { display: flex; align-items: center; flex-shrink: 0; }
+
+/* Stats panel — glass container (与角色管理统一) */
+.um-stats-panel {
+  display: flex;
   align-items: center;
   gap: 32px;
-  background: rgba(17, 19, 30, 0.8);
-  backdrop-filter: blur(24px);
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border-lighter);
+  padding: 16px 24px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(74, 68, 85, 0.15);
 }
-.um-th-left { display: flex; align-items: center; gap: 32px; }
-.um-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #fff;
-  margin: 0;
-}
-.um-nav { display: flex; gap: 24px; }
-.um-nav-item {
-  font-size: 11px;
-  font-weight: 400;
+.um-stat-item { text-align: center; }
+.um-stat-label {
+  display: block;
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-slate);
-  padding-bottom: 8px;
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
-  transition: all 0.2s;
+  letter-spacing: 2px;
+  color: #958da1;
+  margin-bottom: 4px;
 }
-.um-nav-item:hover { color: #fff; }
-.um-nav-item.active {
-  color: var(--primary);
-  border-bottom-color: var(--primary-container);
-  font-weight: 700;
-}
+.um-stat-number { font-size: 24px; font-weight: 700; }
+.um-stat-primary { color: #d2bbff; }
+.um-stat-secondary { color: #adc6ff; }
+.um-stat-divider { width: 1px; height: 32px; background: rgba(74, 68, 85, 0.2); }
 
-.um-th-right { display: flex; align-items: center; gap: 24px; }
-.um-search-box { position: relative; }
-.um-search-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #64748b;
-}
-.um-search-input {
-  background: #0c0e18;
-  border: none;
-  border-radius: 8px;
-  padding: 6px 16px 6px 40px;
-  font-size: 12px;
-  color: #fff;
-  width: 256px;
-  outline: none;
-}
-.um-search-input::placeholder { color: #475569; }
-
-.um-toolbar-icons {
+/* Add button — inside the glass panel (与角色管理统一) */
+.um-add-btn {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding-left: 24px;
-  border-left: 1px solid rgba(74, 68, 85, 0.2);
-}
-.um-icon-btn {
-  background: transparent;
+  gap: 8px;
+  padding: 10px 20px;
+  margin-left: 16px;
+  border-radius: 10px;
   border: none;
-  color: var(--text-slate);
-  font-size: 20px;
-  cursor: pointer;
-  padding: 0;
-  display: flex;
-  transition: color 0.2s;
-}
-.um-icon-btn:hover { color: #fff; }
-.um-notify { position: relative; }
-.um-notify-dot {
-  position: absolute;
-  right: -2px;
-  top: -2px;
-  width: 8px;
-  height: 8px;
-  background: var(--primary);
-  border: 2px solid var(--bg-main);
-  border-radius: 50%;
-}
-.um-avatar-border {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 1px solid rgba(210, 187, 255, 0.3);
-  overflow: hidden;
-}
-.um-admin-avatar { width: 100%; height: 100%; object-fit: cover; }
-.um-add-btn {
-  background: linear-gradient(to right, var(--primary-container), var(--secondary-container));
-  border: none;
-  padding: 8px 16px;
-  border-radius: 8px;
+  background: #7c3aed;
   color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: -0.02em;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
+  transition: all 0.2s;
+  white-space: nowrap;
 }
-.um-add-btn:active { box-shadow: 0 0 15px rgba(124, 58, 237, 0.5); transform: scale(0.98); }
+.um-add-btn:hover { filter: brightness(1.15); }
+.um-add-btn:active { transform: scale(0.95); }
+.um-add-icon { font-size: 16px; font-weight: 700; }
 
 /* ── Bento Grid ── */
 .um-dashboard-bento {

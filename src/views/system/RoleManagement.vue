@@ -7,19 +7,68 @@ import type { Role } from '../../api/types'
 /** 预置角色标识名集合（与后端 model.IsPresetSystemRole 保持一致） */
 const PRESET_ROLES = new Set(['admin', 'manager', 'tester', 'reviewer', 'developer', 'readonly'])
 
-/** 角色对应的主题色 */
-const ROLE_COLORS: Record<string, string> = {
-  admin: '#ef4444',
-  manager: '#f59e0b',
-  tester: '#3b82f6',
-  reviewer: '#22c55e',
-  readonly: '#6b7280',
-  developer: '#8b5cf6',
+/** 角色对应的图标（Material Symbols） */
+const ROLE_ICONS: Record<string, string> = {
+  admin: 'admin_panel_settings',
+  manager: 'architecture',
+  tester: 'touch_app',
+  reviewer: 'visibility',
+  readonly: 'lock',
+  developer: 'bolt',
 }
-const DEFAULT_COLOR = '#6366f1'
 
-function getRoleColor(name: string) {
-  return ROLE_COLORS[name.toLowerCase()] || DEFAULT_COLOR
+/** 角色对应的假数据权限标签 */
+const ROLE_PERMISSIONS: Record<string, string[]> = {
+  admin: ['用户管理', 'API 访问', '系统配置'],
+  manager: ['项目管理', '成员分配', '配置模块'],
+  tester: ['用例执行', '缺陷提交', '截图上传'],
+  reviewer: ['用例审核', '状态修改', '评审报告'],
+  readonly: ['数据查看', '报表导出'],
+  developer: ['用例查看', '缺陷认领', '日志查看'],
+}
+
+/** 角色对应的用户数假数据 */
+const ROLE_USER_COUNTS: Record<string, number> = {
+  admin: 5,
+  manager: 12,
+  tester: 45,
+  reviewer: 82,
+  readonly: 4,
+  developer: 18,
+}
+
+/** 抽屉中展示的假数据用户列表 */
+const MOCK_USERS: Record<string, { name: string; email: string }[]> = {
+  admin: [
+    { name: 'Chen Wei (陈伟)', email: 'w.chen@testpilot.io' },
+    { name: 'Li Xiao (李晓)', email: 'x.li@testpilot.io' },
+    { name: 'Zhang Hao (张浩)', email: 'h.zhang@testpilot.io' },
+    { name: 'Yang Min (杨敏)', email: 'm.yang@testpilot.io' },
+    { name: 'Fan Jing (范静)', email: 'j.fan@testpilot.io' },
+  ],
+  manager: [
+    { name: 'Wang Lei (王磊)', email: 'l.wang@testpilot.io' },
+    { name: 'Liu Yan (刘燕)', email: 'y.liu@testpilot.io' },
+    { name: 'Zhao Peng (赵鹏)', email: 'p.zhao@testpilot.io' },
+  ],
+  tester: [
+    { name: 'Sun Mei (孙梅)', email: 'm.sun@testpilot.io' },
+    { name: 'Zhou Tao (周涛)', email: 't.zhou@testpilot.io' },
+    { name: 'Wu Fang (吴芳)', email: 'f.wu@testpilot.io' },
+    { name: 'Xu Gang (徐刚)', email: 'g.xu@testpilot.io' },
+  ],
+  reviewer: [
+    { name: 'Ma Ling (马玲)', email: 'l.ma@testpilot.io' },
+    { name: 'Huang Bo (黄博)', email: 'b.huang@testpilot.io' },
+  ],
+  readonly: [
+    { name: 'Lin Zhi (林志)', email: 'z.lin@testpilot.io' },
+  ],
+  developer: [
+    { name: 'Gao Jun (高军)', email: 'j.gao@testpilot.io' },
+    { name: 'He Shan (何珊)', email: 's.he@testpilot.io' },
+    { name: 'Deng Kai (邓凯)', email: 'k.deng@testpilot.io' },
+  ],
 }
 
 const roles = ref<Role[]>([])
@@ -27,6 +76,34 @@ const rolesLoading = ref(false)
 const roleDialogVisible = ref(false)
 const editingRoleId = ref<number | null>(null)
 const savingRole = ref(false)
+
+// ── 用户抽屉 ──
+const drawerVisible = ref(false)
+const drawerRole = ref<Role | null>(null)
+const drawerSearch = ref('')
+
+const drawerUsers = computed(() => {
+  if (!drawerRole.value) return []
+  const all = MOCK_USERS[drawerRole.value.name.toLowerCase()] || []
+  const kw = drawerSearch.value.trim().toLowerCase()
+  if (!kw) return all
+  return all.filter(u => u.name.toLowerCase().includes(kw) || u.email.toLowerCase().includes(kw))
+})
+
+function openUserDrawer(role: Role) {
+  drawerRole.value = role
+  drawerSearch.value = ''
+  drawerVisible.value = true
+}
+
+function closeUserDrawer() {
+  drawerVisible.value = false
+}
+
+function getAvatarUrl(name: string) {
+  const seed = encodeURIComponent(name.split('(')[0].trim() || 'User')
+  return `https://api.dicebear.com/7.x/initials/svg?seed=${seed}`
+}
 
 const roleForm = reactive({
   name: '',
@@ -39,7 +116,7 @@ function isPresetRole(name: string) {
   return PRESET_ROLES.has(name.toLowerCase())
 }
 
-/** 当前编辑的角色是否为预置角色（用于禁用 name 输入框） */
+/** 当前编辑的角色是否为预置角色 */
 const editingIsPreset = computed(() => {
   if (!editingRoleId.value) return false
   const role = roles.value.find((r) => r.id === editingRoleId.value)
@@ -48,9 +125,28 @@ const editingIsPreset = computed(() => {
 
 /* ── 统计数据 ── */
 const totalRoles = computed(() => roles.value.length)
-const presetCount = computed(() => roles.value.filter((r) => isPresetRole(r.name)).length)
-const customCount = computed(() => totalRoles.value - presetCount.value)
-const totalAssignedUsers = computed(() => roles.value.reduce((sum, r) => sum + (r.user_count ?? 0), 0))
+const totalAssignedUsers = computed(() => {
+  return roles.value.reduce((sum, r) => {
+    const mock = ROLE_USER_COUNTS[r.name.toLowerCase()]
+    return sum + (mock ?? r.user_count ?? 0)
+  }, 0)
+})
+
+/** 获取角色的图标名 */
+function getRoleIcon(name: string): string {
+  return ROLE_ICONS[name.toLowerCase()] || 'shield_person'
+}
+
+/** 获取角色的权限标签 */
+function getRolePerms(name: string): string[] {
+  return ROLE_PERMISSIONS[name.toLowerCase()] || ['自定义权限']
+}
+
+/** 获取角色的用户数 */
+function getRoleUserCount(role: Role): number {
+  const mock = ROLE_USER_COUNTS[role.name.toLowerCase()]
+  return mock ?? role.user_count ?? 0
+}
 
 async function loadRoles() {
   rolesLoading.value = true
@@ -114,7 +210,7 @@ async function submitRole() {
   }
 }
 
-/** 删除角色（预置角色不可删，有关联用户的角色不可删） */
+/** 删除角色 */
 async function removeRole(row: Role) {
   try {
     await ElMessageBox.confirm(`确认删除角色【${row.display_name || row.name}】？`, '删除确认', {
@@ -139,116 +235,146 @@ onMounted(() => loadRoles())
 
 <template>
   <div class="rm-root" v-loading="rolesLoading">
-    <!-- 页面顶栏 -->
+    <!-- Header Section -->
     <div class="rm-header">
-      <h2 class="rm-title">角色管理</h2>
-      <el-button type="primary" class="rm-create-btn" @click="openCreateRole">
-        + 新建角色
-      </el-button>
+      <div class="rm-header-left">
+        <h2 class="rm-title">角色管理</h2>
+        <p class="rm-subtitle">配置和分配组织内的细粒度权限。</p>
+      </div>
+      <div class="rm-header-right">
+        <div class="rm-stats-panel">
+          <div class="rm-stat-item">
+            <span class="rm-stat-label">总角色</span>
+            <span class="rm-stat-number rm-stat-primary">{{ totalRoles }}</span>
+          </div>
+          <div class="rm-stat-divider"></div>
+          <div class="rm-stat-item">
+            <span class="rm-stat-label">活跃用户</span>
+            <span class="rm-stat-number rm-stat-secondary">{{ totalAssignedUsers }}</span>
+          </div>
+          <button class="rm-add-btn" @click="openCreateRole">
+            <span class="rm-add-icon">+</span>
+            新增角色
+          </button>
+        </div>
+      </div>
     </div>
 
-    <!-- 主内容区：列表 + 侧栏 -->
-    <div class="rm-body">
-      <!-- 左侧角色列表 -->
-      <div class="rm-list">
-        <div
-          v-for="role in roles"
-          :key="role.id"
-          class="rm-role-item"
-          :style="{ '--accent': getRoleColor(role.name) }"
-        >
-          <div class="rm-role-accent"></div>
-          <div class="rm-role-content">
-            <div class="rm-role-top">
-              <span class="rm-role-display">{{ role.display_name || role.name }}</span>
-              <el-tag
-                v-if="isPresetRole(role.name)"
-                size="small"
-                type="warning"
-                effect="plain"
-                class="rm-preset-tag"
-              >
-                预置
-              </el-tag>
-              <code class="rm-role-code">{{ role.name }}</code>
+    <!-- Roles Bento Grid -->
+    <div class="rm-grid">
+      <div
+        v-for="role in roles"
+        :key="role.id"
+        class="rm-card"
+      >
+        <!-- Hover accent bar -->
+        <div class="rm-card-accent"></div>
+
+        <!-- Card top: icon + user badge -->
+        <div class="rm-card-top">
+          <div class="rm-card-icon">
+            <span class="material-symbols-outlined rm-icon-filled">{{ getRoleIcon(role.name) }}</span>
+          </div>
+          <div class="rm-badge">
+            <span class="rm-badge-icon">👥</span>
+            <span class="rm-badge-text">{{ getRoleUserCount(role) }} 用户</span>
+          </div>
+        </div>
+
+        <!-- Role name + description -->
+        <h3 class="rm-card-name">{{ role.display_name || role.name }}</h3>
+        <p class="rm-card-desc">{{ role.description || '暂无描述' }}</p>
+
+        <!-- Permission tags -->
+        <div class="rm-perm-tags">
+          <span
+            v-for="perm in getRolePerms(role.name)"
+            :key="perm"
+            class="rm-perm-tag"
+          >{{ perm }}</span>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="rm-card-actions">
+          <button class="rm-btn-edit" @click="openEditRole(role)">编辑权限</button>
+          <button class="rm-btn-view" @click="openUserDrawer(role)">展示用户</button>
+        </div>
+      </div>
+
+      <!-- Create Custom Role Card -->
+      <div class="rm-card rm-card-empty" @click="openCreateRole">
+        <div class="rm-empty-icon">
+          <span class="rm-empty-plus">+</span>
+        </div>
+        <p class="rm-empty-title">创建自定义角色</p>
+        <p class="rm-empty-desc">定义一组独特的权限以满足特定需求。</p>
+      </div>
+    </div>
+
+    <!-- 空状态 -->
+    <div v-if="!rolesLoading && roles.length === 0" class="rm-empty-state">暂无角色</div>
+
+    <!-- 用户列表抽屉 -->
+    <teleport to="body">
+      <transition name="drawer-fade">
+        <div v-if="drawerVisible" class="drawer-overlay" @click="closeUserDrawer"></div>
+      </transition>
+      <transition name="drawer-slide">
+        <aside v-if="drawerVisible" class="drawer-panel">
+          <!-- Header -->
+          <div class="drawer-header">
+            <div class="drawer-title-area">
+              <div class="drawer-title-row">
+                <span class="material-symbols-outlined rm-icon-filled drawer-title-icon">{{ getRoleIcon(drawerRole?.name || '') }}</span>
+                <h2 class="drawer-title">{{ drawerRole?.display_name || drawerRole?.name }}</h2>
+              </div>
+              <p class="drawer-subtitle">用户列表 ({{ drawerUsers.length }})</p>
             </div>
-            <div class="rm-role-desc">{{ role.description || '暂无描述' }}</div>
-          </div>
-          <div class="rm-role-users">
-            <span class="rm-user-count" :class="{ 'rm-user-count--active': (role.user_count ?? 0) > 0 }">
-              {{ role.user_count ?? 0 }}
-            </span>
-            <span class="rm-user-label">用户</span>
-          </div>
-          <div class="rm-role-actions">
-            <button class="rm-action-btn rm-action-edit" @click="openEditRole(role)">编辑</button>
-            <button
-              class="rm-action-btn rm-action-delete"
-              :disabled="isPresetRole(role.name)"
-              @click="removeRole(role)"
-            >
-              删除
+            <button class="drawer-close" @click="closeUserDrawer">
+              <span class="material-symbols-outlined">close</span>
             </button>
           </div>
-        </div>
 
-        <!-- 空状态 -->
-        <div v-if="!rolesLoading && roles.length === 0" class="rm-empty">暂无角色</div>
-      </div>
-
-      <!-- 右侧统计面板 -->
-      <div class="rm-sidebar">
-        <div class="rm-stat-card">
-          <div class="rm-stat-title">角色概览</div>
-
-          <!-- 环形图 -->
-          <div class="rm-ring-wrapper">
-            <svg viewBox="0 0 120 120" class="rm-ring-svg">
-              <circle cx="60" cy="60" r="48" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="12" />
-              <circle
-                cx="60" cy="60" r="48"
-                fill="none"
-                stroke="url(#ringGrad)"
-                stroke-width="12"
-                stroke-linecap="round"
-                :stroke-dasharray="`${presetCount / Math.max(totalRoles, 1) * 301.6} 301.6`"
-                transform="rotate(-90 60 60)"
-              />
-              <defs>
-                <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stop-color="#8b5cf6" />
-                  <stop offset="100%" stop-color="#3b82f6" />
-                </linearGradient>
-              </defs>
-            </svg>
-            <div class="rm-ring-center">
-              <span class="rm-ring-number">{{ totalRoles }}</span>
-              <span class="rm-ring-label">总角色</span>
-            </div>
+          <!-- Search -->
+          <div class="drawer-search">
+            <span class="material-symbols-outlined drawer-search-icon">search</span>
+            <input
+              v-model="drawerSearch"
+              class="drawer-search-input"
+              placeholder="搜索用户姓名或邮箱..."
+            />
           </div>
 
-          <!-- 指标行 -->
-          <div class="rm-stat-rows">
-            <div class="rm-stat-row">
-              <span class="rm-stat-dot" style="background: #8b5cf6"></span>
-              <span class="rm-stat-key">预置角色</span>
-              <span class="rm-stat-val">{{ presetCount }}</span>
+          <!-- User list -->
+          <div class="drawer-list">
+            <div
+              v-for="(user, idx) in drawerUsers"
+              :key="idx"
+              class="drawer-user-item"
+            >
+              <div class="drawer-user-info">
+                <div class="drawer-avatar">
+                  <img :src="getAvatarUrl(user.name)" :alt="user.name" />
+                </div>
+                <div>
+                  <div class="drawer-user-name">{{ user.name }}</div>
+                  <div class="drawer-user-email">{{ user.email }}</div>
+                </div>
+              </div>
             </div>
-            <div class="rm-stat-row">
-              <span class="rm-stat-dot" style="background: #3b82f6"></span>
-              <span class="rm-stat-key">自定义角色</span>
-              <span class="rm-stat-val">{{ customCount }}</span>
-            </div>
+            <div v-if="drawerUsers.length === 0" class="drawer-empty">暂无匹配用户</div>
           </div>
-        </div>
 
-        <div class="rm-stat-card rm-users-card">
-          <div class="rm-stat-title">已分配用户</div>
-          <div class="rm-big-number">{{ totalAssignedUsers }}</div>
-          <div class="rm-big-label">累计关联用户数</div>
-        </div>
-      </div>
-    </div>
+          <!-- Footer -->
+          <div class="drawer-footer">
+            <button class="drawer-footer-btn">
+              <span class="material-symbols-outlined" style="font-size: 20px">person_add</span>
+              添加新成员
+            </button>
+          </div>
+        </aside>
+      </transition>
+    </teleport>
 
     <!-- 创建/编辑角色弹窗 -->
     <el-dialog
@@ -281,294 +407,566 @@ onMounted(() => loadRoles())
 </template>
 
 <style scoped>
-/* ── 页面根容器 ── */
+/* ── Google Material Symbols ── */
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
+
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+}
+.rm-icon-filled {
+  font-variation-settings: 'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+}
+
+/* ── Root ── */
 .rm-root {
-  padding: 28px 32px;
+  padding: 16px 20px;
   min-height: 100%;
 }
 
-/* ── 顶栏 ── */
+/* ── Header ── */
 .rm-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
+  align-items: flex-end;
+  margin-bottom: 40px;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.rm-header-left {
+  flex: 1;
+  min-width: 200px;
 }
 .rm-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #fff;
-  margin: 0;
-}
-.rm-create-btn {
-  border-radius: 8px;
+  font-size: 28px;
   font-weight: 600;
+  color: #e1e1f2;
+  margin: 0 0 6px 0;
+  letter-spacing: -0.5px;
 }
-
-/* ── 主内容区 ── */
-.rm-body {
-  display: flex;
-  gap: 24px;
-  align-items: flex-start;
+.rm-subtitle {
+  font-size: 14px;
+  color: #ccc3d8;
+  margin: 0;
+  font-weight: 300;
 }
-
-/* ── 左侧角色列表 ── */
-.rm-list {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-}
-
-.rm-role-item {
+.rm-header-right {
   display: flex;
   align-items: center;
-  gap: 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 12px;
-  padding: 16px 20px;
-  transition: all 0.2s ease;
-  position: relative;
-  overflow: hidden;
-}
-.rm-role-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.1);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
 }
 
-/* 左侧彩色条 */
-.rm-role-accent {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background: var(--accent);
-  border-radius: 4px 0 0 4px;
+/* Stats panel — glass container holding stats + button */
+.rm-stats-panel {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  padding: 16px 24px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(74, 68, 85, 0.15);
+}
+.rm-stat-item {
+  text-align: center;
+}
+.rm-stat-label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #958da1;
+  margin-bottom: 4px;
+}
+.rm-stat-number {
+  font-size: 24px;
+  font-weight: 700;
+}
+.rm-stat-primary {
+  color: #d2bbff;
+}
+.rm-stat-secondary {
+  color: #adc6ff;
+}
+.rm-stat-divider {
+  width: 1px;
+  height: 32px;
+  background: rgba(74, 68, 85, 0.2);
 }
 
-/* 角色主内容 */
-.rm-role-content {
-  flex: 1;
-  min-width: 0;
-  padding-left: 4px;
-}
-.rm-role-top {
+/* Add button — inside the glass panel */
+.rm-add-btn {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 6px;
-}
-.rm-role-display {
-  font-size: 15px;
-  font-weight: 600;
+  padding: 10px 20px;
+  margin-left: 16px;
+  border-radius: 10px;
+  border: none;
+  background: #7c3aed;
   color: #fff;
-}
-.rm-preset-tag {
-  flex-shrink: 0;
-  font-size: 10px;
-}
-.rm-role-code {
-  font-size: 11px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  color: rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.05);
-  padding: 1px 6px;
-  border-radius: 4px;
-}
-.rm-role-desc {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.45);
-  line-height: 1.4;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
   white-space: nowrap;
 }
+.rm-add-btn:hover {
+  filter: brightness(1.15);
+}
+.rm-add-btn:active {
+  transform: scale(0.95);
+}
+.rm-add-icon {
+  font-size: 16px;
+  font-weight: 700;
+}
 
-/* 用户数 */
-.rm-role-users {
+/* ── Grid ── */
+.rm-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+/* ── Card ── */
+.rm-card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-  min-width: 48px;
+  padding: 24px;
+  border-radius: 16px;
+  background: #191b26;
+  border: 1px solid rgba(74, 68, 85, 0.15);
+  transition: all 0.3s ease;
+  overflow: hidden;
 }
-.rm-user-count {
-  font-size: 18px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.3);
-  width: 36px;
-  height: 36px;
+.rm-card:hover {
+  background: #272935;
+}
+
+/* Accent bar */
+.rm-card-accent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 0;
+  background: #adc6ff;
+  border-radius: 16px 0 0 16px;
+  transition: height 0.5s ease;
+}
+.rm-card:hover .rm-card-accent {
+  height: 100%;
+}
+
+/* Card top row */
+.rm-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.rm-card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(210, 187, 255, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
+  color: #d2bbff;
 }
-.rm-user-count--active {
-  color: #8b5cf6;
-  background: rgba(139, 92, 246, 0.1);
-}
-.rm-user-label {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.3);
+.rm-card-icon .material-symbols-outlined {
+  font-size: 28px;
 }
 
-/* 操作按钮 */
-.rm-role-actions {
+/* User badge */
+.rm-badge {
   display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-.rm-action-btn {
-  font-size: 12px;
+  align-items: center;
+  gap: 5px;
   padding: 4px 12px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.6);
-  cursor: pointer;
-  transition: all 0.15s;
+  border-radius: 9999px;
+  background: rgba(173, 198, 255, 0.1);
+  border: 1px solid rgba(173, 198, 255, 0.2);
+  color: #adc6ff;
 }
-.rm-action-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+.rm-badge-icon {
+  font-size: 12px;
 }
-.rm-action-edit:hover {
-  border-color: rgba(139, 92, 246, 0.4);
-  color: #a78bfa;
-}
-.rm-action-delete:hover {
-  border-color: rgba(239, 68, 68, 0.4);
-  color: #f87171;
-}
-.rm-action-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-.rm-action-btn:disabled:hover {
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.6);
-  border-color: rgba(255, 255, 255, 0.1);
+.rm-badge-text {
+  font-size: 12px;
+  font-weight: 600;
 }
 
-/* 空状态 */
-.rm-empty {
+/* Card name & desc */
+.rm-card-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: #e1e1f2;
+  margin: 0 0 4px 0;
+}
+.rm-card-desc {
+  font-size: 12px;
+  color: #958da1;
+  margin: 0 0 20px 0;
+  line-height: 1.5;
+}
+
+/* Permission tags */
+.rm-perm-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 24px;
+}
+.rm-perm-tag {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: #1d1f2b;
+  color: #ccc3d8;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  font-weight: 500;
+}
+
+/* Card actions */
+.rm-card-actions {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rm-btn-edit {
+  flex: 1;
+  padding: 8px 0;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  background: #373845;
+  color: #e1e1f2;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.rm-btn-edit:hover {
+  background: #323440;
+}
+.rm-btn-view {
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid rgba(74, 68, 85, 0.3);
+  background: transparent;
+  color: #958da1;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.rm-btn-view:hover {
+  color: #e1e1f2;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* ── Empty state card ── */
+.rm-card-empty {
+  border: 2px dashed rgba(74, 68, 85, 0.2);
+  background: transparent;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 32px;
+  min-height: 240px;
+  transition: all 0.3s;
+}
+.rm-card-empty:hover {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(124, 58, 237, 0.4);
+}
+.rm-empty-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #1d1f2b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  transition: all 0.3s;
+}
+.rm-card-empty:hover .rm-empty-icon {
+  transform: scale(1.1);
+}
+.rm-empty-plus {
+  font-size: 24px;
+  color: #958da1;
+  transition: color 0.3s;
+}
+.rm-card-empty:hover .rm-empty-plus {
+  color: #d2bbff;
+}
+.rm-empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ccc3d8;
+  margin: 0 0 8px 0;
+  transition: color 0.3s;
+}
+.rm-card-empty:hover .rm-empty-title {
+  color: #e1e1f2;
+}
+.rm-empty-desc {
+  font-size: 12px;
+  color: #958da1;
+  text-align: center;
+  max-width: 180px;
+  margin: 0;
+}
+
+/* ── Global empty ── */
+.rm-empty-state {
   text-align: center;
   padding: 48px 0;
   color: rgba(255, 255, 255, 0.3);
   font-size: 14px;
 }
 
-/* ── 右侧统计面板 ── */
-.rm-sidebar {
-  width: 260px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.rm-stat-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 14px;
-  padding: 20px;
-}
-.rm-stat-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
-  margin-bottom: 16px;
-}
-
-/* 环形图 */
-.rm-ring-wrapper {
-  position: relative;
-  width: 120px;
-  height: 120px;
-  margin: 0 auto 16px;
-}
-.rm-ring-svg {
-  width: 100%;
-  height: 100%;
-}
-.rm-ring-center {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-.rm-ring-number {
-  font-size: 28px;
-  font-weight: 700;
-  color: #fff;
-  line-height: 1;
-}
-.rm-ring-label {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
-  margin-top: 2px;
-}
-
-/* 统计行 */
-.rm-stat-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.rm-stat-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.rm-stat-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.rm-stat-key {
-  flex: 1;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.5);
-}
-.rm-stat-val {
-  font-size: 15px;
-  font-weight: 700;
-  color: #fff;
-}
-
-/* 已分配用户卡片 */
-.rm-users-card {
-  text-align: center;
-}
-.rm-big-number {
-  font-size: 40px;
-  font-weight: 800;
-  background: linear-gradient(135deg, #8b5cf6, #3b82f6);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  line-height: 1.1;
-  margin-bottom: 4px;
-}
-.rm-big-label {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.35);
-}
-
-/* 弹窗提示 */
+/* ── Form hint ── */
 .form-hint {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.4);
   margin-top: 4px;
 }
 </style>
+
+<!-- Drawer 使用 teleport 到 body，必须单独放在 unscoped style 中 -->
+<style>
+/* ══════════════════════════════════════
+   用户抽屉 Drawer
+   ══════════════════════════════════════ */
+
+/* Overlay */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 19, 30, 0.8);
+  backdrop-filter: blur(4px);
+  z-index: 2000;
+}
+
+/* Panel */
+.drawer-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: 480px;
+  background: #191b26;
+  z-index: 2001;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid rgba(74, 68, 85, 0.1);
+  box-shadow: 0 0 60px -10px rgba(0, 0, 0, 0.6);
+}
+
+/* Header */
+.drawer-header {
+  padding: 32px 32px 24px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.drawer-title-area {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.drawer-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.drawer-title-icon {
+  color: #d2bbff;
+  font-size: 22px;
+}
+.drawer-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: #e1e1f2;
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+.drawer-subtitle {
+  font-size: 13px;
+  color: #ccc3d8;
+  margin: 0;
+}
+.drawer-close {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: #ccc3d8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.drawer-close:hover {
+  background: #323440;
+  color: #fff;
+}
+
+/* Search */
+.drawer-search {
+  padding: 0 32px;
+  margin-bottom: 24px;
+  position: relative;
+}
+.drawer-search-icon {
+  position: absolute;
+  left: 44px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #ccc3d8;
+  font-size: 18px;
+}
+.drawer-search-input {
+  width: 100%;
+  background: #0c0e18;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 12px 10px 40px;
+  font-size: 13px;
+  color: #e1e1f2;
+  outline: none;
+  transition: box-shadow 0.2s;
+}
+.drawer-search-input::placeholder {
+  color: #958da1;
+}
+.drawer-search-input:focus {
+  box-shadow: 0 0 0 1px rgba(210, 187, 255, 0.4);
+}
+
+/* User list */
+.drawer-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 32px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.drawer-user-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #1d1f2b;
+  border: 1px solid rgba(74, 68, 85, 0.05);
+  transition: all 0.2s;
+}
+.drawer-user-item:hover {
+  border-color: rgba(74, 68, 85, 0.2);
+}
+.drawer-user-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.drawer-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid rgba(124, 58, 237, 0.2);
+  flex-shrink: 0;
+}
+.drawer-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.drawer-user-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #e1e1f2;
+}
+.drawer-user-email {
+  font-size: 12px;
+  color: #ccc3d8;
+  font-weight: 300;
+}
+.drawer-empty {
+  text-align: center;
+  padding: 32px 0;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 13px;
+}
+
+/* Footer */
+.drawer-footer {
+  padding: 24px 32px;
+  border-top: 1px solid rgba(74, 68, 85, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  margin-top: auto;
+}
+.drawer-footer-btn {
+  width: 100%;
+  padding: 14px 0;
+  border-radius: 12px;
+  border: none;
+  background: #7c3aed;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.3);
+  transition: all 0.2s;
+}
+.drawer-footer-btn:hover {
+  filter: brightness(1.1);
+}
+
+/* Transitions */
+.drawer-fade-enter-active,
+.drawer-fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.drawer-fade-enter-from,
+.drawer-fade-leave-to {
+  opacity: 0;
+}
+.drawer-slide-enter-active,
+.drawer-slide-leave-active {
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.drawer-slide-enter-from,
+.drawer-slide-leave-to {
+  transform: translateX(100%);
+}
+</style>
+
