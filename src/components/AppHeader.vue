@@ -1,25 +1,20 @@
 <script setup lang="ts">
-import { Bell, PanelLeftOpen } from 'lucide-vue-next'
+import { Bell } from 'lucide-vue-next'
 
 defineProps<{
   userName: string
   avatarUrl: string
-  sidebarCollapsed?: boolean
 }>()
 
 defineEmits<{
   (e: 'open-profile'): void
   (e: 'logout'): void
-  (e: 'toggle-sidebar'): void
 }>()
 </script>
 
 <template>
   <header class="top-header">
     <div class="brand">
-      <button v-if="sidebarCollapsed" class="header-icon-btn sidebar-toggle-btn" title="展开侧栏" @click="$emit('toggle-sidebar')">
-        <PanelLeftOpen :size="18" />
-      </button>
       <img class="logo" src="/images/logo.png" alt="Aisight" />
       <div class="brand-text">
         <div class="name">Aisight</div>

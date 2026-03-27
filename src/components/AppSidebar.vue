@@ -89,7 +89,7 @@ const showSystemMenu = computed(() => {
 const navItems: { key: TopMenu; label: string; icon: string }[] = [
   { key: 'workbench', label: '仪表盘', icon: 'dashboard' },
   { key: 'testcases', label: '测试用例', icon: 'rule' },
-  { key: 'e2e', label: '执行记录', icon: 'history_edu' },
+  { key: 'e2e', label: '测试智编', icon: 'history_edu' },
   { key: 'project', label: '缺陷管理', icon: 'bug_report' },
   { key: 'plan', label: '数据分析', icon: 'analytics' },
 ]

@@ -188,10 +188,8 @@ onMounted(async () => {
         <AppHeader
           :user-name="currentUser?.name || ''"
           :avatar-url="userAvatarUrl"
-          :sidebar-collapsed="sidebarCollapsed"
           @open-profile="openProfileCenter"
           @logout="logout"
-          @toggle-sidebar="toggleSidebar"
         />
 
         <div class="main" :class="{ 'sidebar-hidden': sidebarCollapsed }">

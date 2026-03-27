@@ -556,6 +556,20 @@
   padding: 16px 8px;
 }
 
+/* 折叠态：缩小项目头卡片，防止图标溢出 */
+.main-nav.collapsed .nav-header-card {
+  padding: 6px;
+  justify-content: center;
+}
+.main-nav.collapsed .nav-header-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+.main-nav.collapsed .nav-header {
+  padding: 0;
+}
+
 .nav-bottom-group {
   margin-top: auto;
   padding-top: 20px;
