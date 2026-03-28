@@ -8,6 +8,7 @@ import './styles/variables.css'
 import './styles/base.css'
 import './styles/layout.css'
 import './styles/animations.css'
+import './styles/ai-script.css'
 import router from './router'
 import App from './App.vue'
 

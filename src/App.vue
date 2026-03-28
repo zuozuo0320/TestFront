@@ -57,7 +57,8 @@ function toggleSidebar() {
 const routeToMenu: Record<string, TopMenu> = {
   '/': 'workbench',
   '/testcases': 'testcases',
-  '/executions': 'e2e',
+  '/ai-script': 'e2e',
+  '/ai-script/library': 'e2e',
   '/defects': 'project',
   '/analytics': 'plan',
   '/system/users': 'system',
@@ -90,7 +91,7 @@ function switchTopMenu(menu: TopMenu) {
     system: `/system/${projectStore.activeMenu}`,
     project: '/defects',
     plan: '/analytics',
-    e2e: '/executions',
+    e2e: '/ai-script',
   }
   router.push(menuRoutes[menu])
   projectStore.persistNavState()

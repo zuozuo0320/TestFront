@@ -62,9 +62,21 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresAdmin: true },
     },
     {
-      path: '/executions',
-      name: 'Executions',
-      component: () => import('../views/ComingSoonPage.vue'),
+      path: '/ai-script',
+      name: 'AiScriptTaskList',
+      component: () => import('../views/ai-script/AiScriptTaskList.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/ai-script/library',
+      name: 'AiScriptLibrary',
+      component: () => import('../views/ai-script/AiScriptLibrary.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/ai-script/:taskId',
+      name: 'AiScriptTaskDetail',
+      component: () => import('../views/ai-script/AiScriptTaskDetail.vue'),
       meta: { requiresAuth: true },
     },
     {
