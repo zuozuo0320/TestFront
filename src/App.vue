@@ -161,18 +161,33 @@ router.isReady().then(() => {
   routerReady.value = true
 })
 
-// 首次加载：从登录页跳转后，重新加载项目和用户信息
-onMounted(async () => {
-  if (loggedIn.value) {
-    await projectStore.fetchProjects()
-    projectStore.restoreProjectFromNav()
-    try {
-      currentUser.value = await getMyProfile()
-    } catch {
-      // silently fail — user stays as fallback
-    }
+// 加载用户数据（项目列表 + 个人信息）
+async function loadUserData() {
+  // 直接读取 localStorage 判断登录状态（不使用 computed 缓存，避免非响应式问题）
+  if (!localStorage.getItem('tp-token')) return
+  await projectStore.fetchProjects()
+  projectStore.restoreProjectFromNav()
+  try {
+    currentUser.value = await getMyProfile()
+  } catch {
+    // silently fail — user stays as fallback
   }
+}
+
+// 首次加载
+onMounted(() => {
+  loadUserData()
 })
+
+// 登录成功从 /login 跳转后，重新加载用户数据（修复头像不刷新的问题）
+watch(
+  () => route.path,
+  (newPath, oldPath) => {
+    if (oldPath === '/login' && newPath !== '/login' && localStorage.getItem('tp-token')) {
+      loadUserData()
+    }
+  },
+)
 </script>
 
 <template>

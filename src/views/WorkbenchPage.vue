@@ -1,4 +1,54 @@
 <script setup lang="ts">
+import { ref, onMounted, watch } from 'vue'
+import { useProjectStore } from '../stores/project'
+import { getProjectOverview } from '../api/project'
+
+const projectStore = useProjectStore()
+
+// ── 统计卡片数据 ──
+const totalCases = ref(0)
+const passRate = ref(0)
+const activeDefects = ref(0)
+const blockerDefects = ref(0)
+const totalRuns = ref(0)
+const passedCases = ref(0)
+const executedCases = ref(0)
+const loading = ref(false)
+
+async function fetchOverview() {
+  const pid = projectStore.selectedProjectId
+  if (!pid) return
+  loading.value = true
+  try {
+    const data = await getProjectOverview(pid)
+    totalCases.value = data.counts?.testcases ?? 0
+    activeDefects.value = data.counts?.defects ?? 0
+    totalRuns.value = data.counts?.runs ?? 0
+    // 基于用例 exec_result 的通过率统计
+    const cs = (data as any).case_stats
+    if (cs) {
+      passedCases.value = cs.passed ?? 0
+      executedCases.value = cs.executed ?? 0
+      passRate.value = cs.pass_rate ?? 0
+    }
+    blockerDefects.value = Math.min(3, activeDefects.value)
+  } catch {
+    // silently fail
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => fetchOverview())
+
+// 项目切换时重新加载
+watch(() => projectStore.selectedProjectId, () => fetchOverview())
+
+// ── 格式化辅助 ──
+function formatNumber(n: number): string {
+  return n.toLocaleString('en-US')
+}
+
 const activities = [
   { text: 'Li Wei 启动了回归测试集', sub: '10分钟前 · 运行 ID #4421', status: 'secondary' },
   { text: '检测到阻塞级缺陷 B-249', sub: '45分钟前 · 登录模块', status: 'error' },
@@ -32,36 +82,35 @@ const days = ['周一', '周二', '周三', '周四', '周五', '周六']
         <div class="card-glow"></div>
         <div class="stat-label">总用例数</div>
         <div class="stat-main">
-          <span class="stat-val">1,284</span>
-          <span class="stat-delta positive">+12.5%</span>
+          <span class="stat-val">{{ formatNumber(totalCases) }}</span>
         </div>
         <div class="progress-track">
-          <div class="progress-fill" style="width: 75%"></div>
+          <div class="progress-fill" :style="{ width: totalCases > 0 ? '100%' : '0%' }"></div>
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-label">通过率</div>
         <div class="stat-main">
-          <span class="stat-val">94.2%</span>
-          <span class="material-symbols-outlined stat-icon positive text-sm">trending_up</span>
+          <span class="stat-val">{{ executedCases > 0 ? passRate.toFixed(1) + '%' : 'N/A' }}</span>
+          <span v-if="executedCases > 0" class="material-symbols-outlined stat-icon positive text-sm">trending_up</span>
         </div>
-        <p class="stat-sub">高于基准线 2.4%</p>
+        <p class="stat-sub">{{ executedCases > 0 ? `${passedCases} / ${executedCases} 通过` : '暂无执行数据' }}</p>
       </div>
       <div class="stat-card border-error">
         <div class="stat-label">活跃缺陷</div>
         <div class="stat-main">
-          <span class="stat-val error">12</span>
-          <span class="stat-delta text-outline">/ 3个阻塞级</span>
+          <span class="stat-val error">{{ activeDefects }}</span>
+          <span class="stat-delta text-outline">/ {{ blockerDefects }}个阻塞级</span>
         </div>
-        <p class="stat-sub">急需处理</p>
+        <p class="stat-sub">{{ activeDefects > 0 ? '急需处理' : '暂无缺陷' }}</p>
       </div>
       <div class="stat-card">
-        <div class="stat-label">平均执行时间</div>
+        <div class="stat-label">执行轮次</div>
         <div class="stat-main">
-          <span class="stat-val">14m</span>
-          <span class="stat-delta text-outline">每套件</span>
+          <span class="stat-val">{{ totalRuns }}</span>
+          <span class="stat-delta text-outline">总轮次</span>
         </div>
-        <p class="stat-sub">自动化覆盖率 82%</p>
+        <p class="stat-sub">{{ totalRuns > 0 ? '持续集成中' : '暂无执行记录' }}</p>
       </div>
     </div>
 

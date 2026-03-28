@@ -72,3 +72,28 @@ export async function uploadProjectAvatar(projectId: number, file: File) {
   )
   return data
 }
+
+/** 获取项目概览（仪表盘统计数据） */
+export async function getProjectOverview(projectId: number) {
+  const { data } = await apiClient.get(`/projects/${projectId}/overview`)
+  return data as {
+    project: any
+    counts: {
+      requirements: number
+      testcases: number
+      scripts: number
+      runs: number
+      defects: number
+    }
+    latest_run: {
+      id?: number
+      total_results?: number
+      passed_results?: number
+      pass_rate?: number
+    }
+    quality_gate: {
+      status: string
+      pass_rate?: number
+    }
+  }
+}
