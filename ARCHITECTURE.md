@@ -17,6 +17,7 @@
 | 路由 | Vue Router | 4.x | SPA 路由管理 |
 | 字体 | Inter + JetBrains Mono + Noto Sans SC | CDN | UI 文字 + 等宽代码 + 中文字体 |
 | 图标 | lucide-vue-next | latest | 侧边栏 / 页面图标 |
+| 代码编辑器 | vue-codemirror + @codemirror/lang-javascript | latest | 脚本预览/编辑（TypeScript 高亮 + one-dark） |
 
 ---
 
@@ -32,7 +33,8 @@ src/
 │   ├── auth.ts                      # useAuthStore
 │   ├── project.ts                   # useProjectStore
 │   ├── testcase.ts                  # useTestCaseStore
-│   └── user.ts                      # useUserStore
+│   ├── user.ts                      # useUserStore
+│   └── aiScript.ts                  # useAiScriptStore（任务列表/详情/录制/编辑）
 ├── api/                             # API 层（按领域拆分）
 │   ├── client.ts                    # Axios 实例 + 拦截器
 │   ├── auth.ts                      # 登录/登出 API
@@ -42,6 +44,7 @@ src/
 │   ├── module.ts                    # 模块目录树 CRUD
 │   ├── attachment.ts                # 附件上传/下载
 │   ├── xlsx.ts                      # Excel 导入/导出
+│   ├── aiScript.ts                  # 测试智编（任务 CRUD + 录制 + 执行 + 验证）
 │   └── types.ts                     # 共享类型定义
 ├── composables/                     # 可复用逻辑（Composition API）
 │   ├── useTable.ts                  # 表格通用逻辑（分页/排序/筛选）
@@ -57,6 +60,9 @@ src/
 │       ├── UserManagement.vue       # 用户管理
 │       ├── RoleManagement.vue       # 角色管理
 │       └── ProjectManagement.vue    # 项目管理
+│   └── ai-script/                   # 测试智编
+│       ├── AiScriptTaskList.vue     # 任务列表（搜索/筛选/创建/快速入口）
+│       └── AiScriptTaskDetail.vue   # 任务详情（CodeMirror 预览 + 录制 + 验证 + 轮询）
 ├── components/                      # 通用 UI 组件
 │   ├── AppHeader.vue                # 顶部导航栏（品牌LOGO + 侧栏展开 + 通知 + 用户信息）
 │   ├── AppSidebar.vue               # 侧边菜单栏（导航项 + 系统管理 + 折叠按钮，底部固定）
@@ -65,6 +71,7 @@ src/
 │   ├── EmptyState.vue               # 空态占位
 │   ├── RichTextEditor.vue           # 富文本编辑器
 │   ├── FileUploader.vue             # 文件上传组件
+│   ├── CodeEditor.vue               # CodeMirror 代码编辑器封装（TypeScript + one-dark）
 │   ├── HoloOrb.vue                  # 登录页全息球动画
 │   └── BreadcrumbBar.vue            # 面包屑导航
 ├── styles/                          # 样式系统
@@ -152,6 +159,9 @@ createApp(App)
 | 模块 | `listModules` / `createModule` / `renameModule` / `moveModule` / `deleteModule` | CRUD `/projects/:id/modules` |
 | 附件 | `uploadAttachment` / `listAttachments` / `deleteAttachment` | CRUD `/projects/:id/testcases/:id/attachments` |
 | 导入导出 | `exportTestCases` / `importTestCases` | GET/POST `/projects/:id/testcases/export|import` |
+| 测试智编 | `createAiTask` / `listAiTasks` / `getAiTaskDetail` | CRUD `/ai-script/tasks` |
+| 测试智编 | `startRecording` / `finishRecording` / `confirmScript` | POST `/ai-script/tasks/:id/*` |
+| 测试智编 | `executeTask` / `exportScript` / `discardScript` | POST `/ai-script/tasks/:id/*` |
 
 ### 4.3 状态管理 (`stores/`)
 
@@ -177,6 +187,7 @@ export const useAuthStore = defineStore('auth', () => {
 | `useProjectStore` | 项目列表、当前项目 | localStorage（当前项目 ID） |
 | `useTestCaseStore` | 用例列表、筛选条件、分页 | 无 |
 | `useUserStore` | 用户/角色列表 | 无 |
+| `useAiScriptStore` | AI 脚本任务列表、详情、录制状态 | 无 |
 
 ### 4.4 Composables (`composables/`)
 
