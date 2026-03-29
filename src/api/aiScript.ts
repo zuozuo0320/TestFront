@@ -37,9 +37,17 @@ export enum ValidationStatus {
 
 /** 生成来源 */
 export enum SourceType {
+  PLAYWRIGHT_RECORDED = 'PLAYWRIGHT_RECORDED',
+  AI_ENHANCED_FROM_RECORDING = 'AI_ENHANCED_FROM_RECORDING',
   AI_GENERATED = 'AI_GENERATED',
   HUMAN_EDITED = 'HUMAN_EDITED',
   MIXED = 'MIXED',
+}
+
+/** 生成模式 */
+export enum GenerationMode {
+  RECORDING_ENHANCED = 'RECORDING_ENHANCED',
+  AI_DIRECT = 'AI_DIRECT',
 }
 
 /** 轨迹动作类型 */
@@ -86,9 +94,16 @@ export const ValidationStatusLabel: Record<ValidationStatus, string> = {
 }
 
 export const SourceTypeLabel: Record<SourceType, string> = {
+  [SourceType.PLAYWRIGHT_RECORDED]: 'Playwright 录制',
+  [SourceType.AI_ENHANCED_FROM_RECORDING]: 'AI 增强',
   [SourceType.AI_GENERATED]: 'AI 生成',
   [SourceType.HUMAN_EDITED]: '人工编写',
   [SourceType.MIXED]: '混合',
+}
+
+export const GenerationModeLabel: Record<GenerationMode, string> = {
+  [GenerationMode.RECORDING_ENHANCED]: '录制增强',
+  [GenerationMode.AI_DIRECT]: 'AI 直生',
 }
 
 export const TraceActionLabel: Record<TraceActionType, string> = {
@@ -137,11 +152,32 @@ export const ValidationStatusColor: Record<ValidationStatus, StatusColor> = {
 
 // ── 核心接口 ──
 
+export interface ActionPermissions {
+  canExecute: boolean
+  canValidate: boolean
+  canEdit: boolean
+  canConfirm: boolean
+  canExport: boolean
+  canDiscard: boolean
+}
+
+export interface RecordingSession {
+  id: number
+  taskId: number
+  recorderType: string
+  recordingStatus: string
+  rawScriptContent?: string
+  stepModelJson?: Record<string, unknown>
+  createdAt: string
+  finishedAt?: string
+}
+
 export interface AiScriptTask {
   id: number
   projectId: number
   projectName: string
   taskName: string
+  generationMode: GenerationMode
   caseIds: number[]
   caseTags: string[]
   caseCount: number
@@ -151,8 +187,11 @@ export interface AiScriptTask {
   envConfig?: Record<string, unknown>
   taskStatus: TaskStatus
   frameworkType: string
+  latestRecordingId?: number
   currentVersionNo?: number
   validationStatus?: ValidationStatus
+  permissions?: ActionPermissions
+  errorMessage?: string
   createdBy: number
   createdName: string
   createdAt: string
@@ -168,7 +207,9 @@ export interface AiScriptVersion {
   scriptStatus: ScriptStatus
   validationStatus: ValidationStatus
   sourceType: SourceType
+  sourceRecordingId?: number
   scriptContent: string
+  stepModelJson?: Record<string, unknown>
   commentText?: string
   basedOnVersionId?: number
   isCurrentFlag: boolean
@@ -235,307 +276,253 @@ export interface AiScriptTrace {
   occurredAt: string
 }
 
-// ── Mock 数据 ──
+// ── 真实 API 方法 ──
 
-const MOCK_SCRIPT_CONTENT = `import { test, expect } from '@playwright/test';
+import { apiClient } from './client'
 
-test('用户登录并进入仪表盘', async ({ page }) => {
-  // 1. 导航到登录页面
-  await page.goto('https://staging.testpilot.io/auth/login');
-
-  // 2. 填写登录表单
-  await page.fill('input[name="email"]', 'qa-bot@testpilot.ai');
-  await page.fill('input[name="password"]', process.env.STAGING_PWD);
-
-  // 3. 提交表单并验证
-  await page.click('button[type="submit"]');
-  await expect(page).toHaveURL('/dashboard');
-});`
-
-export const MOCK_TASKS: AiScriptTask[] = [
-  {
-    id: 29402,
-    projectId: 1001,
-    projectName: 'Project Alpha',
-    taskName: '登录流程回归测试',
-    caseIds: [2001, 2002, 2003],
-    caseTags: ['AUTH_001', '+2'],
-    caseCount: 3,
-    scenarioDesc: '使用测试账号完成登录流程并验证仪表盘加载',
-    startUrl: 'https://staging.testpilot.io/auth/login',
-    taskStatus: TaskStatus.RUNNING,
-    frameworkType: 'Playwright',
-    currentVersionNo: 3,
-    validationStatus: ValidationStatus.VALIDATING,
-    createdBy: 3001,
-    createdName: 'Alex Chen',
-    createdAt: '2025-10-24 14:20',
-    updatedAt: '2025-10-24 14:20',
-  },
-  {
-    id: 29388,
-    projectId: 1002,
-    projectName: '电商 Web 平台',
-    taskName: '结账端到端测试',
-    caseIds: [2010],
-    caseTags: ['SHOP_42'],
-    caseCount: 1,
-    scenarioDesc: '从购物车到支付完成的完整结账流程',
-    startUrl: 'https://shop.example.com/cart',
-    taskStatus: TaskStatus.GENERATE_SUCCESS,
-    frameworkType: 'Playwright',
-    currentVersionNo: 1,
-    validationStatus: ValidationStatus.PASSED,
-    createdBy: 0,
-    createdName: 'System AI',
-    createdAt: '2025-10-24 12:05',
-    updatedAt: '2025-10-24 12:05',
-  },
-  {
-    id: 29350,
-    projectId: 1003,
-    projectName: 'Mobile Core',
-    taskName: '设置页面同步测试',
-    caseIds: [2020],
-    caseTags: ['UI_SYNC_09'],
-    caseCount: 1,
-    scenarioDesc: '移动端设置页面的数据同步验证',
-    startUrl: 'https://m.example.com/settings',
-    taskStatus: TaskStatus.GENERATE_FAILED,
-    frameworkType: 'Playwright',
-    createdBy: 3002,
-    createdName: 'Sarah Zhang',
-    createdAt: '2025-10-23 18:45',
-    updatedAt: '2025-10-23 18:45',
-  },
-  {
-    id: 29312,
-    projectId: 1001,
-    projectName: 'Project Alpha',
-    taskName: '用户资料更新接口测试',
-    caseIds: [2030],
-    caseTags: ['USER_API'],
-    caseCount: 1,
-    scenarioDesc: '调用用户资料更新接口并验证页面数据刷新',
-    startUrl: 'https://staging.testpilot.io/profile',
-    taskStatus: TaskStatus.PENDING_CONFIRM,
-    frameworkType: 'Playwright',
-    currentVersionNo: 2,
-    validationStatus: ValidationStatus.PASSED,
-    createdBy: 0,
-    createdName: 'System AI',
-    createdAt: '2025-10-23 11:20',
-    updatedAt: '2025-10-23 11:20',
-  },
-  {
-    id: 29280,
-    projectId: 1001,
-    projectName: 'Project Alpha',
-    taskName: '鉴权流程 V2',
-    caseIds: [2040],
-    caseTags: ['AUTH_V2'],
-    caseCount: 1,
-    scenarioDesc: '使用有效凭证登录并验证跳转',
-    startUrl: 'https://staging.testpilot.io/auth/login',
-    accountRef: 'test_user_a',
-    taskStatus: TaskStatus.CONFIRMED,
-    frameworkType: 'Playwright',
-    currentVersionNo: 5,
-    validationStatus: ValidationStatus.PASSED,
-    createdBy: 3001,
-    createdName: 'Alex Chen',
-    createdAt: '2025-10-22 09:30',
-    updatedAt: '2025-10-24 16:00',
-  },
-]
-
-export const MOCK_SCRIPTS: AiScriptVersion[] = [
-  {
-    id: 5001,
-    taskId: 29280,
-    versionNo: 5,
-    frameworkType: 'Playwright',
-    scriptName: 'auth_main_flow_v2',
-    scriptStatus: ScriptStatus.CONFIRMED,
-    validationStatus: ValidationStatus.PASSED,
-    sourceType: SourceType.AI_GENERATED,
-    scriptContent: MOCK_SCRIPT_CONTENT,
-    isCurrentFlag: true,
-    confirmedBy: 3001,
-    confirmedAt: '2025-10-24 16:00',
-    createdBy: 0,
-    createdName: 'System AI',
-    createdAt: '2025-11-24 14:20',
-  },
-  {
-    id: 5002,
-    taskId: 29280,
-    versionNo: 4,
-    frameworkType: 'Playwright',
-    scriptName: 'recovery_logic_test',
-    scriptStatus: ScriptStatus.PENDING_REVALIDATE,
-    validationStatus: ValidationStatus.NOT_VALIDATED,
-    sourceType: SourceType.HUMAN_EDITED,
-    scriptContent: MOCK_SCRIPT_CONTENT,
-    isCurrentFlag: false,
-    createdBy: 3002,
-    createdName: 'Sarah Zhang',
-    createdAt: '2025-11-22 09:15',
-  },
-  {
-    id: 5003,
-    taskId: 29280,
-    versionNo: 3,
-    frameworkType: 'Playwright',
-    scriptName: 'edge_case_handler',
-    scriptStatus: ScriptStatus.DRAFT,
-    validationStatus: ValidationStatus.NOT_VALIDATED,
-    sourceType: SourceType.AI_GENERATED,
-    scriptContent: MOCK_SCRIPT_CONTENT,
-    isCurrentFlag: false,
-    createdBy: 0,
-    createdName: 'System AI',
-    createdAt: '2025-11-20 11:30',
-  },
-]
-
-export const MOCK_TRACES: AiScriptTrace[] = [
-  {
-    id: 1,
-    taskId: 29280,
-    traceNo: 1,
-    actionType: TraceActionType.NAVIGATE,
-    pageUrl: 'https://staging.testpilot.io/auth/login',
-    targetSummary: '打开登录页面并等待 DOM 加载完成',
-    actionResult: 'success',
-    occurredAt: '00:02.12',
-  },
-  {
-    id: 2,
-    taskId: 29280,
-    traceNo: 2,
-    actionType: TraceActionType.INPUT,
-    pageUrl: 'https://staging.testpilot.io/auth/login',
-    targetSummary: '在 #email 字段中输入凭证',
-    locatorUsed: 'input[name="email"]',
-    inputValueMasked: 'qa-bot@testpilot.ai',
-    actionResult: 'success',
-    occurredAt: '00:04.45',
-  },
-  {
-    id: 3,
-    taskId: 29280,
-    traceNo: 3,
-    actionType: TraceActionType.CLICK,
-    pageUrl: 'https://staging.testpilot.io/auth/login',
-    targetSummary: '点击 .btn-primary 提交按钮',
-    locatorUsed: 'button[type="submit"]',
-    actionResult: 'success',
-    occurredAt: '00:05.10',
-  },
-  {
-    id: 4,
-    taskId: 29280,
-    traceNo: 4,
-    actionType: TraceActionType.ASSERT_CANDIDATE,
-    pageUrl: 'https://staging.testpilot.io/dashboard',
-    targetSummary: '验证 URL 包含 /dashboard',
-    actionResult: 'success',
-    occurredAt: '00:06.80',
-  },
-]
-
-export const MOCK_VALIDATION: AiScriptValidation = {
-  id: 8001,
-  scriptVersionId: 5001,
-  taskId: 29280,
-  triggerType: 'MANUAL',
-  validationStatus: ValidationStatus.FAILED,
-  totalStepCount: 15,
-  passedStepCount: 14,
-  failedStepNo: 15,
-  failReason: 'Timed out waiting for element: .user-avatar',
-  assertionSummary: [
-    { name: 'URL_VALIDATION', passed: true },
-    { name: 'LOGIN_FIELD_PRESENT', passed: true },
-    { name: 'DASHBOARD_LOAD', passed: false },
-    { name: 'USER_PROFILE_SYNC', passed: false, skipped: true },
-  ],
-  startedAt: '2025-10-24 15:30',
-  finishedAt: '2025-10-24 15:31',
-  durationMs: 8440,
-  triggeredBy: 3001,
-  triggeredName: 'Alex Chen',
-  logs: [
-    { level: 'INFO', message: '[INFO] 浏览器上下文已初始化' },
-    { level: 'INFO', message: '[LOG] 正在导航到目标 URL...' },
-    { level: 'INFO', message: '[LOG] 等待选择器: input[name="email"]' },
-    { level: 'INFO', message: '[LOG] 输入文本: qa-bot@testpilot.ai' },
-    { level: 'INFO', message: '[LOG] 断言: URL 应包含 /dashboard' },
-    { level: 'ERROR', message: '[FAIL] 等待元素超时: .user-avatar' },
-  ],
-  screenshots: [
-    {
-      id: 7001,
-      fileName: 'final-state.png',
-      url: '',
-      caption: '最终状态截图',
-      takenAt: '00:08.44',
-    },
-  ],
+/**
+ * snake_case 对象键转 camelCase（单层 + 数组递归）
+ * 用于将后端 JSON 响应映射到前端 Interface
+ */
+function toCamel(obj: any): any {
+  if (Array.isArray(obj)) return obj.map(toCamel)
+  if (obj !== null && typeof obj === 'object' && !(obj instanceof Date)) {
+    return Object.keys(obj).reduce((acc: Record<string, any>, key) => {
+      const camelKey = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase())
+      acc[camelKey] = toCamel(obj[key])
+      return acc
+    }, {})
+  }
+  return obj
 }
 
-// ── Mock API 方法（首期使用，后续替换为真实接口） ──
-
-/** 模拟延迟 */
-function delay(ms = 300): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms))
+/**
+ * camelCase 对象键转 snake_case（用于发送请求体）
+ */
+function toSnake(obj: any): any {
+  if (Array.isArray(obj)) return obj.map(toSnake)
+  if (obj !== null && typeof obj === 'object' && !(obj instanceof Date)) {
+    return Object.keys(obj).reduce((acc: Record<string, any>, key) => {
+      const snakeKey = key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)
+      acc[snakeKey] = toSnake(obj[key])
+      return acc
+    }, {})
+  }
+  return obj
 }
 
 /** 获取任务列表 */
-export async function fetchTaskList(_params?: {
+export async function fetchTaskList(params?: {
   projectId?: number
   taskStatus?: TaskStatus
   keyword?: string
   pageNo?: number
   pageSize?: number
 }): Promise<{ list: AiScriptTask[]; total: number }> {
-  await delay()
-  return { list: MOCK_TASKS, total: MOCK_TASKS.length }
+  const query: Record<string, any> = {}
+  if (params?.projectId) query.project_id = params.projectId
+  if (params?.taskStatus) query.task_status = params.taskStatus
+  if (params?.keyword) query.keyword = params.keyword
+  if (params?.pageNo) query.page = params.pageNo
+  if (params?.pageSize) query.pageSize = params.pageSize
+
+  const { data } = await apiClient.get('/ai-script/tasks', { params: query })
+
+  // apiClient 拦截器会把分页响应转为 { items, total, page, pageSize }
+  const items = data?.items ?? data ?? []
+  const total = data?.total ?? items.length
+
+  return {
+    list: toCamel(items) as AiScriptTask[],
+    total,
+  }
 }
 
 /** 获取任务详情 */
 export async function fetchTaskDetail(taskId: number): Promise<AiScriptTask | undefined> {
-  await delay()
-  return MOCK_TASKS.find((t) => t.id === taskId)
+  try {
+    const { data } = await apiClient.get(`/ai-script/tasks/${taskId}`)
+    return toCamel(data) as AiScriptTask
+  } catch {
+    return undefined
+  }
+}
+
+/** 创建生成任务 */
+export async function createTask(payload: {
+  projectId: number
+  taskName: string
+  generationMode?: GenerationMode
+  scenarioDesc: string
+  startUrl: string
+  accountRef?: string
+  caseIds: number[]
+  frameworkType?: string
+}): Promise<AiScriptTask> {
+  const { data } = await apiClient.post('/ai-script/tasks', toSnake(payload))
+  return toCamel(data) as AiScriptTask
+}
+
+/** 触发执行生成 */
+export async function executeTask(taskId: number): Promise<void> {
+  await apiClient.post(`/ai-script/tasks/${taskId}/execute`)
 }
 
 /** 获取脚本版本列表 */
-export async function fetchScriptVersions(
-  _taskId: number,
-): Promise<AiScriptVersion[]> {
-  await delay()
-  return MOCK_SCRIPTS
+export async function fetchScriptVersions(taskId: number): Promise<AiScriptVersion[]> {
+  const { data } = await apiClient.get(`/ai-script/tasks/${taskId}/versions`)
+  return toCamel(Array.isArray(data) ? data : []) as AiScriptVersion[]
 }
 
 /** 获取当前脚本版本 */
-export async function fetchCurrentScript(
-  _taskId: number,
-): Promise<AiScriptVersion | undefined> {
-  await delay()
-  return MOCK_SCRIPTS.find((s) => s.isCurrentFlag)
+export async function fetchCurrentScript(taskId: number): Promise<AiScriptVersion | undefined> {
+  try {
+    const { data } = await apiClient.get(`/ai-script/tasks/${taskId}/current-script`)
+    return toCamel(data) as AiScriptVersion
+  } catch {
+    return undefined
+  }
+}
+
+/** 编辑脚本（生成新版本） */
+export async function editScript(
+  taskId: number,
+  payload: { scriptContent: string; commentText?: string },
+): Promise<AiScriptVersion> {
+  const { data } = await apiClient.post(`/ai-script/tasks/${taskId}/edit-script`, toSnake(payload))
+  return toCamel(data) as AiScriptVersion
+}
+
+/** 触发回放验证 */
+export async function triggerValidation(
+  taskId: number,
+  scriptVersionId: number,
+): Promise<AiScriptValidation> {
+  const { data } = await apiClient.post(`/ai-script/tasks/${taskId}/validate`, {
+    script_version_id: scriptVersionId,
+  })
+  return toCamel(data) as AiScriptValidation
 }
 
 /** 获取操作轨迹 */
-export async function fetchTraces(_taskId: number): Promise<AiScriptTrace[]> {
-  await delay()
-  return MOCK_TRACES
+export async function fetchTraces(taskId: number): Promise<AiScriptTrace[]> {
+  const { data } = await apiClient.get(`/ai-script/tasks/${taskId}/traces`)
+  return toCamel(Array.isArray(data) ? data : []) as AiScriptTrace[]
 }
 
 /** 获取最近验证结果 */
 export async function fetchLatestValidation(
-  _scriptId: number,
-): Promise<AiScriptValidation> {
-  await delay()
-  return MOCK_VALIDATION
+  scriptVersionId: number,
+): Promise<AiScriptValidation | undefined> {
+  try {
+    const { data } = await apiClient.get('/ai-script/validations/latest', {
+      params: { script_version_id: scriptVersionId },
+    })
+    return toCamel(data) as AiScriptValidation
+  } catch {
+    return undefined
+  }
+}
+
+/** 获取证据列表 */
+export async function fetchEvidences(taskId: number): Promise<EvidenceScreenshot[]> {
+  const { data } = await apiClient.get(`/ai-script/tasks/${taskId}/evidences`)
+  return toCamel(Array.isArray(data) ? data : []) as EvidenceScreenshot[]
+}
+
+// ── 新增 API 方法（阶段三） ──
+
+/** 确认脚本 */
+export async function confirmScript(scriptId: number): Promise<void> {
+  await apiClient.post(`/ai-script/scripts/${scriptId}/confirm`)
+}
+
+/** 废弃脚本版本 */
+export async function discardScript(scriptId: number, reason: string): Promise<void> {
+  await apiClient.post(`/ai-script/scripts/${scriptId}/discard`, { reason })
+}
+
+/** 废弃任务 */
+export async function discardTask(taskId: number, reason: string): Promise<void> {
+  await apiClient.post(`/ai-script/tasks/${taskId}/discard`, { reason })
+}
+
+/** 克隆任务 */
+export async function cloneTask(taskId: number, taskName: string): Promise<AiScriptTask> {
+  const { data } = await apiClient.post(`/ai-script/tasks/${taskId}/clone`, { task_name: taskName })
+  return toCamel(data) as AiScriptTask
+}
+
+/** 开始录制 */
+export async function startRecording(taskId: number): Promise<RecordingSession> {
+  const { data } = await apiClient.post(`/ai-script/tasks/${taskId}/recording/start`)
+  return toCamel(data) as RecordingSession
+}
+
+/** 结束录制 */
+export async function finishRecording(
+  taskId: number,
+  payload: { recordingId: number; rawScriptContent: string; triggerAiRefactor?: boolean },
+): Promise<void> {
+  await apiClient.post(`/ai-script/tasks/${taskId}/recording/finish`, toSnake(payload))
+}
+
+/** 获取最近录制结果 */
+export async function fetchLatestRecording(taskId: number): Promise<RecordingSession | undefined> {
+  try {
+    const { data } = await apiClient.get(`/ai-script/tasks/${taskId}/recordings/latest`)
+    return toCamel(data) as RecordingSession
+  } catch {
+    return undefined
+  }
+}
+
+/** 导出脚本 */
+export async function exportScript(scriptId: number): Promise<Blob> {
+  const { data } = await apiClient.get(`/ai-script/scripts/${scriptId}/export`, {
+    responseType: 'blob',
+  })
+  return data
+}
+
+/** 获取验证历史 */
+export async function fetchValidationHistory(scriptId: number): Promise<AiScriptValidation[]> {
+  const { data } = await apiClient.get(`/ai-script/scripts/${scriptId}/validations`)
+  return toCamel(Array.isArray(data) ? data : []) as AiScriptValidation[]
+}
+
+/** 更新任务关联用例 */
+export async function updateTaskCases(taskId: number, caseIds: number[]): Promise<void> {
+  await apiClient.post(`/ai-script/tasks/${taskId}/cases/update`, { case_ids: caseIds })
+}
+
+// ── Executor Codegen API（直连 Executor 服务） ──
+
+const EXECUTOR_BASE = 'http://127.0.0.1:8100'
+
+export interface CodegenSession {
+  session_id: string
+  status: string
+}
+
+export interface CodegenPollResult {
+  status: 'starting' | 'recording' | 'completed' | 'error' | 'not_found'
+  script_content: string
+  error: string
+}
+
+/** 启动 Playwright Codegen 录制浏览器 */
+export async function launchCodegen(taskId: number, startUrl: string): Promise<CodegenSession> {
+  const resp = await fetch(`${EXECUTOR_BASE}/recording/codegen`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ task_id: taskId, start_url: startUrl }),
+  })
+  return resp.json()
+}
+
+/** 轮询 Codegen 录制状态 */
+export async function pollCodegenStatus(sessionId: string): Promise<CodegenPollResult> {
+  const resp = await fetch(`${EXECUTOR_BASE}/recording/codegen/${sessionId}`)
+  return resp.json()
 }
