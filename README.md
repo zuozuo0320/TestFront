@@ -16,6 +16,7 @@
 | HTTP | Axios | API 请求 + 拦截器 |
 | 路由 | Vue Router 4 | SPA 路由 |
 | 图标 | lucide-vue-next | 侧边栏 / 页面图标 |
+| 代码编辑器 | vue-codemirror (@codemirror/lang-javascript) | 脚本预览 / 编辑（TypeScript 高亮 + one-dark 主题） |
 
 ---
 
@@ -73,6 +74,7 @@ src/
 ├── components/                      # 通用 UI 组件
 │   ├── AppHeader.vue                # 顶部导航栏（品牌LOGO + 侧栏展开 + 通知 + 用户信息）
 │   ├── AppSidebar.vue               # 侧边菜单（仪表盘/用例/执行/缺陷/分析 + 系统管理 + 折叠按钮）
+│   ├── CodeEditor.vue               # CodeMirror 代码编辑器封装（TypeScript + one-dark）
 │   ├── StatusBadge.vue              # 状态标签
 │   ├── LevelBadge.vue               # 优先级标签
 │   ├── EmptyState.vue               # 空态占位
@@ -108,6 +110,8 @@ src/
 | `/system/users` | UserManagement | 用户管理 |
 | `/system/roles` | RoleManagement | 角色管理 |
 | `/system/projects` | ProjectManagement | 项目管理 |
+| `/ai-script` | AiScriptTaskList | 测试智编 - 任务列表 |
+| `/ai-script/:taskId` | AiScriptTaskDetail | 测试智编 - 任务详情（CodeMirror 脚本预览 + 验证） |
 
 ---
 
