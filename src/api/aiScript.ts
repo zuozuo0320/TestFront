@@ -254,11 +254,17 @@ export interface ValidationLog {
 
 export interface EvidenceScreenshot {
   id: number
+  taskId: number
+  scriptVersionId?: number
+  validationId?: number
+  evidenceType: string
   fileName: string
-  url: string
+  fileUrl: string
+  contentText?: string
   traceNo?: number
   caption?: string
-  takenAt?: string
+  createdBy?: number
+  createdAt?: string
 }
 
 export interface AiScriptTrace {

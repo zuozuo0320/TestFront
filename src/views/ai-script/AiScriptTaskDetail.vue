@@ -89,23 +89,23 @@ const displayTraces = computed(() => {
     const model = recording.value.stepModelJson as any
     const steps = model?.steps || []
     return steps.map((s: any) => ({
-      id: s.step_no,
+      id: s.stepNo,
       taskId: taskId.value,
-      traceNo: s.step_no,
-      actionType: s.action_type || 'CUSTOM',
-      pageUrl: s.page_url || '',
+      traceNo: s.stepNo,
+      actionType: s.actionType || 'CUSTOM',
+      pageUrl: s.pageUrl || '',
       targetSummary:
-        s.action_type === 'NAVIGATE'
-          ? `导航到 ${s.page_url}`
-          : s.action_type === 'INPUT'
-            ? `输入 "${s.input_value}"`
-            : s.action_type === 'CLICK'
+        s.actionType === 'NAVIGATE'
+          ? `导航到 ${s.pageUrl}`
+          : s.actionType === 'INPUT'
+            ? `输入 "${s.inputValue}"`
+            : s.actionType === 'CLICK'
               ? `点击 ${s.locator}`
-              : s.action_type === 'KEY_PRESS'
-                ? `按键 ${s.input_value}`
-                : `步骤 ${s.step_no}`,
+              : s.actionType === 'KEY_PRESS'
+                ? `按键 ${s.inputValue}`
+                : `步骤 ${s.stepNo}`,
       locatorUsed: s.locator || '',
-      inputValueMasked: s.input_value || '',
+      inputValueMasked: s.inputValue || '',
       occurredAt: '',
     }))
   }
@@ -635,7 +635,7 @@ const isTaskActive = computed(() => {
         </section>
 
         <!-- 操作轨迹时间线 -->
-        <section class="ai-info-card" style="flex: 1">
+        <section class="ai-info-card" style="flex: 1; overflow-y: auto; max-height: 600px">
           <span class="ai-section-title" style="margin-bottom: 18px; display: block">
             {{ isRecordingMode ? '操作步骤 (录制解析)' : '操作轨迹 (browser-use)' }}
           </span>
@@ -838,13 +838,13 @@ const isTaskActive = computed(() => {
                   最终状态截图
                 </span>
                 <span class="ai-fail-label-time">
-                  截取于 {{ validation.screenshots?.[0]?.takenAt || '-' }}
+                  截取于 {{ validation.screenshots?.[0]?.createdAt || '-' }}
                 </span>
               </div>
               <div class="ai-fail-screenshot">
                 <img
                   v-if="validation.screenshots?.length"
-                  :src="validation.screenshots?.[0]?.url"
+                  :src="validation.screenshots?.[0]?.fileUrl"
                   :alt="validation.screenshots?.[0]?.caption || '错误状态截图'"
                   style="width: 100%; border-radius: 8px; object-fit: contain; max-height: 300px; background: rgba(0,0,0,0.3)"
                 />
