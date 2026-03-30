@@ -5,6 +5,8 @@ import { useAiScriptStore } from '../../stores/aiScript'
 import {
   TaskStatusLabel,
   TaskStatusColor,
+  ValidationStatusLabel,
+  ValidationStatusColor,
   GenerationMode,
   GenerationModeLabel,
   type AiScriptTask,
@@ -21,6 +23,22 @@ const projects = ref<Project[]>([])
 const currentPage = ref(1)
 const pageSize = ref(10)
 
+// ── 筛选状态 ──
+const showFilterPanel = ref(false)
+const filterProjectId = ref<number | undefined>(undefined)
+const filterStatus = ref<string>('')
+const filterKeyword = ref('')
+const sortDesc = ref(true)
+
+// ── Toast 提示 ──
+const toastMsg = ref('')
+let toastTimer: ReturnType<typeof setTimeout> | null = null
+function showToast(msg: string) {
+  toastMsg.value = msg
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => { toastMsg.value = '' }, 3000)
+}
+
 const totalPages = computed(() => Math.max(1, Math.ceil(store.taskTotal / pageSize.value)))
 const displayPages = computed(() => {
   const pages: number[] = []
@@ -32,14 +50,42 @@ const displayPages = computed(() => {
   return pages
 })
 
+function buildQueryParams(page = currentPage.value) {
+  return {
+    projectId: filterProjectId.value,
+    taskStatus: filterStatus.value || undefined,
+    keyword: filterKeyword.value.trim() || undefined,
+    pageNo: page,
+    pageSize: pageSize.value,
+  }
+}
+
 async function loadPage(page: number) {
   if (page < 1 || page > totalPages.value) return
   currentPage.value = page
-  await store.loadTaskList({ pageNo: page, pageSize: pageSize.value })
+  await store.loadTaskList(buildQueryParams(page))
+}
+
+async function applyFilter() {
+  currentPage.value = 1
+  await store.loadTaskList(buildQueryParams(1))
+  showFilterPanel.value = false
+}
+
+function resetFilter() {
+  filterProjectId.value = undefined
+  filterStatus.value = ''
+  filterKeyword.value = ''
+  applyFilter()
+}
+
+function toggleSort() {
+  sortDesc.value = !sortDesc.value
+  applyFilter()
 }
 
 onMounted(async () => {
-  store.loadTaskList({ pageNo: 1, pageSize: pageSize.value })
+  store.loadTaskList(buildQueryParams(1))
   projects.value = await listProjects()
 })
 
@@ -138,11 +184,16 @@ function isCaseSelected(id: number) {
 }
 
 async function submitCreateTask() {
-  if (
-    !createForm.taskName.trim() ||
-    !createForm.scenarioDesc.trim() ||
-    !createForm.startUrl.trim()
-  ) {
+  if (!createForm.taskName.trim()) {
+    showToast('请输入任务名称')
+    return
+  }
+  if (!createForm.scenarioDesc.trim()) {
+    showToast('请输入场景描述')
+    return
+  }
+  if (!createForm.startUrl.trim()) {
+    showToast('请输入起始 URL')
     return
   }
   // 解析用例 ID：支持逗号分隔
@@ -150,7 +201,10 @@ async function submitCreateTask() {
     .split(',')
     .map((s) => parseInt(s.trim(), 10))
     .filter((n) => !isNaN(n) && n > 0)
-  if (caseIds.length === 0) return
+  if (caseIds.length === 0) {
+    showToast('请至少关联一条测试用例')
+    return
+  }
 
   try {
     const task = await store.createTask({
@@ -168,6 +222,34 @@ async function submitCreateTask() {
     router.push(`/ai-script/${task.id}`)
   } catch (e) {
     console.error('创建任务失败:', e)
+  }
+}
+
+// ── 废弃任务 ──
+const showDiscardDialog = ref(false)
+const discardTaskId = ref(0)
+const discardTaskName = ref('')
+const discardReason = ref('')
+
+function openDiscardDialog(task: AiScriptTask) {
+  discardTaskId.value = task.id
+  discardTaskName.value = task.taskName
+  discardReason.value = ''
+  showDiscardDialog.value = true
+}
+
+async function confirmDiscard() {
+  if (!discardReason.value.trim()) {
+    showToast('请输入废弃原因')
+    return
+  }
+  try {
+    await store.discardTask(discardTaskId.value, discardReason.value.trim())
+    showDiscardDialog.value = false
+    showToast('任务已废弃')
+  } catch (e) {
+    console.error('废弃任务失败:', e)
+    showToast('废弃失败，请重试')
   }
 }
 
@@ -200,18 +282,49 @@ async function handleExecute(task: AiScriptTask) {
         <h1>智能脚本生成任务列表</h1>
       </div>
       <div class="ai-action-group">
-        <button class="ai-btn ai-btn-ghost">
+        <button class="ai-btn ai-btn-ghost" @click="showFilterPanel = !showFilterPanel">
           <span class="material-symbols-outlined">filter_alt</span>
           筛选条件
         </button>
-        <button class="ai-btn ai-btn-ghost">
-          <span class="material-symbols-outlined">sort</span>
-          按时间排序
+        <button class="ai-btn ai-btn-ghost" @click="toggleSort">
+          <span class="material-symbols-outlined">{{ sortDesc ? 'arrow_downward' : 'arrow_upward' }}</span>
+          {{ sortDesc ? '最新优先' : '最早优先' }}
         </button>
         <button class="ai-btn ai-btn-primary" @click="openCreateDialog">
           <span class="material-symbols-outlined">add</span>
           新建任务
         </button>
+      </div>
+    </div>
+
+    <!-- 筛选面板 -->
+    <div v-if="showFilterPanel" class="ai-filter-panel">
+      <div class="ai-filter-row">
+        <div class="ai-filter-item">
+          <label>项目</label>
+          <select v-model="filterProjectId" class="ai-form-select" style="min-width: 160px">
+            <option :value="undefined">全部项目</option>
+            <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
+          </select>
+        </div>
+        <div class="ai-filter-item">
+          <label>状态</label>
+          <select v-model="filterStatus" class="ai-form-select" style="min-width: 140px">
+            <option value="">全部状态</option>
+            <option v-for="(label, key) in TaskStatusLabel" :key="key" :value="key">{{ label }}</option>
+          </select>
+        </div>
+        <div class="ai-filter-item">
+          <label>关键字</label>
+          <input v-model="filterKeyword" class="ai-form-input" style="min-width: 180px" placeholder="任务名称 / 用例名称" @keyup.enter="applyFilter" />
+        </div>
+        <div class="ai-filter-actions">
+          <button class="ai-btn ai-btn-primary" style="padding: 6px 16px; font-size: 0.8rem" @click="applyFilter">
+            <span class="material-symbols-outlined" style="font-size: 16px">search</span>
+            查询
+          </button>
+          <button class="ai-btn ai-btn-ghost" style="padding: 6px 12px; font-size: 0.8rem" @click="resetFilter">重置</button>
+        </div>
       </div>
     </div>
 
@@ -224,8 +337,10 @@ async function handleExecute(task: AiScriptTask) {
             <th>所属项目</th>
             <th>关联用例</th>
             <th>输出框架</th>
-            <th>状态</th>
+            <th>任务状态</th>
+            <th>验证状态</th>
             <th>生成人 / 时间</th>
+            <th>更新时间</th>
             <th style="text-align: right">操作</th>
           </tr>
         </thead>
@@ -276,12 +391,21 @@ async function handleExecute(task: AiScriptTask) {
               </div>
             </td>
             <td>
+              <div v-if="task.validationStatus" class="ai-status-badge" :class="ValidationStatusColor[task.validationStatus]" style="font-size: 0.7rem">
+                {{ ValidationStatusLabel[task.validationStatus] }}
+              </div>
+              <span v-else style="font-size: 0.75rem; color: var(--tp-gray-600)">—</span>
+            </td>
+            <td>
               <div class="ai-task-cell">
                 <span style="font-size: 0.78rem; font-weight: 500">{{ task.createdName }}</span>
                 <span style="font-size: 0.6rem; color: var(--tp-gray-500)">
                   {{ task.createdAt }}
                 </span>
               </div>
+            </td>
+            <td>
+              <span style="font-size: 0.75rem; color: var(--tp-gray-500)">{{ task.updatedAt || '-' }}</span>
             </td>
             <td>
               <div class="ai-row-actions">
@@ -302,7 +426,7 @@ async function handleExecute(task: AiScriptTask) {
                 <button class="ai-row-action-btn" title="复制配置" @click.stop>
                   <span class="material-symbols-outlined">content_copy</span>
                 </button>
-                <button class="ai-row-action-btn danger" title="废弃" @click.stop>
+                <button class="ai-row-action-btn danger" title="废弃" @click.stop="openDiscardDialog(task)">
                   <span class="material-symbols-outlined">delete</span>
                 </button>
               </div>
@@ -407,10 +531,7 @@ async function handleExecute(task: AiScriptTask) {
         <button
           class="ai-quickstart-link"
           style="position: relative; z-index: 1"
-          @click="
-            openCreateDialog()
-            createForm.generationMode = GenerationMode.RECORDING_ENHANCED
-          "
+          @click="openCreateDialog(); createForm.generationMode = GenerationMode.RECORDING_ENHANCED"
         >
           立即体验
           <span class="material-symbols-outlined" style="font-size: 14px">arrow_forward</span>
@@ -504,10 +625,7 @@ async function handleExecute(task: AiScriptTask) {
                 <span
                   class="material-symbols-outlined"
                   style="font-size: 14px; cursor: pointer"
-                  @click="
-                    selectedCaseIds.splice(selectedCaseIds.indexOf(cid), 1)
-                    createForm.caseIds = selectedCaseIds.join(',')
-                  "
+                  @click="selectedCaseIds.splice(selectedCaseIds.indexOf(cid), 1); createForm.caseIds = selectedCaseIds.join(',')"
                 >
                   ×
                 </span>
@@ -613,6 +731,51 @@ async function handleExecute(task: AiScriptTask) {
         </div>
       </div>
     </div>
+
+    <!-- Toast 提示 -->
+    <Transition name="toast">
+      <div v-if="toastMsg" class="task-list-toast">
+        <span class="material-symbols-outlined" style="font-size: 16px; color: #ff8a80">error</span>
+        {{ toastMsg }}
+      </div>
+    </Transition>
+
+    <!-- 废弃确认 Dialog -->
+    <div v-if="showDiscardDialog" class="ai-dialog-overlay" @click.self="showDiscardDialog = false">
+      <div class="ai-dialog" style="max-width: 440px">
+        <div class="ai-dialog-header">
+          <h2>ℹ️ 废弃任务</h2>
+          <button class="ai-dialog-close" @click="showDiscardDialog = false">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="ai-dialog-body">
+          <p class="discard-warning">
+            确定要废弃任务 <strong>{{ discardTaskName }}</strong>（ID: {{ discardTaskId }}）吗？废弃后任务将不可恢复。
+          </p>
+          <div class="ai-form-group">
+            <label class="ai-form-label">废弃原因 *</label>
+            <textarea
+              v-model="discardReason"
+              class="ai-form-textarea"
+              placeholder="请输入废弃原因..."
+              rows="3"
+            />
+          </div>
+        </div>
+        <div class="ai-dialog-footer">
+          <button class="ai-btn ai-btn-ghost" @click="showDiscardDialog = false">取消</button>
+          <button
+            class="ai-btn ai-btn-danger"
+            :disabled="store.actionLoading"
+            @click="confirmDiscard"
+          >
+            <span v-if="store.actionLoading" class="ai-spinner"></span>
+            {{ store.actionLoading ? '处理中...' : '确认废弃' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -628,5 +791,100 @@ async function handleExecute(task: AiScriptTask) {
 }
 .animate-pulse {
   animation: pulse 2s ease-in-out infinite;
+}
+
+/* 筛选面板 */
+.ai-filter-panel {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  animation: fadeIn 0.2s ease;
+}
+.ai-filter-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.ai-filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ai-filter-item label {
+  font-size: 0.7rem;
+  color: var(--tp-gray-500);
+  font-weight: 500;
+}
+.ai-filter-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* Toast */
+.task-list-toast {
+  position: fixed !important;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  background: rgba(30, 30, 46, 0.95);
+  border: 1px solid rgba(255, 138, 128, 0.3);
+  color: #ff8a80;
+  font-size: 0.82rem;
+  font-weight: 500;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+  max-width: 360px;
+  width: auto;
+  white-space: nowrap;
+}
+.toast-enter-active { animation: task-toast-in 0.3s ease; }
+.toast-leave-active { animation: task-toast-in 0.2s ease reverse; }
+@keyframes task-toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 废弃确认弹窗 */
+.discard-warning {
+  font-size: 0.85rem;
+  color: var(--tp-gray-300);
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+.discard-warning strong {
+  color: #ff8a80;
+}
+.ai-btn-danger {
+  background: linear-gradient(135deg, #e53935, #c62828);
+  color: #fff;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.ai-btn-danger:hover {
+  background: linear-gradient(135deg, #f44336, #d32f2f);
+  box-shadow: 0 4px 12px rgba(229, 57, 53, 0.4);
+}
+.ai-btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>

@@ -19,6 +19,7 @@ import {
   executeTask as apiExecuteTask,
   editScript as apiEditScript,
   triggerValidation as apiTriggerValidation,
+  discardTask as apiDiscardTask,
 } from '../api/aiScript'
 
 export const useAiScriptStore = defineStore('aiScript', () => {
@@ -184,6 +185,17 @@ export const useAiScriptStore = defineStore('aiScript', () => {
     }
   }
 
+  /** 废弃任务 */
+  async function discardTask(taskId: number, reason: string): Promise<void> {
+    actionLoading.value = true
+    try {
+      await apiDiscardTask(taskId, reason)
+      await loadTaskList()
+    } finally {
+      actionLoading.value = false
+    }
+  }
+
   return {
     // 读
     taskList,
@@ -210,5 +222,6 @@ export const useAiScriptStore = defineStore('aiScript', () => {
     executeTask,
     updateScript,
     runValidation,
+    discardTask,
   }
 })

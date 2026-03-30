@@ -498,7 +498,7 @@ export async function updateTaskCases(taskId: number, caseIds: number[]): Promis
 
 // ── Executor Codegen API（直连 Executor 服务） ──
 
-const EXECUTOR_BASE = 'http://127.0.0.1:8100'
+const EXECUTOR_BASE = import.meta.env.VITE_EXECUTOR_URL || 'http://127.0.0.1:8100'
 
 export interface CodegenSession {
   session_id: string

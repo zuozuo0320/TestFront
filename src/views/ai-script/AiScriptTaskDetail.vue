@@ -11,6 +11,9 @@ import {
   GenerationModeLabel,
   ValidationStatusLabel,
   ValidationStatusColor,
+  ScriptStatusLabel,
+  ScriptStatusColor,
+  SourceTypeLabel,
 } from '../../api/aiScript'
 import {
   confirmScript,
@@ -530,6 +533,28 @@ const isTaskActive = computed(() => {
               <div class="ai-info-label">起始地址</div>
               <div class="ai-info-url">{{ task?.startUrl || '-' }}</div>
             </div>
+            <!-- 场景描述 -->
+            <div v-if="task?.scenarioDesc">
+              <div class="ai-info-label">场景描述</div>
+              <div style="font-size: 0.8rem; color: var(--tp-gray-300); line-height: 1.6; background: rgba(255,255,255,0.02); padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); white-space: pre-wrap">
+                {{ task.scenarioDesc }}
+              </div>
+            </div>
+            <!-- 创建人/时间 -->
+            <div style="display: flex; gap: 24px">
+              <div>
+                <div class="ai-info-label">创建人</div>
+                <div class="ai-info-value">{{ task?.createdName || '-' }}</div>
+              </div>
+              <div>
+                <div class="ai-info-label">创建时间</div>
+                <div class="ai-info-value">{{ task?.createdAt || '-' }}</div>
+              </div>
+              <div v-if="task?.updatedAt">
+                <div class="ai-info-label">更新时间</div>
+                <div class="ai-info-value">{{ task.updatedAt }}</div>
+              </div>
+            </div>
             <!-- 失败原因 -->
             <div
               v-if="task?.taskStatus === TaskStatus.GENERATE_FAILED && task?.errorMessage"
@@ -817,9 +842,15 @@ const isTaskActive = computed(() => {
                 </span>
               </div>
               <div class="ai-fail-screenshot">
-                <div class="ai-fail-screenshot-placeholder">
+                <img
+                  v-if="validation.screenshots?.length"
+                  :src="validation.screenshots?.[0]?.url"
+                  :alt="validation.screenshots?.[0]?.caption || '错误状态截图'"
+                  style="width: 100%; border-radius: 8px; object-fit: contain; max-height: 300px; background: rgba(0,0,0,0.3)"
+                />
+                <div v-else class="ai-fail-screenshot-placeholder">
                   <span class="material-symbols-outlined">broken_image</span>
-                  <span>错误状态</span>
+                  <span>无截图</span>
                 </div>
               </div>
             </div>
@@ -882,6 +913,55 @@ const isTaskActive = computed(() => {
               <div style="font-size: 0.7rem; color: var(--tp-gray-600)">
                 通过 {{ v.passedStepCount }}/{{ v.totalStepCount }}
               </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 脚本版本记录 -->
+        <section v-if="store.scriptVersions.length > 0" class="ai-info-card" style="margin-top: 16px">
+          <span class="ai-section-title" style="margin-bottom: 12px; display: block">
+            <span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle">
+              layers
+            </span>
+            版本记录 ({{ store.scriptVersions.length }})
+          </span>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div
+              v-for="ver in store.scriptVersions"
+              :key="ver.id"
+              style="
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 8px 12px;
+                border-radius: 6px;
+                background: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.06);
+              "
+              :style="{ borderColor: ver.isCurrentFlag ? 'rgba(124,77,255,0.3)' : '' }"
+            >
+              <div style="font-size: 0.8rem; font-weight: 600; color: var(--tp-gray-300); min-width: 36px">
+                v{{ ver.versionNo }}
+              </div>
+              <div
+                class="ai-status-badge"
+                :class="ScriptStatusColor[ver.scriptStatus]"
+                style="font-size: 0.65rem; min-width: 48px; text-align: center"
+              >
+                {{ ScriptStatusLabel[ver.scriptStatus] }}
+              </div>
+              <div style="font-size: 0.7rem; color: var(--tp-gray-500)">
+                {{ SourceTypeLabel[ver.sourceType] || ver.sourceType }}
+              </div>
+              <div style="flex: 1; font-size: 0.7rem; color: var(--tp-gray-600); text-align: right">
+                {{ ver.createdName }} · {{ ver.createdAt }}
+              </div>
+              <span
+                v-if="ver.isCurrentFlag"
+                style="font-size: 0.6rem; padding: 1px 6px; border-radius: 8px; background: rgba(124,77,255,0.15); color: #b388ff"
+              >
+                当前
+              </span>
             </div>
           </div>
         </section>
