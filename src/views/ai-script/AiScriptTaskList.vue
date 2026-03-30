@@ -117,6 +117,18 @@ function isRunning(status: TaskStatus) {
   return status === TaskStatus.RUNNING
 }
 
+function formatTime(raw?: string): string {
+  if (!raw) return '-'
+  const d = new Date(raw)
+  if (isNaN(d.getTime())) return raw
+  const Y = d.getFullYear()
+  const M = String(d.getMonth() + 1).padStart(2, '0')
+  const D = String(d.getDate()).padStart(2, '0')
+  const h = String(d.getHours()).padStart(2, '0')
+  const m = String(d.getMinutes()).padStart(2, '0')
+  return `${Y}-${M}-${D} ${h}:${m}`
+}
+
 // ── 新建任务 Dialog ──
 const showCreateDialog = ref(false)
 const createForm = reactive({
@@ -253,6 +265,28 @@ async function confirmDiscard() {
   }
 }
 
+// ── 删除已废弃任务 ──
+const showDeleteDialog = ref(false)
+const deleteTaskId = ref(0)
+const deleteTaskName = ref('')
+
+function openDeleteDialog(task: AiScriptTask) {
+  deleteTaskId.value = task.id
+  deleteTaskName.value = task.taskName
+  showDeleteDialog.value = true
+}
+
+async function confirmDelete() {
+  try {
+    await store.deleteDiscardedTask(deleteTaskId.value)
+    showDeleteDialog.value = false
+    showToast('任务已彻底删除')
+  } catch (e) {
+    console.error('删除任务失败:', e)
+    showToast('删除失败，请重试')
+  }
+}
+
 // ── 触发执行 ──
 async function handleExecute(task: AiScriptTask) {
   if (
@@ -339,7 +373,8 @@ async function handleExecute(task: AiScriptTask) {
             <th>输出框架</th>
             <th>任务状态</th>
             <th>验证状态</th>
-            <th>生成人 / 时间</th>
+            <th>创建人</th>
+            <th>创建时间</th>
             <th>更新时间</th>
             <th style="text-align: right">操作</th>
           </tr>
@@ -397,15 +432,13 @@ async function handleExecute(task: AiScriptTask) {
               <span v-else style="font-size: 0.75rem; color: var(--tp-gray-600)">—</span>
             </td>
             <td>
-              <div class="ai-task-cell">
-                <span style="font-size: 0.78rem; font-weight: 500">{{ task.createdName }}</span>
-                <span style="font-size: 0.6rem; color: var(--tp-gray-500)">
-                  {{ task.createdAt }}
-                </span>
-              </div>
+              <span style="font-size: 0.8rem; font-weight: 500">{{ task.createdName }}</span>
             </td>
             <td>
-              <span style="font-size: 0.75rem; color: var(--tp-gray-500)">{{ task.updatedAt || '-' }}</span>
+              <span style="font-size: 0.75rem; color: var(--tp-gray-500)">{{ formatTime(task.createdAt) }}</span>
+            </td>
+            <td>
+              <span style="font-size: 0.75rem; color: var(--tp-gray-500)">{{ formatTime(task.updatedAt) }}</span>
             </td>
             <td>
               <div class="ai-row-actions">
@@ -427,7 +460,15 @@ async function handleExecute(task: AiScriptTask) {
                   <span class="material-symbols-outlined">content_copy</span>
                 </button>
                 <button class="ai-row-action-btn danger" title="废弃" @click.stop="openDiscardDialog(task)">
-                  <span class="material-symbols-outlined">delete</span>
+                  <span class="material-symbols-outlined">block</span>
+                </button>
+                <button
+                  v-if="task.taskStatus === TaskStatus.DISCARDED"
+                  class="ai-row-action-btn danger"
+                  title="删除"
+                  @click.stop="openDeleteDialog(task)"
+                >
+                  <span class="material-symbols-outlined">delete_forever</span>
                 </button>
               </div>
             </td>
@@ -772,6 +813,37 @@ async function handleExecute(task: AiScriptTask) {
           >
             <span v-if="store.actionLoading" class="ai-spinner"></span>
             {{ store.actionLoading ? '处理中...' : '确认废弃' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 删除确认 Dialog -->
+    <div v-if="showDeleteDialog" class="ai-dialog-overlay" @click.self="showDeleteDialog = false">
+      <div class="ai-dialog" style="max-width: 440px">
+        <div class="ai-dialog-header">
+          <h2>⚠️ 删除任务</h2>
+          <button class="ai-dialog-close" @click="showDeleteDialog = false">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="ai-dialog-body">
+          <p class="discard-warning" style="color: #ff8a80">
+            确定要彻底删除任务 <strong>{{ deleteTaskName }}</strong>（ID: {{ deleteTaskId }}）吗？
+          </p>
+          <p style="font-size: 0.8rem; color: var(--tp-gray-500); margin-top: 8px">
+            此操作将级联删除任务关联的所有脚本版本、验证记录、轨迹、证据和录制会话，<strong style="color: #ff8a80">不可恢复</strong>。
+          </p>
+        </div>
+        <div class="ai-dialog-footer">
+          <button class="ai-btn ai-btn-ghost" @click="showDeleteDialog = false">取消</button>
+          <button
+            class="ai-btn ai-btn-danger"
+            :disabled="store.actionLoading"
+            @click="confirmDelete"
+          >
+            <span v-if="store.actionLoading" class="ai-spinner"></span>
+            {{ store.actionLoading ? '删除中...' : '确认删除' }}
           </button>
         </div>
       </div>

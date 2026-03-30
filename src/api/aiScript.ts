@@ -159,6 +159,7 @@ export interface ActionPermissions {
   canConfirm: boolean
   canExport: boolean
   canDiscard: boolean
+  canDelete: boolean
 }
 
 export interface RecordingSession {
@@ -451,6 +452,11 @@ export async function discardScript(scriptId: number, reason: string): Promise<v
 /** 废弃任务 */
 export async function discardTask(taskId: number, reason: string): Promise<void> {
   await apiClient.post(`/ai-script/tasks/${taskId}/discard`, { reason })
+}
+
+/** 删除已废弃任务 */
+export async function deleteTask(taskId: number): Promise<void> {
+  await apiClient.delete(`/ai-script/tasks/${taskId}`)
 }
 
 /** 克隆任务 */

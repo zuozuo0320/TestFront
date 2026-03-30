@@ -19,6 +19,7 @@ import {
   confirmScript,
   discardScript,
   discardTask,
+  deleteTask,
   exportScript,
   startRecording,
   finishRecording,
@@ -223,6 +224,18 @@ function traceIcon(type: TraceActionType): string {
   return map[type] || 'radio_button_checked'
 }
 
+function formatTime(raw?: string): string {
+  if (!raw) return '-'
+  const d = new Date(raw)
+  if (isNaN(d.getTime())) return raw
+  const Y = d.getFullYear()
+  const M = String(d.getMonth() + 1).padStart(2, '0')
+  const D = String(d.getDate()).padStart(2, '0')
+  const h = String(d.getHours()).padStart(2, '0')
+  const m = String(d.getMinutes()).padStart(2, '0')
+  return `${Y}-${M}-${D} ${h}:${m}`
+}
+
 function goBack() {
   router.push('/ai-script')
 }
@@ -273,14 +286,40 @@ async function handleDiscardScript() {
   }
 }
 
-async function handleDiscardTask() {
-  const reason = prompt('请输入废弃任务的原因')
-  if (!reason) return
+// ── 废弃任务 Dialog ──
+const showDetailDiscardDialog = ref(false)
+const detailDiscardReason = ref('')
+
+function handleDiscardTask() {
+  detailDiscardReason.value = ''
+  showDetailDiscardDialog.value = true
+}
+
+async function confirmDetailDiscard() {
+  if (!detailDiscardReason.value.trim()) return
   try {
-    await discardTask(taskId.value, reason)
+    await discardTask(taskId.value, detailDiscardReason.value.trim())
+    showDetailDiscardDialog.value = false
     await store.loadTaskDetailFull(taskId.value)
   } catch (e) {
     console.error('废弃任务失败:', e)
+  }
+}
+
+// ── 删除任务 Dialog ──
+const showDetailDeleteDialog = ref(false)
+
+function handleDeleteTask() {
+  showDetailDeleteDialog.value = true
+}
+
+async function confirmDetailDelete() {
+  try {
+    await deleteTask(taskId.value)
+    showDetailDeleteDialog.value = false
+    router.push('/ai-script')
+  } catch (e) {
+    console.error('删除任务失败:', e)
   }
 }
 
@@ -401,6 +440,10 @@ const canDiscard = computed(() => {
   const s = task.value?.taskStatus
   return s !== TaskStatus.DISCARDED && s !== TaskStatus.CONFIRMED
 })
+const canDelete = computed(() => {
+  if (task.value?.permissions) return task.value.permissions.canDelete
+  return task.value?.taskStatus === TaskStatus.DISCARDED
+})
 const isTaskActive = computed(() => {
   const s = task.value?.taskStatus
   return s !== TaskStatus.DISCARDED && s !== TaskStatus.CONFIRMED
@@ -495,7 +538,15 @@ const isTaskActive = computed(() => {
           title="废弃任务"
           @click="handleDiscardTask"
         >
-          <span class="material-symbols-outlined">delete</span>
+          <span class="material-symbols-outlined">block</span>
+        </button>
+        <button
+          v-if="canDelete"
+          class="ai-btn ai-btn-danger-ghost"
+          title="删除任务"
+          @click="handleDeleteTask"
+        >
+          <span class="material-symbols-outlined">delete_forever</span>
         </button>
       </div>
     </div>
@@ -548,11 +599,11 @@ const isTaskActive = computed(() => {
               </div>
               <div>
                 <div class="ai-info-label">创建时间</div>
-                <div class="ai-info-value">{{ task?.createdAt || '-' }}</div>
+                <div class="ai-info-value">{{ formatTime(task?.createdAt) }}</div>
               </div>
               <div v-if="task?.updatedAt">
                 <div class="ai-info-label">更新时间</div>
-                <div class="ai-info-value">{{ task.updatedAt }}</div>
+                <div class="ai-info-value">{{ formatTime(task.updatedAt) }}</div>
               </div>
             </div>
             <!-- 失败原因 -->
@@ -1047,6 +1098,68 @@ const isTaskActive = computed(() => {
           >
             <span v-if="recordingLoading" class="ai-spinner"></span>
             {{ recordingLoading ? 'AI 重构中...' : '提交并 AI 重构' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 废弃任务 Dialog -->
+    <div v-if="showDetailDiscardDialog" class="ai-dialog-overlay" @click.self="showDetailDiscardDialog = false">
+      <div class="ai-dialog" style="max-width: 440px">
+        <div class="ai-dialog-header">
+          <h2>ℹ️ 废弃任务</h2>
+          <button class="ai-dialog-close" @click="showDetailDiscardDialog = false">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="ai-dialog-body">
+          <p style="font-size: 0.85rem; color: var(--tp-gray-300); margin-bottom: 12px">
+            确定要废弃任务 <strong>{{ task?.taskName }}</strong> 吗？废弃后任务将不可恢复。
+          </p>
+          <div class="ai-form-group">
+            <label class="ai-form-label">废弃原因 *</label>
+            <textarea
+              v-model="detailDiscardReason"
+              class="ai-form-textarea"
+              placeholder="请输入废弃原因..."
+              rows="3"
+            />
+          </div>
+        </div>
+        <div class="ai-dialog-footer">
+          <button class="ai-btn ai-btn-ghost" @click="showDetailDiscardDialog = false">取消</button>
+          <button
+            class="ai-btn ai-btn-danger"
+            :disabled="!detailDiscardReason.trim()"
+            @click="confirmDetailDiscard"
+          >
+            确认废弃
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 删除任务 Dialog -->
+    <div v-if="showDetailDeleteDialog" class="ai-dialog-overlay" @click.self="showDetailDeleteDialog = false">
+      <div class="ai-dialog" style="max-width: 440px">
+        <div class="ai-dialog-header">
+          <h2>⚠️ 删除任务</h2>
+          <button class="ai-dialog-close" @click="showDetailDeleteDialog = false">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="ai-dialog-body">
+          <p style="font-size: 0.85rem; color: #ff8a80">
+            确定要彻底删除任务 <strong>{{ task?.taskName }}</strong> 吗？
+          </p>
+          <p style="font-size: 0.8rem; color: var(--tp-gray-500); margin-top: 8px">
+            此操作将级联删除任务关联的所有脚本版本、验证记录、轨迹、证据和录制会话，<strong style="color: #ff8a80">不可恢复</strong>。
+          </p>
+        </div>
+        <div class="ai-dialog-footer">
+          <button class="ai-btn ai-btn-ghost" @click="showDetailDeleteDialog = false">取消</button>
+          <button class="ai-btn ai-btn-danger" @click="confirmDetailDelete">
+            确认删除
           </button>
         </div>
       </div>
