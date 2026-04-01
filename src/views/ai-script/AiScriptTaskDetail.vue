@@ -26,6 +26,10 @@ import {
   fetchLatestRecording,
   launchCodegen,
   pollCodegenStatus,
+  checkAuthStatus,
+  invalidateAuth,
+  getPendingScript,
+  clearPendingScript,
   type RecordingSession,
 } from '../../api/aiScript'
 import CodeEditor from '../../components/CodeEditor.vue'
@@ -39,17 +43,19 @@ const taskId = computed(() => Number(route.params.taskId))
 onMounted(async () => {
   if (taskId.value) {
     await store.loadTaskDetailFull(taskId.value)
-    // 录制增强模式时，加载最新录制
+    // ??????????????????????
     if (task.value?.generationMode === GenerationMode.RECORDING_ENHANCED) {
       await loadRecording()
     }
-    // #3: RUNNING 状态自动轮询
+    // #3: RUNNING ??????????
     startTaskPolling()
+    startValidationPolling()
   }
 })
 
 // ── #3: 任务状态自动轮询 ──
 let taskPollTimer: ReturnType<typeof setInterval> | null = null
+let validationPollTimer: ReturnType<typeof setInterval> | null = null
 
 function startTaskPolling() {
   stopTaskPolling()
@@ -70,8 +76,48 @@ function stopTaskPolling() {
   }
 }
 
+function shouldPollValidation(): boolean {
+  if (!script.value) return false
+  return (
+    validation.value?.validationStatus === 'VALIDATING' ||
+    script.value.validationStatus === 'VALIDATING' ||
+    task.value?.validationStatus === 'VALIDATING'
+  )
+}
+
+async function refreshValidationState() {
+  if (!script.value) return
+  await Promise.all([
+    store.loadLatestValidation(script.value.id),
+    store.loadValidationHistory(script.value.id),
+    store.loadCurrentScript(taskId.value),
+    store.loadTaskDetail(taskId.value),
+  ])
+}
+
+function startValidationPolling() {
+  stopValidationPolling()
+  if (!shouldPollValidation()) return
+
+  // 验证结果由后台异步回写，这里持续轮询直到状态脱离 VALIDATING。
+  validationPollTimer = setInterval(async () => {
+    await refreshValidationState()
+    if (!shouldPollValidation()) {
+      stopValidationPolling()
+    }
+  }, 3000)
+}
+
+function stopValidationPolling() {
+  if (validationPollTimer) {
+    clearInterval(validationPollTimer)
+    validationPollTimer = null
+  }
+}
+
 onUnmounted(() => {
   stopTaskPolling()
+  stopValidationPolling()
   if (pollTimer) clearInterval(pollTimer)
 })
 
@@ -127,25 +173,56 @@ async function loadRecording() {
   } catch {
     recording.value = null
   }
+
+  // 检查是否有待提交的录制脚本（页面刷新/关闭后自动恢复）
+  try {
+    const pending = await getPendingScript(taskId.value)
+    if (pending.found && pending.script_content) {
+      finishScriptContent.value = pending.script_content
+      const source = pending.source === 'disk' ? '磁盘恢复' : '内存恢复'
+      const timeHint = pending.captured_at ? `（录制于 ${pending.captured_at}）` : ''
+      recordingStatusText.value = `✅ 已自动恢复上次录制的脚本${timeHint}，请确认并提交 [来源: ${source}]`
+      showRecordingDialog.value = true
+    }
+  } catch (e) {
+    console.warn('检查待提交脚本失败:', e)
+  }
 }
 
 async function handleStartRecording() {
   if (!task.value) return
   recordingLoading.value = true
-  recordingStatusText.value = '正在启动录制浏览器...'
+  recordingStatusText.value = '正在检查登录状态...'
   try {
     // 1. 后端创建录制 session
     recording.value = await startRecording(taskId.value)
 
-    // 2. 调 Executor 启动 playwright codegen（弹出浏览器）
+    // 2. 解析 accountRef 中的 auth_config（如果有）
+    let authConfig: Record<string, unknown> | undefined
+    try {
+      if (task.value.accountRef) {
+        const parsed = JSON.parse(task.value.accountRef)
+        // 确认是 auth_config 格式（有 login_url 或 username 字段）
+        if (parsed.login_url || parsed.username) {
+          authConfig = parsed
+        }
+      }
+    } catch {
+      // accountRef 不是有效 JSON，忽略
+    }
+
+    recordingStatusText.value = '正在启动录制浏览器（如需登录将自动完成）...'
+
+    // 3. 调 Executor 启动 playwright codegen（传递 auth_config）
     const { session_id } = await launchCodegen(
       taskId.value,
       task.value.startUrl || 'https://www.baidu.com',
+      authConfig,
     )
     codegenSessionId.value = session_id
-    recordingStatusText.value = '浏览器已打开，请在弹出的浏览器中操作被测系统...'
+    recordingStatusText.value = '浏览器启动中，请稍候...'
 
-    // 3. 开始轮询 codegen 状态
+    // 4. 开始轮询 codegen 状态
     startPolling(session_id)
   } catch (e) {
     console.error('启动录制失败:', e)
@@ -159,7 +236,9 @@ function startPolling(sessionId: string) {
   pollTimer = setInterval(async () => {
     try {
       const result = await pollCodegenStatus(sessionId)
-      if (result.status === 'recording') {
+      if (result.status === 'logging_in') {
+        recordingStatusText.value = '🔐 正在自动登录系统（识别验证码中）...'
+      } else if (result.status === 'recording') {
         recordingStatusText.value = '🔴 录制中... 请在弹出的浏览器中操作，完成后关闭浏览器'
       } else if (result.status === 'completed') {
         // 脚本回收成功
@@ -199,6 +278,8 @@ async function handleFinishRecording() {
       rawScriptContent: finishScriptContent.value,
       triggerAiRefactor: true,
     })
+    // 提交成功后清理磁盘上的 pending 脚本
+    await clearPendingScript(taskId.value)
     await store.loadTaskDetailFull(taskId.value)
     await loadRecording()
     finishScriptContent.value = ''
@@ -259,11 +340,12 @@ async function handleValidate() {
   try {
     await store.runValidation(taskId.value, script.value.id)
     await store.loadTaskDetailFull(taskId.value)
+    // ??????????????????????????????????
+    startValidationPolling()
   } catch (e) {
-    console.error('触发验证失败:', e)
+    console.error('?????????:', e)
   }
 }
-
 async function handleConfirm() {
   if (!script.value) return
   try {
@@ -365,6 +447,17 @@ const copyTooltip = ref('')
 // 原始录制稿折叠
 const showRawScript = ref(false)
 
+// ── V1 多文件查看器 ──
+const activeFileIdx = ref(0)
+const activeFile = computed(() => {
+  const files = script.value?.files
+  if (!files || files.length === 0) return null
+  return files[activeFileIdx.value] || files[0]
+})
+function fileBasename(path: string): string {
+  return path.split('/').pop() || path
+}
+
 // ── 编辑脚本 Dialog ──
 const showEditDialog = ref(false)
 const editContent = ref('')
@@ -392,8 +485,18 @@ async function submitEditScript() {
   }
 }
 
-function openRecordingSubmitDialog() {
-  finishScriptContent.value = ''
+async function openRecordingSubmitDialog() {
+  // 如果当前没有脚本内容，尝试从 Executor 恢复
+  if (!finishScriptContent.value.trim()) {
+    try {
+      const pending = await getPendingScript(taskId.value)
+      if (pending.found && pending.script_content) {
+        finishScriptContent.value = pending.script_content
+      }
+    } catch (e) {
+      console.warn('恢复待提交脚本失败:', e)
+    }
+  }
   showRecordingDialog.value = true
 }
 
@@ -791,6 +894,127 @@ const isTaskActive = computed(() => {
               :readonly="true"
               min-height="200px"
               max-height="600px"
+            />
+          </div>
+        </section>
+
+        <!-- V1 多文件工程化面板 -->
+        <section
+          v-if="script?.files && script.files.length > 0"
+          class="ai-info-card"
+          style="margin-top: 16px"
+        >
+          <div class="ai-code-header" style="margin-bottom: 12px">
+            <div class="ai-code-header-left">
+              <span class="material-symbols-outlined">folder_open</span>
+              <h3>V1 工程化文件 ({{ script.files.length }})</h3>
+            </div>
+            <div v-if="script.versionStatus" class="ai-code-header-right">
+              <span
+                class="ai-status-badge"
+                :class="script.versionStatus === 'MANUAL_REVIEW_REQUIRED' ? 'warning' : 'success'"
+                style="font-size: 0.6rem"
+              >
+                {{ script.versionStatus === 'MANUAL_REVIEW_REQUIRED' ? '需要人工审核' : '已生成' }}
+              </span>
+            </div>
+          </div>
+
+          <!-- 生成摘要 -->
+          <div
+            v-if="script.generationSummary"
+            style="
+              font-size: 0.78rem;
+              color: var(--tp-gray-400);
+              background: rgba(124, 77, 255, 0.06);
+              padding: 8px 12px;
+              border-radius: 6px;
+              border: 1px solid rgba(124, 77, 255, 0.12);
+              margin-bottom: 12px;
+              line-height: 1.5;
+            "
+          >
+            {{ script.generationSummary }}
+          </div>
+
+          <!-- 人工审核项 -->
+          <div
+            v-if="script.manualReviewItems && script.manualReviewItems.length > 0"
+            style="
+              background: rgba(255, 152, 0, 0.08);
+              border: 1px solid rgba(255, 152, 0, 0.2);
+              border-radius: 6px;
+              padding: 10px 12px;
+              margin-bottom: 12px;
+            "
+          >
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px">
+              <span class="material-symbols-outlined" style="font-size: 16px; color: #ffb74d">
+                warning
+              </span>
+              <span style="font-size: 0.78rem; color: #ffb74d; font-weight: 500">
+                需要人工审核 ({{ script.manualReviewItems.length }})
+              </span>
+            </div>
+            <ul style="margin: 0; padding-left: 18px">
+              <li
+                v-for="(item, idx) in script.manualReviewItems"
+                :key="idx"
+                style="font-size: 0.72rem; color: var(--tp-gray-400); line-height: 1.6"
+              >
+                {{ item }}
+              </li>
+            </ul>
+          </div>
+
+          <!-- 文件标签页 -->
+          <div class="v1-file-tabs">
+            <button
+              v-for="(file, idx) in script.files"
+              :key="file.id || idx"
+              class="v1-file-tab"
+              :class="{ active: activeFileIdx === idx }"
+              @click="activeFileIdx = idx"
+            >
+              <span
+                class="v1-file-type-badge"
+                :class="file.fileType"
+              >
+                {{ file.fileType }}
+              </span>
+              <span class="v1-file-name">{{ fileBasename(file.relativePath) }}</span>
+            </button>
+          </div>
+
+          <!-- 当前文件预览 -->
+          <div v-if="activeFile" style="margin-top: 8px">
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 6px 10px;
+                background: rgba(0, 0, 0, 0.2);
+                border-radius: 6px 6px 0 0;
+                font-family: monospace;
+                font-size: 0.72rem;
+                color: var(--tp-gray-400);
+              "
+            >
+              <span>{{ activeFile.relativePath }}</span>
+              <span
+                class="v1-file-type-badge"
+                :class="activeFile.sourceKind"
+                style="font-size: 0.6rem"
+              >
+                {{ activeFile.sourceKind }}
+              </span>
+            </div>
+            <CodeEditor
+              :model-value="activeFile.content"
+              :readonly="true"
+              min-height="150px"
+              max-height="500px"
             />
           </div>
         </section>

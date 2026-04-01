@@ -177,6 +177,7 @@ export interface AiScriptTask {
   id: number
   projectId: number
   projectName: string
+  projectKey: string  // V1 项目标识
   taskName: string
   generationMode: GenerationMode
   caseIds: number[]
@@ -218,6 +219,28 @@ export interface AiScriptVersion {
   confirmedAt?: string
   createdBy: number
   createdName: string
+  createdAt: string
+  // V1 多文件工程化字段
+  projectKeySnapshot?: string
+  versionStatus?: string
+  generationSummary?: string
+  registrySnapshotJson?: string
+  baseFixtureHash?: string
+  manualReviewItems?: string[]
+  files?: AiScriptFile[]
+}
+
+/** V1 生成文件明细 */
+export interface AiScriptFile {
+  id: number
+  projectId: number
+  taskId: number
+  versionId: number
+  fileType: 'page' | 'spec' | 'fixture' | 'shared'
+  relativePath: string
+  content: string
+  contentHash: string
+  sourceKind: 'create' | 'update' | 'merge'
   createdAt: string
 }
 
@@ -518,17 +541,25 @@ export interface CodegenSession {
 }
 
 export interface CodegenPollResult {
-  status: 'starting' | 'recording' | 'completed' | 'error' | 'not_found'
+  status: 'starting' | 'logging_in' | 'recording' | 'completed' | 'error' | 'not_found'
   script_content: string
   error: string
 }
 
-/** 启动 Playwright Codegen 录制浏览器 */
-export async function launchCodegen(taskId: number, startUrl: string): Promise<CodegenSession> {
+/** 启动 Playwright Codegen 录制浏览器（支持 auth_config 自动登录） */
+export async function launchCodegen(
+  taskId: number,
+  startUrl: string,
+  authConfig?: Record<string, unknown>,
+): Promise<CodegenSession> {
+  const body: Record<string, unknown> = { task_id: taskId, start_url: startUrl }
+  if (authConfig) {
+    body.auth_config = authConfig
+  }
   const resp = await fetch(`${EXECUTOR_BASE}/recording/codegen`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ task_id: taskId, start_url: startUrl }),
+    body: JSON.stringify(body),
   })
   return resp.json()
 }
@@ -537,4 +568,53 @@ export async function launchCodegen(taskId: number, startUrl: string): Promise<C
 export async function pollCodegenStatus(sessionId: string): Promise<CodegenPollResult> {
   const resp = await fetch(`${EXECUTOR_BASE}/recording/codegen/${sessionId}`)
   return resp.json()
+}
+
+// ── Executor Pending Script API（录制脚本恢复） ──
+
+export interface PendingScriptResult {
+  found: boolean
+  script_content: string
+  session_id: string
+  source: 'memory' | 'disk' | ''
+  captured_at?: string
+}
+
+/** 获取指定任务的待提交录制脚本（页面刷新后恢复用） */
+export async function getPendingScript(taskId: number): Promise<PendingScriptResult> {
+  const resp = await fetch(`${EXECUTOR_BASE}/recording/codegen/task/${taskId}/pending`)
+  return resp.json()
+}
+
+/** 清除指定任务的待提交脚本（提交成功后调用） */
+export async function clearPendingScript(taskId: number): Promise<void> {
+  await fetch(`${EXECUTOR_BASE}/recording/codegen/task/${taskId}/pending`, {
+    method: 'DELETE',
+  })
+}
+
+// ── Executor Auth API（认证状态管理） ──
+
+export interface AuthStateInfo {
+  exists: boolean
+  valid: boolean
+  file_path: string | null
+  file_age_hours: number | null
+  cookie_count: number
+}
+
+/** 查询目标 URL 的认证状态 */
+export async function checkAuthStatus(startUrl: string): Promise<AuthStateInfo> {
+  const resp = await fetch(
+    `${EXECUTOR_BASE}/auth/status?start_url=${encodeURIComponent(startUrl)}`,
+  )
+  return resp.json()
+}
+
+/** 手动清除认证状态（强制下次重新登录） */
+export async function invalidateAuth(startUrl: string): Promise<void> {
+  await fetch(
+    `${EXECUTOR_BASE}/auth/invalidate?start_url=${encodeURIComponent(startUrl)}`,
+    { method: 'POST' },
+  )
 }

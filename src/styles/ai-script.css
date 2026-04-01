@@ -1513,3 +1513,91 @@
   background: rgba(255, 82, 82, 0.1);
   border-color: #ff5252;
 }
+
+/* ── V1 多文件标签页 ── */
+.v1-file-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+}
+
+.v1-file-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tp-gray-500);
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.v1-file-tab:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--tp-gray-800);
+}
+
+.v1-file-tab.active {
+  background: rgba(124, 58, 237, 0.15);
+  color: #b388ff;
+  font-weight: 600;
+}
+
+.v1-file-name {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.7rem;
+}
+
+/* 文件类型标记 */
+.v1-file-type-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.55rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.v1-file-type-badge.page {
+  background: rgba(173, 198, 255, 0.15);
+  color: #adc6ff;
+}
+
+.v1-file-type-badge.spec {
+  background: rgba(16, 185, 129, 0.15);
+  color: #6ee7b7;
+}
+
+.v1-file-type-badge.fixture {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fcd34d;
+}
+
+.v1-file-type-badge.shared {
+  background: rgba(139, 92, 246, 0.15);
+  color: #c4b5fd;
+}
+
+/* sourceKind badges */
+.v1-file-type-badge.create {
+  background: rgba(16, 185, 129, 0.12);
+  color: #6ee7b7;
+}
+
+.v1-file-type-badge.update {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fcd34d;
+}
+
+.v1-file-type-badge.merge {
+  background: rgba(139, 92, 246, 0.12);
+  color: #c4b5fd;
+}
