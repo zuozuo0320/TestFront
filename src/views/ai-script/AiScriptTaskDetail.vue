@@ -23,11 +23,10 @@ import {
   exportScript,
   startRecording,
   finishRecording,
+  failRecording,
   fetchLatestRecording,
   launchCodegen,
   pollCodegenStatus,
-  checkAuthStatus,
-  invalidateAuth,
   getPendingScript,
   clearPendingScript,
   type RecordingSession,
@@ -128,10 +127,38 @@ const validation = computed(() => store.latestValidation)
 const validationHistory = computed(() => store.validationHistory)
 
 // ── 操作轨迹（录制模式下用步骤模型填充）──
+
+/** 从 Playwright locator 字符串中提取人类可读的元素名 */
+function readableFromLocator(locator: string): string {
+  const m = locator.match(/getBy(?:Role|Text|Label|Placeholder|TestId|AltText|Title)\(['"]([^'"]{1,40})/)
+  if (m?.[1]) return m[1]
+  return locator.length > 40 ? locator.slice(0, 40) + '\u2026' : locator
+}
+
+/** 将 step_model step 转为可读的 targetSummary */
+function stepSummary(s: any): string {
+  const type = (s.actionType || 'CUSTOM').toUpperCase()
+  if (type === 'NAVIGATE') return `导航到 ${s.pageUrl || ''}`
+  if (type === 'CLICK') {
+    const readable = s.locator ? readableFromLocator(s.locator) : `元素 ${s.stepNo}`
+    return `点击「${readable}」`
+  }
+  if (type === 'INPUT') {
+    const field = s.locator ? readableFromLocator(s.locator) : '输入框'
+    const val = s.inputValue ? (s.inputValue.length > 20 ? s.inputValue.slice(0, 20) + '\u2026' : s.inputValue) : ''
+    return val ? `在「${field}」输入 ${val}` : `在「${field}」输入`
+  }
+  if (type === 'KEY_PRESS') return `按键 ${s.inputValue || ''}`
+  if (type === 'SELECT') return `选择「${s.inputValue || ''}」`
+  if (type === 'WAIT') return '等待页面响应'
+  if (type === 'ASSERT') return '断言验证'
+  return s.description || `步骤 ${s.stepNo}`
+}
+
 const displayTraces = computed(() => {
-  // AI 直生模式：直接用 browser-use 采集的 traces
+  // 优先用 DB 持久化的 traces（AI 直生 & 录制增强 AI 重构完成后均有数据）
   if (traces.value.length > 0) return traces.value
-  // 录制增强模式：用 step_model_json 填充
+  // 兜底：录制增强但 AI 还未重构完成，用 step_model_json 实时渲染
   if (isRecordingMode.value && recording.value?.stepModelJson) {
     const model = recording.value.stepModelJson as any
     const steps = model?.steps || []
@@ -139,18 +166,9 @@ const displayTraces = computed(() => {
       id: s.stepNo,
       taskId: taskId.value,
       traceNo: s.stepNo,
-      actionType: s.actionType || 'CUSTOM',
+      actionType: (s.actionType || 'CUSTOM').toUpperCase(),
       pageUrl: s.pageUrl || '',
-      targetSummary:
-        s.actionType === 'NAVIGATE'
-          ? `导航到 ${s.pageUrl}`
-          : s.actionType === 'INPUT'
-            ? `输入 "${s.inputValue}"`
-            : s.actionType === 'CLICK'
-              ? `点击 ${s.locator}`
-              : s.actionType === 'KEY_PRESS'
-                ? `按键 ${s.inputValue}`
-                : `步骤 ${s.stepNo}`,
+      targetSummary: stepSummary(s),
       locatorUsed: s.locator || '',
       inputValueMasked: s.inputValue || '',
       occurredAt: '',
@@ -226,8 +244,22 @@ async function handleStartRecording() {
     startPolling(session_id)
   } catch (e) {
     console.error('启动录制失败:', e)
-    recordingStatusText.value = '启动失败，请重试'
+    await markRecordingFailed('录制浏览器启动失败，请重新发起录制')
+    recordingStatusText.value = '录制启动失败，请重新发起录制'
     recordingLoading.value = false
+  }
+}
+
+async function markRecordingFailed(reason: string) {
+  if (!recording.value) return
+  try {
+    // 录制异常时主动把后端会话标记为 FAILED，避免后续重试被“已有录制中”卡住。
+    await failRecording(taskId.value, {
+      recordingId: recording.value.id,
+      reason,
+    })
+  } catch (e) {
+    console.warn('标记录制失败失败:', e)
   }
 }
 
@@ -249,12 +281,19 @@ function startPolling(sessionId: string) {
           recordingStatusText.value = '✅ 录制完成！脚本已自动回收，请确认并提交'
           showRecordingDialog.value = true // 自动弹出提交弹窗
         } else {
-          recordingStatusText.value = '⚠️ 录制完成但未生成脚本，请手动粘贴'
+          await markRecordingFailed('录制已结束，但未产出可提交脚本')
+          recordingStatusText.value = '录制已结束，但未产出脚本，请重新发起录制'
         }
       } else if (result.status === 'error') {
         stopPolling()
         recordingLoading.value = false
-        recordingStatusText.value = `❌ 录制出错: ${result.error}`
+        await markRecordingFailed(result.error || '录制执行失败')
+        recordingStatusText.value = `录制失败: ${result.error || '请重新发起录制'}`
+      } else if (result.status === 'not_found') {
+        stopPolling()
+        recordingLoading.value = false
+        await markRecordingFailed('录制会话不存在或已过期')
+        recordingStatusText.value = '录制会话不存在或已过期，请重新发起录制'
       }
     } catch (e) {
       console.error('轮询失败:', e)

@@ -502,6 +502,14 @@ export async function finishRecording(
   await apiClient.post(`/ai-script/tasks/${taskId}/recording/finish`, toSnake(payload))
 }
 
+/** 标记录制失败，释放异常卡住的录制会话 */
+export async function failRecording(
+  taskId: number,
+  payload: { recordingId: number; reason: string },
+): Promise<void> {
+  await apiClient.post(`/ai-script/tasks/${taskId}/recording/fail`, toSnake(payload))
+}
+
 /** 获取最近录制结果 */
 export async function fetchLatestRecording(taskId: number): Promise<RecordingSession | undefined> {
   try {
