@@ -4,64 +4,70 @@
 
 // ── 枚举 ──
 
-/** 任务状态 */
-export enum TaskStatus {
-  DRAFT = 'DRAFT',
-  PENDING_EXECUTE = 'PENDING_EXECUTE',
-  RUNNING = 'RUNNING',
-  GENERATE_SUCCESS = 'GENERATE_SUCCESS',
-  GENERATE_FAILED = 'GENERATE_FAILED',
-  PENDING_CONFIRM = 'PENDING_CONFIRM',
-  PENDING_REVALIDATE = 'PENDING_REVALIDATE',
-  CONFIRMED = 'CONFIRMED',
-  DISCARDED = 'DISCARDED',
-}
+/** 任务状态常量。 */
+export const TaskStatus = {
+  DRAFT: 'DRAFT',
+  PENDING_EXECUTE: 'PENDING_EXECUTE',
+  RUNNING: 'RUNNING',
+  GENERATE_SUCCESS: 'GENERATE_SUCCESS',
+  GENERATE_FAILED: 'GENERATE_FAILED',
+  PENDING_CONFIRM: 'PENDING_CONFIRM',
+  PENDING_REVALIDATE: 'PENDING_REVALIDATE',
+  CONFIRMED: 'CONFIRMED',
+  DISCARDED: 'DISCARDED',
+} as const
+export type TaskStatus = (typeof TaskStatus)[keyof typeof TaskStatus]
 
-/** 脚本状态 */
-export enum ScriptStatus {
-  DRAFT = 'DRAFT',
-  PENDING_CONFIRM = 'PENDING_CONFIRM',
-  PENDING_REVALIDATE = 'PENDING_REVALIDATE',
-  CONFIRMED = 'CONFIRMED',
-  DISCARDED = 'DISCARDED',
-}
+/** 脚本状态常量。 */
+export const ScriptStatus = {
+  DRAFT: 'DRAFT',
+  PENDING_CONFIRM: 'PENDING_CONFIRM',
+  PENDING_REVALIDATE: 'PENDING_REVALIDATE',
+  CONFIRMED: 'CONFIRMED',
+  DISCARDED: 'DISCARDED',
+} as const
+export type ScriptStatus = (typeof ScriptStatus)[keyof typeof ScriptStatus]
 
-/** 验证状态 */
-export enum ValidationStatus {
-  NOT_VALIDATED = 'NOT_VALIDATED',
-  VALIDATING = 'VALIDATING',
-  PASSED = 'PASSED',
-  FAILED = 'FAILED',
-  ERROR = 'ERROR',
-}
+/** 验证状态常量。 */
+export const ValidationStatus = {
+  NOT_VALIDATED: 'NOT_VALIDATED',
+  VALIDATING: 'VALIDATING',
+  PASSED: 'PASSED',
+  FAILED: 'FAILED',
+  ERROR: 'ERROR',
+} as const
+export type ValidationStatus = (typeof ValidationStatus)[keyof typeof ValidationStatus]
 
-/** 生成来源 */
-export enum SourceType {
-  PLAYWRIGHT_RECORDED = 'PLAYWRIGHT_RECORDED',
-  AI_ENHANCED_FROM_RECORDING = 'AI_ENHANCED_FROM_RECORDING',
-  AI_GENERATED = 'AI_GENERATED',
-  HUMAN_EDITED = 'HUMAN_EDITED',
-  MIXED = 'MIXED',
-}
+/** 生成来源常量。 */
+export const SourceType = {
+  PLAYWRIGHT_RECORDED: 'PLAYWRIGHT_RECORDED',
+  AI_ENHANCED_FROM_RECORDING: 'AI_ENHANCED_FROM_RECORDING',
+  AI_GENERATED: 'AI_GENERATED',
+  HUMAN_EDITED: 'HUMAN_EDITED',
+  MIXED: 'MIXED',
+} as const
+export type SourceType = (typeof SourceType)[keyof typeof SourceType]
 
-/** 生成模式 */
-export enum GenerationMode {
-  RECORDING_ENHANCED = 'RECORDING_ENHANCED',
-  AI_DIRECT = 'AI_DIRECT',
-}
+/** 生成模式常量。 */
+export const GenerationMode = {
+  RECORDING_ENHANCED: 'RECORDING_ENHANCED',
+  AI_DIRECT: 'AI_DIRECT',
+} as const
+export type GenerationMode = (typeof GenerationMode)[keyof typeof GenerationMode]
 
-/** 轨迹动作类型 */
-export enum TraceActionType {
-  NAVIGATE = 'NAVIGATE',
-  CLICK = 'CLICK',
-  INPUT = 'INPUT',
-  SELECT = 'SELECT',
-  UPLOAD = 'UPLOAD',
-  SCROLL = 'SCROLL',
-  WAIT = 'WAIT',
-  ASSERT_CANDIDATE = 'ASSERT_CANDIDATE',
-  CUSTOM = 'CUSTOM',
-}
+/** 轨迹动作类型常量。 */
+export const TraceActionType = {
+  NAVIGATE: 'NAVIGATE',
+  CLICK: 'CLICK',
+  INPUT: 'INPUT',
+  SELECT: 'SELECT',
+  UPLOAD: 'UPLOAD',
+  SCROLL: 'SCROLL',
+  WAIT: 'WAIT',
+  ASSERT_CANDIDATE: 'ASSERT_CANDIDATE',
+  CUSTOM: 'CUSTOM',
+} as const
+export type TraceActionType = (typeof TraceActionType)[keyof typeof TraceActionType]
 
 // ── 中文映射 ──
 
@@ -160,6 +166,50 @@ export interface ActionPermissions {
   canExport: boolean
   canDiscard: boolean
   canDelete: boolean
+}
+
+/** 任务列表查询参数 */
+export interface AiScriptTaskListQuery {
+  projectId?: number
+  taskStatus?: TaskStatus
+  keyword?: string
+  pageNo?: number
+  pageSize?: number
+}
+
+/** 批量选择模式 */
+export type BatchTaskSelectionMode = 'IDS' | 'FILTER_ALL'
+
+/** 任务筛选快照 */
+export interface TaskFilterSnapshot {
+  projectId?: number
+  keyword?: string
+  taskStatus?: TaskStatus
+}
+
+/** 批量任务选择请求体 */
+export interface BatchTaskSelectionPayload {
+  selectionMode: BatchTaskSelectionMode
+  taskIds: number[]
+  excludedTaskIds: number[]
+  filterSnapshot?: TaskFilterSnapshot | null
+  expectedTotal: number
+}
+
+/** 批量任务原因统计 */
+export interface BatchTaskReasonStat {
+  reason: string
+  count: number
+}
+
+/** 批量任务操作结果 */
+export interface BatchTaskActionResult {
+  matched: number
+  success: number
+  skipped: number
+  failed: number
+  skipReasons?: BatchTaskReasonStat[]
+  failedReasons?: BatchTaskReasonStat[]
 }
 
 export interface RecordingSession {
@@ -342,13 +392,7 @@ function toSnake(obj: any): any {
 }
 
 /** 获取任务列表 */
-export async function fetchTaskList(params?: {
-  projectId?: number
-  taskStatus?: TaskStatus
-  keyword?: string
-  pageNo?: number
-  pageSize?: number
-}): Promise<{ list: AiScriptTask[]; total: number }> {
+export async function fetchTaskList(params?: AiScriptTaskListQuery): Promise<{ list: AiScriptTask[]; total: number }> {
   const query: Record<string, any> = {}
   if (params?.projectId) query.project_id = params.projectId
   if (params?.taskStatus) query.task_status = params.taskStatus
@@ -477,9 +521,25 @@ export async function discardTask(taskId: number, reason: string): Promise<void>
   await apiClient.post(`/ai-script/tasks/${taskId}/discard`, { reason })
 }
 
+/** 批量废弃任务 */
+export async function batchDiscardTasks(
+  payload: BatchTaskSelectionPayload & { reason: string },
+): Promise<BatchTaskActionResult> {
+  const { data } = await apiClient.post('/ai-script/tasks/batch-discard', toSnake(payload))
+  return toCamel(data) as BatchTaskActionResult
+}
+
 /** 删除已废弃任务 */
 export async function deleteTask(taskId: number): Promise<void> {
   await apiClient.delete(`/ai-script/tasks/${taskId}`)
+}
+
+/** 批量删除任务 */
+export async function batchDeleteTasks(
+  payload: BatchTaskSelectionPayload,
+): Promise<BatchTaskActionResult> {
+  const { data } = await apiClient.post('/ai-script/tasks/batch-delete', toSnake(payload))
+  return toCamel(data) as BatchTaskActionResult
 }
 
 /** 克隆任务 */

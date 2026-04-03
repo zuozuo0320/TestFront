@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { listRoles, createRole, updateRoleById, deleteRoleById } from '../../api/user'
+import { ElMessage } from 'element-plus'
+import { listRoles, createRole, updateRoleById } from '../../api/user'
 import type { Role } from '../../api/types'
 
 /** 预置角色标识名集合（与后端 model.IsPresetSystemRole 保持一致） */
@@ -101,7 +101,8 @@ function closeUserDrawer() {
 }
 
 function getAvatarUrl(name: string) {
-  const seed = encodeURIComponent(name.split('(')[0].trim() || 'User')
+  const seedSource = name.split('(')[0] ?? 'User'
+  const seed = encodeURIComponent(seedSource.trim() || 'User')
   return `https://api.dicebear.com/7.x/initials/svg?seed=${seed}`
 }
 
@@ -207,26 +208,6 @@ async function submitRole() {
     ElMessage.error(e?.response?.data?.error || '保存角色失败')
   } finally {
     savingRole.value = false
-  }
-}
-
-/** 删除角色 */
-async function removeRole(row: Role) {
-  try {
-    await ElMessageBox.confirm(`确认删除角色【${row.display_name || row.name}】？`, '删除确认', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      type: 'warning',
-    })
-  } catch {
-    return
-  }
-  try {
-    await deleteRoleById(row.id)
-    ElMessage.success('角色删除成功')
-    await loadRoles()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '删除角色失败')
   }
 }
 
@@ -969,4 +950,3 @@ onMounted(() => loadRoles())
   transform: translateX(100%);
 }
 </style>
-

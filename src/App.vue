@@ -15,7 +15,6 @@ const projectStore = useProjectStore()
 
 // ── Auth ──
 
-const loggedIn = computed(() => !!localStorage.getItem('tp-token'))
 const currentUser = ref<User | null>(null)
 
 const userAvatarUrl = computed(() => {

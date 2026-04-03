@@ -249,7 +249,6 @@ const usersLoading = ref(false)
 // ── 分页 ──
 const userPage = ref(1)
 const userPageSize = ref(10)
-const userPageSizeOptions = [10, 20, 50]
 
 // ── 筛选 ──
 const searchKeyword = ref('')
@@ -547,11 +546,6 @@ function isAdmin(u: UserRow) {
     u.role_names.some((n) => n.toLowerCase() === 'admin' || n === '系统管理员') ||
     u.role === 'admin'
   )
-}
-
-function onUserPaginationSizeChange(size: number) {
-  userPageSize.value = size
-  userPage.value = 1
 }
 
 function onUserPaginationCurrentChange(current: number) {

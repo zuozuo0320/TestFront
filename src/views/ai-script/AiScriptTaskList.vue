@@ -10,6 +10,7 @@ import {
   GenerationMode,
   GenerationModeLabel,
   type AiScriptTask,
+  type AiScriptTaskListQuery,
 } from '../../api/aiScript'
 import { TaskStatus } from '../../api/aiScript'
 import { listProjects } from '../../api/project'
@@ -26,7 +27,7 @@ const pageSize = ref(10)
 // ── 筛选状态 ──
 const showFilterPanel = ref(false)
 const filterProjectId = ref<number | undefined>(undefined)
-const filterStatus = ref<string>('')
+const filterStatus = ref<TaskStatus | ''>('')
 const filterKeyword = ref('')
 const sortDesc = ref(true)
 
@@ -50,7 +51,8 @@ const displayPages = computed(() => {
   return pages
 })
 
-function buildQueryParams(page = currentPage.value) {
+/** 构建任务列表查询参数，确保状态字段始终符合接口约束。 */
+function buildQueryParams(page = currentPage.value): AiScriptTaskListQuery {
   return {
     projectId: filterProjectId.value,
     taskStatus: filterStatus.value || undefined,
@@ -60,6 +62,27 @@ function buildQueryParams(page = currentPage.value) {
   }
 }
 
+/** 当前页面可见任务 ID。 */
+const currentPageTaskIds = computed(() => store.taskList.map((task) => task.id))
+
+/** 当前是否处于按筛选结果全选模式。 */
+const isFilterAllSelection = computed(() => store.taskSelection.selectionMode === 'FILTER_ALL')
+
+/** 当前页是否已经全部勾选。 */
+const currentPageAllSelected = computed(() => {
+  if (currentPageTaskIds.value.length === 0) return false
+  return currentPageTaskIds.value.every((taskId) => store.isTaskSelected(taskId))
+})
+
+/** 当前页是否处于部分勾选状态。 */
+const currentPagePartiallySelected = computed(() => {
+  if (currentPageTaskIds.value.length === 0) return false
+  return (
+    currentPageTaskIds.value.some((taskId) => store.isTaskSelected(taskId)) &&
+    !currentPageAllSelected.value
+  )
+})
+
 async function loadPage(page: number) {
   if (page < 1 || page > totalPages.value) return
   currentPage.value = page
@@ -67,12 +90,14 @@ async function loadPage(page: number) {
 }
 
 async function applyFilter() {
+  store.clearTaskSelection()
   currentPage.value = 1
   await store.loadTaskList(buildQueryParams(1))
   showFilterPanel.value = false
 }
 
 function resetFilter() {
+  store.clearTaskSelection()
   filterProjectId.value = undefined
   filterStatus.value = ''
   filterKeyword.value = ''
@@ -257,6 +282,7 @@ async function confirmDiscard() {
   }
   try {
     await store.discardTask(discardTaskId.value, discardReason.value.trim())
+    store.clearTaskSelection()
     showDiscardDialog.value = false
     showToast('任务已废弃')
   } catch (e) {
@@ -279,6 +305,7 @@ function openDeleteDialog(task: AiScriptTask) {
 async function confirmDelete() {
   try {
     await store.deleteDiscardedTask(deleteTaskId.value)
+    store.clearTaskSelection()
     showDeleteDialog.value = false
     showToast('任务已彻底删除')
   } catch (e) {
@@ -288,6 +315,98 @@ async function confirmDelete() {
 }
 
 // ── 触发执行 ──
+// ── 批量操作 ──
+const showBatchDiscardDialog = ref(false)
+const batchDiscardReason = ref('')
+const showBatchDeleteDialog = ref(false)
+
+/** 汇总批量执行结果，用于 Toast 提示。 */
+function buildBatchResultMessage(actionName: string, result: {
+  matched: number
+  success: number
+  skipped: number
+  failed: number
+}): string {
+  return `${actionName}完成：命中 ${result.matched} 条，成功 ${result.success} 条，跳过 ${result.skipped} 条，失败 ${result.failed} 条`
+}
+
+/** 切换单条任务勾选状态。 */
+function toggleTaskChecked(taskId: number) {
+  store.toggleTaskSelection(taskId)
+}
+
+/** 切换当前页全选状态。 */
+function toggleCurrentPageSelection(checked: boolean) {
+  store.setCurrentPageTaskSelection(currentPageTaskIds.value, checked)
+}
+
+/** 处理当前页表头复选框变更。 */
+function handleCurrentPageCheckboxChange(event: Event) {
+  toggleCurrentPageSelection((event.target as HTMLInputElement).checked)
+}
+
+/** 按当前筛选结果全选。 */
+function selectAllByCurrentFilter() {
+  if (store.taskTotal <= 0) {
+    showToast('当前没有可选择的任务')
+    return
+  }
+  store.selectAllTasksByCurrentFilter()
+  showToast(`已选择当前筛选结果的 ${store.taskTotal} 条任务`)
+}
+
+/** 清空当前全部勾选。 */
+function clearSelectedTasks() {
+  store.clearTaskSelection()
+}
+
+/** 打开批量废弃确认弹窗。 */
+function openBatchDiscardDialog() {
+  if (store.selectedTaskCount <= 0) {
+    showToast('请先选择要废弃的任务')
+    return
+  }
+  batchDiscardReason.value = ''
+  showBatchDiscardDialog.value = true
+}
+
+/** 确认执行批量废弃。 */
+async function confirmBatchDiscard() {
+  if (!batchDiscardReason.value.trim()) {
+    showToast('请输入批量废弃原因')
+    return
+  }
+  try {
+    const result = await store.batchDiscardSelectedTasks(batchDiscardReason.value.trim())
+    showBatchDiscardDialog.value = false
+    showToast(buildBatchResultMessage('批量废弃', result))
+  } catch (e) {
+    console.error('批量废弃任务失败:', e)
+    showToast('批量废弃失败，请重试')
+  }
+}
+
+/** 打开批量删除确认弹窗。 */
+function openBatchDeleteDialog() {
+  if (store.selectedTaskCount <= 0) {
+    showToast('请先选择要删除的任务')
+    return
+  }
+  showBatchDeleteDialog.value = true
+}
+
+/** 确认执行批量删除。 */
+async function confirmBatchDelete() {
+  try {
+    const result = await store.batchDeleteSelectedTasks()
+    showBatchDeleteDialog.value = false
+    showToast(buildBatchResultMessage('批量删除', result))
+  } catch (e) {
+    console.error('批量删除任务失败:', e)
+    showToast('批量删除失败，请重试')
+  }
+}
+
 async function handleExecute(task: AiScriptTask) {
   if (
     task.taskStatus !== TaskStatus.PENDING_EXECUTE &&
@@ -362,11 +481,68 @@ async function handleExecute(task: AiScriptTask) {
       </div>
     </div>
 
+    <div class="ai-bulk-toolbar">
+      <div class="ai-bulk-summary">
+        <span>已选择 {{ store.selectedTaskCount }} 条任务</span>
+        <span v-if="isFilterAllSelection">（按当前筛选结果全选）</span>
+        <span v-if="isFilterAllSelection && store.taskSelection.excludedIds.length > 0">
+          ，已排除 {{ store.taskSelection.excludedIds.length }} 条
+        </span>
+      </div>
+      <div class="ai-bulk-actions">
+        <button
+          class="ai-btn ai-btn-ghost"
+          :disabled="store.taskList.length === 0"
+          @click="toggleCurrentPageSelection(!currentPageAllSelected)"
+        >
+          {{ currentPageAllSelected ? '取消本页全选' : '本页全选' }}
+        </button>
+        <button
+          class="ai-btn ai-btn-ghost"
+          :disabled="store.taskTotal === 0 || isFilterAllSelection"
+          @click="selectAllByCurrentFilter"
+        >
+          按筛选结果全选
+        </button>
+        <button
+          class="ai-btn ai-btn-ghost"
+          :disabled="store.selectedTaskCount <= 0"
+          @click="clearSelectedTasks"
+        >
+          清空勾选
+        </button>
+        <button
+          class="ai-btn ai-btn-ghost"
+          :disabled="store.selectedTaskCount <= 0"
+          @click="openBatchDiscardDialog"
+        >
+          批量废弃
+        </button>
+        <button
+          class="ai-btn ai-btn-danger"
+          :disabled="store.selectedTaskCount <= 0"
+          @click="openBatchDeleteDialog"
+        >
+          批量删除
+        </button>
+      </div>
+    </div>
+
     <!-- 主表格 -->
     <div class="ai-table-wrap">
       <table class="ai-table">
         <thead>
           <tr>
+            <th style="width: 54px">
+              <input
+                type="checkbox"
+                class="ai-row-checkbox"
+                :checked="currentPageAllSelected"
+                :data-partial="currentPagePartiallySelected"
+                @click.stop
+                @change="handleCurrentPageCheckboxChange"
+              />
+            </th>
             <th>任务名称 / ID</th>
             <th>所属项目</th>
             <th>关联用例</th>
@@ -381,6 +557,15 @@ async function handleExecute(task: AiScriptTask) {
         </thead>
         <tbody>
           <tr v-for="task in store.taskList" :key="task.id" @click="goDetail(task)">
+            <td @click.stop>
+              <input
+                type="checkbox"
+                class="ai-row-checkbox"
+                :checked="store.isTaskSelected(task.id)"
+                @click.stop
+                @change="toggleTaskChecked(task.id)"
+              />
+            </td>
             <td>
               <div class="ai-task-cell">
                 <span class="ai-task-name">{{ task.taskName }}</span>
@@ -848,6 +1033,74 @@ async function handleExecute(task: AiScriptTask) {
         </div>
       </div>
     </div>
+
+    <!-- 批量废弃确认 Dialog -->
+    <div v-if="showBatchDiscardDialog" class="ai-dialog-overlay" @click.self="showBatchDiscardDialog = false">
+      <div class="ai-dialog" style="max-width: 460px">
+        <div class="ai-dialog-header">
+          <h2>批量废弃任务</h2>
+          <button class="ai-dialog-close" @click="showBatchDiscardDialog = false">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="ai-dialog-body">
+          <p class="discard-warning">
+            确定要批量废弃已选中的 <strong>{{ store.selectedTaskCount }}</strong> 条任务吗？
+          </p>
+          <div class="ai-form-group">
+            <label class="ai-form-label">废弃原因 *</label>
+            <textarea
+              v-model="batchDiscardReason"
+              class="ai-form-textarea"
+              placeholder="请输入统一废弃原因..."
+              rows="3"
+            />
+          </div>
+        </div>
+        <div class="ai-dialog-footer">
+          <button class="ai-btn ai-btn-ghost" @click="showBatchDiscardDialog = false">取消</button>
+          <button
+            class="ai-btn ai-btn-danger"
+            :disabled="store.actionLoading"
+            @click="confirmBatchDiscard"
+          >
+            <span v-if="store.actionLoading" class="ai-spinner"></span>
+            {{ store.actionLoading ? '处理中...' : '确认批量废弃' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 批量删除确认 Dialog -->
+    <div v-if="showBatchDeleteDialog" class="ai-dialog-overlay" @click.self="showBatchDeleteDialog = false">
+      <div class="ai-dialog" style="max-width: 460px">
+        <div class="ai-dialog-header">
+          <h2>批量删除任务</h2>
+          <button class="ai-dialog-close" @click="showBatchDeleteDialog = false">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="ai-dialog-body">
+          <p class="discard-warning" style="color: #ff8a80">
+            确定要批量删除已选中的 <strong>{{ store.selectedTaskCount }}</strong> 条任务吗？
+          </p>
+          <p style="font-size: 0.8rem; color: var(--tp-gray-500); margin-top: 8px">
+            只有已废弃任务会被真正删除，不满足条件的任务会在结果中按“跳过/失败”统计返回。
+          </p>
+        </div>
+        <div class="ai-dialog-footer">
+          <button class="ai-btn ai-btn-ghost" @click="showBatchDeleteDialog = false">取消</button>
+          <button
+            class="ai-btn ai-btn-danger"
+            :disabled="store.actionLoading"
+            @click="confirmBatchDelete"
+          >
+            <span v-if="store.actionLoading" class="ai-spinner"></span>
+            {{ store.actionLoading ? '删除中...' : '确认批量删除' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -958,5 +1211,46 @@ async function handleExecute(task: AiScriptTask) {
 .ai-btn-danger:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.ai-bulk-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ai-bulk-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  color: var(--tp-gray-300);
+}
+
+.ai-bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ai-row-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--tp-primary, #4f8cff);
+}
+
+.ai-row-checkbox[data-partial='true'] {
+  outline: 2px solid rgba(79, 140, 255, 0.4);
+  outline-offset: 1px;
 }
 </style>
