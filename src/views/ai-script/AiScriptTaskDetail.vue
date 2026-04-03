@@ -39,6 +39,17 @@ const store = useAiScriptStore()
 
 const taskId = computed(() => Number(route.params.taskId))
 
+// ── Toast 提示 ──
+const toastMsg = ref('')
+const toastType = ref<'success' | 'error'>('success')
+let toastTimer: ReturnType<typeof setTimeout> | null = null
+function showToast(msg: string, type: 'success' | 'error' = 'success') {
+  toastMsg.value = msg
+  toastType.value = type
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => { toastMsg.value = '' }, 3000)
+}
+
 onMounted(async () => {
   if (taskId.value) {
     await store.loadTaskDetailFull(taskId.value)
@@ -80,7 +91,7 @@ function shouldPollValidation(): boolean {
   return (
     validation.value?.validationStatus === 'VALIDATING' ||
     script.value.validationStatus === 'VALIDATING' ||
-    task.value?.validationStatus === 'VALIDATING'
+    task.value?.latestValidationStatus === 'VALIDATING'
   )
 }
 
@@ -367,10 +378,12 @@ async function handleExecute() {
   try {
     await store.executeTask(taskId.value)
     await store.loadTaskDetailFull(taskId.value)
+    showToast('已触发生成，请等待执行完成')
     // 执行后自动启动状态轮询
     startTaskPolling()
   } catch (e) {
     console.error('触发执行失败:', e)
+    showToast('触发执行失败，请重试', 'error')
   }
 }
 
@@ -379,10 +392,11 @@ async function handleValidate() {
   try {
     await store.runValidation(taskId.value, script.value.id)
     await store.loadTaskDetailFull(taskId.value)
-    // ??????????????????????????????????
+    showToast('验证已触发，正在执行回放...')
     startValidationPolling()
   } catch (e) {
-    console.error('?????????:', e)
+    console.error('触发验证失败:', e)
+    showToast('触发验证失败，请重试', 'error')
   }
 }
 async function handleConfirm() {
@@ -390,8 +404,10 @@ async function handleConfirm() {
   try {
     await confirmScript(script.value.id)
     await store.loadTaskDetailFull(taskId.value)
+    showToast('脚本已确认 ✅')
   } catch (e) {
     console.error('确认脚本失败:', e)
+    showToast('确认脚本失败，请重试', 'error')
   }
 }
 
@@ -402,8 +418,10 @@ async function handleDiscardScript() {
   try {
     await discardScript(script.value.id, reason)
     await store.loadTaskDetailFull(taskId.value)
+    showToast('脚本版本已废弃')
   } catch (e) {
     console.error('废弃脚本失败:', e)
+    showToast('废弃脚本失败，请重试', 'error')
   }
 }
 
@@ -422,8 +440,10 @@ async function confirmDetailDiscard() {
     await discardTask(taskId.value, detailDiscardReason.value.trim())
     showDetailDiscardDialog.value = false
     await store.loadTaskDetailFull(taskId.value)
+    showToast('任务已废弃')
   } catch (e) {
     console.error('废弃任务失败:', e)
+    showToast('废弃任务失败，请重试', 'error')
   }
 }
 
@@ -438,9 +458,11 @@ async function confirmDetailDelete() {
   try {
     await deleteTask(taskId.value)
     showDetailDeleteDialog.value = false
+    showToast('任务已彻底删除')
     router.push('/ai-script')
   } catch (e) {
     console.error('删除任务失败:', e)
+    showToast('删除任务失败，请重试', 'error')
   }
 }
 
@@ -519,8 +541,10 @@ async function submitEditScript() {
     })
     showEditDialog.value = false
     await store.loadTaskDetailFull(taskId.value)
+    showToast('脚本已更新，生成新版本')
   } catch (e) {
     console.error('编辑脚本失败:', e)
+    showToast('编辑脚本失败，请重试', 'error')
   }
 }
 
@@ -1427,5 +1451,52 @@ const isTaskActive = computed(() => {
         </div>
       </div>
     </div>
+
+    <!-- Toast 提示 -->
+    <Transition name="detail-toast">
+      <div v-if="toastMsg" class="detail-toast" :class="toastType">
+        <span class="material-symbols-outlined" style="font-size: 16px">
+          {{ toastType === 'success' ? 'check_circle' : 'error' }}
+        </span>
+        {{ toastMsg }}
+      </div>
+    </Transition>
   </div>
 </template>
+
+<style scoped>
+.detail-toast {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+  max-width: 400px;
+  white-space: nowrap;
+}
+.detail-toast.success {
+  background: rgba(30, 46, 30, 0.95);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  color: #81c784;
+}
+.detail-toast.error {
+  background: rgba(46, 30, 30, 0.95);
+  border: 1px solid rgba(255, 138, 128, 0.3);
+  color: #ff8a80;
+}
+.detail-toast-enter-active { animation: detail-toast-in 0.3s ease; }
+.detail-toast-leave-active { animation: detail-toast-in 0.2s ease reverse; }
+@keyframes detail-toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+</style>

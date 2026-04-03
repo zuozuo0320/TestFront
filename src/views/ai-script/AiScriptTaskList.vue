@@ -426,8 +426,8 @@ async function handleExecute(task: AiScriptTask) {
               </div>
             </td>
             <td>
-              <div v-if="task.validationStatus" class="ai-status-badge" :class="ValidationStatusColor[task.validationStatus]" style="font-size: 0.7rem">
-                {{ ValidationStatusLabel[task.validationStatus] }}
+              <div v-if="task.latestValidationStatus" class="ai-status-badge" :class="ValidationStatusColor[task.latestValidationStatus]" style="font-size: 0.7rem">
+                {{ ValidationStatusLabel[task.latestValidationStatus] }}
               </div>
               <span v-else style="font-size: 0.75rem; color: var(--tp-gray-600)">—</span>
             </td>

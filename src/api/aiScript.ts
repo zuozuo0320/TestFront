@@ -191,7 +191,7 @@ export interface AiScriptTask {
   frameworkType: string
   latestRecordingId?: number
   currentVersionNo?: number
-  validationStatus?: ValidationStatus
+  latestValidationStatus?: ValidationStatus
   permissions?: ActionPermissions
   errorMessage?: string
   createdBy: number

@@ -377,7 +377,7 @@
   display: flex;
   justify-content: flex-end;
   gap: 2px;
-  opacity: 0;
+  opacity: 0.6;
   transition: opacity var(--tp-transition);
 }
 
