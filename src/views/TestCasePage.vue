@@ -1,14 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox, ElImageViewer } from 'element-plus'
-import {
-  CopyDocument,
-  Delete,
-  Edit,
-  Search,
-  Grid,
-  List,
-} from '@element-plus/icons-vue'
+import { CopyDocument, Delete, Edit, Search, Grid, List } from '@element-plus/icons-vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import LevelBadge from '../components/LevelBadge.vue'
 
@@ -18,11 +11,12 @@ import {
   globalModuleCaseCount,
   globalUnplannedCount,
   globalSelectedModulePath,
-  globalTreeExpanded,
+  globalSelectedModuleId,
   globalTreeActions,
 } from '../composables/useTestCaseTree'
 
 import { useProjectStore } from '../stores/project'
+import { useAuthStore } from '../stores/auth'
 import {
   listTestCases,
   createTestCase,
@@ -33,11 +27,15 @@ import {
   batchMoveTestCases,
   cloneTestCase,
   listCaseHistory,
+  submitReview,
+  discardTestCase,
+  recoverTestCase,
 } from '../api/testcase'
 import { apiClient } from '../api/client'
 import { uploadAttachment, listAttachments, deleteAttachment } from '../api/attachment'
 import { importTestCases } from '../api/xlsx'
-import type { TestCase, CaseAttachment } from '../api/types'
+import { getModuleTree, createModule, renameModule, deleteModule } from '../api/module'
+import type { TestCase, CaseAttachment, ModuleTreeNode as APIModuleTreeNode } from '../api/types'
 
 // ── Types ──
 
@@ -60,15 +58,21 @@ type TableRow = {
   createdByName: string
   createdAt: string
   priority: string
+  status: 'draft' | 'pending' | 'active' | 'discarded'
+  version: string
 }
 
 type StepRow = { action: string; expected: string }
 
-type ModuleTreeNode = { name: string; path: string; children: ModuleTreeNode[] }
-
 // ── State ──
 
 const projectStore = useProjectStore()
+const authStore = useAuthStore()
+
+const isAdminOrManager = computed(() => {
+  const role = authStore.user?.role
+  return role === 'admin' || role === 'owner' || role === 'manager'
+})
 
 const selectedProject = computed(() => projectStore.selectedProjectId)
 const rows = ref<TableRow[]>([])
@@ -80,6 +84,7 @@ const keyword = ref('')
 const levelFilter = ref('')
 const reviewFilter = ref('')
 const execFilter = ref('')
+const moduleIdFilter = ref<number | ''>('')
 const tagsFilter = ref('')
 const creatorFilter = ref('')
 const updaterFilter = ref('')
@@ -138,61 +143,64 @@ const kanbanColumns = computed(() => [
 ])
 
 // Flat module paths for filter dropdown
-function collectModulePaths(nodes: ModuleTreeNode[], paths: string[] = []): string[] {
+type FlatModule = { id: number; name: string; path: string }
+function collectModulePaths(nodes: any[], paths: FlatModule[] = [], parentPath = ''): FlatModule[] {
   for (const n of nodes) {
-    paths.push(n.path)
-    if (n.children?.length) collectModulePaths(n.children, paths)
+    const currentPath = parentPath + '/' + n.name
+    paths.push({ id: n.id, name: n.name, path: currentPath })
+    if (n.children?.length) collectModulePaths(n.children, paths, currentPath)
   }
   return paths
 }
-const flatModules = computed(() => collectModulePaths(moduleTree.value))
+const flatModules = computed(() => collectModulePaths(moduleTreeRaw.value))
 
 // Batch move
 const batchMoveVisible = ref(false)
-const batchMoveTarget = ref('/未规划用例')
+const batchMoveTargetId = ref<number>(0) // 0 表示“未规划用例”或“根目录”
+const batchMoveTargetPath = ref('/未规划用例')
 
-// Inline dropdown menu handler (MeterSphere style)
-async function onNodeMenuCommand(cmd: string, path: string, name: string) {
-  if (cmd === 'rename') {
+// Inline dropdown menu handler (Real API)
+async function onNodeMenuCommand(cmd: string, path: string, name: string, id?: number) {
+  if (!selectedProject.value) return
+
+  if (cmd === 'rename' && id) {
     const result = await ElMessageBox.prompt('请输入新目录名称', '目录重命名', {
       inputValue: name,
       confirmButtonText: '确定',
       cancelButtonText: '取消',
     }).catch(() => null)
     if (!result || !result.value?.trim()) return
-    const oldPath = path
-    const parentPath = oldPath.substring(0, oldPath.lastIndexOf('/'))
-    const newPath = normalizeDirectoryPath(`${parentPath}/${result.value.trim()}`)
-    customModulePaths.value = customModulePaths.value.map((p) => {
-      if (p === oldPath) return newPath
-      if (p.startsWith(`${oldPath}/`)) return newPath + p.substring(oldPath.length)
-      return p
-    })
-    if (selectedProject.value) {
-      for (const r of rows.value) {
-        const rp = normalizeCaseModulePath(r.modulePath || '/未规划用例')
-        if (rp === oldPath || rp.startsWith(`${oldPath}/`)) {
-          const newModPath = newPath + rp.substring(oldPath.length)
-          try {
-            await updateTestCase(selectedProject.value, r.id, { module_path: newModPath })
-          } catch {
-            /* skip */
-          }
-        }
-      }
-      await loadCases()
+
+    try {
+      await renameModule(selectedProject.value, id, result.value.trim())
+      ElMessage.success('重命名成功')
+      await loadTreeData()
+      await loadCases({ skipTree: true })
+    } catch (e: any) {
+      ElMessage.error(e?.response?.data?.error || '重命名失败')
     }
-    ElMessage.success('重命名成功')
-  } else if (cmd === 'delete') {
-    removeDirectory(path)
+  } else if (cmd === 'delete' && id) {
+    try {
+      await ElMessageBox.confirm('确认删除该目录？(仅限空目录)', '提示', { type: 'warning' })
+      await deleteModule(selectedProject.value, id)
+      ElMessage.success('删除成功')
+      if (selectedModulePath.value === path) {
+        selectedModulePath.value = ''
+      }
+      await loadTreeData()
+      await loadCases({ skipTree: true })
+    } catch (e: any) {
+      if (e !== 'cancel') {
+        ElMessage.error(e?.response?.data?.error || '删除失败')
+      }
+    }
   }
 }
 
 // Batch selection
 const selectedIds = ref<number[]>([])
 const selectAll = ref(false)
-const customModulePaths = ref<string[]>([])
-const treeExpanded = ref(true)
+const moduleTreeRaw = ref<APIModuleTreeNode[]>([]) // 存储从 API 获取的原始树
 
 const selectedModulePath = ref(
   (() => {
@@ -213,12 +221,18 @@ const draggingStepIndex = ref<number | null>(null)
 const directoryDialogVisible = ref(false)
 const pageSizeOptions = [10, 20, 50]
 
+// ── Priority Level Picker ──
+const levelPickerOpen = ref(false)
+const levelLabels: Record<string, string> = { P0: '核心', P1: '重点', P2: '一般', P3: '边界' }
+const levelKeys = ['P0', 'P1', 'P2', 'P3'] as const
+
 const caseForm = reactive({
   title: '',
   level: 'P1',
   reviewResult: '未评审',
   execResult: '未执行',
   modulePath: '/未规划用例',
+  moduleId: 0,
   tags: '',
   precondition: '',
   steps: '',
@@ -230,7 +244,7 @@ const caseForm = reactive({
 const caseAttachments = ref<CaseAttachment[]>([])
 const caseHistory = ref<any[]>([])
 
-const directoryForm = reactive({ parentPath: '/', name: '' })
+const directoryForm = reactive({ parentPath: '/', parentId: 0, name: '' })
 
 // ── Computed ──
 
@@ -248,98 +262,49 @@ const activeFilterChips = computed(() => {
   return chips
 })
 
-function normalizeDirectoryPath(path: string) {
-  const cleaned = path.trim().replace(/^\/+/, '').replace(/\/+$/, '')
-  if (!cleaned) return '/'
-  return `/${cleaned}`
-}
-
-function normalizeCaseModulePath(path: string) {
-  const normalized = normalizeDirectoryPath(path)
-  return normalized === '/' ? '/未规划用例' : normalized
-}
-
-function calcModuleDepth(path: string) {
-  const normalized = normalizeDirectoryPath(path)
-  if (normalized === '/') return 0
-  return normalized.split('/').filter(Boolean).length
-}
-
-const modulePaths = computed(() => {
-  const set = new Set<string>()
-  treeRows.value.forEach((r) => {
-    const normalized = normalizeCaseModulePath((r.modulePath || '').trim())
-    if (normalized !== '/未规划用例') set.add(normalized)
-  })
-  customModulePaths.value.forEach((p) => {
-    const normalized = normalizeDirectoryPath(p)
-    if (normalized !== '/') set.add(normalized)
-  })
-  return Array.from(set).sort((a, b) => a.localeCompare(b, 'zh-CN'))
-})
-
-const moduleTree = computed<ModuleTreeNode[]>(() => {
-  const rootMap = new Map<string, ModuleTreeNode>()
-  const ensureChild = (nodes: ModuleTreeNode[], path: string, name: string) => {
-    let node = nodes.find((n) => n.path === path)
-    if (!node) {
-      node = { name, path, children: [] }
-      nodes.push(node)
-      nodes.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
+// 辅助函数：递归处理 API 返回的树节点，为其补全 path 字段并收集计数
+function processApiTree(nodes: APIModuleTreeNode[] | null | undefined, parentPath = ''): any[] {
+  if (!nodes || !Array.isArray(nodes)) return []
+  return nodes.map((n) => {
+    const currentPath = parentPath + '/' + n.name
+    const node: any = {
+      ...n,
+      path: currentPath,
+      children: n.children ? processApiTree(n.children, currentPath) : [],
     }
     return node
-  }
-  for (const p of modulePaths.value) {
-    const parts = p.split('/').filter(Boolean)
-    let currentPath = ''
-    let cursor: ModuleTreeNode[] = Array.from(rootMap.values())
-    for (const part of parts) {
-      currentPath += `/${part}`
-      if (!rootMap.has(currentPath) && currentPath.split('/').filter(Boolean).length === 1) {
-        rootMap.set(currentPath, { name: part, path: currentPath, children: [] })
-      }
-      let node: ModuleTreeNode
-      if (currentPath.split('/').filter(Boolean).length === 1) {
-        node = rootMap.get(currentPath)!
-      } else {
-        node = ensureChild(cursor, currentPath, part)
-      }
-      cursor = node.children
-    }
-  }
-  return Array.from(rootMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
-})
+  })
+}
 
-// 各目录用例计数（包含子目录）— 基于全量 treeRows 计算
+const moduleTree = computed(() => processApiTree(moduleTreeRaw.value))
+
 const moduleCaseCount = computed(() => {
-  const countMap: Record<string, number> = {}
-  for (const r of treeRows.value) {
-    const mp = normalizeCaseModulePath((r.modulePath || '').trim())
-    // 累加到自身及所有父目录
-    const parts = mp.split('/').filter(Boolean)
-    let current = ''
-    for (const part of parts) {
-      current += `/${part}`
-      countMap[current] = (countMap[current] || 0) + 1
+  const counts: Record<string, number> = {}
+  const traverse = (nodes: any[]) => {
+    for (const n of nodes) {
+      counts[n.path] = n.case_count
+      if (n.children) traverse(n.children)
     }
   }
-  return countMap
+  traverse(moduleTree.value)
+  return counts
 })
 
-const unplannedCount = computed(() => {
-  return treeRows.value.filter((r) => {
-    const mp = normalizeCaseModulePath((r.modulePath || '').trim())
-    return mp === '/未规划用例'
-  }).length
-})
+const unplannedCount = ref(0)
 
-function onModuleClick(path: string) {
-  selectedModulePath.value = selectedModulePath.value === path ? '' : path
+function onModuleClick(path: string, id: number = 0) {
+  if (globalSelectedModulePath.value === path) {
+    globalSelectedModulePath.value = ''
+    globalSelectedModuleId.value = 0
+  } else {
+    globalSelectedModulePath.value = path
+    globalSelectedModuleId.value = id
+  }
   try {
-    localStorage.setItem(`tp-module-path-${selectedProject.value}`, selectedModulePath.value)
+    localStorage.setItem(`tp-module-path-${selectedProject.value}`, globalSelectedModulePath.value)
   } catch {}
   page.value = 1
-  loadCases({ skipTree: true }) // 目录切换只刷新表格，不重载树
+  loadCases({ skipTree: true })
 }
 
 // Bind to global test case tree state
@@ -367,41 +332,41 @@ watch(
   { immediate: true },
 )
 
-watch(
-  selectedModulePath,
-  (val) => {
-    globalSelectedModulePath.value = val
-  },
-  { immediate: true },
-)
+watch(globalSelectedModuleId, () => {
+  page.value = 1
+  loadCases({ skipTree: true })
+})
 
-watch(
-  treeExpanded,
-  (val) => {
-    globalTreeExpanded.value = val
-  },
-  { immediate: true },
-)
+/** 监听批量移动的目标目录 ID，同步更新路径名 */
+watch(batchMoveTargetId, (newId) => {
+  if (newId === 0) {
+    batchMoveTargetPath.value = '/未规划用例'
+  } else {
+    const found = flatModules.value.find((m) => m.id === newId)
+    if (found) {
+      batchMoveTargetPath.value = found.path
+    }
+  }
+})
 
-globalTreeActions.onModuleClick = onModuleClick
+globalTreeActions.onModuleClick = (path: string, id?: number) => onModuleClick(path, id || 0)
 globalTreeActions.openCreateDirectory = () => {
-  directoryForm.parentPath = '/'
+  directoryForm.parentId = 0
   directoryForm.name = ''
   directoryDialogVisible.value = true
 }
-globalTreeActions.openRenameDialog = (path, name) => {
-  onNodeMenuCommand('rename', path, name)
+globalTreeActions.onAddRootModule = () => {
+  directoryForm.parentId = 0
+  directoryForm.name = ''
+  directoryDialogVisible.value = true
 }
-globalTreeActions.deleteDirectory = (path) => {
-  removeDirectory(path)
-}
-globalTreeActions.onNodeMenuCommand = (cmd, path, name) => {
+globalTreeActions.onNodeMenuCommand = (cmd, path, name, id) => {
   if (cmd === 'add') {
-    directoryForm.parentPath = path
+    directoryForm.parentId = id || 0
     directoryForm.name = ''
     directoryDialogVisible.value = true
   } else {
-    onNodeMenuCommand(cmd, path, name)
+    onNodeMenuCommand(cmd, path, name, id)
   }
 }
 
@@ -442,6 +407,8 @@ function toRow(tc: TestCase): TableRow {
     createdByName: tc.created_by_name || '-',
     createdAt: formatTime(tc.created_at),
     priority: tc.priority,
+    status: tc.status || 'draft',
+    version: tc.version || 'V1',
   }
 }
 
@@ -468,30 +435,27 @@ function rowsToStepsText(rows: StepRow[]): string {
     .join('\n')
 }
 
-function isPathEqualOrChild(path: string, target: string) {
-  const normalizedPath = normalizeCaseModulePath(path)
-  const normalizedTarget = normalizeDirectoryPath(target)
-  if (normalizedTarget === '/') return true
-  return normalizedPath === normalizedTarget || normalizedPath.startsWith(`${normalizedTarget}/`)
-}
-
 // ── Data Loading ──
 
-/** 加载全量用例数据用于构建目录树（不带 module_path 过滤） */
+/** 加载树结构数据（正式 API 驱动） */
 async function loadTreeData() {
   if (!selectedProject.value) {
-    treeRows.value = []
+    moduleTreeRaw.value = []
     return
   }
   try {
-    const data = await listTestCases(selectedProject.value, {
-      page: 1,
-      pageSize: 9999,
-    })
-    const items = Array.isArray((data as any).items) ? (data as any).items : []
-    treeRows.value = items.map(toRow)
-  } catch {
-    // 树数据加载失败不影响主流程
+    const res = await getModuleTree(selectedProject.value)
+
+    // 兼容逻辑：处理经 interceptor 脱壳后可能存在的不同结构
+    const rawData = (res as any).tree || (Array.isArray(res) ? res : [])
+    moduleTreeRaw.value = rawData
+
+    // 同步到全局状态供 Sidebar 使用
+    globalModuleTree.value = processApiTree(rawData)
+    globalModuleCaseCount.value = (res as any).counts || {}
+    globalUnplannedCount.value = (res as any).unplannedCount || 0
+  } catch (e) {
+    console.error('Failed to load tree:', e)
   }
 }
 
@@ -522,7 +486,13 @@ async function loadCases(opts?: { skipTree?: boolean }) {
       updated_before: updatedBefore.value || undefined,
       sortBy: sortBy.value,
       sortOrder: sortOrder.value,
-      module_path: selectedModulePath.value || undefined,
+      module_id:
+        moduleIdFilter.value ||
+        (globalSelectedModuleId.value !== 0 ? globalSelectedModuleId.value : undefined),
+      module_path:
+        globalSelectedModuleId.value === 0 && globalSelectedModulePath.value
+          ? globalSelectedModulePath.value
+          : undefined,
     })
     const items = Array.isArray((data as any).items) ? (data as any).items : []
     rows.value = items.map(toRow)
@@ -626,6 +596,7 @@ async function openEdit(row: TableRow) {
     reviewResult: row.reviewResult || '未评审',
     execResult: row.execResult || '未执行',
     modulePath: row.modulePath || '/未规划用例',
+    moduleId: row.moduleId || 0,
     tags: row.tags || '',
     precondition: row.precondition || '',
     steps: row.steps,
@@ -656,6 +627,17 @@ async function openEdit(row: TableRow) {
   dialogVisible.value = true
 }
 
+function onModuleChangeInDrawer() {
+  if (caseForm.moduleId === 0) {
+    caseForm.modulePath = '/未规划用例'
+    return
+  }
+  const node = flatModules.value.find((n) => n.id === caseForm.moduleId)
+  if (node) {
+    caseForm.modulePath = node.path
+  }
+}
+
 async function submitCase() {
   if (!selectedProject.value) return
   if (!caseForm.title.trim()) {
@@ -671,6 +653,7 @@ async function submitCase() {
       review_result: caseForm.reviewResult,
       exec_result: caseForm.execResult,
       module_path: caseForm.modulePath.trim(),
+      module_id: caseForm.moduleId || 0,
       tags: caseForm.tags.trim(),
       precondition: caseForm.precondition,
       steps: stepsText,
@@ -749,8 +732,13 @@ async function onBatchUpdateLevel(level: string) {
 async function onBatchMove() {
   if (!selectedProject.value || selectedIds.value.length === 0) return
   try {
-    await batchMoveTestCases(selectedProject.value, selectedIds.value, 0, batchMoveTarget.value)
-    ElMessage.success(`已移动 ${selectedIds.value.length} 条用例到 ${batchMoveTarget.value}`)
+    await batchMoveTestCases(
+      selectedProject.value,
+      selectedIds.value,
+      batchMoveTargetId.value,
+      batchMoveTargetPath.value,
+    )
+    ElMessage.success(`已移动 ${selectedIds.value.length} 条用例`)
     selectedIds.value = []
     selectAll.value = false
     batchMoveVisible.value = false
@@ -768,6 +756,53 @@ async function onCloneCase(row: TableRow) {
     await loadCases()
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.error || '复制失败')
+  }
+}
+
+async function onReview(row: TableRow) {
+  if (!selectedProject.value) return
+  try {
+    await ElMessageBox.confirm(`确认将用例【${row.title}】提交评审？`, '提审确认', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'info',
+    })
+    await submitReview(selectedProject.value, row.id)
+    ElMessage.success('提审成功')
+    await loadCases()
+  } catch (e: any) {
+    if (e !== 'cancel') {
+      ElMessage.error(e?.response?.data?.error || '提审失败')
+    }
+  }
+}
+
+async function onDiscard(row: TableRow) {
+  if (!selectedProject.value) return
+  try {
+    await ElMessageBox.confirm(`确认废弃用例【${row.title}】？废弃后将不可直接编辑。`, '废弃确认', {
+      confirmButtonText: '废弃',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+    await discardTestCase(selectedProject.value, row.id)
+    ElMessage.success('已废弃')
+    await loadCases()
+  } catch (e: any) {
+    if (e !== 'cancel') {
+      ElMessage.error(e?.response?.data?.error || '操作失败')
+    }
+  }
+}
+
+async function onRecover(row: TableRow) {
+  if (!selectedProject.value) return
+  try {
+    await recoverTestCase(selectedProject.value, row.id)
+    ElMessage.success('已恢复为草稿')
+    await loadCases()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '恢复失败')
   }
 }
 
@@ -937,9 +972,9 @@ async function onDelete(row: TableRow) {
 
 // ── Directory ──
 
-function submitDirectory() {
-  const parent = normalizeDirectoryPath(directoryForm.parentPath || '/')
-  const name = directoryForm.name.trim().replace(/^\/+/, '').replace(/\/+$/, '')
+async function submitDirectory() {
+  if (!selectedProject.value) return
+  const name = directoryForm.name.trim()
   if (!name) {
     ElMessage.warning('目录名称不能为空')
     return
@@ -948,62 +983,14 @@ function submitDirectory() {
     ElMessage.warning('目录名称仅支持中文、英文、数字、下划线、中划线')
     return
   }
-  const nextPath = normalizeDirectoryPath(`${parent}/${name}`)
-  if (calcModuleDepth(nextPath) > 5) {
-    ElMessage.warning('目录最多支持 5 层')
-    return
-  }
-  if (modulePaths.value.includes(nextPath)) {
-    ElMessage.warning('目录已存在')
-    return
-  }
-  customModulePaths.value.push(nextPath)
-  caseForm.modulePath = nextPath
-  directoryDialogVisible.value = false
-  ElMessage.success('创建成功')
-}
 
-async function removeDirectory(path: string) {
-  const target = normalizeDirectoryPath(path)
-  if (target === '/') {
-    ElMessage.warning('根目录不可删除')
-    return
-  }
-  if (!selectedProject.value) {
-    ElMessage.warning('请先选择项目')
-    return
-  }
-  const childDirs = modulePaths.value.filter((p) => p !== target && p.startsWith(`${target}/`))
-  if (childDirs.length > 0) {
-    ElMessage.warning('仅支持从最下级目录开始删除，请先删除子目录')
-    return
-  }
-  const boundCases = rows.value.filter((r) =>
-    isPathEqualOrChild(r.modulePath || '/未规划用例', target),
-  )
   try {
-    await ElMessageBox.confirm(
-      `确认删除目录 ${target}（含 ${boundCases.length} 条用例）？`,
-      '删除确认',
-      { confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'warning' },
-    )
-  } catch {
-    return
-  }
-  try {
-    for (const tc of boundCases) await deleteTestCase(selectedProject.value, tc.id)
-    customModulePaths.value = customModulePaths.value.filter((p) => !isPathEqualOrChild(p, target))
-    if (isPathEqualOrChild(caseForm.modulePath || '/未规划用例', target))
-      caseForm.modulePath = '/未规划用例'
-    const maxAfterDelete = Math.max(
-      1,
-      Math.ceil((total.value - boundCases.length) / pageSize.value),
-    )
-    if (page.value > maxAfterDelete) page.value = maxAfterDelete
-    await loadCases()
-    ElMessage.success(`删除成功（${boundCases.length} 条）`)
+    await createModule(selectedProject.value, directoryForm.parentId, name)
+    ElMessage.success('创建成功')
+    directoryDialogVisible.value = false
+    await loadTreeData()
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '删除目录失败')
+    ElMessage.error(e?.response?.data?.error || '创建失败')
   }
 }
 
@@ -1049,6 +1036,16 @@ function onStepDragEnd() {
 onMounted(async () => {
   await projectStore.fetchProjects()
   if (selectedProject.value) await loadCases()
+  // 关闭优先级面板的全局点击监听
+  document.addEventListener('click', closeLevelPicker)
+})
+
+function closeLevelPicker() {
+  levelPickerOpen.value = false
+}
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeLevelPicker)
 })
 
 watch(selectedProject, (newId) => {
@@ -1092,7 +1089,7 @@ watch(selectedProject, (newId) => {
             <input
               ref="importInput"
               type="file"
-              accept=".xlsx"
+              accept=".xlsx,.xls"
               style="display: none"
               @change="onImportXlsx"
             />
@@ -1231,14 +1228,14 @@ watch(selectedProject, (newId) => {
             <el-option label="已失败" value="已失败" />
           </el-select>
           <el-select
-            v-model="reviewFilter"
+            v-model="moduleIdFilter"
             placeholder="所属模块"
             clearable
             size="default"
             class="filter-dropdown"
             @change="onSearch"
           >
-            <el-option v-for="m in flatModules" :key="m" :label="m" :value="m" />
+            <el-option v-for="n in flatModules" :key="n.id" :label="n.path" :value="n.id" />
           </el-select>
           <button class="filter-icon-btn" title="高级筛选" @click="filterPanelVisible = true">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -1333,8 +1330,17 @@ watch(selectedProject, (newId) => {
                   <span class="material-symbols-outlined" style="color: #34d399">label</span>
                   <span>打标签</span>
                 </button>
-                <button class="batch-action-item" @click="batchMoveVisible = true">
-                  <span class="material-symbols-outlined" style="color: #94a3b8">drive_file_move</span>
+                <button
+                  class="batch-action-item"
+                  @click="
+                    batchMoveTargetId = 0
+                    batchMoveTargetPath = '/未规划用例'
+                    batchMoveVisible = true
+                  "
+                >
+                  <span class="material-symbols-outlined" style="color: #94a3b8">
+                    drive_file_move
+                  </span>
                   <span>批量移动</span>
                 </button>
                 <button class="batch-action-item batch-action-danger" @click="onBatchDelete">
@@ -1342,7 +1348,13 @@ watch(selectedProject, (newId) => {
                   <span>批量删除</span>
                 </button>
                 <div class="batch-divider"></div>
-                <button class="batch-close" @click="selectedIds = []; selectAll = false">
+                <button
+                  class="batch-close"
+                  @click="
+                    selectedIds = []
+                    selectAll = false
+                  "
+                >
                   <span class="material-symbols-outlined">close</span>
                 </button>
               </div>
@@ -1384,7 +1396,10 @@ watch(selectedProject, (newId) => {
                 <input
                   type="checkbox"
                   :checked="selectAll"
-                  @change="selectAll = !selectAll; toggleSelectAll()"
+                  @change="
+                    selectAll = !selectAll
+                    toggleSelectAll()
+                  "
                 />
               </th>
               <th style="width: 80px" class="sortable" @click="toggleSort('id')">
@@ -1406,13 +1421,13 @@ watch(selectedProject, (newId) => {
                   {{ sortBy === 'updated_at' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕' }}
                 </span>
               </th>
-              <th style="width: 110px">创建人</th>
               <th style="width: 100px" class="sortable" @click="toggleSort('created_at')">
                 创建时间
                 <span class="sort-flag" :class="{ active: sortBy === 'created_at' }">
                   {{ sortBy === 'created_at' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕' }}
                 </span>
               </th>
+              <th style="width: 60px">版本</th>
               <th style="width: 140px">操作</th>
             </tr>
           </thead>
@@ -1456,14 +1471,52 @@ watch(selectedProject, (newId) => {
                 {{ r.id }}
               </td>
               <td class="name" :title="r.title">
-                <strong>{{ r.title }}</strong>
+                <div style="display: flex; align-items: center; gap: 6px">
+                  <strong>{{ r.title }}</strong>
+                  <span
+                    v-if="r.status === 'discarded'"
+                    style="
+                      font-size: 10px;
+                      background: #fee2e2;
+                      color: #ef4444;
+                      padding: 1px 4px;
+                      border-radius: 4px;
+                    "
+                  >
+                    已废弃
+                  </span>
+                </div>
               </td>
               <td><LevelBadge :level="r.level" /></td>
               <td>
                 {{ (r.modulePath || '').split('/').filter(Boolean).pop() || '未分类' }}
               </td>
               <td><StatusBadge :value="r.reviewResult" /></td>
-              <td><StatusBadge :value="r.execResult" /></td>
+              <td>
+                <el-tag
+                  size="small"
+                  :type="
+                    r.status === 'active'
+                      ? 'success'
+                      : r.status === 'pending'
+                        ? 'warning'
+                        : r.status === 'discarded'
+                          ? 'danger'
+                          : 'info'
+                  "
+                  effect="plain"
+                >
+                  {{
+                    r.status === 'active'
+                      ? '已生效'
+                      : r.status === 'pending'
+                        ? '待评审'
+                        : r.status === 'discarded'
+                          ? '已废弃'
+                          : '草稿'
+                  }}
+                </el-tag>
+              </td>
               <td :title="r.tags || '-'">
                 <div v-if="r.tags" style="display: flex; gap: 4px; flex-wrap: wrap">
                   <span v-for="t in r.tags.split(',')" :key="t" class="table-tag">
@@ -1499,8 +1552,47 @@ watch(selectedProject, (newId) => {
                 </span>
               </td>
               <td>
+                <span style="font-family: monospace; font-weight: 600; color: #10b981">
+                  {{ r.version }}
+                </span>
+              </td>
+              <td>
                 <div class="action-group">
-                  <button class="action-btn action-edit icon-only" @click="openEdit(r)">
+                  <button
+                    v-if="r.status === 'draft'"
+                    class="action-btn action-edit icon-only"
+                    style="color: #f59e0b"
+                    @click="onReview(r)"
+                  >
+                    <span class="material-symbols-outlined" style="font-size: 18px">send</span>
+                    <span>提审</span>
+                  </button>
+                  <button
+                    v-if="r.status === 'active' && isAdminOrManager"
+                    class="action-btn action-edit icon-only"
+                    style="color: #ef4444"
+                    @click="onDiscard(r)"
+                  >
+                    <span class="material-symbols-outlined" style="font-size: 18px">block</span>
+                    <span>废弃</span>
+                  </button>
+                  <button
+                    v-if="r.status === 'discarded' && isAdminOrManager"
+                    class="action-btn action-edit icon-only"
+                    style="color: #10b981"
+                    @click="onRecover(r)"
+                  >
+                    <span class="material-symbols-outlined" style="font-size: 18px">
+                      settings_backup_restore
+                    </span>
+                    <span>恢复</span>
+                  </button>
+
+                  <button
+                    v-if="r.status !== 'discarded'"
+                    class="action-btn action-edit icon-only"
+                    @click="openEdit(r)"
+                  >
                     <el-icon class="btn-icon"><Edit /></el-icon>
                     <span>编辑</span>
                   </button>
@@ -1673,9 +1765,9 @@ watch(selectedProject, (newId) => {
     <el-dialog v-model="batchMoveVisible" title="批量移动" width="400px" :append-to-body="true">
       <el-form label-position="top">
         <el-form-item label="目标目录">
-          <el-select v-model="batchMoveTarget" style="width: 100%">
-            <el-option label="/未规划用例" value="/未规划用例" />
-            <el-option v-for="p in modulePaths" :key="p" :label="p" :value="p" />
+          <el-select v-model="batchMoveTargetId" style="width: 100%">
+            <el-option label="/未规划用例" :value="0" />
+            <el-option v-for="n in flatModules" :key="n.id" :label="n.path" :value="n.id" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -1758,14 +1850,40 @@ watch(selectedProject, (newId) => {
                 <!-- Priority / Level -->
                 <div class="stitch-form-item">
                   <label>优先级</label>
-                  <div class="stitch-select-wrapper">
-                    <select v-model="caseForm.level" class="stitch-select">
-                      <option value="P0">P0 - 紧急</option>
-                      <option value="P1">P1 - 高</option>
-                      <option value="P2">P2 - 中</option>
-                      <option value="P3">P3 - 低</option>
-                    </select>
-                    <span class="material-symbols-outlined select-icon">expand_more</span>
+                  <div class="stitch-level-picker" @click.stop="levelPickerOpen = !levelPickerOpen">
+                    <span class="level-badge" :class="caseForm.level.toLowerCase()">
+                      {{ caseForm.level }}
+                    </span>
+                    <span class="level-desc">{{ levelLabels[caseForm.level] }}</span>
+                    <span
+                      class="material-symbols-outlined level-arrow"
+                      :class="{ open: levelPickerOpen }"
+                    >
+                      expand_more
+                    </span>
+                    <Transition name="level-fade">
+                      <div v-if="levelPickerOpen" class="level-dropdown-panel">
+                        <div
+                          v-for="lv in levelKeys"
+                          :key="lv"
+                          class="level-dropdown-item"
+                          :class="{ active: caseForm.level === lv }"
+                          @click.stop="
+                            caseForm.level = lv
+                            levelPickerOpen = false
+                          "
+                        >
+                          <span class="level-badge" :class="lv.toLowerCase()">{{ lv }}</span>
+                          <span class="level-item-label">{{ levelLabels[lv] }}</span>
+                          <span
+                            v-if="caseForm.level === lv"
+                            class="material-symbols-outlined level-check"
+                          >
+                            check
+                          </span>
+                        </div>
+                      </div>
+                    </Transition>
                   </div>
                 </div>
 
@@ -1773,9 +1891,15 @@ watch(selectedProject, (newId) => {
                 <div class="stitch-form-item">
                   <label>所属模块</label>
                   <div class="stitch-select-wrapper">
-                    <select v-model="caseForm.modulePath" class="stitch-select">
-                      <option value="/未规划用例">/未规划用例</option>
-                      <option v-for="p in modulePaths" :key="p" :value="p">{{ p }}</option>
+                    <select
+                      v-model="caseForm.moduleId"
+                      class="stitch-select"
+                      @change="onModuleChangeInDrawer"
+                    >
+                      <option :value="0">/未规划用例</option>
+                      <option v-for="n in flatModules" :key="n.id" :value="n.id">
+                        {{ n.path }}
+                      </option>
                     </select>
                     <span class="material-symbols-outlined select-icon">account_tree</span>
                   </div>
@@ -2181,9 +2305,9 @@ watch(selectedProject, (newId) => {
     <el-dialog v-model="directoryDialogVisible" title="新建目录" width="520px">
       <el-form label-position="top">
         <el-form-item label="父级目录">
-          <el-select v-model="directoryForm.parentPath" placeholder="请选择父级目录">
-            <el-option label="全部用例（根目录）" value="/" />
-            <el-option v-for="p in modulePaths" :key="p" :label="p" :value="p" />
+          <el-select v-model="directoryForm.parentId" placeholder="请选择父级目录">
+            <el-option label="全部用例（根目录）" :value="0" />
+            <el-option v-for="n in flatModules" :key="n.id" :label="n.path" :value="n.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="目录名称">

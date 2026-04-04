@@ -6,7 +6,9 @@ import {
   globalModuleCaseCount,
   globalUnplannedCount,
   globalSelectedModulePath,
-  globalTreeActions
+  globalSelectedModuleId,
+  globalTreeExpanded,
+  globalTreeActions,
 } from '../composables/useTestCaseTree'
 
 type TopMenu = 'workbench' | 'project' | 'plan' | 'testcases' | 'e2e' | 'system'
@@ -34,7 +36,7 @@ const projectStore = useProjectStore()
 const dropdownOpen = ref(false)
 
 const currentProject = computed(() =>
-  projectStore.projects.find((p) => p.id === projectStore.selectedProjectId)
+  projectStore.projects.find((p) => p.id === projectStore.selectedProjectId),
 )
 
 const currentProjectName = computed(() => currentProject.value?.name || 'Select Project')
@@ -65,6 +67,35 @@ function toggleDropdown() {
 }
 
 // 点击外部关闭
+function onModuleClick(node: any) {
+  const path = node.path || ''
+  const id = node.id
+
+  // 如果是虚拟节点且 id=0 (全部用例)，重置选择
+  if (id === 0) {
+    globalSelectedModulePath.value = ''
+    globalSelectedModuleId.value = 0
+    return
+  }
+
+  if (globalSelectedModuleId.value === id && id !== 0) {
+    globalSelectedModulePath.value = ''
+    globalSelectedModuleId.value = 0
+  } else {
+    globalSelectedModulePath.value = path
+    globalSelectedModuleId.value = id
+  }
+}
+
+/** 聚合目录树：包含“全部用例”和“未规划用例”作为顶层节点，确保对齐 */
+const combinedTree = computed(() => {
+  return [
+    { id: 0, name: '全部用例', path: '', icon: 'grid_view', isVirtual: true },
+    { id: -1, name: '未规划用例', path: '/未规划用例', icon: 'description', isVirtual: true },
+    ...globalModuleTree.value,
+  ]
+})
+
 function handleClickOutside(e: MouseEvent) {
   const el = document.querySelector('.nav-header')
   if (el && !el.contains(e.target as Node)) {
@@ -106,14 +137,20 @@ const systemNavItems: { key: SystemMenu; label: string }[] = [
     <div class="nav-inner">
       <!-- Project Switcher Header -->
       <div class="nav-header">
-        <div
-          class="nav-header-card"
-          :class="{ active: dropdownOpen }"
-          @click="toggleDropdown"
-        >
+        <div class="nav-header-card" :class="{ active: dropdownOpen }" @click="toggleDropdown">
           <div class="nav-header-icon">
-            <img v-if="currentProjectAvatar" :src="currentProjectAvatar" class="nav-header-avatar-img" />
-            <span v-else class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1; font-size: 22px; color: #fff;">rocket_launch</span>
+            <img
+              v-if="currentProjectAvatar"
+              :src="currentProjectAvatar"
+              class="nav-header-avatar-img"
+            />
+            <span
+              v-else
+              class="material-symbols-outlined"
+              style="font-variation-settings: 'FILL' 1; font-size: 22px; color: #fff"
+            >
+              rocket_launch
+            </span>
           </div>
           <div v-if="!collapsed" class="nav-header-info">
             <span class="nav-header-title">{{ currentProjectName }}</span>
@@ -122,8 +159,16 @@ const systemNavItems: { key: SystemMenu; label: string }[] = [
             v-if="!collapsed"
             class="material-symbols-outlined nav-header-chevron"
             :class="{ rotated: dropdownOpen }"
-            style="font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;"
-          >unfold_more</span>
+            style="
+              font-variation-settings:
+                'FILL' 0,
+                'wght' 300,
+                'GRAD' 0,
+                'opsz' 24;
+            "
+          >
+            unfold_more
+          </span>
         </div>
 
         <!-- Dropdown panel -->
@@ -142,15 +187,27 @@ const systemNavItems: { key: SystemMenu; label: string }[] = [
                 @click="p.status !== 'archived' && selectProject(p.id)"
               >
                 <div class="nav-project-item-icon">
-                  <img v-if="resolveAvatarUrl(p.avatar)" :src="resolveAvatarUrl(p.avatar)" class="nav-project-item-avatar" />
-                  <span v-else class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1; font-size: 14px; color: #fff;">rocket_launch</span>
+                  <img
+                    v-if="resolveAvatarUrl(p.avatar)"
+                    :src="resolveAvatarUrl(p.avatar)"
+                    class="nav-project-item-avatar"
+                  />
+                  <span
+                    v-else
+                    class="material-symbols-outlined"
+                    style="font-variation-settings: 'FILL' 1; font-size: 14px; color: #fff"
+                  >
+                    rocket_launch
+                  </span>
                 </div>
                 <span class="nav-project-name">{{ p.name }}</span>
                 <span
                   v-if="p.id === projectStore.selectedProjectId"
                   class="material-symbols-outlined nav-project-check"
-                  style="font-size: 16px;"
-                >check</span>
+                  style="font-size: 16px"
+                >
+                  check
+                </span>
               </div>
             </div>
           </div>
@@ -173,8 +230,14 @@ const systemNavItems: { key: SystemMenu; label: string }[] = [
         >
           <span
             class="material-symbols-outlined nav-icon"
-            :style="topMenu === item.key ? { fontVariationSettings: `'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 24` } : { fontVariationSettings: `'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24` }"
-          >{{ item.icon }}</span>
+            :style="
+              topMenu === item.key
+                ? { fontVariationSettings: `'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 24` }
+                : { fontVariationSettings: `'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24` }
+            "
+          >
+            {{ item.icon }}
+          </span>
           <span v-if="!collapsed" class="nav-label">{{ item.label }}</span>
         </a>
       </nav>
@@ -182,64 +245,64 @@ const systemNavItems: { key: SystemMenu; label: string }[] = [
       <!-- Test Cases Directory Tree (Visible only when TEST SUITES is active) -->
       <div v-if="topMenu === 'testcases' && !collapsed" class="nav-tree-section">
         <div class="nav-tree-header">
-          <span class="nav-tree-title">目录树</span>
-          <button class="nav-tree-add-btn" title="新建目录" @click="globalTreeActions.openCreateDirectory">
-            <span class="material-symbols-outlined" style="font-size: 16px;">create_new_folder</span>
+          <span class="tree-root-title">目录树</span>
+          <button
+            class="nav-tree-add-btn"
+            title="新建根目录"
+            @click="globalTreeActions.onAddRootModule"
+          >
+            <span class="material-symbols-outlined" style="font-size: 18px">create_new_folder</span>
           </button>
         </div>
-        
+
         <div class="nav-tree-scroll">
-          <!-- 全部用例 -->
-          <div
-            class="nav-tree-item"
-            :class="{ active: globalSelectedModulePath === '' }"
-            @click="globalTreeActions.onModuleClick('')"
-          >
-            <div class="nav-tree-item-left">
-              <span class="material-symbols-outlined nav-tree-icon" style="font-variation-settings: 'FILL' 1;">grid_view</span>
-              <span>全部用例</span>
-            </div>
-          </div>
-
-          <!-- 未规划用例 -->
-          <div
-            class="nav-tree-item"
-            :class="{ active: globalSelectedModulePath === '/未规划用例' }"
-            @click="globalTreeActions.onModuleClick('/未规划用例')"
-          >
-            <div class="nav-tree-item-left">
-              <span class="material-symbols-outlined nav-tree-icon" style="font-variation-settings: 'FILL' 1;">description</span>
-              <span>未规划用例</span>
-            </div>
-            <span class="nav-tree-count">{{ globalUnplannedCount }}</span>
-          </div>
-
-          <!-- Module Tree -->
           <el-tree
-            v-if="globalModuleTree.length > 0"
+            ref="moduleTreeRef"
             class="nav-module-tree"
-            :data="globalModuleTree"
-            node-key="path"
-            default-expand-all
-            :expand-on-click-node="false"
+            :data="combinedTree"
             :props="{ label: 'name', children: 'children' }"
+            node-key="id"
+            :indent="16"
+            :default-expand-all="globalTreeExpanded"
+            highlight-current
+            @node-click="onModuleClick"
           >
-            <template #default="{ data }">
+            <template #default="{ node, data }">
               <div
                 class="nav-tree-node-row"
-                :class="{ active: globalSelectedModulePath === data.path }"
-                @click.stop="globalTreeActions.onModuleClick(data.path)"
+                :class="{
+                  active: globalSelectedModuleId === data.id,
+                  'is-virtual': data.isVirtual,
+                }"
+                :style="{ paddingLeft: (node.level - 1) * 16 + 8 + 'px' }"
               >
                 <div class="nav-tree-node-left">
-                  <span class="material-symbols-outlined nav-tree-icon" style="font-variation-settings: 'FILL' 1;">folder</span>
+                  <span
+                    class="material-symbols-outlined nav-tree-icon"
+                    :style="{ fontVariationSettings: `'FILL' ${data.id === 0 ? 0 : 1}` }"
+                  >
+                    {{ data.icon || 'folder' }}
+                  </span>
                   <span class="nav-tree-node-name">{{ data.name }}</span>
                 </div>
                 <div class="nav-tree-node-right">
-                  <span class="nav-tree-count">{{ globalModuleCaseCount[data.path] || 0 }}</span>
+                  <span class="nav-tree-count">
+                    {{
+                      data.id === -1
+                        ? globalUnplannedCount
+                        : data.id === 0
+                          ? ''
+                          : globalModuleCaseCount[data.path] || 0
+                    }}
+                  </span>
                   <el-dropdown
+                    v-if="!data.isVirtual"
                     trigger="click"
                     placement="bottom-end"
-                    @command="(cmd: string) => globalTreeActions.onNodeMenuCommand(cmd, data.path, data.name)"
+                    @command="
+                      (cmd: string) =>
+                        globalTreeActions.onNodeMenuCommand(cmd, data.path, data.name, data.id)
+                    "
                     @click.stop
                   >
                     <span class="material-symbols-outlined nav-tree-more">more_vert</span>
@@ -272,7 +335,18 @@ const systemNavItems: { key: SystemMenu; label: string }[] = [
             @click="$emit('update:topMenu', 'system')"
             @keydown.enter="$emit('update:topMenu', 'system')"
           >
-            <span class="material-symbols-outlined nav-icon" style="font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;">settings</span>
+            <span
+              class="material-symbols-outlined nav-icon"
+              style="
+                font-variation-settings:
+                  'FILL' 0,
+                  'wght' 300,
+                  'GRAD' 0,
+                  'opsz' 24;
+              "
+            >
+              settings
+            </span>
             <span v-if="!collapsed" class="nav-label">系统管理</span>
           </a>
 
@@ -293,11 +367,20 @@ const systemNavItems: { key: SystemMenu; label: string }[] = [
           </div>
         </template>
 
-        <div class="nav-collapse-btn" @click="$emit('toggle-collapse')" :title="collapsed ? '展开侧栏' : '收起侧栏'">
+        <div
+          class="nav-collapse-btn"
+          :title="collapsed ? '展开侧栏' : '收起侧栏'"
+          @click="$emit('toggle-collapse')"
+        >
           <span
             class="material-symbols-outlined nav-icon"
-            :style="{ transform: collapsed ? 'rotate(180deg)' : 'none', fontVariationSettings: `'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24` }"
-          >menu_open</span>
+            :style="{
+              transform: collapsed ? 'rotate(180deg)' : 'none',
+              fontVariationSettings: `'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24`,
+            }"
+          >
+            menu_open
+          </span>
           <span v-if="!collapsed" class="nav-label">收起侧栏</span>
         </div>
       </div>

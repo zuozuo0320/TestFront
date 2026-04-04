@@ -36,10 +36,9 @@ export interface TestCasePayload {
 }
 
 export async function listTestCases(projectId: number, params: TestCaseListParams) {
-  const { data } = await apiClient.get<TestCaseListResp>(
-    `/projects/${projectId}/testcases`,
-    { params },
-  )
+  const { data } = await apiClient.get<TestCaseListResp>(`/projects/${projectId}/testcases`, {
+    params,
+  })
   return data
 }
 
@@ -75,25 +74,42 @@ export async function batchDeleteTestCases(projectId: number, ids: number[]) {
 }
 
 export async function batchUpdateLevel(projectId: number, ids: number[], level: string) {
-  const { data } = await apiClient.post(`/projects/${projectId}/testcases/batch-update-level`, { ids, level })
+  const { data } = await apiClient.post(`/projects/${projectId}/testcases/batch-update-level`, {
+    ids,
+    level,
+  })
   return data
 }
 
-export async function batchMoveTestCases(projectId: number, ids: number[], module_id: number, module_path: string) {
-  const { data } = await apiClient.post(`/projects/${projectId}/testcases/batch-move`, { ids, module_id, module_path })
+export async function batchMoveTestCases(
+  projectId: number,
+  ids: number[],
+  module_id: number,
+  module_path: string,
+) {
+  const { data } = await apiClient.post(`/projects/${projectId}/testcases/batch-move`, {
+    ids,
+    module_id,
+    module_path,
+  })
   return data
 }
 
 // ========== Clone ==========
 
 export async function cloneTestCase(projectId: number, testcaseId: number) {
-  const { data } = await apiClient.post<TestCase>(`/projects/${projectId}/testcases/${testcaseId}/clone`)
+  const { data } = await apiClient.post(`/projects/${projectId}/testcase/${testcaseId}/clone`)
   return data
 }
 
 // ========== History ==========
 
-export async function listCaseHistory(projectId: number, testcaseId: number, page = 1, pageSize = 20) {
+export async function listCaseHistory(
+  projectId: number,
+  testcaseId: number,
+  page = 1,
+  pageSize = 20,
+) {
   const { data } = await apiClient.get(`/projects/${projectId}/testcases/${testcaseId}/history`, {
     params: { page, pageSize },
   })
@@ -113,16 +129,42 @@ export async function createCaseRelation(
   targetCaseId: number,
   relationType: 'precondition' | 'related',
 ) {
-  const { data } = await apiClient.post(`/projects/${projectId}/testcases/${testcaseId}/relations`, {
-    target_case_id: targetCaseId,
-    relation_type: relationType,
-  })
+  const { data } = await apiClient.post(
+    `/projects/${projectId}/testcases/${testcaseId}/relations`,
+    {
+      target_case_id: targetCaseId,
+      relation_type: relationType,
+    },
+  )
   return data
 }
 
-export async function deleteCaseRelation(projectId: number, testcaseId: number, relationId: number) {
+export async function deleteCaseRelation(
+  projectId: number,
+  testcaseId: number,
+  relationId: number,
+) {
   const { data } = await apiClient.delete(
     `/projects/${projectId}/testcases/${testcaseId}/relations/${relationId}`,
   )
+  return data
+}
+
+// ========== 生命周期状态流转 ==========
+
+export async function submitReview(projectId: number, testcaseId: number) {
+  const { data } = await apiClient.post(
+    `/projects/${projectId}/testcase/${testcaseId}/submit-review`,
+  )
+  return data
+}
+
+export async function discardTestCase(projectId: number, testcaseId: number) {
+  const { data } = await apiClient.post(`/projects/${projectId}/testcase/${testcaseId}/discard`)
+  return data
+}
+
+export async function recoverTestCase(projectId: number, testcaseId: number) {
+  const { data } = await apiClient.post(`/projects/${projectId}/testcase/${testcaseId}/recover`)
   return data
 }

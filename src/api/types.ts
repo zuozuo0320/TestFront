@@ -36,6 +36,8 @@ export type TestCase = {
   id: number
   project_id: number
   title: string
+  status: 'draft' | 'pending' | 'active' | 'discarded'
+  version: string
   level: string
   review_result: string
   exec_result: string
@@ -102,6 +104,12 @@ export type ModuleTreeNode = {
   sort_order: number
   case_count: number
   children: ModuleTreeNode[]
+}
+
+export type ModuleTreeResp = {
+  data: ModuleTreeNode[]
+  counts: Record<string, number>
+  unplannedCount: number
 }
 
 // Attachment
