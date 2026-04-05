@@ -59,7 +59,7 @@ const routeToMenu: Record<string, TopMenu> = {
   '/ai-script': 'e2e',
   '/ai-script/library': 'e2e',
   '/defects': 'project',
-  '/analytics': 'plan',
+  '/case-reviews': 'plan',
   '/system/users': 'system',
   '/system/roles': 'system',
   '/system/projects': 'system',
@@ -89,7 +89,7 @@ function switchTopMenu(menu: TopMenu) {
     testcases: '/testcases',
     system: `/system/${projectStore.activeMenu}`,
     project: '/defects',
-    plan: '/analytics',
+    plan: '/case-reviews',
     e2e: '/ai-script',
   }
   router.push(menuRoutes[menu])

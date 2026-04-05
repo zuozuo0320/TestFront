@@ -159,6 +159,20 @@ export async function submitReview(projectId: number, testcaseId: number) {
   return data
 }
 
+export async function approveReview(projectId: number, testcaseId: number) {
+  const { data } = await apiClient.post(
+    `/projects/${projectId}/testcase/${testcaseId}/approve-review`,
+  )
+  return data
+}
+
+export async function rejectReview(projectId: number, testcaseId: number) {
+  const { data } = await apiClient.post(
+    `/projects/${projectId}/testcase/${testcaseId}/reject-review`,
+  )
+  return data
+}
+
 export async function discardTestCase(projectId: number, testcaseId: number) {
   const { data } = await apiClient.post(`/projects/${projectId}/testcase/${testcaseId}/discard`)
   return data

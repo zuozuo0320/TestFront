@@ -28,6 +28,8 @@ import {
   cloneTestCase,
   listCaseHistory,
   submitReview,
+  approveReview,
+  rejectReview,
   discardTestCase,
   recoverTestCase,
 } from '../api/testcase'
@@ -806,6 +808,42 @@ async function onRecover(row: TableRow) {
   }
 }
 
+async function onApprove(row: TableRow) {
+  if (!selectedProject.value) return
+  try {
+    await ElMessageBox.confirm(`确认通过用例【${row.title}】的评审？`, '评审通过', {
+      confirmButtonText: '通过',
+      cancelButtonText: '取消',
+      type: 'success',
+    })
+    await approveReview(selectedProject.value, row.id)
+    ElMessage.success('评审已通过')
+    await loadCases()
+  } catch (e: any) {
+    if (e !== 'cancel') {
+      ElMessage.error(e?.response?.data?.error || '操作失败')
+    }
+  }
+}
+
+async function onReject(row: TableRow) {
+  if (!selectedProject.value) return
+  try {
+    await ElMessageBox.confirm(`确认驳回用例【${row.title}】的评审？驳回后将回退为草稿。`, '评审驳回', {
+      confirmButtonText: '驳回',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+    await rejectReview(selectedProject.value, row.id)
+    ElMessage.success('已驳回，用例回退为草稿')
+    await loadCases()
+  } catch (e: any) {
+    if (e !== 'cancel') {
+      ElMessage.error(e?.response?.data?.error || '操作失败')
+    }
+  }
+}
+
 function copyIdToClipboard(id: number) {
   navigator.clipboard.writeText(String(id))
   ElMessage.success(`ID ${id} 已复制`)
@@ -1332,11 +1370,7 @@ watch(selectedProject, (newId) => {
                 </button>
                 <button
                   class="batch-action-item"
-                  @click="
-                    batchMoveTargetId = 0
-                    batchMoveTargetPath = '/未规划用例'
-                    batchMoveVisible = true
-                  "
+                  @click="batchMoveTargetId = 0; batchMoveTargetPath = '/未规划用例'; batchMoveVisible = true"
                 >
                   <span class="material-symbols-outlined" style="color: #94a3b8">
                     drive_file_move
@@ -1350,10 +1384,7 @@ watch(selectedProject, (newId) => {
                 <div class="batch-divider"></div>
                 <button
                   class="batch-close"
-                  @click="
-                    selectedIds = []
-                    selectAll = false
-                  "
+                  @click="selectedIds = []; selectAll = false"
                 >
                   <span class="material-symbols-outlined">close</span>
                 </button>
@@ -1396,10 +1427,7 @@ watch(selectedProject, (newId) => {
                 <input
                   type="checkbox"
                   :checked="selectAll"
-                  @change="
-                    selectAll = !selectAll
-                    toggleSelectAll()
-                  "
+                  @change="selectAll = !selectAll; toggleSelectAll()"
                 />
               </th>
               <th style="width: 80px" class="sortable" @click="toggleSort('id')">
@@ -1566,6 +1594,24 @@ watch(selectedProject, (newId) => {
                   >
                     <span class="material-symbols-outlined" style="font-size: 18px">send</span>
                     <span>提审</span>
+                  </button>
+                  <button
+                    v-if="r.status === 'pending' && isAdminOrManager"
+                    class="action-btn action-edit icon-only"
+                    style="color: #10b981"
+                    @click="onApprove(r)"
+                  >
+                    <span class="material-symbols-outlined" style="font-size: 18px">check_circle</span>
+                    <span>通过</span>
+                  </button>
+                  <button
+                    v-if="r.status === 'pending' && isAdminOrManager"
+                    class="action-btn action-edit icon-only"
+                    style="color: #ef4444"
+                    @click="onReject(r)"
+                  >
+                    <span class="material-symbols-outlined" style="font-size: 18px">cancel</span>
+                    <span>驳回</span>
                   </button>
                   <button
                     v-if="r.status === 'active' && isAdminOrManager"
@@ -1868,10 +1914,7 @@ watch(selectedProject, (newId) => {
                           :key="lv"
                           class="level-dropdown-item"
                           :class="{ active: caseForm.level === lv }"
-                          @click.stop="
-                            caseForm.level = lv
-                            levelPickerOpen = false
-                          "
+                          @click.stop="caseForm.level = lv; levelPickerOpen = false"
                         >
                           <span class="level-badge" :class="lv.toLowerCase()">{{ lv }}</span>
                           <span class="level-item-label">{{ levelLabels[lv] }}</span>

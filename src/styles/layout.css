@@ -2971,7 +2971,7 @@
   padding: 0;
 }
 
-.step-op + .step-op.danger {
+.step-op+.step-op.danger {
   margin-left: 4px;
 }
 
@@ -3041,11 +3041,11 @@
   font-size: 14px;
 }
 
-.action-btn.icon-only span {
+.action-btn.icon-only span:not(.material-symbols-outlined) {
   display: none;
 }
 
-.action-btn + .action-btn::before {
+.action-btn+.action-btn::before {
   content: '';
   position: absolute;
   left: -1px;
@@ -3064,7 +3064,7 @@
   background: transparent;
 }
 
-.action-btn:hover + .action-btn::before {
+.action-btn:hover+.action-btn::before {
   background: transparent;
 }
 
@@ -3300,12 +3300,10 @@ tr.row-selected td {
 .sk {
   height: 14px;
   border-radius: 6px;
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.04) 25%,
-    rgba(255, 255, 255, 0.08) 37%,
-    rgba(255, 255, 255, 0.04) 63%
-  );
+  background: linear-gradient(90deg,
+      rgba(255, 255, 255, 0.04) 25%,
+      rgba(255, 255, 255, 0.08) 37%,
+      rgba(255, 255, 255, 0.04) 63%);
   background-size: 400% 100%;
   animation: sk-loading 1.4s ease infinite;
 }
@@ -3816,11 +3814,11 @@ tr.row-selected td {
 }
 
 /* 子级节点添加左侧竖线缩进 */
-.nav-module-tree > .el-tree-node > .el-tree-node__children {
+.nav-module-tree>.el-tree-node>.el-tree-node__children {
   position: relative;
 }
 
-.nav-module-tree > .el-tree-node > .el-tree-node__children::before {
+.nav-module-tree>.el-tree-node>.el-tree-node__children::before {
   content: '';
   position: absolute;
   left: 20px;
@@ -3850,7 +3848,7 @@ tr.row-selected td {
   color: transparent !important;
 }
 
-.nav-module-tree .el-tree-node:focus > .el-tree-node__content {
+.nav-module-tree .el-tree-node:focus>.el-tree-node__content {
   background: transparent !important;
 }
 

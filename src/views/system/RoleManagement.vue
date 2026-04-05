@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { listRoles, createRole, updateRoleById } from '../../api/user'
-import type { Role } from '../../api/types'
+import { listRoles, createRole, updateRoleById, listUsers } from '../../api/user'
+import type { Role, User } from '../../api/types'
 
 /** 预置角色标识名集合（与后端 model.IsPresetSystemRole 保持一致） */
 const PRESET_ROLES = new Set(['admin', 'manager', 'tester', 'reviewer', 'developer', 'readonly'])
@@ -27,49 +27,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   developer: ['用例查看', '缺陷认领', '日志查看'],
 }
 
-/** 角色对应的用户数假数据 */
-const ROLE_USER_COUNTS: Record<string, number> = {
-  admin: 5,
-  manager: 12,
-  tester: 45,
-  reviewer: 82,
-  readonly: 4,
-  developer: 18,
-}
-
-/** 抽屉中展示的假数据用户列表 */
-const MOCK_USERS: Record<string, { name: string; email: string }[]> = {
-  admin: [
-    { name: 'Chen Wei (陈伟)', email: 'w.chen@testpilot.io' },
-    { name: 'Li Xiao (李晓)', email: 'x.li@testpilot.io' },
-    { name: 'Zhang Hao (张浩)', email: 'h.zhang@testpilot.io' },
-    { name: 'Yang Min (杨敏)', email: 'm.yang@testpilot.io' },
-    { name: 'Fan Jing (范静)', email: 'j.fan@testpilot.io' },
-  ],
-  manager: [
-    { name: 'Wang Lei (王磊)', email: 'l.wang@testpilot.io' },
-    { name: 'Liu Yan (刘燕)', email: 'y.liu@testpilot.io' },
-    { name: 'Zhao Peng (赵鹏)', email: 'p.zhao@testpilot.io' },
-  ],
-  tester: [
-    { name: 'Sun Mei (孙梅)', email: 'm.sun@testpilot.io' },
-    { name: 'Zhou Tao (周涛)', email: 't.zhou@testpilot.io' },
-    { name: 'Wu Fang (吴芳)', email: 'f.wu@testpilot.io' },
-    { name: 'Xu Gang (徐刚)', email: 'g.xu@testpilot.io' },
-  ],
-  reviewer: [
-    { name: 'Ma Ling (马玲)', email: 'l.ma@testpilot.io' },
-    { name: 'Huang Bo (黄博)', email: 'b.huang@testpilot.io' },
-  ],
-  readonly: [
-    { name: 'Lin Zhi (林志)', email: 'z.lin@testpilot.io' },
-  ],
-  developer: [
-    { name: 'Gao Jun (高军)', email: 'j.gao@testpilot.io' },
-    { name: 'He Shan (何珊)', email: 's.he@testpilot.io' },
-    { name: 'Deng Kai (邓凯)', email: 'k.deng@testpilot.io' },
-  ],
-}
+/** 角色对应的用户数 — 从真实用户列表统计 */
+const allUsers = ref<User[]>([])
 
 const roles = ref<Role[]>([])
 const rolesLoading = ref(false)
@@ -82,12 +41,23 @@ const drawerVisible = ref(false)
 const drawerRole = ref<Role | null>(null)
 const drawerSearch = ref('')
 
+function roleUserCountMap(): Record<string, number> {
+  const map: Record<string, number> = {}
+  for (const u of allUsers.value) {
+    const key = (u.role || '').toLowerCase()
+    map[key] = (map[key] || 0) + 1
+  }
+  return map
+}
+
+/** 抽屉中展示的真实用户列表 */
 const drawerUsers = computed(() => {
   if (!drawerRole.value) return []
-  const all = MOCK_USERS[drawerRole.value.name.toLowerCase()] || []
+  const roleName = drawerRole.value.name.toLowerCase()
+  const all = allUsers.value.filter(u => (u.role || '').toLowerCase() === roleName)
   const kw = drawerSearch.value.trim().toLowerCase()
   if (!kw) return all
-  return all.filter(u => u.name.toLowerCase().includes(kw) || u.email.toLowerCase().includes(kw))
+  return all.filter(u => (u.name || '').toLowerCase().includes(kw) || (u.email || '').toLowerCase().includes(kw))
 })
 
 function openUserDrawer(role: Role) {
@@ -126,12 +96,7 @@ const editingIsPreset = computed(() => {
 
 /* ── 统计数据 ── */
 const totalRoles = computed(() => roles.value.length)
-const totalAssignedUsers = computed(() => {
-  return roles.value.reduce((sum, r) => {
-    const mock = ROLE_USER_COUNTS[r.name.toLowerCase()]
-    return sum + (mock ?? r.user_count ?? 0)
-  }, 0)
-})
+const totalAssignedUsers = computed(() => allUsers.value.length)
 
 /** 获取角色的图标名 */
 function getRoleIcon(name: string): string {
@@ -145,18 +110,21 @@ function getRolePerms(name: string): string[] {
 
 /** 获取角色的用户数 */
 function getRoleUserCount(role: Role): number {
-  const mock = ROLE_USER_COUNTS[role.name.toLowerCase()]
-  return mock ?? role.user_count ?? 0
+  const map = roleUserCountMap()
+  return map[role.name.toLowerCase()] || 0
 }
 
 async function loadRoles() {
   rolesLoading.value = true
   try {
-    roles.value = await listRoles()
+    const [rolesData, usersData] = await Promise.all([listRoles(), listUsers()])
+    roles.value = rolesData
+    allUsers.value = usersData
   } finally {
     rolesLoading.value = false
   }
 }
+
 
 /** 打开创建角色弹窗，重置表单 */
 function openCreateRole() {

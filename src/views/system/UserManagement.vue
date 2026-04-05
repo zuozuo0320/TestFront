@@ -107,15 +107,36 @@
               <td>
                 <div class="um-status-cell">
                   <span class="um-status-dot" :class="u.active ? 'active' : 'disabled'"></span>
-                  <span class="um-status-text" :class="u.active ? 'text-success' : 'text-error'">{{ u.active ? '在线' : '禁用' }}</span>
+                  <span class="um-status-text" :class="u.active ? 'text-success' : 'text-error'">{{ u.active ? '已启用' : '已冻结' }}</span>
                 </div>
               </td>
               <td class="text-right">
-                <div class="um-actions-cell">
-                  <button class="um-act hover-white" title="Edit" @click="openEditUser(u)"><el-icon><Edit /></el-icon></button>
-                  <button class="um-act hover-secondary" title="Reset Password" @click="openResetPwd(u)"><el-icon><Clock /></el-icon></button>
-                  <button class="um-act" :class="u.active ? 'hover-error' : 'hover-success'" :title="u.active ? 'Disable' : 'Enable'" :disabled="isAdmin(u)" @click="!isAdmin(u) && removeUser(u)">
-                    <el-icon><CircleClose v-if="u.active" /><CircleCheck v-else /></el-icon>
+                <div class="action-group">
+                  <button class="action-btn action-edit icon-only" title="编辑" @click="openEditUser(u)">
+                    <el-icon class="btn-icon"><Edit /></el-icon>
+                    <span>编辑</span>
+                  </button>
+                  <button class="action-btn action-clone icon-only" title="重置密码" @click="openResetPwd(u)">
+                    <el-icon class="btn-icon"><Clock /></el-icon>
+                    <span>重置密码</span>
+                  </button>
+                  <button
+                    class="action-btn action-clone icon-only"
+                    :title="u.active ? '冻结' : '解冻'"
+                    :disabled="isAdmin(u)"
+                    @click="!isAdmin(u) && toggleFreeze(u)"
+                  >
+                    <el-icon class="btn-icon"><CircleClose v-if="u.active" /><CircleCheck v-else /></el-icon>
+                    <span>{{ u.active ? '冻结' : '解冻' }}</span>
+                  </button>
+                  <button
+                    class="action-btn action-delete icon-only"
+                    title="删除"
+                    :disabled="isAdmin(u)"
+                    @click="!isAdmin(u) && removeUser(u)"
+                  >
+                    <el-icon class="btn-icon"><Delete /></el-icon>
+                    <span>删除</span>
                   </button>
                 </div>
               </td>
@@ -226,7 +247,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { User as UserIcon, UserFilled, Filter, Download, Edit, Clock, CircleClose, CircleCheck } from '@element-plus/icons-vue'
+import { User as UserIcon, UserFilled, Filter, Download, Edit, Clock, CircleClose, CircleCheck, Delete } from '@element-plus/icons-vue'
 import {
   listUsers,
   createUser,
@@ -494,10 +515,31 @@ async function submitUser() {
   }
 }
 
+/** 冻结/解冻用户 */
+async function toggleFreeze(row: UserRow) {
+  const action = row.active ? '冻结' : '解冻'
+  try {
+    await ElMessageBox.confirm(`确认${action}用户【${row.name}】？${row.active ? '冻结后该用户将无法登录。' : ''}`, `${action}确认`, {
+      confirmButtonText: action,
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+  try {
+    await updateUser(row.id, { active: !row.active })
+    ElMessage.success(`用户已${action}`)
+    await loadUsers()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || `${action}失败`)
+  }
+}
+
 /** 删除用户（逻辑删除） */
 async function removeUser(row: UserRow) {
   try {
-    await ElMessageBox.confirm(`确认删除用户【${row.name}】？`, '删除确认', {
+    await ElMessageBox.confirm(`确认删除用户【${row.name}】？删除后不可恢复。`, '删除确认', {
       confirmButtonText: '删除',
       cancelButtonText: '取消',
       type: 'warning',
@@ -630,7 +672,9 @@ onMounted(async () => {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   color: var(--text-on-surface);
   line-height: 1.5;
-  min-height: 100vh;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: 16px 20px;
   display: flex;
   flex-direction: column;
@@ -786,7 +830,7 @@ onMounted(async () => {
   background: var(--bg-card);
   border-radius: 16px;
   border: 1px solid var(--border-lighter);
-  overflow: hidden;
+  overflow: visible;
 }
 .um-list-header {
   padding: 24px;
@@ -870,30 +914,13 @@ onMounted(async () => {
 .um-status-dot.disabled { background: var(--error); box-shadow: 0 0 8px rgba(239, 68, 68, 0.5); }
 .um-status-text { font-size: 12px; font-weight: 500; }
 
-.um-actions-cell {
+/* 操作按钮使用全局 .action-btn 样式 */
+.um-tr .action-group {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  opacity: 0.4;
-  transition: opacity 0.2s;
+  align-items: center;
+  gap: 2px;
 }
-.um-tr:hover .um-actions-cell { opacity: 1; }
-.um-act {
-  background: transparent;
-  border: none;
-  padding: 8px;
-  border-radius: 8px;
-  color: var(--text-slate);
-  cursor: pointer;
-  display: flex;
-  transition: all 0.2s;
-}
-.um-act:hover { background: var(--bg-card-high); }
-.um-act.hover-white:hover { color: #fff; }
-.um-act.hover-secondary:hover { color: var(--secondary); }
-.um-act.hover-error:hover { color: var(--error); }
-.um-act.hover-success:hover { color: var(--success); }
-.um-act:disabled { opacity: 0.3; cursor: not-allowed; }
 
 .um-empty { text-align: center; padding: 48px; color: #64748b; font-size: 14px; }
 
