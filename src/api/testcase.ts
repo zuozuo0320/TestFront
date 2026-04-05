@@ -24,7 +24,6 @@ export interface TestCaseListParams {
 export interface TestCasePayload {
   title: string
   level?: string
-  review_result?: string
   exec_result?: string
   module_id?: number
   module_path?: string
@@ -151,27 +150,6 @@ export async function deleteCaseRelation(
 }
 
 // ========== 生命周期状态流转 ==========
-
-export async function submitReview(projectId: number, testcaseId: number) {
-  const { data } = await apiClient.post(
-    `/projects/${projectId}/testcase/${testcaseId}/submit-review`,
-  )
-  return data
-}
-
-export async function approveReview(projectId: number, testcaseId: number) {
-  const { data } = await apiClient.post(
-    `/projects/${projectId}/testcase/${testcaseId}/approve-review`,
-  )
-  return data
-}
-
-export async function rejectReview(projectId: number, testcaseId: number) {
-  const { data } = await apiClient.post(
-    `/projects/${projectId}/testcase/${testcaseId}/reject-review`,
-  )
-  return data
-}
 
 export async function discardTestCase(projectId: number, testcaseId: number) {
   const { data } = await apiClient.post(`/projects/${projectId}/testcase/${testcaseId}/discard`)

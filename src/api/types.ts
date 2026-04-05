@@ -54,6 +54,10 @@ export type TestCase = {
   updated_by_name?: string
   created_at?: string
   updated_at?: string
+  in_review?: boolean
+  current_review_id?: number
+  current_review_name?: string
+  related_review_count?: number
 }
 
 export type TestCaseListResp = {

@@ -1,11 +1,6 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import {
-  listTestCases,
-  createTestCase,
-  updateTestCase,
-  deleteTestCase,
-} from '../api/testcase'
+import { listTestCases, createTestCase, updateTestCase, deleteTestCase } from '../api/testcase'
 import type { TestCase } from '../api/types'
 
 export type TableRow = {
@@ -24,6 +19,10 @@ export type TableRow = {
   createdAt: string
   steps: string
   priority: string
+  inReview: boolean
+  currentReviewId?: number
+  currentReviewName?: string
+  relatedReviewCount: number
 }
 
 export type StepRow = {
@@ -69,6 +68,10 @@ function toRow(tc: TestCase): TableRow {
     createdAt: formatTime(tc.created_at),
     steps: tc.steps,
     priority: tc.priority,
+    inReview: tc.in_review || false,
+    currentReviewId: tc.current_review_id || undefined,
+    currentReviewName: tc.current_review_name || '',
+    relatedReviewCount: tc.related_review_count || 0,
   }
 }
 
@@ -107,12 +110,9 @@ export const useTestCaseStore = defineStore('testcase', () => {
     }> = []
     if (keyword.value.trim())
       chips.push({ key: 'keyword', label: '关键字', value: keyword.value.trim() })
-    if (levelFilter.value)
-      chips.push({ key: 'level', label: '等级', value: levelFilter.value })
-    if (reviewFilter.value)
-      chips.push({ key: 'review', label: '评审', value: reviewFilter.value })
-    if (execFilter.value)
-      chips.push({ key: 'exec', label: '执行', value: execFilter.value })
+    if (levelFilter.value) chips.push({ key: 'level', label: '等级', value: levelFilter.value })
+    if (reviewFilter.value) chips.push({ key: 'review', label: '评审', value: reviewFilter.value })
+    if (execFilter.value) chips.push({ key: 'exec', label: '执行', value: execFilter.value })
     return chips
   })
 
@@ -201,10 +201,7 @@ export const useTestCaseStore = defineStore('testcase', () => {
     }
   }
 
-  async function addCase(
-    projectId: number,
-    payload: Parameters<typeof createTestCase>[1],
-  ) {
+  async function addCase(projectId: number, payload: Parameters<typeof createTestCase>[1]) {
     return await createTestCase(projectId, payload)
   }
 

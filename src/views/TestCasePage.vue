@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox, ElImageViewer } from 'element-plus'
 import { CopyDocument, Delete, Edit, Search, Grid, List } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
 import StatusBadge from '../components/StatusBadge.vue'
 import LevelBadge from '../components/LevelBadge.vue'
 
@@ -27,9 +28,6 @@ import {
   batchMoveTestCases,
   cloneTestCase,
   listCaseHistory,
-  submitReview,
-  approveReview,
-  rejectReview,
   discardTestCase,
   recoverTestCase,
 } from '../api/testcase'
@@ -46,6 +44,10 @@ type TableRow = {
   title: string
   level: string
   reviewResult: string
+  inReview: boolean
+  currentReviewId?: number
+  currentReviewName?: string
+  relatedReviewCount: number
   execResult: string
   moduleId: number
   modulePath: string
@@ -70,6 +72,7 @@ type StepRow = { action: string; expected: string }
 
 const projectStore = useProjectStore()
 const authStore = useAuthStore()
+const router = useRouter()
 
 const isAdminOrManager = computed(() => {
   const role = authStore.user?.role
@@ -217,6 +220,7 @@ const selectedModulePath = ref(
 
 const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
+const editingCaseRow = ref<TableRow | null>(null)
 const saving = ref(false)
 const stepRows = ref<StepRow[]>([{ action: '', expected: '' }])
 const draggingStepIndex = ref<number | null>(null)
@@ -231,7 +235,6 @@ const levelKeys = ['P0', 'P1', 'P2', 'P3'] as const
 const caseForm = reactive({
   title: '',
   level: 'P1',
-  reviewResult: '未评审',
   execResult: '未执行',
   modulePath: '/未规划用例',
   moduleId: 0,
@@ -395,6 +398,10 @@ function toRow(tc: TestCase): TableRow {
     title: tc.title,
     level: tc.level,
     reviewResult: tc.review_result,
+    inReview: tc.in_review || false,
+    currentReviewId: tc.current_review_id || undefined,
+    currentReviewName: tc.current_review_name || '',
+    relatedReviewCount: tc.related_review_count || 0,
     execResult: tc.exec_result,
     moduleId: tc.module_id,
     modulePath: tc.module_path,
@@ -573,10 +580,10 @@ function applyAdvancedFilters() {
 
 function openCreate() {
   editingId.value = null
+  editingCaseRow.value = null
   Object.assign(caseForm, {
     title: '',
     level: 'P1',
-    reviewResult: '未评审',
     execResult: '未执行',
     modulePath: '/未规划用例',
     tags: '',
@@ -592,10 +599,10 @@ function openCreate() {
 
 async function openEdit(row: TableRow) {
   editingId.value = row.id
+  editingCaseRow.value = row
   Object.assign(caseForm, {
     title: row.title,
     level: row.level || 'P1',
-    reviewResult: row.reviewResult || '未评审',
     execResult: row.execResult || '未执行',
     modulePath: row.modulePath || '/未规划用例',
     moduleId: row.moduleId || 0,
@@ -652,7 +659,6 @@ async function submitCase() {
     const payload = {
       title: caseForm.title.trim(),
       level: caseForm.level,
-      review_result: caseForm.reviewResult,
       exec_result: caseForm.execResult,
       module_path: caseForm.modulePath.trim(),
       module_id: caseForm.moduleId || 0,
@@ -761,22 +767,51 @@ async function onCloneCase(row: TableRow) {
   }
 }
 
-async function onReview(row: TableRow) {
-  if (!selectedProject.value) return
-  try {
-    await ElMessageBox.confirm(`确认将用例【${row.title}】提交评审？`, '提审确认', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'info',
-    })
-    await submitReview(selectedProject.value, row.id)
-    ElMessage.success('提审成功')
-    await loadCases()
-  } catch (e: any) {
-    if (e !== 'cancel') {
-      ElMessage.error(e?.response?.data?.error || '提审失败')
-    }
+function onAddToReview(row: TableRow) {
+  openReviewCreate([row.id])
+}
+
+function onBatchAddToReview() {
+  const candidateIds = rows.value
+    .filter((row) => selectedIds.value.includes(row.id) && row.status !== 'discarded')
+    .map((row) => row.id)
+
+  if (candidateIds.length === 0) {
+    ElMessage.warning('请先选择可加入评审的用例')
+    return
   }
+
+  openReviewCreate(candidateIds)
+}
+
+function openReviewCreate(testcaseIds: number[]) {
+  const ids = Array.from(new Set(testcaseIds.filter((id) => Number.isFinite(id) && id > 0)))
+  if (ids.length === 0) {
+    ElMessage.warning('未找到可加入评审的用例')
+    return
+  }
+
+  router.push({
+    name: 'CaseReviews',
+    query: {
+      create: '1',
+      testcaseIds: ids.join(','),
+    },
+  })
+}
+
+function onViewReview(row: TableRow) {
+  if (!row.currentReviewId) {
+    ElMessage.warning('当前用例暂无进行中的评审计划')
+    return
+  }
+
+  router.push({
+    name: 'CaseReviews',
+    query: {
+      reviewId: String(row.currentReviewId),
+    },
+  })
 }
 
 async function onDiscard(row: TableRow) {
@@ -805,42 +840,6 @@ async function onRecover(row: TableRow) {
     await loadCases()
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.error || '恢复失败')
-  }
-}
-
-async function onApprove(row: TableRow) {
-  if (!selectedProject.value) return
-  try {
-    await ElMessageBox.confirm(`确认通过用例【${row.title}】的评审？`, '评审通过', {
-      confirmButtonText: '通过',
-      cancelButtonText: '取消',
-      type: 'success',
-    })
-    await approveReview(selectedProject.value, row.id)
-    ElMessage.success('评审已通过')
-    await loadCases()
-  } catch (e: any) {
-    if (e !== 'cancel') {
-      ElMessage.error(e?.response?.data?.error || '操作失败')
-    }
-  }
-}
-
-async function onReject(row: TableRow) {
-  if (!selectedProject.value) return
-  try {
-    await ElMessageBox.confirm(`确认驳回用例【${row.title}】的评审？驳回后将回退为草稿。`, '评审驳回', {
-      confirmButtonText: '驳回',
-      cancelButtonText: '取消',
-      type: 'warning',
-    })
-    await rejectReview(selectedProject.value, row.id)
-    ElMessage.success('已驳回，用例回退为草稿')
-    await loadCases()
-  } catch (e: any) {
-    if (e !== 'cancel') {
-      ElMessage.error(e?.response?.data?.error || '操作失败')
-    }
   }
 }
 
@@ -1342,9 +1341,9 @@ watch(selectedProject, (newId) => {
                 </div>
               </div>
               <div class="batch-actions">
-                <button class="batch-action-item">
-                  <span class="material-symbols-outlined" style="color: #60a5fa">play_circle</span>
-                  <span>批量执行</span>
+                <button class="batch-action-item" @click="onBatchAddToReview">
+                  <span class="material-symbols-outlined" style="color: #60a5fa">rate_review</span>
+                  <span>批量加入评审</span>
                 </button>
                 <button class="batch-action-item">
                   <span class="material-symbols-outlined" style="color: #a78bfa">person_add</span>
@@ -1370,7 +1369,11 @@ watch(selectedProject, (newId) => {
                 </button>
                 <button
                   class="batch-action-item"
-                  @click="batchMoveTargetId = 0; batchMoveTargetPath = '/未规划用例'; batchMoveVisible = true"
+                  @click="
+                    batchMoveTargetId = 0
+                    batchMoveTargetPath = '/未规划用例'
+                    batchMoveVisible = true
+                  "
                 >
                   <span class="material-symbols-outlined" style="color: #94a3b8">
                     drive_file_move
@@ -1384,7 +1387,10 @@ watch(selectedProject, (newId) => {
                 <div class="batch-divider"></div>
                 <button
                   class="batch-close"
-                  @click="selectedIds = []; selectAll = false"
+                  @click="
+                    selectedIds = []
+                    selectAll = false
+                  "
                 >
                   <span class="material-symbols-outlined">close</span>
                 </button>
@@ -1427,7 +1433,10 @@ watch(selectedProject, (newId) => {
                 <input
                   type="checkbox"
                   :checked="selectAll"
-                  @change="selectAll = !selectAll; toggleSelectAll()"
+                  @change="
+                    selectAll = !selectAll
+                    toggleSelectAll()
+                  "
                 />
               </th>
               <th style="width: 80px" class="sortable" @click="toggleSort('id')">
@@ -1519,7 +1528,28 @@ watch(selectedProject, (newId) => {
               <td>
                 {{ (r.modulePath || '').split('/').filter(Boolean).pop() || '未分类' }}
               </td>
-              <td><StatusBadge :value="r.reviewResult" /></td>
+              <td>
+                <div class="review-cell">
+                  <StatusBadge :value="r.reviewResult" />
+                  <button
+                    v-if="r.currentReviewId"
+                    type="button"
+                    class="review-link-btn"
+                    @click="onViewReview(r)"
+                  >
+                    {{ r.currentReviewName || '查看当前评审' }}
+                  </button>
+                  <span v-else class="review-meta" :class="{ active: r.inReview }">
+                    {{
+                      r.inReview
+                        ? '评审中'
+                        : r.relatedReviewCount > 0
+                          ? `历史关联 ${r.relatedReviewCount} 次`
+                          : '暂无关联评审'
+                    }}
+                  </span>
+                </div>
+              </td>
               <td>
                 <el-tag
                   size="small"
@@ -1587,31 +1617,26 @@ watch(selectedProject, (newId) => {
               <td>
                 <div class="action-group">
                   <button
-                    v-if="r.status === 'draft'"
+                    v-if="r.status !== 'discarded'"
                     class="action-btn action-edit icon-only"
-                    style="color: #f59e0b"
-                    @click="onReview(r)"
+                    style="color: #6366f1"
+                    @click="onAddToReview(r)"
                   >
-                    <span class="material-symbols-outlined" style="font-size: 18px">send</span>
-                    <span>提审</span>
+                    <span class="material-symbols-outlined" style="font-size: 18px">
+                      rate_review
+                    </span>
+                    <span>加入评审</span>
                   </button>
                   <button
-                    v-if="r.status === 'pending' && isAdminOrManager"
+                    v-if="r.currentReviewId"
                     class="action-btn action-edit icon-only"
-                    style="color: #10b981"
-                    @click="onApprove(r)"
+                    style="color: #8b5cf6"
+                    @click="onViewReview(r)"
                   >
-                    <span class="material-symbols-outlined" style="font-size: 18px">check_circle</span>
-                    <span>通过</span>
-                  </button>
-                  <button
-                    v-if="r.status === 'pending' && isAdminOrManager"
-                    class="action-btn action-edit icon-only"
-                    style="color: #ef4444"
-                    @click="onReject(r)"
-                  >
-                    <span class="material-symbols-outlined" style="font-size: 18px">cancel</span>
-                    <span>驳回</span>
+                    <span class="material-symbols-outlined" style="font-size: 18px">
+                      visibility
+                    </span>
+                    <span>查看评审</span>
                   </button>
                   <button
                     v-if="r.status === 'active' && isAdminOrManager"
@@ -1914,7 +1939,10 @@ watch(selectedProject, (newId) => {
                           :key="lv"
                           class="level-dropdown-item"
                           :class="{ active: caseForm.level === lv }"
-                          @click.stop="caseForm.level = lv; levelPickerOpen = false"
+                          @click.stop="
+                            caseForm.level = lv
+                            levelPickerOpen = false
+                          "
                         >
                           <span class="level-badge" :class="lv.toLowerCase()">{{ lv }}</span>
                           <span class="level-item-label">{{ levelLabels[lv] }}</span>
@@ -1948,17 +1976,40 @@ watch(selectedProject, (newId) => {
                   </div>
                 </div>
 
-                <!-- Review Status -->
+                <!-- Review Summary -->
                 <div class="stitch-form-item">
-                  <label>评审状态</label>
-                  <div class="stitch-select-wrapper">
-                    <select v-model="caseForm.reviewResult" class="stitch-select">
-                      <option value="未评审">未评审</option>
-                      <option value="已通过">已通过</option>
-                      <option value="不通过">不通过</option>
-                      <option value="重新提审">重新提审</option>
-                    </select>
-                    <span class="material-symbols-outlined select-icon">expand_more</span>
+                  <label>评审信息</label>
+                  <div class="review-readonly-card">
+                    <div class="review-readonly-main">
+                      <StatusBadge :value="editingCaseRow?.reviewResult || '未评审'" />
+                      <span class="review-readonly-text">
+                        {{
+                          !editingCaseRow
+                            ? '新建后可从用例评审模块发起评审'
+                            : editingCaseRow.inReview
+                              ? `当前正在评审：${editingCaseRow.currentReviewName || '未命名评审计划'}`
+                              : editingCaseRow.relatedReviewCount > 0
+                                ? `历史已关联 ${editingCaseRow.relatedReviewCount} 个评审计划`
+                                : '当前暂无关联评审计划'
+                        }}
+                      </span>
+                    </div>
+                    <button
+                      v-if="editingCaseRow?.currentReviewId"
+                      type="button"
+                      class="review-readonly-link"
+                      @click="onViewReview(editingCaseRow)"
+                    >
+                      查看当前评审
+                    </button>
+                    <button
+                      v-else-if="editingCaseRow && editingCaseRow.status !== 'discarded'"
+                      type="button"
+                      class="review-readonly-link"
+                      @click="onAddToReview(editingCaseRow)"
+                    >
+                      加入评审
+                    </button>
                   </div>
                 </div>
 
@@ -2376,4 +2427,76 @@ watch(selectedProject, (newId) => {
 
 <style scoped>
 @import '../styles/testcase-drawer.css';
+
+.review-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.review-meta {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--tp-gray-500);
+}
+
+.review-meta.active {
+  color: var(--tp-warning);
+}
+
+.review-link-btn {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--tp-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.review-link-btn:hover {
+  color: var(--tp-primary-dark);
+  text-decoration: underline;
+}
+
+.review-readonly-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--tp-gray-200);
+  border-radius: 10px;
+  background: var(--tp-surface-elevated);
+}
+
+.review-readonly-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.review-readonly-text {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--tp-gray-600);
+}
+
+.review-readonly-link {
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--tp-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.review-readonly-link:hover {
+  color: var(--tp-primary-dark);
+  text-decoration: underline;
+}
 </style>
