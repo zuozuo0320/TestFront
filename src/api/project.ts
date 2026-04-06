@@ -8,7 +8,11 @@ export async function listProjects() {
 }
 
 /** 创建项目 */
-export async function createProject(payload: { name: string; description?: string }) {
+export async function createProject(payload: {
+  name: string
+  description?: string
+  owner_id?: number
+}) {
   const { data } = await apiClient.post<Project>('/projects', payload)
   return data
 }
@@ -16,7 +20,12 @@ export async function createProject(payload: { name: string; description?: strin
 /** 更新项目 */
 export async function updateProject(
   projectId: number,
-  payload: { name?: string; description?: string; status?: 'active' | 'archived' },
+  payload: {
+    name?: string
+    description?: string
+    owner_id?: number
+    status?: 'active' | 'archived'
+  },
 ) {
   const { data } = await apiClient.put<Project>(`/projects/${projectId}`, payload)
   return data

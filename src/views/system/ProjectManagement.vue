@@ -29,35 +29,34 @@ const currentPage = ref(1)
 const pageSize = 4
 const selectedIds = ref<Set<number>>(new Set())
 
-// ── Mock 扩展数据 ──
-const mockOwners = [
-  { name: '姜大卫' },
-  { name: '李莎莎' },
-  { name: '张伟' },
-  { name: '赵敏' },
-  { name: '王芳' },
-]
-const mockStatuses: Array<{ label: string; color: 'emerald' | 'amber' | 'rose' }> = [
-  { label: 'Stable', color: 'emerald' },
-  { label: 'Degraded', color: 'amber' },
-  { label: 'Failing', color: 'rose' },
-  { label: 'Stable', color: 'emerald' },
-]
-const mockProgress = [92, 45, 12, 100, 78, 33, 67, 55]
+type QualityTone = 'emerald' | 'amber' | 'rose' | 'slate'
 
-function getMockOwner(idx: number) {
-  return mockOwners[idx % mockOwners.length]!
+const qualityStatusMeta: Record<
+  NonNullable<Project['quality_status']>,
+  { label: string; color: QualityTone }
+> = {
+  stable: { label: '良好', color: 'emerald' },
+  degraded: { label: '需关注', color: 'amber' },
+  failing: { label: '失败', color: 'rose' },
+  unknown: { label: '未知', color: 'slate' },
 }
-function getMockStatus(idx: number) {
-  return mockStatuses[idx % mockStatuses.length]!
+
+function getProjectQuality(project: Project) {
+  return qualityStatusMeta[project.quality_status ?? 'unknown'] ?? qualityStatusMeta.unknown
 }
-function getMockProgress(idx: number) {
-  return mockProgress[idx % mockProgress.length]!
+function getProjectProgress(project: Project) {
+  const progress = typeof project.test_progress === 'number' ? project.test_progress : 0
+  const normalized = Math.max(0, Math.min(100, progress))
+  return Math.round(normalized * 10) / 10
 }
-function getProgressColor(idx: number) {
-  const s = getMockStatus(idx)
+function formatProgress(progress: number) {
+  return Number.isInteger(progress) ? `${progress}` : progress.toFixed(1)
+}
+function getProgressColor(project: Project) {
+  const s = getProjectQuality(project)
   if (s.color === 'emerald') return '#34d399'
   if (s.color === 'amber') return '#adc6ff'
+  if (s.color === 'slate') return '#94a3b8'
   return '#ffb4ab'
 }
 
@@ -66,7 +65,11 @@ const dialogVisible = ref(false)
 const dialogMode = ref<'create' | 'edit'>('create')
 const editingProjectId = ref<number | null>(null)
 const savingProject = ref(false)
-const projectForm = reactive({ name: '', description: '' })
+const projectForm = reactive<{ name: string; description: string; ownerId: number | '' }>({
+  name: '',
+  description: '',
+  ownerId: '',
+})
 const avatarFile = ref<File | null>(null)
 const avatarPreview = ref('')
 const avatarInputRef = ref<HTMLInputElement | null>(null)
@@ -138,6 +141,7 @@ const availableUsers = computed(() => {
   const memberUserIds = new Set(members.value.map((m) => m.user_id))
   return allUsers.value.filter((u) => !memberUserIds.has(u.id) && u.active)
 })
+const ownerOptions = computed(() => allUsers.value.filter((u) => u.active))
 
 function isSeedProject(p: Project) {
   return p.name === SEED_PROJECT_NAME
@@ -178,6 +182,10 @@ async function loadProjects() {
     appLoading.value = false
   }
 }
+async function ensureUsersLoaded() {
+  if (allUsers.value.length > 0) return
+  allUsers.value = (await listUsers()) as User[]
+}
 async function loadAllProjectMembers() {
   const map: Record<number, ProjectMember[]> = {}
   await Promise.all(
@@ -192,20 +200,51 @@ async function loadAllProjectMembers() {
   projectMembers.value = map
 }
 
-function openCreateProject() {
+function getProjectOwnerName(project: Project) {
+  return project.owner_name?.trim() || '未设置'
+}
+function getProjectOwnerAvatar(project: Project) {
+  return resolveAvatarUrl(project.owner_avatar, getProjectOwnerName(project))
+}
+function isProjectOwnerMember(member: ProjectMember) {
+  return memberProject.value?.owner_id === member.user_id
+}
+function isMemberRemovalBlocked(member: ProjectMember) {
+  return isProjectOwnerMember(member) || isProtectedMember(member)
+}
+function memberRemovalTip(member: ProjectMember) {
+  if (isProjectOwnerMember(member)) return '当前负责人不可移除，请先转交负责人'
+  return '管理员角色不可移除'
+}
+
+async function openCreateProject() {
+  try {
+    await ensureUsersLoaded()
+  } catch {
+    ElMessage.error('负责人列表加载失败，请稍后重试')
+    return
+  }
   dialogMode.value = 'create'
   editingProjectId.value = null
   projectForm.name = ''
   projectForm.description = ''
+  projectForm.ownerId = ''
   avatarFile.value = null
   avatarPreview.value = ''
   dialogVisible.value = true
 }
-function openEditProject(p: Project) {
+async function openEditProject(p: Project) {
+  try {
+    await ensureUsersLoaded()
+  } catch {
+    ElMessage.error('负责人列表加载失败，请稍后重试')
+    return
+  }
   dialogMode.value = 'edit'
   editingProjectId.value = p.id
   projectForm.name = p.name
   projectForm.description = p.description || ''
+  projectForm.ownerId = p.owner_id || ''
   avatarFile.value = null
   avatarPreview.value = p.avatar ? resolveAvatarUrl(p.avatar) : ''
   dialogVisible.value = true
@@ -234,10 +273,12 @@ async function submitProject() {
   savingProject.value = true
   try {
     let projectId: number
+    const ownerId = projectForm.ownerId || undefined
     if (dialogMode.value === 'create') {
       const created = await createProject({
         name,
         description: projectForm.description.trim() || undefined,
+        owner_id: ownerId,
       })
       projectId = created.id
       ElMessage.success('项目创建成功')
@@ -246,6 +287,7 @@ async function submitProject() {
       await updateProject(projectId, {
         name,
         description: projectForm.description.trim() || undefined,
+        owner_id: ownerId,
       })
       ElMessage.success('项目更新成功')
     }
@@ -307,12 +349,10 @@ async function openMemberDialog(p: Project) {
   addMemberUserId.value = ''
   memberDialogVisible.value = true
   await loadMembers(p.id)
-  if (allUsers.value.length === 0) {
-    try {
-      allUsers.value = (await listUsers()) as any[]
-    } catch {
-      /* 非 admin */
-    }
+  try {
+    await ensureUsersLoaded()
+  } catch {
+    /* 用户列表加载失败时保持成员管理可用 */
   }
 }
 async function loadMembers(projectId: number) {
@@ -421,13 +461,13 @@ void Search // suppress unused import warning
             </th>
             <th class="pm-th">项目名称</th>
             <th class="pm-th">负责人</th>
-            <th class="pm-th">健康状态</th>
+            <th class="pm-th">质量状态</th>
             <th class="pm-th">测试进度</th>
             <th class="pm-th pm-th-action">操作</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(p, idx) in paginatedProjects" :key="p.id" class="pm-row">
+          <tr v-for="p in paginatedProjects" :key="p.id" class="pm-row">
             <td class="pm-td pm-td-check">
               <input
                 type="checkbox"
@@ -438,7 +478,7 @@ void Search // suppress unused import warning
             </td>
             <td class="pm-td">
               <div class="pm-project-cell">
-                <div class="pm-project-icon" :class="`pm-icon-${getMockStatus(idx).color}`">
+                <div class="pm-project-icon" :class="`pm-icon-${getProjectQuality(p).color}`">
                   <img
                     v-if="p.avatar"
                     :src="resolveAvatarUrl(p.avatar)"
@@ -457,27 +497,27 @@ void Search // suppress unused import warning
             </td>
             <td class="pm-td">
               <div class="pm-owner-cell">
-                <img class="pm-owner-avatar" :src="resolveAvatarUrl('', getMockOwner(idx).name)" />
-                <span class="pm-owner-name">{{ getMockOwner(idx).name }}</span>
+                <img class="pm-owner-avatar" :src="getProjectOwnerAvatar(p)" />
+                <span class="pm-owner-name">{{ getProjectOwnerName(p) }}</span>
               </div>
             </td>
             <td class="pm-td">
-              <span class="pm-health-badge" :class="`pm-health-${getMockStatus(idx).color}`">
+              <span class="pm-health-badge" :class="`pm-health-${getProjectQuality(p).color}`">
                 <span class="pm-health-dot"></span>
-                {{ getMockStatus(idx).label }}
+                {{ getProjectQuality(p).label }}
               </span>
             </td>
             <td class="pm-td">
               <div class="pm-progress-cell">
-                <span class="pm-progress-label">{{ getMockProgress(idx) }}%</span>
+                <span class="pm-progress-label">{{ formatProgress(getProjectProgress(p)) }}%</span>
                 <div class="pm-progress-track">
                   <div
                     class="pm-progress-bar"
                     :style="{
-                      width: getMockProgress(idx) + '%',
-                      background: getProgressColor(idx),
+                      width: getProjectProgress(p) + '%',
+                      background: getProgressColor(p),
                     }"
-                    :class="{ 'pm-progress-glow': getMockProgress(idx) === 100 }"
+                    :class="{ 'pm-progress-glow': getProjectProgress(p) === 100 }"
                   ></div>
                 </div>
               </div>
@@ -672,6 +712,22 @@ void Search // suppress unused import warning
             placeholder="请输入项目描述（可选）"
           />
         </el-form-item>
+        <el-form-item label="负责人">
+          <el-select
+            v-model="projectForm.ownerId"
+            filterable
+            :clearable="dialogMode === 'create'"
+            placeholder="不选择则默认创建人为负责人"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="user in ownerOptions"
+              :key="user.id"
+              :label="`${user.name} (${user.email})`"
+              :value="user.id"
+            />
+          </el-select>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -734,6 +790,7 @@ void Search // suppress unused import warning
           <span class="mb-card-name">{{ m.user?.name || '-' }}</span>
           <span class="mb-card-email">{{ m.user?.email || '' }}</span>
           <div class="mb-card-roles">
+            <span v-if="isProjectOwnerMember(m)" class="mb-role-pill mb-role-pill--owner">负责人</span>
             <span
               v-for="(roleName, ridx) in getMemberRoleNames(m)"
               :key="`${m.user_id}-${ridx}`"
@@ -742,9 +799,18 @@ void Search // suppress unused import warning
             >
               {{ roleName }}
             </span>
-            <span v-if="getMemberRoleNames(m).length === 0" class="mb-role-pill">成员</span>
+            <span
+              v-if="getMemberRoleNames(m).length === 0 && !isProjectOwnerMember(m)"
+              class="mb-role-pill"
+            >
+              成员
+            </span>
           </div>
-          <el-tooltip v-if="isProtectedMember(m)" content="管理员角色不可移除" placement="top">
+          <el-tooltip
+            v-if="isMemberRemovalBlocked(m)"
+            :content="memberRemovalTip(m)"
+            placement="top"
+          >
             <button class="mb-card-remove mb-card-remove--disabled" disabled>移除</button>
           </el-tooltip>
           <button v-else class="mb-card-remove" @click="onRemoveMember(m)">移除</button>
@@ -972,6 +1038,10 @@ void Search // suppress unused import warning
   background: rgba(255, 180, 171, 0.1);
   color: #ffb4ab;
 }
+.pm-icon-slate {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+}
 .pm-project-name {
   font-size: 13px;
   font-weight: 600;
@@ -1020,6 +1090,10 @@ void Search // suppress unused import warning
 .pm-health-rose {
   background: rgba(251, 113, 133, 0.1);
   color: #fb7185;
+}
+.pm-health-slate {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
 }
 .pm-progress-cell {
   width: 120px;
@@ -1452,6 +1526,11 @@ void Search // suppress unused import warning
   background: rgba(239, 68, 68, 0.1);
   color: #f87171;
   border-color: rgba(239, 68, 68, 0.2);
+}
+.mb-role-pill--owner {
+  background: rgba(139, 92, 246, 0.18);
+  color: #c4b5fd;
+  border-color: rgba(139, 92, 246, 0.32);
 }
 .mb-card-remove {
   margin-top: 6px;

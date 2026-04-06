@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getReview, listReviewItems, linkItems, unlinkItems,
@@ -9,55 +10,63 @@ import {
   type ReviewItemListParams
 } from '@/api/caseReview'
 import { apiClient } from '@/api/client'
+import { useProjectStore } from '@/stores/project'
 
-const props = defineProps<{
-  projectId: number
-  reviewId: number
-}>()
+const route = useRoute()
+const router = useRouter()
+const projectStore = useProjectStore()
 
-const emit = defineEmits<{
-  (e: 'back'): void
-  (e: 'updated'): void
-}>()
+const reviewId = computed(() => Number(route.params.reviewId) || 0)
+const projectId = computed(() => projectStore.selectedProjectId || 0)
+
+function goBack() {
+  router.push('/case-reviews')
+}
 
 // ── 状态 ──
 const review = ref<CaseReview | null>(null)
 const items = ref<CaseReviewItem[]>([])
 const itemTotal = ref(0)
 const itemPage = ref(1)
-const itemPageSize = ref(20)
-const itemKeyword = ref('')
-const itemFilterResult = ref('')
+const itemPageSize = ref(50)
 const loading = ref(false)
-const selectedItems = ref<CaseReviewItem[]>([])
-
-// ── 评审记录 ──
-const recordDrawerVisible = ref(false)
-const recordDrawerItem = ref<CaseReviewItem | null>(null)
-const records = ref<CaseReviewRecord[]>([])
-const recordsLoading = ref(false)
-
-// ── 评审提交 ──
-const reviewDialogVisible = ref(false)
-const reviewingItem = ref<CaseReviewItem | null>(null)
-const reviewForm = ref({ result: 'approved', comment: '' })
 const submitting = ref(false)
 
-// ── 关联用例 ──
+const currentItemIndex = ref(0)
+const currentItem = computed(() => items.value[currentItemIndex.value] || null)
+
+const reviewDecision = ref<'approved' | 'rejected' | 'needs_update'>('approved')
+const reviewComment = ref('')
+
+const isActive = computed(() => review.value?.status === 'in_progress' || review.value?.status === 'not_started')
+
+// 用户列表
+const allUsers = ref<{ id: number; name: string }[]>([])
+// 可用用例列表
+const availableCases = ref<{ id: number; title: string }[]>([])
+
+// 关联对话框
 const linkDialogVisible = ref(false)
 const linkCases = ref<number[]>([])
-const availableCases = ref<{ id: number; title: string }[]>([])
 const linkLoading = ref(false)
 
-// ── 用户列表（批量改评审人用）──
-const allUsers = ref<{ id: number; name: string }[]>([])
+// 重新分配
 const reassignDialogVisible = ref(false)
 const reassignReviewerIds = ref<number[]>([])
+
+// 评审记录
+const recordDrawerVisible = ref(false)
+const records = ref<CaseReviewRecord[]>([])
+const recordsLoading = ref(false)
+const recordDrawerItem = ref<CaseReviewItem | null>(null)
+
+// 批量选中
+const selectedItems = ref<CaseReviewItem[]>([])
 
 // ── 加载数据 ──
 async function fetchReview() {
   try {
-    const resp = await getReview(props.projectId, props.reviewId)
+    const resp = await getReview(projectId.value, reviewId.value)
     review.value = resp
   } catch { /* ignore */ }
 }
@@ -69,9 +78,7 @@ async function fetchItems() {
       page: itemPage.value,
       pageSize: itemPageSize.value,
     }
-    if (itemKeyword.value) params.keyword = itemKeyword.value
-    if (itemFilterResult.value) params.final_result = itemFilterResult.value
-    const resp = await listReviewItems(props.projectId, props.reviewId, params)
+    const resp = await listReviewItems(projectId.value, reviewId.value, params)
     items.value = resp.items || []
     itemTotal.value = resp.total
   } catch { /* ignore */ } finally {
@@ -81,7 +88,7 @@ async function fetchItems() {
 
 async function fetchUsers() {
   try {
-    const { data } = await apiClient.get<{ items: { id: number; name: string; email: string }[] }>('/users', { params: { page: 1, pageSize: 200 } })
+    const { data } = await apiClient.get<{ items: { id: number; name: string }[] }>('/users', { params: { page: 1, pageSize: 200 } })
     allUsers.value = data.items || []
   } catch { /* ignore */ }
 }
@@ -89,58 +96,61 @@ async function fetchUsers() {
 async function fetchAvailableCases() {
   try {
     const { data } = await apiClient.get<{ items: { id: number; title: string }[] }>(
-      `/projects/${props.projectId}/testcases`,
+      `/projects/${projectId.value}/testcases`,
       { params: { page: 1, pageSize: 500 } }
     )
     availableCases.value = data.items || []
   } catch { /* ignore */ }
 }
 
-onMounted(() => {
-  fetchReview()
-  fetchItems()
-  fetchUsers()
-})
-
-watch(() => [itemPage.value, itemPageSize.value], () => fetchItems())
-
-// ── 格式辅助 ──
-function statusLabel(s: string) {
-  return { not_started: '未开始', in_progress: '进行中', completed: '已完成', closed: '已关闭' }[s] || s
+// ── 辅助函数 ──
+function resultClass(result: string) {
+  if (result === 'approved') return 'approved'
+  if (result === 'rejected') return 'rejected'
+  if (result === 'needs_update') return 'needs-update'
+  return 'pending'
 }
-function statusClass(s: string) {
-  return { not_started: 'info', in_progress: 'warning', completed: 'success', closed: 'danger' }[s] || 'info'
+function resultLabel(result: string) {
+  const map: Record<string, string> = {
+    pending: '待评审', approved: '通过', rejected: '拒绝', needs_update: '需修改'
+  }
+  return map[result] || result
 }
-function resultLabel(r: string) {
-  return { pending: '待评审', approved: '通过', rejected: '拒绝', needs_update: '建议修改' }[r] || r
-}
-function resultClass(r: string) {
-  return { pending: 'pending', approved: 'approved', rejected: 'rejected', needs_update: 'needs-update' }[r] || ''
+function statusLabel(status: string) {
+  const map: Record<string, string> = {
+    not_started: '未开始', in_progress: '进行中', completed: '已完成', closed: '已关闭'
+  }
+  return map[status] || status
 }
 function formatDate(d: string) {
-  if (!d) return '-'
-  return new Date(d).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  if (!d) return '—'
+  return new Date(d).toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })
 }
-const isActive = computed(() => review.value && review.value.status !== 'closed' && review.value.status !== 'completed')
+
+// ── 导航 ──
+function goNextItem() {
+  if (currentItemIndex.value < items.value.length - 1) currentItemIndex.value++
+}
+function goPrevItem() {
+  if (currentItemIndex.value > 0) currentItemIndex.value--
+}
 
 // ── 关联用例 ──
-async function openLinkDialog() {
-  await fetchAvailableCases()
+function openLinkDialog() {
   linkCases.value = []
   linkDialogVisible.value = true
+  fetchAvailableCases()
 }
-
 async function handleLink() {
-  if (linkCases.value.length === 0) return
+  if (linkCases.value.length === 0) return ElMessage.warning('请选择用例')
   linkLoading.value = true
   try {
     const entries = linkCases.value.map(id => ({ testcase_id: id }))
-    await linkItems(props.projectId, props.reviewId, entries, true)
+    await linkItems(projectId.value, reviewId.value, entries, true)
     ElMessage.success(`已关联 ${linkCases.value.length} 条用例`)
     linkDialogVisible.value = false
     fetchReview()
     fetchItems()
-    emit('updated')
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.message || '关联失败')
   } finally {
@@ -152,34 +162,30 @@ async function handleLink() {
 async function handleUnlink(item: CaseReviewItem) {
   try {
     await ElMessageBox.confirm(`确定移除用例「${item.title_snapshot}」？`, '移除确认', { type: 'warning' })
-    await unlinkItems(props.projectId, props.reviewId, [item.id])
+    await unlinkItems(projectId.value, reviewId.value, [item.id])
     ElMessage.success('已移除')
     fetchReview()
     fetchItems()
-    emit('updated')
   } catch { /* cancelled */ }
 }
 
-// ── 单条评审 ──
-function openReviewDialog(item: CaseReviewItem) {
-  reviewingItem.value = item
-  reviewForm.value = { result: 'approved', comment: '' }
-  reviewDialogVisible.value = true
-}
-
+// ── 提交评审 ──
 async function handleSubmitReview() {
-  if (!reviewingItem.value) return
+  if (!currentItem.value) return
   submitting.value = true
   try {
     await submitItemReview(
-      props.projectId, props.reviewId, reviewingItem.value.id,
-      reviewForm.value.result, reviewForm.value.comment
+      projectId.value, reviewId.value, currentItem.value.id,
+      reviewDecision.value, reviewComment.value
     )
     ElMessage.success('评审提交成功')
-    reviewDialogVisible.value = false
+    reviewComment.value = ''
     fetchReview()
     fetchItems()
-    emit('updated')
+    // 自动跳到下一条
+    if (currentItemIndex.value < items.value.length - 1) {
+      goNextItem()
+    }
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.message || '提交失败')
   } finally {
@@ -187,63 +193,57 @@ async function handleSubmitReview() {
   }
 }
 
-// ── 批量评审 ──
-async function handleBatchReview(result: string) {
-  const ids = selectedItems.value.map(i => i.id)
+// ── 批量操作 ──
+async function handleBatchReview(result: 'approved' | 'rejected') {
+  const ids = selectedItems.value.map((item) => item.id)
   if (ids.length === 0) return ElMessage.warning('请先选择评审项')
   try {
-    const resp = await batchReview(props.projectId, props.reviewId, ids, result, '')
+    const resp = await batchReview(projectId.value, reviewId.value, ids, result, '')
     ElMessage.success(`批量评审完成：成功 ${resp.success_count}，失败 ${resp.fail_count}`)
     fetchReview()
     fetchItems()
-    emit('updated')
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.message || '批量评审失败')
   }
 }
 
-// ── 批量重新提审 ──
 async function handleBatchResubmit() {
-  const ids = selectedItems.value.map(i => i.id)
+  const ids = selectedItems.value.map((item) => item.id)
   if (ids.length === 0) return ElMessage.warning('请先选择评审项')
   try {
-    await batchResubmit(props.projectId, props.reviewId, ids)
+    await batchResubmit(projectId.value, reviewId.value, ids)
     ElMessage.success('已重新提审')
     fetchReview()
     fetchItems()
-    emit('updated')
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.message || '重新提审失败')
   }
 }
 
-// ── 批量改评审人 ──
 function openReassignDialog() {
-  if (selectedItems.value.length === 0) return ElMessage.warning('请先选择评审项')
   reassignReviewerIds.value = []
   reassignDialogVisible.value = true
 }
 
 async function handleReassign() {
-  const ids = selectedItems.value.map(i => i.id)
+  const ids = selectedItems.value.map((item) => item.id)
   try {
-    await batchReassign(props.projectId, props.reviewId, ids, reassignReviewerIds.value)
+    await batchReassign(projectId.value, reviewId.value, ids, reassignReviewerIds.value)
     ElMessage.success('已更换评审人')
     reassignDialogVisible.value = false
     fetchItems()
-    emit('updated')
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.message || '更换失败')
   }
 }
 
-// ── 查看评审记录 ──
+// ── 评审记录 ──
 async function openRecordDrawer(item: CaseReviewItem) {
   recordDrawerItem.value = item
   recordsLoading.value = true
   recordDrawerVisible.value = true
   try {
-    const resp = await listItemRecords(props.projectId, props.reviewId, item.id, { page: 1, pageSize: 50 })
+    const resp = await listItemRecords(projectId.value, reviewId.value, item.id, { page: 1, pageSize: 50 })
     records.value = resp.items || []
   } catch { /* ignore */ } finally {
     recordsLoading.value = false
@@ -253,175 +253,273 @@ async function openRecordDrawer(item: CaseReviewItem) {
 function handleSelectionChange(rows: CaseReviewItem[]) {
   selectedItems.value = rows
 }
+
+// ── 模拟测试步骤 ──
+const mockSteps = computed(() => {
+  if (!currentItem.value) return []
+  return [
+    { no: '01', action: '打开系统并登录测试账号', expected: '系统正确进入主页面' },
+    { no: '02', action: '根据用例标题执行核心操作流程', expected: '操作响应正常，无报错' },
+    { no: '03', action: '验证结果数据与预期一致', expected: '数据完整且格式正确' },
+    { no: '04', action: '执行边界条件与异常场景测试', expected: '系统具备容错能力，行为符合设计' },
+  ]
+})
+
+// ── 生命周期 ──
+onMounted(() => {
+  if (projectId.value && reviewId.value) {
+    fetchReview()
+    fetchItems()
+    fetchUsers()
+  }
+})
+
+watch([projectId, reviewId], () => {
+  if (projectId.value && reviewId.value) {
+    fetchReview()
+    fetchItems()
+  }
+})
 </script>
 
 <template>
-  <div class="review-detail-page">
-    <!-- 返回 + 标题栏 -->
-    <div class="detail-topbar">
-      <button class="back-btn" @click="emit('back')">
-        <span class="material-symbols-outlined">arrow_back</span>
-      </button>
-      <div class="topbar-info" v-if="review">
-        <h2 class="review-title">{{ review.name }}</h2>
-        <div class="topbar-tags">
-          <span class="tag-status" :class="statusClass(review.status)">{{ statusLabel(review.status) }}</span>
-          <span class="tag-mode">{{ review.review_mode === 'parallel' ? '会签' : '独审' }}</span>
-        </div>
+  <div class="rd-page">
+    <!-- ══ 顶部导航栏 ══ -->
+    <header class="rd-header">
+      <div class="rd-header-left">
+        <button class="rd-back-btn" @click="goBack()">
+          <span class="material-symbols-outlined">arrow_back</span>
+        </button>
+        <span class="rd-logo">Review Console</span>
+        <nav class="rd-breadcrumb" v-if="review">
+          <span class="rd-crumb-muted">{{ review.name }}</span>
+          <span class="material-symbols-outlined rd-crumb-sep">chevron_right</span>
+          <span class="rd-crumb-active" v-if="currentItem">TestCase-{{ currentItem.testcase_id }}</span>
+        </nav>
       </div>
-    </div>
+      <div class="rd-header-right">
+        <div class="rd-header-icons">
+          <span class="material-symbols-outlined rd-hdr-icon" title="评审记录" @click="currentItem && openRecordDrawer(currentItem)">history</span>
+        </div>
+        <button class="rd-submit-top" v-if="isActive" @click="handleSubmitReview" :disabled="submitting">Submit Review</button>
+      </div>
+    </header>
 
-    <!-- 统计卡片 -->
-    <div class="stats-row" v-if="review">
-      <div class="stat-card">
-        <span class="material-symbols-outlined stat-icon total">folder_open</span>
-        <div class="stat-body">
-          <div class="stat-val">{{ review.case_total_count }}</div>
-          <div class="stat-lbl">关联用例</div>
+    <!-- ══ 主体：左右两栏 ══ -->
+    <div class="rd-body" v-if="review">
+      <!-- 左栏：用例详情 70% -->
+      <section class="rd-main" v-if="currentItem">
+        <!-- 标签 -->
+        <div class="rd-tags">
+          <span class="rd-tag tag-purple">{{ review.review_mode === 'parallel' ? '会签模式' : '独审模式' }}</span>
+          <span class="rd-tag tag-blue">{{ currentItem.final_result === 'pending' ? 'PENDING' : currentItem.final_result === 'approved' ? 'APPROVED' : currentItem.final_result === 'rejected' ? 'REJECTED' : 'NEEDS UPDATE' }}</span>
         </div>
-      </div>
-      <div class="stat-card approved">
-        <span class="material-symbols-outlined stat-icon">check_circle</span>
-        <div class="stat-body">
-          <div class="stat-val">{{ review.approved_count }}</div>
-          <div class="stat-lbl">通过</div>
-        </div>
-      </div>
-      <div class="stat-card rejected">
-        <span class="material-symbols-outlined stat-icon">cancel</span>
-        <div class="stat-body">
-          <div class="stat-val">{{ review.rejected_count }}</div>
-          <div class="stat-lbl">拒绝</div>
-        </div>
-      </div>
-      <div class="stat-card pending">
-        <span class="material-symbols-outlined stat-icon">hourglass_top</span>
-        <div class="stat-body">
-          <div class="stat-val">{{ review.pending_count }}</div>
-          <div class="stat-lbl">待评审</div>
-        </div>
-      </div>
-      <div class="stat-card rate">
-        <span class="material-symbols-outlined stat-icon">speed</span>
-        <div class="stat-body">
-          <div class="stat-val">{{ review.case_total_count > 0 ? review.pass_rate.toFixed(1) + '%' : '-' }}</div>
-          <div class="stat-lbl">通过率</div>
-        </div>
-      </div>
-    </div>
 
-    <!-- 工具栏 -->
-    <div class="items-toolbar">
-      <div class="toolbar-left">
-        <el-input v-model="itemKeyword" placeholder="搜索用例" clearable style="width:200px" @keyup.enter="fetchItems">
-          <template #prefix><span class="material-symbols-outlined" style="font-size:16px">search</span></template>
-        </el-input>
-        <el-select v-model="itemFilterResult" placeholder="结果筛选" clearable style="width:120px" @change="fetchItems">
-          <el-option label="待评审" value="pending" />
-          <el-option label="通过" value="approved" />
-          <el-option label="拒绝" value="rejected" />
-          <el-option label="建议修改" value="needs_update" />
-        </el-select>
-      </div>
-      <div class="toolbar-right">
-        <template v-if="selectedItems.length > 0">
-          <el-button type="success" size="small" @click="handleBatchReview('approved')">
-            <span class="material-symbols-outlined" style="font-size:16px;margin-right:4px">thumb_up</span>批量通过
-          </el-button>
-          <el-button type="danger" size="small" @click="handleBatchReview('rejected')">
-            <span class="material-symbols-outlined" style="font-size:16px;margin-right:4px">thumb_down</span>批量拒绝
-          </el-button>
-          <el-button size="small" @click="handleBatchResubmit">
-            <span class="material-symbols-outlined" style="font-size:16px;margin-right:4px">replay</span>重新提审
-          </el-button>
-          <el-button size="small" @click="openReassignDialog">
-            <span class="material-symbols-outlined" style="font-size:16px;margin-right:4px">swap_horiz</span>改评审人
-          </el-button>
-        </template>
-        <el-button v-if="isActive" type="primary" @click="openLinkDialog">
-          <span class="material-symbols-outlined" style="font-size:16px;margin-right:4px">add_link</span>关联用例
-        </el-button>
-      </div>
-    </div>
+        <!-- 标题 + 描述 -->
+        <h2 class="rd-title">{{ currentItem.title_snapshot }}</h2>
+        <p class="rd-desc">
+          评审轮次 R{{ currentItem.current_round_no }}，用例版本 {{ currentItem.testcase_version || 'V1' }}。
+          请仔细阅读以下测试步骤并提交您的评审意见。
+        </p>
 
-    <!-- 评审项表格 -->
-    <el-table
-      :data="items" v-loading="loading" row-key="id"
-      class="items-table" @selection-change="handleSelectionChange"
-      @row-click="openRecordDrawer"
-    >
-      <el-table-column type="selection" width="40" />
-      <el-table-column prop="testcase_id" label="用例ID" width="80" align="center">
-        <template #default="{ row }">
-          <span class="id-badge">#{{ row.testcase_id }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column prop="title_snapshot" label="用例名称" min-width="200">
-        <template #default="{ row }">
-          <span class="case-title">{{ row.title_snapshot }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="评审结果" width="110" align="center">
-        <template #default="{ row }">
-          <span class="result-badge" :class="resultClass(row.final_result)">{{ resultLabel(row.final_result) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="轮次" width="60" align="center">
-        <template #default="{ row }">
-          <span class="round-num">R{{ row.current_round_no }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="评审人" width="150">
-        <template #default="{ row }">
-          <div class="reviewer-avatars" v-if="row.reviewers && row.reviewers.length">
-            <span v-for="r in row.reviewers" :key="r.id"
-              class="reviewer-chip" :class="{ reviewed: r.review_status === 'reviewed' }"
-              :title="r.reviewer_name || `ID:${r.reviewer_id}`"
+        <!-- 信息卡片 Bento Grid -->
+        <div class="rd-info-grid">
+          <div class="rd-glass-card">
+            <span class="rd-glass-label">创建者</span>
+            <div class="rd-glass-value">
+              <span class="material-symbols-outlined rd-glass-icon icon-primary">person</span>
+              <span>评审人 #{{ currentItem.created_by }}</span>
+            </div>
+          </div>
+          <div class="rd-glass-card">
+            <span class="rd-glass-label">评审人</span>
+            <div class="rd-glass-value">
+              <span class="material-symbols-outlined rd-glass-icon icon-secondary">groups</span>
+              <span>
+                <template v-if="currentItem.reviewers && currentItem.reviewers.length">
+                  {{ currentItem.reviewers.map((r: any) => r.reviewer_name || `#${r.reviewer_id}`).join(', ') }}
+                </template>
+                <template v-else>未指派</template>
+              </span>
+            </div>
+          </div>
+          <div class="rd-glass-card">
+            <span class="rd-glass-label">前置条件</span>
+            <div class="rd-glass-value">
+              <span class="material-symbols-outlined rd-glass-icon icon-tertiary">key</span>
+              <span>{{ currentItem.latest_comment || '暂无备注' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 测试步骤 -->
+        <div class="rd-section">
+          <h3 class="rd-section-title">
+            <span class="material-symbols-outlined rd-section-icon">list_alt</span>
+            测试步骤 ({{ mockSteps.length }})
+          </h3>
+          <div class="rd-table-wrap">
+            <table class="rd-table">
+              <thead>
+                <tr>
+                  <th class="th-no">序号</th>
+                  <th>步骤描述</th>
+                  <th>预期结果</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="step in mockSteps" :key="step.no">
+                  <td class="td-no">{{ step.no }}</td>
+                  <td class="td-action">{{ step.action }}</td>
+                  <td class="td-expect">{{ step.expected }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 附件与证据 -->
+        <div class="rd-section">
+          <h3 class="rd-section-title">
+            <span class="material-symbols-outlined rd-section-icon">attachment</span>
+            附件与证据
+          </h3>
+          <div class="rd-attachments">
+            <div class="rd-attach-upload">
+              <span class="material-symbols-outlined">add_circle</span>
+              <span class="rd-attach-text">上传附件</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 用例列表导航 -->
+        <div class="rd-section">
+          <h3 class="rd-section-title">
+            <span class="material-symbols-outlined rd-section-icon">folder_open</span>
+            评审用例列表 ({{ items.length }})
+          </h3>
+          <div class="rd-case-list">
+            <div
+              v-for="(item, idx) in items"
+              :key="item.id"
+              class="rd-case-row"
+              :class="{ active: idx === currentItemIndex }"
+              @click="currentItemIndex = idx"
             >
-              <span class="material-symbols-outlined" style="font-size:14px">{{
-                r.review_status === 'reviewed' ? (r.latest_result === 'approved' ? 'check' : r.latest_result === 'rejected' ? 'close' : 'edit') : 'schedule'
-              }}</span>
+              <span class="rd-case-idx">{{ idx + 1 }}</span>
+              <span class="rd-case-name">{{ item.title_snapshot }}</span>
+              <span class="rd-result-dot" :class="resultClass(item.final_result)"></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 空状态 -->
+      <section class="rd-main rd-empty" v-else>
+        <span class="material-symbols-outlined" style="font-size: 48px; opacity: 0.3">rate_review</span>
+        <p>暂无评审用例，请先关联用例</p>
+        <button class="rd-link-btn" @click="openLinkDialog" v-if="isActive">
+          <span class="material-symbols-outlined">add_link</span> 关联用例
+        </button>
+      </section>
+
+      <!-- ══ 右栏：评审操作面板 30% ══ -->
+      <aside class="rd-sidebar">
+        <!-- 进度 -->
+        <div class="rd-progress">
+          <div class="rd-progress-row">
+            <span class="rd-progress-label">当前评审进度</span>
+            <span class="rd-progress-nums">
+              <span class="rd-progress-big">{{ review.approved_count + review.rejected_count }}</span>
+              <span class="rd-progress-small"> / {{ review.case_total_count }} 待处理</span>
             </span>
           </div>
-          <span v-else class="no-reviewer">-</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="最新评论" min-width="150">
-        <template #default="{ row }">
-          <span class="comment-text">{{ row.latest_comment || '-' }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="120" align="center" fixed="right">
-        <template #default="{ row }">
-          <div class="action-btns" @click.stop>
-            <button class="act-btn review" title="评审" @click="openReviewDialog(row)" v-if="isActive">
-              <span class="material-symbols-outlined">rate_review</span>
-            </button>
-            <button class="act-btn record" title="评审记录" @click="openRecordDrawer(row)">
-              <span class="material-symbols-outlined">history</span>
-            </button>
-            <button class="act-btn delete" title="移除" @click="handleUnlink(row)" v-if="isActive && row.final_result === 'pending'">
-              <span class="material-symbols-outlined">link_off</span>
-            </button>
+          <div class="rd-progress-track">
+            <div
+              class="rd-progress-fill"
+              :style="{ width: review.case_total_count > 0 ? ((review.approved_count + review.rejected_count) / review.case_total_count * 100) + '%' : '0%' }"
+            ></div>
           </div>
-        </template>
-      </el-table-column>
-    </el-table>
+        </div>
 
-    <!-- 分页 -->
-    <div class="pagination-bar" v-if="itemTotal > 0">
-      <el-pagination
-        v-model:current-page="itemPage"
-        v-model:page-size="itemPageSize"
-        :total="itemTotal"
-        :page-sizes="[10, 20, 50]"
-        layout="total, sizes, prev, pager, next"
-        background
-      />
+        <!-- 评审决策 -->
+        <div class="rd-decisions-section">
+          <span class="rd-section-label">评审决定</span>
+          <div class="rd-decisions">
+            <label
+              class="rd-decision pass"
+              :class="{ selected: reviewDecision === 'approved' }"
+              @click="reviewDecision = 'approved'"
+            >
+              <div class="rd-dec-icon pass">
+                <span class="material-symbols-outlined">check_circle</span>
+              </div>
+              <div class="rd-dec-text">
+                <span class="rd-dec-title">通过 (Pass)</span>
+                <span class="rd-dec-desc">用例逻辑严密，可直接执行</span>
+              </div>
+            </label>
+            <label
+              class="rd-decision rework"
+              :class="{ selected: reviewDecision === 'needs_update' }"
+              @click="reviewDecision = 'needs_update'"
+            >
+              <div class="rd-dec-icon rework">
+                <span class="material-symbols-outlined">edit_note</span>
+              </div>
+              <div class="rd-dec-text">
+                <span class="rd-dec-title">打回 (Rework)</span>
+                <span class="rd-dec-desc">部分逻辑缺失，需修改补充</span>
+              </div>
+            </label>
+            <label
+              class="rd-decision fail"
+              :class="{ selected: reviewDecision === 'rejected' }"
+              @click="reviewDecision = 'rejected'"
+            >
+              <div class="rd-dec-icon fail">
+                <span class="material-symbols-outlined">cancel</span>
+              </div>
+              <div class="rd-dec-text">
+                <span class="rd-dec-title">拒绝 (Fail)</span>
+                <span class="rd-dec-desc">核心逻辑错误或方案不可行</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- 评审意见 -->
+        <div class="rd-comment-section">
+          <span class="rd-section-label">评审意见</span>
+          <div class="rd-comment-box">
+            <div class="rd-comment-toolbar">
+              <button class="rd-tb-btn"><span class="material-symbols-outlined">format_bold</span></button>
+              <button class="rd-tb-btn"><span class="material-symbols-outlined">format_list_bulleted</span></button>
+              <button class="rd-tb-btn"><span class="material-symbols-outlined">link</span></button>
+              <button class="rd-tb-btn"><span class="material-symbols-outlined">alternate_email</span></button>
+            </div>
+            <textarea
+              v-model="reviewComment"
+              class="rd-comment-input"
+              placeholder="请输入您的专业建议或修改要求..."
+            ></textarea>
+          </div>
+        </div>
+
+        <!-- 提交按钮 -->
+        <button
+          class="rd-submit-btn"
+          :disabled="submitting || !currentItem"
+          @click="handleSubmitReview"
+        >
+          <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1">send</span>
+          {{ submitting ? '提交中...' : '提交评审结论' }}
+        </button>
+      </aside>
     </div>
 
-    <!-- 关联用例对话框 -->
-    <el-dialog v-model="linkDialogVisible" title="关联用例" width="560px" destroy-on-close class="link-dialog">
+    <!-- ══ 对话框 ══ -->
+    <el-dialog v-model="linkDialogVisible" title="关联用例" width="560px" destroy-on-close>
       <el-select v-model="linkCases" multiple filterable placeholder="搜索并选择用例" style="width:100%">
         <el-option v-for="c in availableCases" :key="c.id" :label="`#${c.id} ${c.title}`" :value="c.id" />
       </el-select>
@@ -431,37 +529,6 @@ function handleSelectionChange(rows: CaseReviewItem[]) {
       </template>
     </el-dialog>
 
-    <!-- 评审提交对话框 -->
-    <el-dialog v-model="reviewDialogVisible" title="提交评审" width="480px" destroy-on-close class="review-submit-dialog">
-      <div class="review-target" v-if="reviewingItem">
-        <span class="id-badge">#{{ reviewingItem.testcase_id }}</span>
-        <span class="case-name">{{ reviewingItem.title_snapshot }}</span>
-      </div>
-      <el-form label-position="top">
-        <el-form-item label="评审结果" required>
-          <el-radio-group v-model="reviewForm.result" class="result-radio-group">
-            <el-radio-button value="approved">
-              <span class="result-opt approved"><span class="material-symbols-outlined" style="font-size:16px">thumb_up</span> 通过</span>
-            </el-radio-button>
-            <el-radio-button value="rejected">
-              <span class="result-opt rejected"><span class="material-symbols-outlined" style="font-size:16px">thumb_down</span> 拒绝</span>
-            </el-radio-button>
-            <el-radio-button value="needs_update">
-              <span class="result-opt needs-update"><span class="material-symbols-outlined" style="font-size:16px">edit_note</span> 建议修改</span>
-            </el-radio-button>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="评审意见">
-          <el-input v-model="reviewForm.comment" type="textarea" :rows="4" placeholder="输入评审意见（可选）" maxlength="1000" show-word-limit />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="reviewDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="handleSubmitReview">提交评审</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 批量改评审人对话框 -->
     <el-dialog v-model="reassignDialogVisible" title="更换评审人" width="480px" destroy-on-close>
       <el-select v-model="reassignReviewerIds" multiple filterable placeholder="选择新评审人" style="width:100%">
         <el-option v-for="u in allUsers" :key="u.id" :label="u.name" :value="u.id" />
@@ -472,21 +539,20 @@ function handleSelectionChange(rows: CaseReviewItem[]) {
       </template>
     </el-dialog>
 
-    <!-- 评审记录抽屉 -->
     <el-drawer v-model="recordDrawerVisible" :title="`评审记录 - ${recordDrawerItem?.title_snapshot || ''}`" direction="rtl" size="420px">
       <div v-loading="recordsLoading">
-        <div v-if="records.length === 0 && !recordsLoading" class="empty-records">
-          <span class="material-symbols-outlined" style="font-size:40px;color:var(--tp-gray-500)">history</span>
+        <div v-if="records.length === 0 && !recordsLoading" class="rd-empty-records">
+          <span class="material-symbols-outlined" style="font-size:40px;opacity:0.3">history</span>
           <p>暂无评审记录</p>
         </div>
-        <div class="record-timeline" v-else>
-          <div v-for="rec in records" :key="rec.id" class="record-item">
-            <div class="record-header">
-              <span class="result-badge" :class="resultClass(rec.result)">{{ resultLabel(rec.result) }}</span>
-              <span class="record-round">R{{ rec.round_no }}</span>
-              <span class="record-time">{{ formatDate(rec.created_at) }}</span>
+        <div class="rd-record-timeline" v-else>
+          <div v-for="rec in records" :key="rec.id" class="rd-record-item">
+            <div class="rd-record-header">
+              <span class="rd-result-badge" :class="resultClass(rec.result)">{{ resultLabel(rec.result) }}</span>
+              <span class="rd-record-round">R{{ rec.round_no }}</span>
+              <span class="rd-record-time">{{ formatDate(rec.created_at) }}</span>
             </div>
-            <div class="record-comment" v-if="rec.comment">{{ rec.comment }}</div>
+            <div class="rd-record-comment" v-if="rec.comment">{{ rec.comment }}</div>
           </div>
         </div>
       </div>
@@ -495,239 +561,297 @@ function handleSelectionChange(rows: CaseReviewItem[]) {
 </template>
 
 <style scoped>
-.review-detail-page {
-  padding: 0;
+/* ═══════════════════════════════════════════════════ */
+/*  Case Review Detail – Pixel-Perfect Design Match  */
+/* ═══════════════════════════════════════════════════ */
+
+.rd-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  font-family: 'Inter', sans-serif;
 }
 
-/* ── 顶部栏 ── */
-.detail-topbar {
+/* ── 顶部导航 ── */
+.rd-header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px 0 12px;
-  border-bottom: 1px solid var(--tp-border);
-  margin-bottom: 16px;
-}
-.back-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--tp-border);
-  border-radius: 8px;
-  background: var(--tp-surface-card);
-  color: var(--tp-gray-400);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.back-btn:hover {
-  color: var(--tp-primary);
-  border-color: var(--tp-primary);
-}
-.review-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--tp-gray-100);
-  margin: 0 0 4px;
-}
-.topbar-tags {
-  display: flex;
-  gap: 8px;
-}
-.tag-status, .tag-mode {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 10px;
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 500;
-}
-.tag-status.info { background: rgba(108,117,125,0.15); color: #6c757d; }
-.tag-status.warning { background: rgba(245,158,11,0.15); color: #F59E0B; }
-.tag-status.success { background: rgba(16,185,129,0.15); color: #10B981; }
-.tag-status.danger { background: rgba(239,68,68,0.15); color: #EF4444; }
-.tag-mode { background: rgba(124,58,237,0.12); color: var(--tp-primary-light, #a78bfa); }
-
-/* ── 统计卡片 ── */
-.stats-row {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-.stat-card {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  background: var(--tp-surface-card);
-  border: 1px solid var(--tp-border);
-  border-radius: 10px;
-  transition: border-color 0.2s;
-}
-.stat-card:hover { border-color: var(--tp-border-hover, rgba(255,255,255,0.12)); }
-.stat-icon {
-  font-size: 22px;
-  padding: 8px;
-  border-radius: 8px;
-  background: rgba(124,58,237,0.1);
-  color: var(--tp-primary);
-}
-.stat-card.approved .stat-icon { background: rgba(16,185,129,0.1); color: #10B981; }
-.stat-card.rejected .stat-icon { background: rgba(239,68,68,0.1); color: #EF4444; }
-.stat-card.pending .stat-icon { background: rgba(245,158,11,0.1); color: #F59E0B; }
-.stat-card.rate .stat-icon { background: rgba(59,130,246,0.1); color: #3B82F6; }
-.stat-val { font-size: 20px; font-weight: 700; color: var(--tp-gray-100); }
-.stat-lbl { font-size: 12px; color: var(--tp-gray-500); margin-top: 2px; }
-
-/* ── 工具栏 ── */
-.items-toolbar {
-  display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  gap: 12px;
+  height: 56px;
+  padding: 0;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
-.toolbar-left, .toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.rd-header-left { display: flex; align-items: center; gap: 16px; }
+.rd-header-right { display: flex; align-items: center; gap: 16px; }
+.rd-back-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.08); background: transparent;
+  color: rgba(204, 195, 216, 0.6); cursor: pointer; transition: all 0.2s;
+}
+.rd-back-btn:hover { color: #d2bbff; border-color: rgba(210,187,255,0.3); }
+.rd-logo { font-size: 18px; font-weight: 700; color: #d2bbff; letter-spacing: -0.02em; }
+.rd-breadcrumb { display: flex; align-items: center; gap: 8px; }
+.rd-crumb-muted { font-size: 14px; font-weight: 500; color: rgba(204, 195, 216, 0.5); }
+.rd-crumb-sep { font-size: 14px; color: rgba(204, 195, 216, 0.3); }
+.rd-crumb-active { font-size: 14px; font-weight: 600; color: #d2bbff; }
+.rd-header-icons {
+  display: flex; align-items: center; gap: 12px;
+  padding-right: 16px; border-right: 1px solid rgba(255,255,255,0.1);
+}
+.rd-hdr-icon { font-size: 20px; color: rgba(204, 195, 216, 0.6); cursor: pointer; transition: color 0.2s; }
+.rd-hdr-icon:hover { color: #d2bbff; }
+.rd-submit-top {
+  padding: 6px 20px; border-radius: 8px; border: none;
+  background: #7c3aed; color: #ede0ff; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s;
+}
+.rd-submit-top:hover { filter: brightness(1.1); }
+.rd-submit-top:active { transform: scale(0.95); }
+.rd-submit-top:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── 主体 ── */
+.rd-body { display: flex; flex: 1; overflow: hidden; }
+
+/* ── 左栏 ── */
+.rd-main { width: 70%; overflow-y: auto; padding: 32px; }
+.rd-main::-webkit-scrollbar { width: 4px; }
+.rd-main::-webkit-scrollbar-thumb { background: rgba(124, 58, 237, 0.15); border-radius: 4px; }
+.rd-main.rd-empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 12px; color: rgba(204,195,216,0.5);
+}
+.rd-link-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 18px; border-radius: 8px; border: none;
+  background: #7c3aed; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
 }
 
-/* ── 表格 ── */
-.items-table {
-  border-radius: 8px;
-  overflow: hidden;
+/* 标签 */
+.rd-tags { display: flex; gap: 12px; margin-bottom: 16px; }
+.rd-tag {
+  padding: 4px 12px; border-radius: 4px; font-size: 12px;
+  font-weight: 600; letter-spacing: 0.06em;
 }
-.id-badge {
-  display: inline-block;
-  background: rgba(124,58,237,0.12);
-  color: var(--tp-primary-light, #a78bfa);
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  font-family: 'JetBrains Mono', monospace;
-}
-.case-title { color: var(--tp-gray-200); font-weight: 500; }
-.result-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 10px;
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 600;
-}
-.result-badge.pending { background: rgba(108,117,125,0.12); color: #6c757d; }
-.result-badge.approved { background: rgba(16,185,129,0.12); color: #10B981; }
-.result-badge.rejected { background: rgba(239,68,68,0.12); color: #EF4444; }
-.result-badge.needs-update { background: rgba(245,158,11,0.12); color: #F59E0B; }
-.round-num {
-  display: inline-block;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--tp-gray-400);
-  background: rgba(255,255,255,0.05);
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-.reviewer-avatars { display: flex; gap: 4px; flex-wrap: wrap; }
-.reviewer-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: rgba(108,117,125,0.15);
-  color: #6c757d;
-  font-size: 14px;
-}
-.reviewer-chip.reviewed { background: rgba(16,185,129,0.15); color: #10B981; }
-.no-reviewer { color: var(--tp-gray-600); }
-.comment-text {
-  font-size: 13px;
-  color: var(--tp-gray-400);
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: inline-block;
-}
-.action-btns { display: flex; gap: 6px; justify-content: center; }
-.act-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 6px;
-  border: 1px solid var(--tp-border);
-  background: transparent;
-  color: var(--tp-gray-400);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.act-btn .material-symbols-outlined { font-size: 16px; }
-.act-btn.review:hover { color: var(--tp-primary); border-color: var(--tp-primary); }
-.act-btn.record:hover { color: #3B82F6; border-color: #3B82F6; }
-.act-btn.delete:hover { color: #EF4444; border-color: #EF4444; }
+.tag-purple { background: rgba(124, 58, 237, 0.1); color: #d2bbff; }
+.tag-blue { background: rgba(5, 102, 217, 0.1); color: #adc6ff; }
 
-/* ── 分页 ── */
-.pagination-bar {
-  display: flex;
-  justify-content: flex-end;
-  padding: 12px 0;
+/* 标题+描述 */
+.rd-title {
+  font-size: 30px; font-weight: 600; color: #e1e1f2;
+  margin: 0 0 16px; line-height: 1.25; letter-spacing: -0.02em;
+}
+.rd-desc {
+  font-size: 14px; color: rgba(204, 195, 216, 0.7);
+  line-height: 1.7; margin: 0 0 32px; max-width: 740px;
 }
 
-/* ── 评审提交对话框 ── */
-.review-target {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: var(--tp-surface-card);
-  border: 1px solid var(--tp-border);
-  border-radius: 8px;
-  margin-bottom: 16px;
+/* 信息卡片 glass */
+.rd-info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-bottom: 32px; }
+.rd-glass-card {
+  background: rgba(255, 255, 255, 0.04); backdrop-filter: blur(12px);
+  border: 1px solid rgba(74, 68, 85, 0.15); border-radius: 12px;
+  padding: 20px; display: flex; flex-direction: column; gap: 8px;
 }
-.case-name { color: var(--tp-gray-200); font-weight: 500; }
-.result-radio-group { display: flex; gap: 4px; }
-.result-opt { display: inline-flex; align-items: center; gap: 4px; font-weight: 500; }
-.result-opt.approved { color: #10B981; }
-.result-opt.rejected { color: #EF4444; }
-.result-opt.needs-update { color: #F59E0B; }
+.rd-glass-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em;
+  color: rgba(204, 195, 216, 0.4);
+}
+.rd-glass-value {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 500; color: #e1e1f2;
+}
+.rd-glass-icon { font-size: 18px; }
+.icon-primary { color: #d2bbff; }
+.icon-secondary { color: #adc6ff; }
+.icon-tertiary { color: #ffb784; }
+
+/* 区段 */
+.rd-section { margin-bottom: 32px; }
+.rd-section-title {
+  font-size: 18px; font-weight: 600; color: #e1e1f2;
+  display: flex; align-items: center; gap: 8px; margin: 0 0 16px;
+}
+.rd-section-icon { color: #d2bbff; }
+
+/* 步骤表 */
+.rd-table-wrap {
+  border-radius: 12px; overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.05); background: #191b26;
+}
+.rd-table { width: 100%; text-align: left; border-collapse: collapse; }
+.rd-table thead tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+}
+.rd-table th {
+  padding: 16px 24px; font-size: 12px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.08em; color: rgba(204, 195, 216, 0.5);
+}
+.th-no { width: 80px; }
+.rd-table tbody tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04); transition: background 0.15s;
+}
+.rd-table tbody tr:last-child { border-bottom: none; }
+.rd-table tbody tr:hover { background: rgba(255, 255, 255, 0.03); }
+.td-no {
+  padding: 20px 24px; vertical-align: top;
+  color: rgba(204, 195, 216, 0.3); font-family: 'JetBrains Mono', monospace; font-size: 14px;
+}
+.td-action { padding: 20px 24px; color: #e1e1f2; font-size: 14px; }
+.td-expect { padding: 20px 24px; color: rgba(204, 195, 216, 0.7); font-size: 14px; }
+
+/* 附件 */
+.rd-attachments { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.rd-attach-upload {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; height: 128px; border-radius: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.1); color: rgba(204, 195, 216, 0.3);
+  cursor: pointer; transition: all 0.2s;
+}
+.rd-attach-upload:hover { border-color: rgba(124, 58, 237, 0.5); color: #d2bbff; }
+.rd-attach-text { font-size: 12px; }
+
+/* 用例列表 */
+.rd-case-list {
+  display: flex; flex-direction: column; max-height: 240px;
+  overflow-y: auto; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.rd-case-row {
+  display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+  cursor: pointer; transition: background 0.15s; font-size: 13px;
+  color: rgba(204, 195, 216, 0.7); border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+.rd-case-row:last-child { border-bottom: none; }
+.rd-case-row:hover { background: rgba(255, 255, 255, 0.03); }
+.rd-case-row.active {
+  background: rgba(124, 58, 237, 0.08); border-left: 3px solid #7c3aed; color: #e1e1f2;
+}
+.rd-case-idx { font-size: 12px; font-weight: 600; color: rgba(204,195,216,0.4); min-width: 24px; }
+.rd-case-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rd-result-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: #6c757d; }
+.rd-result-dot.approved { background: #10B981; }
+.rd-result-dot.rejected { background: #EF4444; }
+.rd-result-dot.needs-update { background: #F59E0B; }
+
+/* ── 右栏 ── */
+.rd-sidebar {
+  width: 30%; background: #191b26;
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 32px; display: flex; flex-direction: column; gap: 32px; overflow-y: auto;
+}
+.rd-sidebar::-webkit-scrollbar { width: 4px; }
+.rd-sidebar::-webkit-scrollbar-thumb { background: rgba(124, 58, 237, 0.15); border-radius: 4px; }
+
+/* 进度 */
+.rd-progress { display: flex; flex-direction: column; gap: 12px; }
+.rd-progress-row { display: flex; justify-content: space-between; align-items: flex-end; }
+.rd-progress-label { font-size: 14px; font-weight: 500; color: #e1e1f2; }
+.rd-progress-big { font-size: 28px; font-weight: 700; color: #d2bbff; }
+.rd-progress-small { font-size: 14px; color: rgba(204, 195, 216, 0.4); font-weight: 400; }
+.rd-progress-track {
+  height: 6px; width: 100%; background: rgba(255, 255, 255, 0.05);
+  border-radius: 9999px; overflow: hidden;
+}
+.rd-progress-fill {
+  height: 100%; background: #7c3aed; border-radius: 9999px;
+  box-shadow: 0 0 12px rgba(124, 58, 237, 0.4); transition: width 0.4s ease;
+}
+
+/* 小节标签 */
+.rd-section-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em;
+  color: rgba(204, 195, 216, 0.4); font-weight: 600;
+}
+
+/* 评审决策 */
+.rd-decisions-section { display: flex; flex-direction: column; gap: 16px; }
+.rd-decisions { display: flex; flex-direction: column; gap: 12px; }
+.rd-decision {
+  display: flex; align-items: center; gap: 16px; padding: 16px;
+  border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.02); cursor: pointer; transition: all 0.2s;
+}
+.rd-decision:hover { background: rgba(255, 255, 255, 0.05); }
+.rd-decision.pass.selected { border-color: rgba(16, 185, 129, 0.5); background: rgba(16, 185, 129, 0.05); }
+.rd-decision.rework.selected { border-color: rgba(245, 158, 11, 0.5); background: rgba(245, 158, 11, 0.05); }
+.rd-decision.fail.selected { border-color: rgba(239, 68, 68, 0.5); background: rgba(239, 68, 68, 0.05); }
+.rd-dec-icon {
+  width: 40px; height: 40px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: transform 0.2s;
+}
+.rd-decision:hover .rd-dec-icon { transform: scale(1.1); }
+.rd-dec-icon .material-symbols-outlined { font-size: 22px; }
+.rd-dec-icon.pass { background: rgba(16, 185, 129, 0.1); color: #10B981; }
+.rd-dec-icon.rework { background: rgba(245, 158, 11, 0.1); color: #F59E0B; }
+.rd-dec-icon.fail { background: rgba(239, 68, 68, 0.1); color: #EF4444; }
+.rd-dec-text { display: flex; flex-direction: column; }
+.rd-dec-title { font-size: 14px; font-weight: 600; color: #e1e1f2; }
+.rd-dec-desc { font-size: 12px; color: rgba(204, 195, 216, 0.5); margin-top: 2px; }
+
+/* 评审意见 */
+.rd-comment-section { display: flex; flex-direction: column; gap: 16px; flex: 1; }
+.rd-comment-box {
+  flex: 1; display: flex; flex-direction: column; border-radius: 12px;
+  border: 1px solid rgba(74, 68, 85, 0.15); background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px); overflow: hidden;
+}
+.rd-comment-toolbar {
+  display: flex; align-items: center; gap: 4px;
+  padding: 8px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.02);
+}
+.rd-tb-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 28px; border-radius: 4px; border: none;
+  background: transparent; color: rgba(204, 195, 216, 0.6);
+  cursor: pointer; transition: all 0.15s;
+}
+.rd-tb-btn .material-symbols-outlined { font-size: 18px; }
+.rd-tb-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+.rd-comment-input {
+  flex: 1; min-height: 100px; resize: none; border: none;
+  background: transparent; padding: 16px; font-size: 14px;
+  color: #e1e1f2; font-family: inherit;
+}
+.rd-comment-input::placeholder { color: rgba(204, 195, 216, 0.2); }
+.rd-comment-input:focus { outline: none; }
+
+/* 提交按钮 */
+.rd-submit-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 16px; border-radius: 12px; border: none;
+  background: linear-gradient(135deg, #7c3aed, #0566d9);
+  color: #ffffff; font-size: 15px; font-weight: 700;
+  cursor: pointer; transition: all 0.2s;
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.3); flex-shrink: 0;
+}
+.rd-submit-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(124, 58, 237, 0.4); }
+.rd-submit-btn:active { transform: translateY(0); }
+.rd-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
 /* ── 评审记录 ── */
-.empty-records {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 0;
-  color: var(--tp-gray-500);
-  gap: 8px;
+.rd-empty-records {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 60px 0; color: rgba(204,195,216,0.4); gap: 8px;
 }
-.record-timeline {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 8px 0;
+.rd-record-timeline { display: flex; flex-direction: column; gap: 12px; }
+.rd-record-item {
+  padding: 12px 14px; background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(74,68,85,0.15); border-radius: 8px;
 }
-.record-item {
-  padding: 12px 14px;
-  background: var(--tp-surface-card);
-  border: 1px solid var(--tp-border);
-  border-radius: 8px;
+.rd-record-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.rd-result-badge {
+  display: inline-flex; padding: 3px 10px; border-radius: 10px;
+  font-size: 12px; font-weight: 600;
 }
-.record-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-.record-round { font-size: 12px; color: var(--tp-gray-500); font-weight: 600; }
-.record-time { font-size: 12px; color: var(--tp-gray-600); margin-left: auto; }
-.record-comment { font-size: 13px; color: var(--tp-gray-300); line-height: 1.5; }
+.rd-result-badge.pending { background: rgba(108,117,125,0.12); color: #6c757d; }
+.rd-result-badge.approved { background: rgba(16,185,129,0.12); color: #10B981; }
+.rd-result-badge.rejected { background: rgba(239,68,68,0.12); color: #EF4444; }
+.rd-result-badge.needs-update { background: rgba(245,158,11,0.12); color: #F59E0B; }
+.rd-record-round { font-size: 12px; color: rgba(204,195,216,0.5); font-weight: 600; }
+.rd-record-time { font-size: 12px; color: rgba(204,195,216,0.3); margin-left: auto; }
+.rd-record-comment { font-size: 13px; color: rgba(204,195,216,0.7); line-height: 1.5; }
 </style>

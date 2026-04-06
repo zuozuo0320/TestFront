@@ -14,12 +14,21 @@ export type Project = {
   name: string
   description: string
   avatar?: string
+  owner_id: number
+  owner_name?: string
+  owner_avatar?: string
   status: 'active' | 'archived'
   archived_at?: string | null
   created_at?: string
   updated_at?: string
   member_count: number
   testcase_count: number
+  testcase_total_count?: number
+  executed_testcase_count?: number
+  test_progress?: number
+  quality_status?: 'stable' | 'degraded' | 'failing' | 'unknown'
+  quality_reason?: string
+  latest_run_pass_rate?: number | null
 }
 
 export type ProjectMember = {

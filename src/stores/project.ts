@@ -79,7 +79,7 @@ export const useProjectStore = defineStore('project', () => {
     selectedProjectId.value = pickPreferredProjectId(projects.value, selectedProjectId.value)
   }
 
-  async function addProject(payload: { name: string; description?: string }) {
+  async function addProject(payload: { name: string; description?: string; owner_id?: number }) {
     const project = await createProject(payload)
     projects.value.push(project)
     return project

@@ -86,6 +86,19 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/case-reviews/create',
+      name: 'CaseReviewCreate',
+      component: () => import('../views/CaseReviewCreate.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/case-reviews/:reviewId',
+      name: 'CaseReviewDetail',
+      component: () => import('../views/CaseReviewDetail.vue'),
+      meta: { requiresAuth: true },
+      props: true,
+    },
+    {
       path: '/case-reviews',
       name: 'CaseReviews',
       component: () => import('../views/CaseReviewPage.vue'),

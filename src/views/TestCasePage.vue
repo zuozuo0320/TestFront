@@ -756,6 +756,27 @@ async function onBatchMove() {
   }
 }
 
+function openBatchMoveDialog() {
+  batchMoveTargetId.value = 0
+  batchMoveTargetPath.value = '/未规划用例'
+  batchMoveVisible.value = true
+}
+
+function clearBatchSelection() {
+  selectedIds.value = []
+  selectAll.value = false
+}
+
+function handleToggleSelectAll() {
+  selectAll.value = !selectAll.value
+  toggleSelectAll()
+}
+
+function selectCaseLevel(level: string) {
+  caseForm.level = level
+  levelPickerOpen.value = false
+}
+
 async function onCloneCase(row: TableRow) {
   if (!selectedProject.value) return
   try {
@@ -1369,11 +1390,7 @@ watch(selectedProject, (newId) => {
                 </button>
                 <button
                   class="batch-action-item"
-                  @click="
-                    batchMoveTargetId = 0
-                    batchMoveTargetPath = '/未规划用例'
-                    batchMoveVisible = true
-                  "
+                  @click="openBatchMoveDialog"
                 >
                   <span class="material-symbols-outlined" style="color: #94a3b8">
                     drive_file_move
@@ -1387,10 +1404,7 @@ watch(selectedProject, (newId) => {
                 <div class="batch-divider"></div>
                 <button
                   class="batch-close"
-                  @click="
-                    selectedIds = []
-                    selectAll = false
-                  "
+                  @click="clearBatchSelection"
                 >
                   <span class="material-symbols-outlined">close</span>
                 </button>
@@ -1433,10 +1447,7 @@ watch(selectedProject, (newId) => {
                 <input
                   type="checkbox"
                   :checked="selectAll"
-                  @change="
-                    selectAll = !selectAll
-                    toggleSelectAll()
-                  "
+                  @change="handleToggleSelectAll"
                 />
               </th>
               <th style="width: 80px" class="sortable" @click="toggleSort('id')">
@@ -1939,10 +1950,7 @@ watch(selectedProject, (newId) => {
                           :key="lv"
                           class="level-dropdown-item"
                           :class="{ active: caseForm.level === lv }"
-                          @click.stop="
-                            caseForm.level = lv
-                            levelPickerOpen = false
-                          "
+                          @click.stop="selectCaseLevel(lv)"
                         >
                           <span class="level-badge" :class="lv.toLowerCase()">{{ lv }}</span>
                           <span class="level-item-label">{{ levelLabels[lv] }}</span>
