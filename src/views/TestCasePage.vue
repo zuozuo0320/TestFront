@@ -1457,31 +1457,32 @@ watch(selectedProject, (newId) => {
                 </span>
               </th>
               <th>用例名称</th>
-              <th style="width: 80px">优先级</th>
-              <th style="width: 140px">所属模块</th>
+              <th style="width: 70px">优先级</th>
+              <th style="width: 120px">所属模块</th>
               <th style="width: 80px">评审结果</th>
-              <th style="width: 80px">状态</th>
-              <th style="width: 120px">标签</th>
-              <th style="width: 110px">负责人</th>
+              <th style="width: 70px">状态</th>
+              <th style="width: 100px">标签</th>
+              <th style="width: 100px">更新人</th>
               <th style="width: 100px" class="sortable" @click="toggleSort('updated_at')">
                 更新时间
                 <span class="sort-flag" :class="{ active: sortBy === 'updated_at' }">
                   {{ sortBy === 'updated_at' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕' }}
                 </span>
               </th>
+              <th style="width: 100px">创建人</th>
               <th style="width: 100px" class="sortable" @click="toggleSort('created_at')">
                 创建时间
                 <span class="sort-flag" :class="{ active: sortBy === 'created_at' }">
                   {{ sortBy === 'created_at' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕' }}
                 </span>
               </th>
-              <th style="width: 60px">版本</th>
-              <th style="width: 140px">操作</th>
+              <th style="width: 50px">版本</th>
+              <th style="width: 130px">操作</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="loadError">
-              <td colspan="13" class="empty-td">
+              <td colspan="14" class="empty-td">
                 {{ loadError }}
                 <el-button size="small" style="margin-left: 10px" @click="loadCases">
                   重试
@@ -1489,7 +1490,7 @@ watch(selectedProject, (newId) => {
               </td>
             </tr>
             <tr v-else-if="rows.length === 0">
-              <td colspan="13" class="empty-td testcase-empty-cell">
+              <td colspan="14" class="empty-td testcase-empty-cell">
                 <div class="testcase-empty-wrap">
                   <el-empty description="暂无数据" :image-size="140">
                     <el-button type="primary" plain @click="openCreate">去新建</el-button>
