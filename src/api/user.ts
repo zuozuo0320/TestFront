@@ -109,10 +109,18 @@ export async function changeMyPassword(oldPassword: string, newPassword: string)
   return data
 }
 
-/** 上传头像 */
+/** 上传头像（当前用户） */
 export async function uploadMyAvatar(file: File) {
   const form = new FormData()
   form.append('avatar', file)
   const { data } = await apiClient.post<{ avatar: string }>('/users/me/avatar', form)
+  return data
+}
+
+/** 管理员为指定用户上传头像 */
+export async function uploadUserAvatar(userId: number, file: File) {
+  const form = new FormData()
+  form.append('avatar', file)
+  const { data } = await apiClient.post<{ avatar: string }>(`/users/${userId}/avatar`, form)
   return data
 }

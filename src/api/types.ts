@@ -59,8 +59,10 @@ export type TestCase = {
   priority: string
   created_by: number
   created_by_name?: string
+  created_by_avatar?: string
   updated_by: number
   updated_by_name?: string
+  updated_by_avatar?: string
   created_at?: string
   updated_at?: string
   in_review?: boolean

@@ -21,6 +21,7 @@ export interface CaseReview {
     created_by: number
     updated_by: number
     created_by_name?: string
+    created_by_avatar?: string
     reviewer_ids?: number[]
     reviewer_names?: string[]
     created_at: string

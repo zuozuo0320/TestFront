@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref, reactive, computed } from 'vue'
+import { onMounted, ref, reactive, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAiScriptStore } from '../../stores/aiScript'
+import { useProjectStore } from '../../stores/project'
 import {
   TaskStatusLabel,
   TaskStatusColor,
@@ -19,6 +20,7 @@ import type { Project, TestCase } from '../../api/types'
 
 const router = useRouter()
 const store = useAiScriptStore()
+const projectStore = useProjectStore()
 
 const projects = ref<Project[]>([])
 const currentPage = ref(1)
@@ -167,8 +169,52 @@ const createForm = reactive({
   frameworkType: 'Playwright',
 })
 
-function openCreateDialog() {
-  createForm.projectId = projects.value[0]?.id ?? 0
+// ── 用例搜索选择 ──
+const caseCandidates = ref<TestCase[]>([])
+const selectedCaseIds = ref<number[]>([])
+const caseSearchKeyword = ref('')
+const showCaseDropdown = ref(false)
+const caseLoading = ref(false)
+const caseLoadError = ref('')
+let caseSearchTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * 为新建任务弹窗选择默认项目。
+ * 优先沿用左侧导航当前选中的项目，避免弹窗默认切到其它空项目导致误以为“没有可关联用例”。
+ */
+function resolveDefaultCreateProjectId(): number {
+  const selectedProjectId = projectStore.selectedProjectId
+  if (
+    typeof selectedProjectId === 'number' &&
+    projects.value.some((project) => project.id === selectedProjectId)
+  ) {
+    return selectedProjectId
+  }
+  return projects.value[0]?.id ?? 0
+}
+
+/**
+ * 重置关联用例选择器状态。
+ * 打开弹窗或切换所属项目时，需要清掉旧项目残留的已选项、搜索词和错误提示。
+ */
+function resetCasePickerState() {
+  caseCandidates.value = []
+  selectedCaseIds.value = []
+  caseSearchKeyword.value = ''
+  createForm.caseIds = ''
+  caseLoadError.value = ''
+}
+
+/**
+ * 打开新建任务弹窗并预加载关联用例。
+ * 这里会在打开前确保项目列表可用，避免项目尚未加载完成时 projectId 被初始化为 0。
+ */
+async function openCreateDialog() {
+  if (projects.value.length === 0) {
+    projects.value = await listProjects()
+  }
+
+  createForm.projectId = resolveDefaultCreateProjectId()
   createForm.taskName = ''
   createForm.scenarioDesc = ''
   createForm.startUrl = ''
@@ -176,24 +222,42 @@ function openCreateDialog() {
   createForm.caseIds = ''
   createForm.frameworkType = 'Playwright'
   createForm.generationMode = GenerationMode.RECORDING_ENHANCED
-  selectedCaseIds.value = []
+  resetCasePickerState()
+  showCaseDropdown.value = false
   showCreateDialog.value = true
-  if (createForm.projectId) loadCases(createForm.projectId)
+
+  if (!createForm.projectId) {
+    showToast('当前没有可用项目，请先创建项目')
+    return
+  }
+
+  await loadCases(createForm.projectId)
 }
 
-// ── 用例搜索选择 ──
-const caseCandidates = ref<TestCase[]>([])
-const selectedCaseIds = ref<number[]>([])
-const caseSearchKeyword = ref('')
-const showCaseDropdown = ref(false)
-let caseSearchTimer: ReturnType<typeof setTimeout> | null = null
-
+/**
+ * 加载当前项目下可供关联的测试用例候选列表。
+ * 这里不会按评审结果或用例状态做额外过滤，理论上只要是该项目下的用例都应能被搜到。
+ */
 async function loadCases(projectId: number, keyword = '') {
+  if (!projectId) {
+    caseCandidates.value = []
+    caseLoadError.value = '请先选择所属项目'
+    return
+  }
+
+  caseLoading.value = true
+  caseLoadError.value = ''
   try {
     const resp = await listTestCases(projectId, { page: 1, pageSize: 20, keyword })
     caseCandidates.value = resp?.items || []
+    if (caseCandidates.value.length === 0) {
+      caseLoadError.value = keyword.trim() ? '未找到匹配的测试用例' : '当前项目下暂无可关联用例'
+    }
   } catch {
     caseCandidates.value = []
+    caseLoadError.value = '加载关联用例失败，请稍后重试'
+  } finally {
+    caseLoading.value = false
   }
 }
 
@@ -219,6 +283,17 @@ function toggleCase(caseItem: TestCase) {
 function isCaseSelected(id: number) {
   return selectedCaseIds.value.includes(id)
 }
+
+watch(
+  () => createForm.projectId,
+  async (projectId, previousProjectId) => {
+    if (!showCreateDialog.value || projectId === previousProjectId) return
+    resetCasePickerState()
+    if (projectId) {
+      await loadCases(projectId)
+    }
+  },
+)
 
 async function submitCreateTask() {
   if (!createForm.taskName.trim()) {
@@ -868,7 +943,7 @@ async function handleExecute(task: AiScriptTask) {
               />
               <!-- 下拉列表 -->
               <div
-                v-if="showCaseDropdown && caseCandidates.length"
+                v-if="showCaseDropdown"
                 style="
                   position: absolute;
                   top: 100%;
@@ -885,55 +960,80 @@ async function handleExecute(task: AiScriptTask) {
                 "
               >
                 <div
-                  v-for="c in caseCandidates"
-                  :key="c.id"
+                  v-if="caseLoading"
                   style="
-                    padding: 8px 12px;
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
+                    padding: 10px 12px;
                     font-size: 0.8rem;
-                    transition: background 0.15s;
+                    color: var(--tp-gray-500);
                   "
-                  :style="{ background: isCaseSelected(c.id) ? 'rgba(124,77,255,0.12)' : '' }"
-                  @mousedown.prevent="toggleCase(c)"
                 >
-                  <span
-                    class="material-symbols-outlined"
-                    style="font-size: 16px"
-                    :style="{ color: isCaseSelected(c.id) ? '#b388ff' : 'var(--tp-gray-500)' }"
-                  >
-                    {{ isCaseSelected(c.id) ? 'check_box' : 'check_box_outline_blank' }}
-                  </span>
-                  <span style="color: var(--tp-gray-500); min-width: 50px">TC-{{ c.id }}</span>
-                  <span
-                    style="
-                      color: var(--tp-gray-300);
-                      flex: 1;
-                      overflow: hidden;
-                      text-overflow: ellipsis;
-                      white-space: nowrap;
-                    "
-                  >
-                    {{ c.title }}
-                  </span>
-                  <span
-                    v-if="c.level"
-                    style="
-                      font-size: 0.65rem;
-                      padding: 1px 6px;
-                      border-radius: 8px;
-                      background: rgba(255, 255, 255, 0.06);
-                      color: var(--tp-gray-500);
-                    "
-                  >
-                    {{ c.level }}
-                  </span>
+                  正在加载用例...
                 </div>
+                <div
+                  v-else-if="caseCandidates.length === 0"
+                  style="
+                    padding: 10px 12px;
+                    font-size: 0.8rem;
+                    color: var(--tp-gray-500);
+                  "
+                >
+                  {{ caseLoadError || '当前没有可关联用例' }}
+                </div>
+                <template v-else>
+                  <div
+                    v-for="c in caseCandidates"
+                    :key="c.id"
+                    style="
+                      padding: 8px 12px;
+                      cursor: pointer;
+                      display: flex;
+                      align-items: center;
+                      gap: 8px;
+                      font-size: 0.8rem;
+                      transition: background 0.15s;
+                    "
+                    :style="{ background: isCaseSelected(c.id) ? 'rgba(124,77,255,0.12)' : '' }"
+                    @mousedown.prevent="toggleCase(c)"
+                  >
+                    <span
+                      class="material-symbols-outlined"
+                      style="font-size: 16px"
+                      :style="{ color: isCaseSelected(c.id) ? '#b388ff' : 'var(--tp-gray-500)' }"
+                    >
+                      {{ isCaseSelected(c.id) ? 'check_box' : 'check_box_outline_blank' }}
+                    </span>
+                    <span style="color: var(--tp-gray-500); min-width: 50px">TC-{{ c.id }}</span>
+                    <span
+                      style="
+                        color: var(--tp-gray-300);
+                        flex: 1;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                      "
+                    >
+                      {{ c.title }}
+                    </span>
+                    <span
+                      v-if="c.level"
+                      style="
+                        font-size: 0.65rem;
+                        padding: 1px 6px;
+                        border-radius: 8px;
+                        background: rgba(255, 255, 255, 0.06);
+                        color: var(--tp-gray-500);
+                      "
+                    >
+                      {{ c.level }}
+                    </span>
+                  </div>
+                </template>
               </div>
             </div>
-            <span class="ai-form-hint">已选择 {{ selectedCaseIds.length }} 条用例</span>
+            <span class="ai-form-hint">
+              已选择 {{ selectedCaseIds.length }} 条用例
+              <template v-if="caseLoadError && !caseLoading">，{{ caseLoadError }}</template>
+            </span>
           </div>
           <div class="ai-form-group">
             <label class="ai-form-label">测试账号 (可选)</label>

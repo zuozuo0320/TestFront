@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search } from '@element-plus/icons-vue'
+
 import { useRoute, useRouter } from 'vue-router'
 import { useProjectStore } from '../stores/project'
+import { apiClient } from '../api/client'
 import { listUsers } from '../api/user'
 import {
   listReviews,
@@ -26,6 +27,8 @@ import { listTestCases } from '../api/testcase'
 const projectStore = useProjectStore()
 const route = useRoute()
 const router = useRouter()
+const apiBaseUrl = apiClient.defaults.baseURL || 'http://localhost:8080/api/v1'
+const serverUrl = apiBaseUrl.replace(/\/api\/v1\/?$/, '')
 
 const selectedProjectId = computed(() => projectStore.selectedProjectId)
 
@@ -48,7 +51,7 @@ async function loadUsers() {
     const resp = await listUsers()
     allUsers.value = (resp as any)?.items || resp || []
   } catch {
-    /* ignore */
+    ElMessage.error('加载用户列表失败')
   }
 }
 
@@ -75,7 +78,28 @@ async function fetchReviews() {
   }
 }
 
-watch([selectedProjectId, page, pageSize, viewMode], () => fetchReviews())
+// 页码 / 每页条数变化：直接拉取，不重置页码
+watch([page, pageSize], () => fetchReviews())
+
+// 项目切换 / 视图模式 / 筛选条件变化：重置到第 1 页再拉取
+watch([selectedProjectId, viewMode, filterStatus, filterMode], () => {
+  if (page.value !== 1) {
+    page.value = 1 // 触发 [page, pageSize] watch → fetchReviews
+  } else {
+    fetchReviews()
+  }
+})
+
+// 搜索关键词防抖（350ms）；回车键由 handleSearch 立即触发
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+watch(searchKeyword, () => {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+  searchDebounceTimer = setTimeout(() => {
+    page.value = 1
+    fetchReviews()
+  }, 350)
+})
+
 watch(
   [
     selectedProjectId,
@@ -96,18 +120,11 @@ onMounted(() => {
 })
 
 function handleSearch() {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
   page.value = 1
   fetchReviews()
 }
 
-function handlePageChange(p: number) {
-  page.value = p
-}
-
-function handleSizeChange(s: number) {
-  pageSize.value = s
-  page.value = 1
-}
 
 // ── 创建评审 ──
 const createDialogVisible = ref(false)
@@ -311,11 +328,6 @@ const detailLinkLoading = ref(false)
 const detailLinkCases = ref<number[]>([])
 const detailAvailableCases = ref<{ id: number; title: string }[]>([])
 
-async function openDetail(review: CaseReview) {
-  currentReview.value = review
-  detailDrawerVisible.value = true
-  await loadDetailItems(review.id)
-}
 
 async function loadDetailItems(reviewId: number) {
   if (!selectedProjectId.value) return
@@ -441,6 +453,8 @@ const statsApproved = computed(() =>
 const statsRejected = computed(() =>
   reviews.value.reduce((sum, r) => sum + (r.rejected_count || 0), 0),
 )
+// 用例维度总量（待评审 + 已批准 + 已拒绝），用于进度条比例计算
+const statsTotalCases = computed(() => statsPending.value + statsApproved.value + statsRejected.value)
 
 // ── 分页辅助 ──
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
@@ -465,6 +479,14 @@ function goPage(p: number) {
 function getInitials(name: string) {
   if (!name) return '?'
   return name.slice(0, 2).toUpperCase()
+}
+
+function getUserAvatarUrl(avatar?: string) {
+  const raw = (avatar || '').trim()
+  if (!raw) return ''
+  if (/^https?:\/\//i.test(raw)) return raw
+  const normalized = raw.startsWith('/') ? raw : `/${raw}`
+  return `${serverUrl}${normalized}`
 }
 
 function getProgressPercent(review: CaseReview) {
@@ -520,7 +542,7 @@ function statusBadgeClass(status: string) {
         <div class="stat-value-row">
           <span class="stat-num">{{ statsPending }}</span>
         </div>
-        <div class="stat-bar-track"><div class="stat-bar-fill bar-secondary" style="width: 33%"></div></div>
+        <div class="stat-bar-track"><div class="stat-bar-fill bar-secondary" :style="{ width: (statsTotalCases > 0 ? Math.round(statsPending / statsTotalCases * 100) : 0) + '%' }"></div></div>
       </div>
       <div class="stat-card-pl">
         <div class="stat-bg-icon icon-primary"><span class="material-symbols-outlined">sync</span></div>
@@ -529,7 +551,7 @@ function statusBadgeClass(status: string) {
           <span class="stat-num">{{ statsInProgress }}</span>
           <span class="stat-sub primary">Active</span>
         </div>
-        <div class="stat-bar-track"><div class="stat-bar-fill bar-primary" style="width: 50%"></div></div>
+        <div class="stat-bar-track"><div class="stat-bar-fill bar-primary" :style="{ width: (total > 0 ? Math.round(statsInProgress / total * 100) : 0) + '%' }"></div></div>
       </div>
       <div class="stat-card-pl">
         <div class="stat-bg-icon icon-emerald"><span class="material-symbols-outlined">check_circle</span></div>
@@ -538,7 +560,7 @@ function statusBadgeClass(status: string) {
           <span class="stat-num">{{ statsApproved }}</span>
           <span class="stat-sub emerald">{{ reviews.length > 0 && statsApproved > 0 ? Math.round((statsApproved / (statsApproved + statsRejected + statsPending || 1)) * 100) + '% passing' : '' }}</span>
         </div>
-        <div class="stat-bar-track"><div class="stat-bar-fill bar-emerald" style="width: 100%"></div></div>
+        <div class="stat-bar-track"><div class="stat-bar-fill bar-emerald" :style="{ width: (statsTotalCases > 0 ? Math.round(statsApproved / statsTotalCases * 100) : 0) + '%' }"></div></div>
       </div>
       <div class="stat-card-pl">
         <div class="stat-bg-icon icon-error"><span class="material-symbols-outlined">cancel</span></div>
@@ -547,7 +569,7 @@ function statusBadgeClass(status: string) {
           <span class="stat-num">{{ statsRejected }}</span>
           <span v-if="statsRejected > 0" class="stat-sub error">Action required</span>
         </div>
-        <div class="stat-bar-track"><div class="stat-bar-fill bar-error" style="width: 25%"></div></div>
+        <div class="stat-bar-track"><div class="stat-bar-fill bar-error" :style="{ width: (statsTotalCases > 0 ? Math.round(statsRejected / statsTotalCases * 100) : 0) + '%' }"></div></div>
       </div>
     </div>
 
@@ -578,7 +600,6 @@ function statusBadgeClass(status: string) {
             placeholder="状态"
             clearable
             class="filter-select-pl"
-            @change="handleSearch"
           >
             <el-option label="未开始" value="not_started" />
             <el-option label="进行中" value="in_progress" />
@@ -590,7 +611,6 @@ function statusBadgeClass(status: string) {
             placeholder="模式"
             clearable
             class="filter-select-pl"
-            @change="handleSearch"
           >
             <el-option label="独审" value="single" />
             <el-option label="会签" value="parallel" />
@@ -628,7 +648,13 @@ function statusBadgeClass(status: string) {
               </td>
               <td>
                 <div class="person-cell">
-                  <div class="avatar-circle">{{ getInitials(review.created_by_name || '') }}</div>
+                  <img
+                    v-if="review.created_by_avatar"
+                    class="avatar-circle-img"
+                    :src="getUserAvatarUrl(review.created_by_avatar)"
+                    :alt="review.created_by_name || '创建人头像'"
+                  />
+                  <div v-else class="avatar-circle">{{ getInitials(review.created_by_name || '') }}</div>
                   <span class="person-name">{{ review.created_by_name || '—' }}</span>
                 </div>
               </td>
@@ -654,21 +680,21 @@ function statusBadgeClass(status: string) {
               </td>
               <td class="td-right">
                 <div class="row-actions" @click.stop>
-                  <button class="row-act-btn" title="查看详情" @click="router.push(`/case-reviews/${review.id}`)">
+                  <button class="action-btn action-edit icon-only" title="查看详情" @click="router.push(`/case-reviews/${review.id}`)">
                     <span class="material-symbols-outlined">visibility</span>
                   </button>
-                  <button class="row-act-btn" title="复制" @click="handleCopy(review)">
+                  <button class="action-btn action-clone icon-only" title="复制" @click="handleCopy(review)">
                     <span class="material-symbols-outlined">content_copy</span>
                   </button>
                   <button
                     v-if="review.status !== 'closed'"
-                    class="row-act-btn"
+                    class="action-btn icon-only"
                     title="关闭"
                     @click="handleClose(review)"
                   >
                     <span class="material-symbols-outlined">block</span>
                   </button>
-                  <button class="row-act-btn danger" title="删除" @click="handleDelete(review)">
+                  <button class="action-btn action-delete icon-only" title="删除" @click="handleDelete(review)">
                     <span class="material-symbols-outlined">delete</span>
                   </button>
                 </div>
@@ -998,13 +1024,13 @@ function statusBadgeClass(status: string) {
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 0 28px 24px;
+  padding: 24px 28px 24px;
   overflow-y: auto;
 }
 
 /* ── 页面标题 ── */
 .pipeline-header {
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 .pipeline-header-top {
   display: flex;
@@ -1035,44 +1061,64 @@ function statusBadgeClass(status: string) {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--tp-surface-base, #0c0e18);
-  border: 1px solid rgba(74, 68, 85, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(74, 68, 85, 0.35);
   border-radius: 8px;
   padding: 6px 12px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.pipeline-search-box:focus-within {
+  border-color: rgba(124, 58, 237, 0.5);
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.12);
+  background: rgba(255, 255, 255, 0.07);
 }
 .search-icon-pl {
   font-size: 18px;
-  color: var(--tp-gray-400, #958da1);
+  color: rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+  transition: color 0.2s;
+}
+.pipeline-search-box:focus-within .search-icon-pl {
+  color: rgba(124, 58, 237, 0.8);
 }
 .pipeline-search-input {
   background: transparent;
   border: none;
   outline: none;
-  color: var(--tp-gray-200, #e1e1f2);
+  color: rgba(255, 255, 255, 0.9);
+  caret-color: #a78bfa;
   font-size: 13px;
-  width: 180px;
+  width: 390px;
 }
 .pipeline-search-input::placeholder {
-  color: var(--tp-gray-500, #605770);
+  color: rgba(255, 255, 255, 0.3);
 }
+
+/* 与用例列表页 insights-btn-primary 保持一致：纯紫色，无渐变 */
 .pipeline-btn-create {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 20px;
+  padding: 0 16px;
+  height: 36px;
   border-radius: 8px;
   border: none;
-  background: linear-gradient(135deg, var(--tp-primary, #7c3aed), var(--tp-info, #0566d9));
+  background: #7c3aed;
   color: #fff;
-  font-weight: 600;
+  font-weight: 500;
   font-size: 14px;
   cursor: pointer;
   transition: all 0.2s;
-  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.25);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
+  font-family: inherit;
+  letter-spacing: 0.5px;
+}
+.pipeline-btn-create .material-symbols-outlined {
+  font-size: 18px !important;
 }
 .pipeline-btn-create:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.35);
+  background: #6d28d9;
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.35);
 }
 .pipeline-btn-create:active {
   transform: scale(0.97);
@@ -1212,19 +1258,32 @@ function statusBadgeClass(status: string) {
 }
 
 /* ── 筛选下拉 ── */
+/* 高度用 CSS 变量精确匹配标签组（30px = 3+5+14+5+3） */
 .filter-select-pl {
-  width: 100px;
+  width: 90px;
+  --el-component-size: 30px;
 }
-:deep(.filter-select-pl .el-input__wrapper) {
+:deep(.filter-select-pl .el-select__wrapper) {
   background: rgba(255, 255, 255, 0.04) !important;
   box-shadow: none !important;
-  border: 1px solid rgba(74, 68, 85, 0.2) !important;
+  border: 1px solid rgba(74, 68, 85, 0.3) !important;
   border-radius: 8px !important;
-}
-:deep(.filter-select-pl .el-input__inner) {
-  color: var(--tp-gray-300, #ccc3d8) !important;
+  padding: 0 10px !important;
   font-size: 12px !important;
 }
+:deep(.filter-select-pl .el-select__placeholder) {
+  color: rgba(255, 255, 255, 0.65) !important;
+  font-size: 12px !important;
+}
+:deep(.filter-select-pl .el-select__selected-item) {
+  color: rgba(255, 255, 255, 0.85) !important;
+  font-size: 12px !important;
+}
+:deep(.filter-select-pl .el-select__suffix .el-icon) {
+  color: rgba(255, 255, 255, 0.45) !important;
+  font-size: 12px !important;
+}
+
 
 /* ── 表格滚动区 ── */
 .table-scroll-area {
@@ -1280,6 +1339,7 @@ function statusBadgeClass(status: string) {
 }
 .pipeline-table td {
   padding: 18px 24px;
+  font-size: 14px;
 }
 .td-right {
   text-align: right;
@@ -1297,7 +1357,7 @@ function statusBadgeClass(status: string) {
   font-size: 14px;
 }
 .review-id-sub {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--tp-gray-400, #958da1);
 }
 
@@ -1320,9 +1380,18 @@ function statusBadgeClass(status: string) {
   color: #fff;
   flex-shrink: 0;
 }
+.avatar-circle-img {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
 .person-name {
-  font-size: 13px;
-  color: var(--tp-gray-200, #e1e1f2);
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.88);
+  font-weight: 500;
 }
 
 /* 进度列 */
@@ -1335,12 +1404,12 @@ function statusBadgeClass(status: string) {
   margin-bottom: 5px;
 }
 .progress-pct {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--tp-primary-light, #d2bbff);
   font-weight: 600;
 }
 .progress-count {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--tp-gray-400, #958da1);
 }
 .progress-bar-track {
@@ -1363,7 +1432,7 @@ function statusBadgeClass(status: string) {
 /* 状态药片标签 */
 .status-badge-pl {
   display: inline-block;
-  padding: 4px 12px;
+  padding: 5px 12px;
   border-radius: 9999px;
   font-size: 10px;
   font-weight: 700;
@@ -1391,35 +1460,11 @@ function statusBadgeClass(status: string) {
   border: 1px solid rgba(74, 68, 85, 0.2);
 }
 
-/* 操作按钮 */
+/* 操作按钮：使用全局 action-btn 体系与用例列表页对齐，此处仅保留 flex 容器 */
 .row-actions {
   display: flex;
   justify-content: flex-end;
   gap: 4px;
-}
-.row-act-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  border: none;
-  background: transparent;
-  color: var(--tp-gray-400, #958da1);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
-}
-.row-act-btn .material-symbols-outlined {
-  font-size: 18px;
-}
-.row-act-btn:hover {
-  background: rgba(55, 56, 69, 0.6);
-  color: #fff;
-}
-.row-act-btn.danger:hover {
-  background: rgba(239, 68, 68, 0.15);
-  color: var(--tp-danger, #ffb4ab);
 }
 
 /* ── 空状态 ── */

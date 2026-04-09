@@ -195,6 +195,23 @@
     <!-- Dialogs -->
     <el-dialog v-model="userDialogVisible" :title="editingUserId ? '编辑用户' : '新建用户'" width="640px" class="um-dialog">
       <el-form label-position="top">
+        <el-form-item label="用户头像">
+          <div class="um-avatar-upload" @click="triggerAvatarInput">
+            <img v-if="avatarPreview" :src="avatarPreview" class="um-avatar-preview" />
+            <div v-else class="um-avatar-placeholder">
+              <span class="um-avatar-placeholder-icon">+</span>
+              <span class="um-avatar-placeholder-text">点击上传</span>
+            </div>
+            <input
+              ref="avatarInputRef"
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp"
+              style="display: none"
+              @change="onAvatarSelected"
+            />
+          </div>
+          <span class="um-avatar-hint">支持 PNG/JPG/GIF/WebP，最大 2MB</span>
+        </el-form-item>
         <el-form-item label="姓名">
           <el-input v-model="userForm.name" placeholder="2-40字符" />
         </el-form-item>
@@ -255,6 +272,7 @@ import {
   deleteUserById,
   resetUserPassword,
   listRoles,
+  uploadUserAvatar,
 } from '../../api/user'
 import { listProjects } from '../../api/project'
 import type { User, Role, Project } from '../../api/types'
@@ -293,6 +311,10 @@ const resetPwdUserId = ref<number | null>(null)
 const resetPwdUserName = ref('')
 const resetPwdForm = reactive({ newPassword: '' })
 const resettingPwd = ref(false)
+
+const avatarFile = ref<File | null>(null)
+const avatarPreview = ref('')
+const avatarInputRef = ref<HTMLInputElement | null>(null)
 
 const userForm = reactive({
   name: '',
@@ -427,6 +449,8 @@ function openCreateUser() {
   userForm.roleIds = []
   userForm.projectIds = []
   userForm.active = true
+  avatarFile.value = null
+  avatarPreview.value = ''
   userDialogVisible.value = true
 }
 
@@ -440,7 +464,28 @@ function openEditUser(u: UserRow) {
   userForm.roleIds = [...u.role_ids]
   userForm.projectIds = [...u.project_ids]
   userForm.active = u.active
+  avatarFile.value = null
+  avatarPreview.value = u.avatar ? resolveAvatarUrl(u.avatar) : ''
   userDialogVisible.value = true
+}
+
+/** 触发头像文件选择 */
+function triggerAvatarInput() {
+  avatarInputRef.value?.click()
+}
+
+/** 处理头像文件选择 */
+function onAvatarSelected(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  if (file.size > 2 * 1024 * 1024) {
+    ElMessage.warning('头像文件不能超过 2MB')
+    return
+  }
+  avatarFile.value = file
+  avatarPreview.value = URL.createObjectURL(file)
+  input.value = ''
 }
 
 /** 提交创建/编辑用户表单 */
@@ -483,6 +528,7 @@ async function submitUser() {
 
   savingUser.value = true
   try {
+    let newUserId: number | null = null
     if (editingUserId.value) {
       await updateUser(editingUserId.value, {
         name,
@@ -495,7 +541,7 @@ async function submitUser() {
     } else {
       const defaultRoleName =
         roles.value.find((r) => r.id === userForm.roleIds[0])?.name || 'tester'
-      await createUser({
+      const created = await createUser({
         name,
         email,
         phone: phone || undefined,
@@ -504,7 +550,17 @@ async function submitUser() {
         role_ids: userForm.roleIds,
         project_ids: userForm.projectIds,
       })
+      newUserId = (created as any)?.id ?? null
       ElMessage.success('用户创建成功')
+    }
+    // 上传头像（如果选择了新文件）
+    const savedUserId = editingUserId.value ?? newUserId
+    if (avatarFile.value && savedUserId) {
+      try {
+        await uploadUserAvatar(savedUserId, avatarFile.value)
+      } catch {
+        ElMessage.warning('头像上传失败，用户信息已保存')
+      }
     }
     userDialogVisible.value = false
     await loadUsers()
@@ -1079,4 +1135,51 @@ onMounted(async () => {
 /* Modals */
 .um-dialog :deep(.el-dialog) { background: #1e1e2d; border-radius: 12px; }
 .um-dialog :deep(.el-dialog__title) { color: #fff; }
+
+/* Avatar Upload */
+.um-avatar-upload {
+  width: 80px;
+  height: 80px;
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px dashed rgba(124, 58, 237, 0.3);
+  transition: all 0.25s ease;
+  position: relative;
+}
+.um-avatar-upload:hover {
+  border-color: rgba(124, 58, 237, 0.7);
+  box-shadow: 0 0 16px rgba(124, 58, 237, 0.15);
+}
+.um-avatar-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.um-avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(124, 58, 237, 0.08);
+}
+.um-avatar-placeholder-icon {
+  font-size: 24px;
+  font-weight: 300;
+  color: rgba(210, 187, 255, 0.6);
+  line-height: 1;
+}
+.um-avatar-placeholder-text {
+  font-size: 10px;
+  color: rgba(210, 187, 255, 0.5);
+  margin-top: 4px;
+}
+.um-avatar-hint {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 6px;
+  display: block;
+}
 </style>

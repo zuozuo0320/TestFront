@@ -78,13 +78,8 @@ function onModuleClick(node: any) {
     return
   }
 
-  if (globalSelectedModuleId.value === id && id !== 0) {
-    globalSelectedModulePath.value = ''
-    globalSelectedModuleId.value = 0
-  } else {
-    globalSelectedModulePath.value = path
-    globalSelectedModuleId.value = id
-  }
+  globalSelectedModulePath.value = path
+  globalSelectedModuleId.value = id
 }
 
 /** 聚合目录树：包含“全部用例”和“未规划用例”作为顶层节点，确保对齐 */
@@ -264,6 +259,7 @@ const systemNavItems: { key: SystemMenu; label: string }[] = [
             node-key="id"
             :indent="16"
             :default-expand-all="globalTreeExpanded"
+            :expand-on-click-node="false"
             highlight-current
             @node-click="onModuleClick"
           >

@@ -2,7 +2,6 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox, ElImageViewer } from 'element-plus'
 import { CopyDocument, Delete, Edit, Search, Grid, List } from '@element-plus/icons-vue'
-import { useRouter } from 'vue-router'
 import StatusBadge from '../components/StatusBadge.vue'
 import LevelBadge from '../components/LevelBadge.vue'
 
@@ -57,9 +56,11 @@ type TableRow = {
   remark: string
   updatedBy: number
   updatedByName: string
+  updatedByAvatar: string
   updatedAt: string
   createdBy: number
   createdByName: string
+  createdByAvatar: string
   createdAt: string
   priority: string
   status: 'draft' | 'pending' | 'active' | 'discarded'
@@ -72,7 +73,6 @@ type StepRow = { action: string; expected: string }
 
 const projectStore = useProjectStore()
 const authStore = useAuthStore()
-const router = useRouter()
 
 const isAdminOrManager = computed(() => {
   const role = authStore.user?.role
@@ -309,7 +309,6 @@ function onModuleClick(path: string, id: number = 0) {
     localStorage.setItem(`tp-module-path-${selectedProject.value}`, globalSelectedModulePath.value)
   } catch {}
   page.value = 1
-  loadCases({ skipTree: true })
 }
 
 // Bind to global test case tree state
@@ -337,7 +336,7 @@ watch(
   { immediate: true },
 )
 
-watch(globalSelectedModuleId, () => {
+watch(globalSelectedModulePath, () => {
   page.value = 1
   loadCases({ skipTree: true })
 })
@@ -411,9 +410,11 @@ function toRow(tc: TestCase): TableRow {
     remark: tc.remark || '',
     updatedBy: tc.updated_by,
     updatedByName: tc.updated_by_name || '-',
+    updatedByAvatar: tc.updated_by_avatar || '',
     updatedAt: formatTime(tc.updated_at),
     createdBy: tc.created_by,
     createdByName: tc.created_by_name || '-',
+    createdByAvatar: tc.created_by_avatar || '',
     createdAt: formatTime(tc.created_at),
     priority: tc.priority,
     status: tc.status || 'draft',
@@ -479,6 +480,10 @@ async function loadCases(opts?: { skipTree?: boolean }) {
   }
   appLoading.value = true
   try {
+    // 中文注释：目录树点击使用 module_path 做前缀筛选，父目录需要能覆盖全部子目录用例；
+    // 顶部“所属模块”下拉仍保留 module_id 精确筛选能力，两者并存时以下拉精确筛选优先。
+    const exactModuleId = moduleIdFilter.value || undefined
+    const treeModulePath = globalSelectedModulePath.value || undefined
     const data = await listTestCases(selectedProject.value, {
       page: page.value,
       pageSize: pageSize.value,
@@ -495,13 +500,8 @@ async function loadCases(opts?: { skipTree?: boolean }) {
       updated_before: updatedBefore.value || undefined,
       sortBy: sortBy.value,
       sortOrder: sortOrder.value,
-      module_id:
-        moduleIdFilter.value ||
-        (globalSelectedModuleId.value !== 0 ? globalSelectedModuleId.value : undefined),
-      module_path:
-        globalSelectedModuleId.value === 0 && globalSelectedModulePath.value
-          ? globalSelectedModulePath.value
-          : undefined,
+      module_id: exactModuleId,
+      module_path: exactModuleId ? undefined : treeModulePath,
     })
     const items = Array.isArray((data as any).items) ? (data as any).items : []
     rows.value = items.map(toRow)
@@ -786,53 +786,6 @@ async function onCloneCase(row: TableRow) {
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.error || '复制失败')
   }
-}
-
-function onAddToReview(row: TableRow) {
-  openReviewCreate([row.id])
-}
-
-function onBatchAddToReview() {
-  const candidateIds = rows.value
-    .filter((row) => selectedIds.value.includes(row.id) && row.status !== 'discarded')
-    .map((row) => row.id)
-
-  if (candidateIds.length === 0) {
-    ElMessage.warning('请先选择可加入评审的用例')
-    return
-  }
-
-  openReviewCreate(candidateIds)
-}
-
-function openReviewCreate(testcaseIds: number[]) {
-  const ids = Array.from(new Set(testcaseIds.filter((id) => Number.isFinite(id) && id > 0)))
-  if (ids.length === 0) {
-    ElMessage.warning('未找到可加入评审的用例')
-    return
-  }
-
-  router.push({
-    name: 'CaseReviews',
-    query: {
-      create: '1',
-      testcaseIds: ids.join(','),
-    },
-  })
-}
-
-function onViewReview(row: TableRow) {
-  if (!row.currentReviewId) {
-    ElMessage.warning('当前用例暂无进行中的评审计划')
-    return
-  }
-
-  router.push({
-    name: 'CaseReviews',
-    query: {
-      reviewId: String(row.currentReviewId),
-    },
-  })
 }
 
 async function onDiscard(row: TableRow) {
@@ -1362,10 +1315,6 @@ watch(selectedProject, (newId) => {
                 </div>
               </div>
               <div class="batch-actions">
-                <button class="batch-action-item" @click="onBatchAddToReview">
-                  <span class="material-symbols-outlined" style="color: #60a5fa">rate_review</span>
-                  <span>批量加入评审</span>
-                </button>
                 <button class="batch-action-item">
                   <span class="material-symbols-outlined" style="color: #a78bfa">person_add</span>
                   <span>分配负责人</span>
@@ -1476,13 +1425,12 @@ watch(selectedProject, (newId) => {
                   {{ sortBy === 'created_at' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕' }}
                 </span>
               </th>
-              <th style="width: 50px">版本</th>
               <th style="width: 130px">操作</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="loadError">
-              <td colspan="14" class="empty-td">
+              <td colspan="13" class="empty-td">
                 {{ loadError }}
                 <el-button size="small" style="margin-left: 10px" @click="loadCases">
                   重试
@@ -1490,7 +1438,7 @@ watch(selectedProject, (newId) => {
               </td>
             </tr>
             <tr v-else-if="rows.length === 0">
-              <td colspan="14" class="empty-td testcase-empty-cell">
+              <td colspan="13" class="empty-td testcase-empty-cell">
                 <div class="testcase-empty-wrap">
                   <el-empty description="暂无数据" :image-size="140">
                     <el-button type="primary" plain @click="openCreate">去新建</el-button>
@@ -1543,18 +1491,10 @@ watch(selectedProject, (newId) => {
               <td>
                 <div class="review-cell">
                   <StatusBadge :value="r.reviewResult" />
-                  <button
-                    v-if="r.currentReviewId"
-                    type="button"
-                    class="review-link-btn"
-                    @click="onViewReview(r)"
-                  >
-                    {{ r.currentReviewName || '查看当前评审' }}
-                  </button>
-                  <span v-else class="review-meta" :class="{ active: r.inReview }">
+                  <span class="review-meta" :class="{ active: r.inReview }">
                     {{
                       r.inReview
-                        ? '评审中'
+                        ? r.currentReviewName || '评审中'
                         : r.relatedReviewCount > 0
                           ? `历史关联 ${r.relatedReviewCount} 次`
                           : '暂无关联评审'
@@ -1597,7 +1537,13 @@ watch(selectedProject, (newId) => {
               </td>
               <td>
                 <div class="table-user">
-                  <div class="table-user-avatar">
+                  <img
+                    v-if="r.updatedByAvatar"
+                    class="table-user-avatar-img"
+                    :src="serverUrl + r.updatedByAvatar"
+                    :alt="r.updatedByName"
+                  />
+                  <div v-else class="table-user-avatar">
                     {{ r.updatedByName ? r.updatedByName.substring(0, 1).toUpperCase() : 'U' }}
                   </div>
                   <span class="table-user-name">{{ r.updatedByName }}</span>
@@ -1610,7 +1556,13 @@ watch(selectedProject, (newId) => {
               </td>
               <td>
                 <div class="table-user">
-                  <div class="table-user-avatar">
+                  <img
+                    v-if="r.createdByAvatar"
+                    class="table-user-avatar-img"
+                    :src="serverUrl + r.createdByAvatar"
+                    :alt="r.createdByName"
+                  />
+                  <div v-else class="table-user-avatar">
                     {{ r.createdByName ? r.createdByName.substring(0, 1).toUpperCase() : 'C' }}
                   </div>
                   <span class="table-user-name">{{ r.createdByName }}</span>
@@ -1622,34 +1574,7 @@ watch(selectedProject, (newId) => {
                 </span>
               </td>
               <td>
-                <span style="font-family: monospace; font-weight: 600; color: #10b981">
-                  {{ r.version }}
-                </span>
-              </td>
-              <td>
                 <div class="action-group">
-                  <button
-                    v-if="r.status !== 'discarded'"
-                    class="action-btn action-edit icon-only"
-                    style="color: #6366f1"
-                    @click="onAddToReview(r)"
-                  >
-                    <span class="material-symbols-outlined" style="font-size: 18px">
-                      rate_review
-                    </span>
-                    <span>加入评审</span>
-                  </button>
-                  <button
-                    v-if="r.currentReviewId"
-                    class="action-btn action-edit icon-only"
-                    style="color: #8b5cf6"
-                    @click="onViewReview(r)"
-                  >
-                    <span class="material-symbols-outlined" style="font-size: 18px">
-                      visibility
-                    </span>
-                    <span>查看评审</span>
-                  </button>
                   <button
                     v-if="r.status === 'active' && isAdminOrManager"
                     class="action-btn action-edit icon-only"
@@ -2003,22 +1928,6 @@ watch(selectedProject, (newId) => {
                         }}
                       </span>
                     </div>
-                    <button
-                      v-if="editingCaseRow?.currentReviewId"
-                      type="button"
-                      class="review-readonly-link"
-                      @click="onViewReview(editingCaseRow)"
-                    >
-                      查看当前评审
-                    </button>
-                    <button
-                      v-else-if="editingCaseRow && editingCaseRow.status !== 'discarded'"
-                      type="button"
-                      class="review-readonly-link"
-                      @click="onAddToReview(editingCaseRow)"
-                    >
-                      加入评审
-                    </button>
                   </div>
                 </div>
 
