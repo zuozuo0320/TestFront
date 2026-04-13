@@ -1489,18 +1489,7 @@ watch(selectedProject, (newId) => {
                 {{ (r.modulePath || '').split('/').filter(Boolean).pop() || '未分类' }}
               </td>
               <td>
-                <div class="review-cell">
-                  <StatusBadge :value="r.reviewResult" />
-                  <span class="review-meta" :class="{ active: r.inReview }">
-                    {{
-                      r.inReview
-                        ? r.currentReviewName || '评审中'
-                        : r.relatedReviewCount > 0
-                          ? `历史关联 ${r.relatedReviewCount} 次`
-                          : '暂无关联评审'
-                    }}
-                  </span>
-                </div>
+                <StatusBadge :value="r.reviewResult" />
               </td>
               <td>
                 <el-tag

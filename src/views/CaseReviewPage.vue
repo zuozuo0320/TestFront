@@ -1339,7 +1339,7 @@ function statusBadgeClass(status: string) {
 }
 .pipeline-table td {
   padding: 18px 24px;
-  font-size: 14px;
+  font-size: 13px;
 }
 .td-right {
   text-align: right;
@@ -1365,11 +1365,11 @@ function statusBadgeClass(status: string) {
 .person-cell {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 .avatar-circle {
-  width: 28px;
-  height: 28px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--tp-primary, #7c3aed), var(--tp-info, #0566d9));
   display: flex;
@@ -1381,15 +1381,15 @@ function statusBadgeClass(status: string) {
   flex-shrink: 0;
 }
 .avatar-circle-img {
-  width: 28px;
-  height: 28px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 .person-name {
-  font-size: 14px;
+  font-size: 13px;
   color: rgba(255, 255, 255, 0.88);
   font-weight: 500;
 }
@@ -1434,7 +1434,7 @@ function statusBadgeClass(status: string) {
   display: inline-block;
   padding: 5px 12px;
   border-radius: 9999px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
