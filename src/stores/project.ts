@@ -5,7 +5,7 @@ import type { Project } from '../api/types'
 
 const NAV_STATE_KEY = 'tp-nav-state-v1'
 const topMenus = ['workbench', 'project', 'plan', 'testcases', 'e2e', 'system'] as const
-const systemMenus = ['users', 'roles', 'projects'] as const
+const systemMenus = ['users', 'roles', 'projects', 'tags'] as const
 
 export type TopMenu = (typeof topMenus)[number]
 export type SystemMenu = (typeof systemMenus)[number]

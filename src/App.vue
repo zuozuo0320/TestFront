@@ -63,12 +63,14 @@ const routeToMenu: Record<string, TopMenu> = {
   '/system/users': 'system',
   '/system/roles': 'system',
   '/system/projects': 'system',
+  '/system/tags': 'system',
 }
 
 const routeToSystemMenu: Record<string, SystemMenu> = {
   '/system/users': 'users',
   '/system/roles': 'roles',
   '/system/projects': 'projects',
+  '/system/tags': 'tags',
 }
 
 // Sync topMenu/activeMenu from route

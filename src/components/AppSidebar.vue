@@ -12,7 +12,7 @@ import {
 } from '../composables/useTestCaseTree'
 
 type TopMenu = 'workbench' | 'project' | 'plan' | 'testcases' | 'e2e' | 'system'
-type SystemMenu = 'users' | 'roles' | 'projects'
+type SystemMenu = 'users' | 'roles' | 'projects' | 'tags'
 
 /** 无权访问系统管理的角色集合（FR-02-22） */
 const NO_SYSTEM_ROLES = new Set(['readonly', 'developer', 'reviewer'])
@@ -124,6 +124,7 @@ const systemNavItems: { key: SystemMenu; label: string }[] = [
   { key: 'users', label: '用户管理' },
   { key: 'roles', label: '角色管理' },
   { key: 'projects', label: '项目管理' },
+  { key: 'tags', label: '标签管理' },
 ]
 </script>
 

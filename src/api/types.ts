@@ -69,6 +69,7 @@ export type TestCase = {
   current_review_id?: number
   current_review_name?: string
   related_review_count?: number
+  tag_list?: { id: number; name: string; color: string }[]
 }
 
 export type TestCaseListResp = {

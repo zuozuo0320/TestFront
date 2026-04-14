@@ -33,6 +33,8 @@ import {
 import { apiClient } from '../api/client'
 import { uploadAttachment, listAttachments, deleteAttachment } from '../api/attachment'
 import { importTestCases } from '../api/xlsx'
+import { listTagOptions, createTag } from '../api/tag'
+import type { TagBrief } from '../api/tag'
 import { getModuleTree, createModule, renameModule, deleteModule } from '../api/module'
 import type { TestCase, CaseAttachment, ModuleTreeNode as APIModuleTreeNode } from '../api/types'
 
@@ -65,6 +67,7 @@ type TableRow = {
   priority: string
   status: 'draft' | 'pending' | 'active' | 'discarded'
   version: string
+  tagList: { id: number; name: string; color: string }[]
 }
 
 type StepRow = { action: string; expected: string }
@@ -249,6 +252,51 @@ const caseForm = reactive({
 const caseAttachments = ref<CaseAttachment[]>([])
 const caseHistory = ref<any[]>([])
 
+// ── Tags ──
+const projectTagOptions = ref<TagBrief[]>([])
+const selectedTagIds = ref<number[]>([])
+const tagSearchQuery = ref('')
+
+async function loadTagOptions() {
+  if (!selectedProject.value) {
+    projectTagOptions.value = []
+    return
+  }
+  try {
+    const resp = await listTagOptions(selectedProject.value)
+    projectTagOptions.value = Array.isArray(resp) ? resp : []
+  } catch {
+    projectTagOptions.value = []
+  }
+}
+
+async function onTagQuickCreate(name: string) {
+  if (!selectedProject.value || !name.trim()) return
+  try {
+    const tag = await createTag(selectedProject.value, {
+      name: name.trim(),
+      color: '#3B82F6',
+    })
+    if (tag && tag.id) {
+      projectTagOptions.value.push({ id: tag.id, name: tag.name, color: tag.color })
+      selectedTagIds.value.push(tag.id)
+    }
+  } catch (e: any) {
+    // 409: 已存在，自动选中
+    if (e?.response?.status === 409) {
+      const existing = projectTagOptions.value.find(
+        (t) => t.name.toLowerCase() === name.trim().toLowerCase(),
+      )
+      if (existing && !selectedTagIds.value.includes(existing.id)) {
+        selectedTagIds.value.push(existing.id)
+        ElMessage.info('标签已存在，已为您自动选中')
+      }
+    } else {
+      ElMessage.error(e?.response?.data?.message || '创建标签失败')
+    }
+  }
+}
+
 const directoryForm = reactive({ parentPath: '/', parentId: 0, name: '' })
 
 // ── Computed ──
@@ -419,6 +467,7 @@ function toRow(tc: TestCase): TableRow {
     priority: tc.priority,
     status: tc.status || 'draft',
     version: tc.version || 'V1',
+    tagList: tc.tag_list || [],
   }
 }
 
@@ -594,6 +643,8 @@ function openCreate() {
   })
   stepRows.value = [{ action: '', expected: '' }]
   caseAttachments.value = []
+  selectedTagIds.value = []
+  loadTagOptions()
   dialogVisible.value = true
 }
 
@@ -613,6 +664,8 @@ async function openEdit(row: TableRow) {
     priority: row.priority || 'medium',
   })
   stepRows.value = parseStepsToRows(row.steps)
+  selectedTagIds.value = row.tagList.map((t) => t.id)
+  loadTagOptions()
   // Load attachments
   if (selectedProject.value && row.id) {
     try {
@@ -663,6 +716,7 @@ async function submitCase() {
       module_path: caseForm.modulePath.trim(),
       module_id: caseForm.moduleId || 0,
       tags: caseForm.tags.trim(),
+      tag_ids: selectedTagIds.value,
       precondition: caseForm.precondition,
       steps: stepsText,
       remark: caseForm.remark,
@@ -1516,10 +1570,23 @@ watch(selectedProject, (newId) => {
                   }}
                 </el-tag>
               </td>
-              <td :title="r.tags || '-'">
-                <div v-if="r.tags" style="display: flex; gap: 4px; flex-wrap: wrap">
-                  <span v-for="t in r.tags.split(',')" :key="t" class="table-tag">
-                    {{ t.trim() }}
+              <td>
+                <div v-if="r.tagList.length > 0" style="display: flex; gap: 4px; flex-wrap: wrap">
+                  <span
+                    v-for="t in r.tagList.slice(0, 3)"
+                    :key="t.id"
+                    class="table-tag"
+                    :style="{ backgroundColor: t.color + '20', color: t.color, borderColor: t.color + '40' }"
+                  >
+                    {{ t.name }}
+                  </span>
+                  <span
+                    v-if="r.tagList.length > 3"
+                    class="table-tag"
+                    style="background: rgba(255,255,255,0.06); color: var(--tp-gray-400)"
+                    :title="r.tagList.slice(3).map(t => t.name).join(', ')"
+                  >
+                    +{{ r.tagList.length - 3 }}
                   </span>
                 </div>
                 <span v-else style="color: var(--tp-gray-500)">-</span>
@@ -1937,12 +2004,42 @@ watch(selectedProject, (newId) => {
                 <!-- Tags -->
                 <div class="stitch-form-item col-span-full">
                   <label>标签</label>
-                  <input
-                    v-model="caseForm.tags"
-                    type="text"
-                    class="stitch-input"
-                    placeholder="多个标签以逗号分隔，如: smoke, core"
-                  />
+                  <div class="tag-selector-wrap">
+                    <div class="tag-selected-list">
+                      <span
+                        v-for="tid in selectedTagIds"
+                        :key="tid"
+                        class="tag-selected-item"
+                        :style="{
+                          backgroundColor: (projectTagOptions.find(t => t.id === tid)?.color || '#3B82F6') + '20',
+                          color: projectTagOptions.find(t => t.id === tid)?.color || '#3B82F6',
+                          borderColor: (projectTagOptions.find(t => t.id === tid)?.color || '#3B82F6') + '40',
+                        }"
+                      >
+                        {{ projectTagOptions.find(t => t.id === tid)?.name || tid }}
+                        <button class="tag-remove-btn" @click="selectedTagIds = selectedTagIds.filter(id => id !== tid)">&times;</button>
+                      </span>
+                    </div>
+                    <el-select
+                      v-model="selectedTagIds"
+                      multiple
+                      filterable
+                      placeholder="搜索或选择标签..."
+                      class="tag-selector"
+                      :reserve-keyword="true"
+                      no-data-text="无匹配标签"
+                    >
+                      <el-option
+                        v-for="opt in projectTagOptions"
+                        :key="opt.id"
+                        :label="opt.name"
+                        :value="opt.id"
+                      >
+                        <span class="tag-option-dot" :style="{ backgroundColor: opt.color }"></span>
+                        <span>{{ opt.name }}</span>
+                      </el-option>
+                    </el-select>
+                  </div>
                 </div>
 
                 <!-- Rich text for condition (Actually precondition) -->
@@ -2405,5 +2502,53 @@ watch(selectedProject, (newId) => {
 .review-readonly-link:hover {
   color: var(--tp-primary-dark);
   text-decoration: underline;
+}
+
+/* Tag selector in case drawer */
+.tag-selector-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tag-selected-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag-selected-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid;
+}
+
+.tag-remove-btn {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  opacity: 0.6;
+}
+
+.tag-remove-btn:hover {
+  opacity: 1;
+}
+
+.tag-option-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: middle;
 }
 </style>

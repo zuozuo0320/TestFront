@@ -62,6 +62,12 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresAdmin: true },
     },
     {
+      path: '/system/tags',
+      name: 'TagManagement',
+      component: () => import('../views/system/TagManagement.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+    {
       path: '/ai-script',
       name: 'AiScriptTaskList',
       component: () => import('../views/ai-script/AiScriptTaskList.vue'),
