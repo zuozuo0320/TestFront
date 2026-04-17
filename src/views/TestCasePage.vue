@@ -32,6 +32,11 @@ import {
 } from '../api/testcase'
 import { apiClient } from '../api/client'
 import { uploadAttachment, listAttachments, deleteAttachment } from '../api/attachment'
+import {
+  listReviewAttachmentsByTestCase,
+  downloadReviewAttachment,
+  type CaseReviewAttachment,
+} from '../api/caseReviewAttachment'
 import { importTestCases } from '../api/xlsx'
 import { listTagOptions, createTag } from '../api/tag'
 import type { TagBrief } from '../api/tag'
@@ -250,6 +255,8 @@ const caseForm = reactive({
 
 // Attachments
 const caseAttachments = ref<CaseAttachment[]>([])
+const reviewAttachments = ref<CaseReviewAttachment[]>([])
+const reviewAttachmentsLoading = ref(false)
 const caseHistory = ref<any[]>([])
 
 // ── Tags ──
@@ -643,6 +650,7 @@ function openCreate() {
   })
   stepRows.value = [{ action: '', expected: '' }]
   caseAttachments.value = []
+  reviewAttachments.value = []
   selectedTagIds.value = []
   loadTagOptions()
   dialogVisible.value = true
@@ -674,6 +682,18 @@ async function openEdit(row: TableRow) {
     } catch {
       caseAttachments.value = []
     }
+    // Load review attachments (read-only evidences)
+    reviewAttachmentsLoading.value = true
+    try {
+      reviewAttachments.value = await listReviewAttachmentsByTestCase(
+        selectedProject.value,
+        row.id,
+      )
+    } catch {
+      reviewAttachments.value = []
+    } finally {
+      reviewAttachmentsLoading.value = false
+    }
     // Load history
     try {
       const resp = await listCaseHistory(selectedProject.value, row.id)
@@ -684,6 +704,7 @@ async function openEdit(row: TableRow) {
     }
   } else {
     caseAttachments.value = []
+    reviewAttachments.value = []
     caseHistory.value = []
   }
   dialogVisible.value = true
@@ -982,6 +1003,37 @@ async function downloadAttachment(file: CaseAttachment) {
     const a = document.createElement('a')
     a.href = url
     a.download = file.file_name || 'download'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch {
+    ElMessage.error('下载失败')
+  }
+}
+
+// ── Review attachments (read-only evidences) ──
+
+function formatReviewAttSize(size: number) {
+  if (!size) return '0 B'
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / 1024 / 1024).toFixed(2)} MB`
+}
+
+function formatReviewAttDate(dateStr?: string) {
+  if (!dateStr) return ''
+  return dateStr.replace('T', ' ').substring(0, 16)
+}
+
+async function downloadReviewAtt(att: CaseReviewAttachment) {
+  if (!selectedProject.value) return
+  try {
+    const blob = await downloadReviewAttachment(selectedProject.value, att.id)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = att.file_name || 'download'
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -2315,6 +2367,59 @@ watch(selectedProject, (newId) => {
               </div>
             </section>
 
+            <!-- Review Attachments (read-only) -->
+            <section class="stitch-panel" v-if="editingId">
+              <h3 class="stitch-subtitle">
+                来自评审的证据
+                <span class="review-att-count">({{ reviewAttachments.length }})</span>
+                <span class="review-att-hint">在评审任务中上传的附件，仅可查看与下载</span>
+              </h3>
+              <div
+                v-if="reviewAttachmentsLoading"
+                class="review-att-empty"
+              >
+                加载中…
+              </div>
+              <div
+                v-else-if="reviewAttachments.length === 0"
+                class="review-att-empty"
+              >
+                <span class="material-symbols-outlined">fact_check</span>
+                <span>暂无评审证据</span>
+              </div>
+              <div v-else class="review-att-list">
+                <div
+                  v-for="att in reviewAttachments"
+                  :key="att.id"
+                  class="review-att-item"
+                >
+                  <div class="review-att-icon">
+                    <span class="material-symbols-outlined">description</span>
+                  </div>
+                  <div class="review-att-main">
+                    <div class="review-att-title" :title="att.file_name">
+                      {{ att.file_name }}
+                      <span class="review-att-badge">评审</span>
+                    </div>
+                    <div class="review-att-meta">
+                      <span>{{ formatReviewAttSize(att.file_size) }}</span>
+                      <span v-if="att.uploader_name">· {{ att.uploader_name }}</span>
+                      <span v-if="att.review_name">· {{ att.review_name }}</span>
+                      <span v-if="att.round_no">· 第 {{ att.round_no }} 轮</span>
+                      <span v-if="att.created_at">· {{ formatReviewAttDate(att.created_at) }}</span>
+                    </div>
+                  </div>
+                  <button
+                    class="review-att-btn"
+                    title="下载"
+                    @click="downloadReviewAtt(att)"
+                  >
+                    <span class="material-symbols-outlined">download</span>
+                  </button>
+                </div>
+              </div>
+            </section>
+
             <!-- Recent Activity -->
             <section class="stitch-panel">
               <h3 class="stitch-subtitle">最新动态</h3>
@@ -2550,5 +2655,115 @@ watch(selectedProject, (newId) => {
   border-radius: 50%;
   margin-right: 8px;
   vertical-align: middle;
+}
+
+/* ── Review attachments (read-only evidences) ── */
+.review-att-count {
+  margin-left: 8px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 400;
+}
+.review-att-hint {
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.4);
+}
+.review-att-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 12px;
+}
+.review-att-empty .material-symbols-outlined {
+  font-size: 28px;
+  opacity: 0.5;
+}
+.review-att-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.review-att-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.review-att-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: rgba(124, 58, 237, 0.15);
+  color: #d2bbff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.review-att-icon .material-symbols-outlined {
+  font-size: 18px;
+}
+.review-att-main {
+  flex: 1;
+  min-width: 0;
+}
+.review-att-title {
+  font-size: 13px;
+  color: #e5e5e5;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.review-att-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  background: rgba(124, 58, 237, 0.25);
+  color: #d2bbff;
+  flex-shrink: 0;
+}
+.review-att-meta {
+  margin-top: 2px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+}
+.review-att-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #d2bbff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+.review-att-btn:hover {
+  background: rgba(124, 58, 237, 0.25);
+}
+.review-att-btn .material-symbols-outlined {
+  font-size: 16px;
 }
 </style>

@@ -9,6 +9,11 @@ import {
   type CaseReview, type CaseReviewItem, type CaseReviewRecord,
   type ReviewItemListParams
 } from '@/api/caseReview'
+import {
+  uploadReviewAttachment, listReviewAttachmentsByItem,
+  deleteReviewAttachment, downloadReviewAttachment,
+  type CaseReviewAttachment,
+} from '@/api/caseReviewAttachment'
 import { apiClient } from '@/api/client'
 import { useProjectStore } from '@/stores/project'
 
@@ -54,11 +59,129 @@ const linkLoading = ref(false)
 const reassignDialogVisible = ref(false)
 const reassignReviewerIds = ref<number[]>([])
 
-// 评审记录
+// 评审记录（主区域内嵌 + drawer 共用同一份数据）
 const recordDrawerVisible = ref(false)
 const records = ref<CaseReviewRecord[]>([])
 const recordsLoading = ref(false)
 const recordDrawerItem = ref<CaseReviewItem | null>(null)
+
+// 加载当前评审项的历史记录，供左栏时间线展示
+async function loadCurrentItemRecords() {
+  if (!projectId.value || !reviewId.value || !currentItem.value) {
+    records.value = []
+    return
+  }
+  recordsLoading.value = true
+  try {
+    const resp = await listItemRecords(
+      projectId.value,
+      reviewId.value,
+      currentItem.value.id,
+      { page: 1, pageSize: 50 },
+    )
+    records.value = resp.items || []
+  } catch {
+    records.value = []
+  } finally {
+    recordsLoading.value = false
+  }
+}
+
+// 评审附件
+const attachments = ref<CaseReviewAttachment[]>([])
+const attachmentsLoading = ref(false)
+const attachmentUploading = ref(false)
+const attachmentInputRef = ref<HTMLInputElement | null>(null)
+
+async function loadAttachments() {
+  if (!projectId.value || !reviewId.value || !currentItem.value) {
+    attachments.value = []
+    return
+  }
+  attachmentsLoading.value = true
+  try {
+    attachments.value = await listReviewAttachmentsByItem(
+      projectId.value,
+      reviewId.value,
+      currentItem.value.id,
+    )
+  } catch {
+    attachments.value = []
+  } finally {
+    attachmentsLoading.value = false
+  }
+}
+
+function triggerAttachmentUpload() {
+  attachmentInputRef.value?.click()
+}
+
+async function onAttachmentFileChange(e: Event) {
+  const target = e.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+  if (!currentItem.value) {
+    ElMessage.warning('请先选择评审用例')
+    target.value = ''
+    return
+  }
+  attachmentUploading.value = true
+  try {
+    await uploadReviewAttachment(
+      projectId.value,
+      reviewId.value,
+      currentItem.value.id,
+      file,
+    )
+    ElMessage.success('上传成功')
+    await loadAttachments()
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.error || '上传失败')
+  } finally {
+    attachmentUploading.value = false
+    target.value = ''
+  }
+}
+
+async function handleDeleteAttachment(att: CaseReviewAttachment) {
+  try {
+    await ElMessageBox.confirm(`确定删除附件「${att.file_name}」？`, '提示', {
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+  try {
+    await deleteReviewAttachment(projectId.value, att.id)
+    ElMessage.success('已删除')
+    await loadAttachments()
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.error || '删除失败')
+  }
+}
+
+async function handleDownloadAttachment(att: CaseReviewAttachment) {
+  try {
+    const blob = await downloadReviewAttachment(projectId.value, att.id)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = att.file_name
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.error || '下载失败')
+  }
+}
+
+function formatFileSize(size: number) {
+  if (!size) return '0 B'
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / 1024 / 1024).toFixed(2)} MB`
+}
 
 // 批量选中
 const selectedItems = ref<CaseReviewItem[]>([])
@@ -181,7 +304,9 @@ async function handleSubmitReview() {
     ElMessage.success('评审提交成功')
     reviewComment.value = ''
     fetchReview()
-    fetchItems()
+    await fetchItems()
+    // 刷新当前用例的评审记录时间线
+    await loadCurrentItemRecords()
     // 自动跳到下一条
     if (currentItemIndex.value < items.value.length - 1) {
       goNextItem()
@@ -240,13 +365,19 @@ async function handleReassign() {
 // ── 评审记录 ──
 async function openRecordDrawer(item: CaseReviewItem) {
   recordDrawerItem.value = item
-  recordsLoading.value = true
   recordDrawerVisible.value = true
-  try {
-    const resp = await listItemRecords(projectId.value, reviewId.value, item.id, { page: 1, pageSize: 50 })
-    records.value = resp.items || []
-  } catch { /* ignore */ } finally {
-    recordsLoading.value = false
+  // 如果点的就是当前用例，直接复用已有数据；否则重新拉取
+  if (!currentItem.value || item.id !== currentItem.value.id) {
+    recordsLoading.value = true
+    try {
+      const resp = await listItemRecords(projectId.value, reviewId.value, item.id, { page: 1, pageSize: 50 })
+      records.value = resp.items || []
+    } catch { /* ignore */ } finally {
+      recordsLoading.value = false
+    }
+  } else {
+    // 点的就是当前用例，保险起见刷一次最新记录
+    await loadCurrentItemRecords()
   }
 }
 
@@ -280,6 +411,20 @@ watch([projectId, reviewId], () => {
     fetchItems()
   }
 })
+
+// 切换当前评审项时，自动拉取其历史记录与附件
+watch(
+  () => currentItem.value?.id,
+  (id) => {
+    if (id) {
+      loadCurrentItemRecords()
+      loadAttachments()
+    } else {
+      records.value = []
+      attachments.value = []
+    }
+  },
+)
 </script>
 
 <template>
@@ -328,7 +473,7 @@ watch([projectId, reviewId], () => {
             <span class="rd-glass-label">创建者</span>
             <div class="rd-glass-value">
               <span class="material-symbols-outlined rd-glass-icon icon-primary">person</span>
-              <span>评审人 #{{ currentItem.created_by }}</span>
+              <span>{{ review?.created_by_name || '未知' }}</span>
             </div>
           </div>
           <div class="rd-glass-card">
@@ -382,12 +527,79 @@ watch([projectId, reviewId], () => {
         <div class="rd-section">
           <h3 class="rd-section-title">
             <span class="material-symbols-outlined rd-section-icon">attachment</span>
-            附件与证据
+            附件与证据 ({{ attachments.length }})
+            <span class="rd-section-hint">评审附件会同步到用例详情作为评审证据（只读）</span>
           </h3>
-          <div class="rd-attachments">
-            <div class="rd-attach-upload">
-              <span class="material-symbols-outlined">add_circle</span>
-              <span class="rd-attach-text">上传附件</span>
+          <input
+            ref="attachmentInputRef"
+            type="file"
+            class="rd-attach-file"
+            @change="onAttachmentFileChange"
+          />
+          <div class="rd-attachments" v-loading="attachmentsLoading">
+            <div
+              class="rd-attach-upload"
+              :class="{ disabled: attachmentUploading || !currentItem }"
+              @click="triggerAttachmentUpload"
+            >
+              <span class="material-symbols-outlined">
+                {{ attachmentUploading ? 'hourglass_empty' : 'add_circle' }}
+              </span>
+              <span class="rd-attach-text">
+                {{ attachmentUploading ? '上传中…' : '上传附件' }}
+              </span>
+            </div>
+            <div
+              v-for="att in attachments"
+              :key="att.id"
+              class="rd-attach-card"
+            >
+              <div class="rd-attach-icon">
+                <span class="material-symbols-outlined">description</span>
+              </div>
+              <div class="rd-attach-info">
+                <div class="rd-attach-name" :title="att.file_name">{{ att.file_name }}</div>
+                <div class="rd-attach-meta">
+                  <span>{{ formatFileSize(att.file_size) }}</span>
+                  <span v-if="att.uploader_name">· {{ att.uploader_name }}</span>
+                </div>
+                <div class="rd-attach-actions">
+                  <button class="rd-attach-btn" @click="handleDownloadAttachment(att)">
+                    <span class="material-symbols-outlined">download</span>
+                    下载
+                  </button>
+                  <button class="rd-attach-btn danger" @click="handleDeleteAttachment(att)">
+                    <span class="material-symbols-outlined">delete</span>
+                    删除
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 评审记录时间线 -->
+        <div class="rd-section">
+          <h3 class="rd-section-title">
+            <span class="material-symbols-outlined rd-section-icon">history</span>
+            评审记录 ({{ records.length }})
+          </h3>
+          <div v-loading="recordsLoading">
+            <div v-if="records.length === 0 && !recordsLoading" class="rd-records-empty">
+              <span class="material-symbols-outlined" style="font-size:32px;opacity:0.3">forum</span>
+              <span>暂无评审记录，提交后将在这里展示</span>
+            </div>
+            <div class="rd-records-inline" v-else>
+              <div v-for="rec in records" :key="rec.id" class="rd-record-card">
+                <div class="rd-record-card-head">
+                  <span class="rd-result-badge" :class="resultClass(rec.result)">{{ resultLabel(rec.result) }}</span>
+                  <span class="rd-record-round">R{{ rec.round_no }}</span>
+                  <span class="rd-record-reviewer">{{ rec.reviewer_name || `评审人 #${rec.reviewer_id}` }}</span>
+                  <span class="rd-record-time">{{ formatDate(rec.created_at) }}</span>
+                </div>
+                <div class="rd-record-comment-inline" v-if="rec.comment">{{ rec.comment }}</div>
+                <div class="rd-record-comment-inline rd-record-comment-empty" v-else>（无评审意见）</div>
+              </div>
             </div>
           </div>
         </div>
@@ -430,14 +642,14 @@ watch([projectId, reviewId], () => {
           <div class="rd-progress-row">
             <span class="rd-progress-label">当前评审进度</span>
             <span class="rd-progress-nums">
-              <span class="rd-progress-big">{{ review.approved_count + review.rejected_count }}</span>
-              <span class="rd-progress-small"> / {{ review.case_total_count }} 待处理</span>
+              <span class="rd-progress-big">{{ review.approved_count + review.rejected_count + review.needs_update_count }}</span>
+              <span class="rd-progress-small"> / {{ review.case_total_count }} 已处理</span>
             </span>
           </div>
           <div class="rd-progress-track">
             <div
               class="rd-progress-fill"
-              :style="{ width: review.case_total_count > 0 ? ((review.approved_count + review.rejected_count) / review.case_total_count * 100) + '%' : '0%' }"
+              :style="{ width: review.case_total_count > 0 ? ((review.approved_count + review.rejected_count + review.needs_update_count) / review.case_total_count * 100) + '%' : '0%' }"
             ></div>
           </div>
         </div>
@@ -704,6 +916,7 @@ watch([projectId, reviewId], () => {
 
 /* 附件 */
 .rd-attachments { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.rd-attach-file { display: none; }
 .rd-attach-upload {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 8px; height: 128px; border-radius: 8px;
@@ -711,7 +924,42 @@ watch([projectId, reviewId], () => {
   cursor: pointer; transition: all 0.2s;
 }
 .rd-attach-upload:hover { border-color: rgba(124, 58, 237, 0.5); color: #d2bbff; }
+.rd-attach-upload.disabled { opacity: 0.5; cursor: not-allowed; }
 .rd-attach-text { font-size: 12px; }
+.rd-section-hint {
+  margin-left: 12px; font-size: 12px; font-weight: 400;
+  color: rgba(204, 195, 216, 0.5);
+}
+.rd-attach-card {
+  display: flex; gap: 12px; height: 128px; padding: 12px;
+  border-radius: 8px; background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.rd-attach-icon {
+  flex-shrink: 0; width: 40px; height: 40px; border-radius: 8px;
+  background: rgba(124, 58, 237, 0.15); color: #d2bbff;
+  display: flex; align-items: center; justify-content: center;
+}
+.rd-attach-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.rd-attach-name {
+  font-size: 13px; color: #e1e1f2; font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rd-attach-meta {
+  font-size: 12px; color: rgba(204, 195, 216, 0.6);
+  display: flex; gap: 4px;
+}
+.rd-attach-actions { margin-top: auto; display: flex; gap: 8px; }
+.rd-attach-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 6px; font-size: 12px;
+  background: rgba(255, 255, 255, 0.06); color: #d2bbff;
+  border: none; cursor: pointer; transition: background 0.2s;
+}
+.rd-attach-btn:hover { background: rgba(124, 58, 237, 0.25); }
+.rd-attach-btn.danger { color: #f87171; }
+.rd-attach-btn.danger:hover { background: rgba(239, 68, 68, 0.2); }
+.rd-attach-btn .material-symbols-outlined { font-size: 14px; }
 
 /* 用例列表 */
 .rd-case-list {
@@ -854,4 +1102,31 @@ watch([projectId, reviewId], () => {
 .rd-record-round { font-size: 12px; color: rgba(204,195,216,0.5); font-weight: 600; }
 .rd-record-time { font-size: 12px; color: rgba(204,195,216,0.3); margin-left: auto; }
 .rd-record-comment { font-size: 13px; color: rgba(204,195,216,0.7); line-height: 1.5; }
+
+/* 主区域内嵌的评审记录时间线 */
+.rd-records-empty {
+  display: flex; align-items: center; gap: 12px;
+  padding: 24px; border-radius: 8px;
+  border: 1px dashed rgba(255,255,255,0.08);
+  color: rgba(204,195,216,0.4); font-size: 13px;
+}
+.rd-records-inline { display: flex; flex-direction: column; gap: 12px; }
+.rd-record-card {
+  padding: 14px 16px; border-radius: 10px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(74,68,85,0.18);
+}
+.rd-record-card-head {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 8px; flex-wrap: wrap;
+}
+.rd-record-reviewer {
+  font-size: 12px; font-weight: 500;
+  color: rgba(204,195,216,0.7);
+}
+.rd-record-comment-inline {
+  font-size: 13px; color: #e1e1f2; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word;
+}
+.rd-record-comment-empty { color: rgba(204,195,216,0.35); font-style: italic; }
 </style>
