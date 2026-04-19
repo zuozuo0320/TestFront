@@ -25,6 +25,7 @@ import {
   batchDeleteTestCases,
   batchUpdateLevel,
   batchMoveTestCases,
+  batchTagTestCases,
   cloneTestCase,
   listCaseHistory,
   discardTestCase,
@@ -37,7 +38,7 @@ import {
   downloadReviewAttachment,
   type CaseReviewAttachment,
 } from '../api/caseReviewAttachment'
-import { importTestCases } from '../api/xlsx'
+import { importTestCases, exportReport } from '../api/xlsx'
 import { listTagOptions, createTag } from '../api/tag'
 import type { TagBrief } from '../api/tag'
 import { getModuleTree, createModule, renameModule, deleteModule } from '../api/module'
@@ -262,8 +263,6 @@ const caseHistory = ref<any[]>([])
 // ── Tags ──
 const projectTagOptions = ref<TagBrief[]>([])
 const selectedTagIds = ref<number[]>([])
-const tagSearchQuery = ref('')
-
 async function loadTagOptions() {
   if (!selectedProject.value) {
     projectTagOptions.value = []
@@ -277,6 +276,7 @@ async function loadTagOptions() {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function onTagQuickCreate(name: string) {
   if (!selectedProject.value || !name.trim()) return
   try {
@@ -685,10 +685,7 @@ async function openEdit(row: TableRow) {
     // Load review attachments (read-only evidences)
     reviewAttachmentsLoading.value = true
     try {
-      reviewAttachments.value = await listReviewAttachmentsByTestCase(
-        selectedProject.value,
-        row.id,
-      )
+      reviewAttachments.value = await listReviewAttachmentsByTestCase(selectedProject.value, row.id)
     } catch {
       reviewAttachments.value = []
     } finally {
@@ -840,6 +837,33 @@ function openBatchMoveDialog() {
 function clearBatchSelection() {
   selectedIds.value = []
   selectAll.value = false
+}
+
+// ── 批量打标签 ──
+const batchTagVisible = ref(false)
+const batchTagSelectedIds = ref<number[]>([])
+
+function openBatchTagDialog() {
+  batchTagSelectedIds.value = []
+  loadTagOptions()
+  batchTagVisible.value = true
+}
+
+async function onBatchTagConfirm() {
+  if (!selectedProject.value || selectedIds.value.length === 0) return
+  if (batchTagSelectedIds.value.length === 0) {
+    ElMessage.warning('请至少选择一个标签')
+    return
+  }
+  try {
+    await batchTagTestCases(selectedProject.value, selectedIds.value, batchTagSelectedIds.value)
+    ElMessage.success(`已为 ${selectedIds.value.length} 条用例打标签`)
+    batchTagVisible.value = false
+    clearBatchSelection()
+    loadCases()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.message || '批量打标签失败')
+  }
 }
 
 function handleToggleSelectAll() {
@@ -1045,6 +1069,40 @@ async function downloadReviewAtt(att: CaseReviewAttachment) {
 
 // ── Import / Export ──
 
+async function onExportReport() {
+  if (!selectedProject.value) {
+    ElMessage.warning('请先选择项目')
+    return
+  }
+  try {
+    appLoading.value = true
+    const exactModuleId = moduleIdFilter.value || undefined
+    const treeModulePath = globalSelectedModulePath.value || undefined
+    await exportReport(selectedProject.value, {
+      keyword: keyword.value.trim() || undefined,
+      level: levelFilter.value || undefined,
+      review_result: reviewFilter.value || undefined,
+      exec_result: execFilter.value || undefined,
+      tags: tagsFilter.value || undefined,
+      created_by: creatorFilter.value ? Number(creatorFilter.value) : undefined,
+      updated_by: updaterFilter.value ? Number(updaterFilter.value) : undefined,
+      created_after: createdAfter.value || undefined,
+      created_before: createdBefore.value || undefined,
+      updated_after: updatedAfter.value || undefined,
+      updated_before: updatedBefore.value || undefined,
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value,
+      module_id: exactModuleId,
+      module_path: exactModuleId ? undefined : treeModulePath,
+    })
+    ElMessage.success('导出成功')
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '导出报表失败')
+  } finally {
+    appLoading.value = false
+  }
+}
+
 async function onImportXlsx(e: Event) {
   const input = e.target as HTMLInputElement
   if (!input.files?.length || !selectedProject.value) return
@@ -1189,13 +1247,7 @@ watch(selectedProject, (newId) => {
             <p class="insights-desc">实时监控项目质量指标与测试进度。</p>
           </div>
           <div class="insights-actions">
-            <button class="insights-btn-secondary">
-              <span class="material-symbols-outlined shrink-0" style="font-size: 18px">
-                calendar_today
-              </span>
-              最近 7 天
-            </button>
-            <button class="insights-btn-primary">
+            <button class="insights-btn-primary" @click="onExportReport">
               <span class="material-symbols-outlined shrink-0">download</span>
               <span>导出报告</span>
             </button>
@@ -1439,14 +1491,11 @@ watch(selectedProject, (newId) => {
                     </el-dropdown-menu>
                   </template>
                 </el-dropdown>
-                <button class="batch-action-item">
+                <button class="batch-action-item" @click="openBatchTagDialog">
                   <span class="material-symbols-outlined" style="color: #34d399">label</span>
                   <span>打标签</span>
                 </button>
-                <button
-                  class="batch-action-item"
-                  @click="openBatchMoveDialog"
-                >
+                <button class="batch-action-item" @click="openBatchMoveDialog">
                   <span class="material-symbols-outlined" style="color: #94a3b8">
                     drive_file_move
                   </span>
@@ -1457,10 +1506,7 @@ watch(selectedProject, (newId) => {
                   <span>批量删除</span>
                 </button>
                 <div class="batch-divider"></div>
-                <button
-                  class="batch-close"
-                  @click="clearBatchSelection"
-                >
+                <button class="batch-close" @click="clearBatchSelection">
                   <span class="material-symbols-outlined">close</span>
                 </button>
               </div>
@@ -1499,11 +1545,7 @@ watch(selectedProject, (newId) => {
           <thead>
             <tr>
               <th style="width: 40px">
-                <input
-                  type="checkbox"
-                  :checked="selectAll"
-                  @change="handleToggleSelectAll"
-                />
+                <input type="checkbox" :checked="selectAll" @change="handleToggleSelectAll" />
               </th>
               <th style="width: 80px" class="sortable" @click="toggleSort('id')">
                 ID
@@ -1573,9 +1615,9 @@ watch(selectedProject, (newId) => {
               >
                 {{ r.id }}
               </td>
-              <td class="name" :title="r.title">
+              <td class="name" :title="r.title" style="cursor: pointer" @click="openEdit(r)">
                 <div style="display: flex; align-items: center; gap: 6px">
-                  <strong>{{ r.title }}</strong>
+                  <strong class="case-title-link">{{ r.title }}</strong>
                   <span
                     v-if="r.status === 'discarded'"
                     style="
@@ -1628,15 +1670,24 @@ watch(selectedProject, (newId) => {
                     v-for="t in r.tagList.slice(0, 3)"
                     :key="t.id"
                     class="table-tag"
-                    :style="{ backgroundColor: t.color + '20', color: t.color, borderColor: t.color + '40' }"
+                    :style="{
+                      backgroundColor: t.color + '20',
+                      color: t.color,
+                      borderColor: t.color + '40',
+                    }"
                   >
                     {{ t.name }}
                   </span>
                   <span
                     v-if="r.tagList.length > 3"
                     class="table-tag"
-                    style="background: rgba(255,255,255,0.06); color: var(--tp-gray-400)"
-                    :title="r.tagList.slice(3).map(t => t.name).join(', ')"
+                    style="background: rgba(255, 255, 255, 0.06); color: var(--tp-gray-400)"
+                    :title="
+                      r.tagList
+                        .slice(3)
+                        .map((t) => t.name)
+                        .join(', ')
+                    "
                   >
                     +{{ r.tagList.length - 3 }}
                   </span>
@@ -1895,6 +1946,47 @@ watch(selectedProject, (newId) => {
       </template>
     </el-dialog>
 
+    <!-- Batch Tag Dialog -->
+    <el-dialog
+      v-model="batchTagVisible"
+      title="批量打标签"
+      width="480px"
+      :close-on-click-modal="false"
+    >
+      <p style="margin-bottom: 12px; color: #94a3b8; font-size: 13px">
+        为已选的 {{ selectedIds.length }} 条用例设置标签（将替换原有标签）
+      </p>
+      <el-select
+        v-model="batchTagSelectedIds"
+        multiple
+        filterable
+        placeholder="搜索或选择标签..."
+        style="width: 100%"
+        :reserve-keyword="true"
+        no-data-text="无匹配标签"
+      >
+        <el-option v-for="opt in projectTagOptions" :key="opt.id" :label="opt.name" :value="opt.id">
+          <span
+            :style="{
+              display: 'inline-block',
+              width: '10px',
+              height: '10px',
+              borderRadius: '50%',
+              backgroundColor: opt.color,
+              marginRight: '8px',
+            }"
+          ></span>
+          {{ opt.name }}
+        </el-option>
+      </el-select>
+      <template #footer>
+        <el-button @click="batchTagVisible = false">取消</el-button>
+        <el-button type="primary" @click="onBatchTagConfirm">
+          确认 ({{ selectedIds.length }} 条)
+        </el-button>
+      </template>
+    </el-dialog>
+
     <!-- Case editor drawer (Stitch Redesign) -->
     <el-drawer
       v-model="dialogVisible"
@@ -1917,8 +2009,13 @@ watch(selectedProject, (newId) => {
               </a>
               <span class="material-symbols-outlined breadcrumb-icon">chevron_right</span>
               <template v-if="caseForm.modulePath && caseForm.modulePath !== '/未规划用例'">
-                <a href="#">{{ caseForm.modulePath }}</a>
-                <span class="material-symbols-outlined breadcrumb-icon">chevron_right</span>
+                <template
+                  v-for="(seg, idx) in caseForm.modulePath.split('/').filter(Boolean)"
+                  :key="idx"
+                >
+                  <a href="#">{{ seg }}</a>
+                  <span class="material-symbols-outlined breadcrumb-icon">chevron_right</span>
+                </template>
               </template>
               <span class="breadcrumb-active">
                 {{ editingId ? '编辑测试用例' : '新建测试用例' }}
@@ -2009,9 +2106,9 @@ watch(selectedProject, (newId) => {
                       class="stitch-select"
                       @change="onModuleChangeInDrawer"
                     >
-                      <option :value="0">/未规划用例</option>
+                      <option :value="0">未规划用例</option>
                       <option v-for="n in flatModules" :key="n.id" :value="n.id">
-                        {{ n.path }}
+                        {{ '\u3000'.repeat(n.path.split('/').length - 2) + n.name }}
                       </option>
                     </select>
                     <span class="material-symbols-outlined select-icon">account_tree</span>
@@ -2063,13 +2160,22 @@ watch(selectedProject, (newId) => {
                         :key="tid"
                         class="tag-selected-item"
                         :style="{
-                          backgroundColor: (projectTagOptions.find(t => t.id === tid)?.color || '#3B82F6') + '20',
-                          color: projectTagOptions.find(t => t.id === tid)?.color || '#3B82F6',
-                          borderColor: (projectTagOptions.find(t => t.id === tid)?.color || '#3B82F6') + '40',
+                          backgroundColor:
+                            (projectTagOptions.find((t) => t.id === tid)?.color || '#3B82F6') +
+                            '20',
+                          color: projectTagOptions.find((t) => t.id === tid)?.color || '#3B82F6',
+                          borderColor:
+                            (projectTagOptions.find((t) => t.id === tid)?.color || '#3B82F6') +
+                            '40',
                         }"
                       >
-                        {{ projectTagOptions.find(t => t.id === tid)?.name || tid }}
-                        <button class="tag-remove-btn" @click="selectedTagIds = selectedTagIds.filter(id => id !== tid)">&times;</button>
+                        {{ projectTagOptions.find((t) => t.id === tid)?.name || tid }}
+                        <button
+                          class="tag-remove-btn"
+                          @click="selectedTagIds = selectedTagIds.filter((id) => id !== tid)"
+                        >
+                          &times;
+                        </button>
                       </span>
                     </div>
                     <el-select
@@ -2368,31 +2474,19 @@ watch(selectedProject, (newId) => {
             </section>
 
             <!-- Review Attachments (read-only) -->
-            <section class="stitch-panel" v-if="editingId">
+            <section v-if="editingId" class="stitch-panel">
               <h3 class="stitch-subtitle">
                 来自评审的证据
                 <span class="review-att-count">({{ reviewAttachments.length }})</span>
                 <span class="review-att-hint">在评审任务中上传的附件，仅可查看与下载</span>
               </h3>
-              <div
-                v-if="reviewAttachmentsLoading"
-                class="review-att-empty"
-              >
-                加载中…
-              </div>
-              <div
-                v-else-if="reviewAttachments.length === 0"
-                class="review-att-empty"
-              >
+              <div v-if="reviewAttachmentsLoading" class="review-att-empty">加载中…</div>
+              <div v-else-if="reviewAttachments.length === 0" class="review-att-empty">
                 <span class="material-symbols-outlined">fact_check</span>
                 <span>暂无评审证据</span>
               </div>
               <div v-else class="review-att-list">
-                <div
-                  v-for="att in reviewAttachments"
-                  :key="att.id"
-                  class="review-att-item"
-                >
+                <div v-for="att in reviewAttachments" :key="att.id" class="review-att-item">
                   <div class="review-att-icon">
                     <span class="material-symbols-outlined">description</span>
                   </div>
@@ -2409,11 +2503,7 @@ watch(selectedProject, (newId) => {
                       <span v-if="att.created_at">· {{ formatReviewAttDate(att.created_at) }}</span>
                     </div>
                   </div>
-                  <button
-                    class="review-att-btn"
-                    title="下载"
-                    @click="downloadReviewAtt(att)"
-                  >
+                  <button class="review-att-btn" title="下载" @click="downloadReviewAtt(att)">
                     <span class="material-symbols-outlined">download</span>
                   </button>
                 </div>
@@ -2765,5 +2855,14 @@ watch(selectedProject, (newId) => {
 }
 .review-att-btn .material-symbols-outlined {
   font-size: 16px;
+}
+
+/* 用例名称可点击样式 */
+.case-title-link {
+  transition: color 0.2s;
+}
+.case-title-link:hover {
+  color: var(--tp-primary-light, #7c3aed);
+  text-decoration: underline;
 }
 </style>

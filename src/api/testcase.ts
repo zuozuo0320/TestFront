@@ -94,6 +94,16 @@ export async function batchMoveTestCases(
   return data
 }
 
+// ========== Batch Tag ==========
+
+export async function batchTagTestCases(projectId: number, ids: number[], tag_ids: number[]) {
+  const { data } = await apiClient.post(`/projects/${projectId}/testcases/batch-tag`, {
+    ids,
+    tag_ids,
+  })
+  return data
+}
+
 // ========== Clone ==========
 
 export async function cloneTestCase(projectId: number, testcaseId: number) {
