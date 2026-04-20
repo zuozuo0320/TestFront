@@ -14,8 +14,8 @@ import HoloOrb from '../components/HoloOrb.vue'
 const passwordFocused = ref(false)
 const router = useRouter()
 const loginLoading = ref(false)
-const loginSuccess = ref(false)   // 登录成功过渡动画
-const rememberMe = ref(true)      // 记住密码
+const loginSuccess = ref(false) // 登录成功过渡动画
+const rememberMe = ref(true) // 记住密码
 const bgCanvas = ref<HTMLCanvasElement | null>(null)
 let animId = 0
 
@@ -25,8 +25,14 @@ const loginForm = reactive({
 })
 
 async function doLogin() {
-  if (!loginForm.email.trim()) { ElMessage.warning('请输入邮箱地址'); return }
-  if (!loginForm.password) { ElMessage.warning('请输入密码'); return }
+  if (!loginForm.email.trim()) {
+    ElMessage.warning('请输入邮箱地址')
+    return
+  }
+  if (!loginForm.password) {
+    ElMessage.warning('请输入密码')
+    return
+  }
   loginLoading.value = true
   try {
     const data = await loginByEmail(loginForm.email, loginForm.password)
@@ -60,7 +66,15 @@ function initBg() {
   let w = (c.width = c.offsetWidth)
   let h = (c.height = c.offsetHeight)
   // 粒子结构：位置、速度、半径、透明度、颜色类型
-  const dots: { x: number; y: number; vx: number; vy: number; r: number; a: number; color: number }[] = []
+  const dots: {
+    x: number
+    y: number
+    vx: number
+    vy: number
+    r: number
+    a: number
+    color: number
+  }[] = []
   const count = 120
   for (let i = 0; i < count; i++) {
     dots.push({
@@ -74,9 +88,9 @@ function initBg() {
     })
   }
   function getColor(c: number, a: number): string {
-    if (c < 0.33) return `rgba(100,140,255,${a})`      // 蓝
+    if (c < 0.33) return `rgba(100,140,255,${a})` // 蓝
     if (c < 0.66) return `rgba(160,100,255,${a * 0.8})` // 紫
-    return `rgba(80,220,255,${a * 0.7})`                // 青
+    return `rgba(80,220,255,${a * 0.7})` // 青
   }
   function draw() {
     ctx.clearRect(0, 0, w, h)
@@ -84,30 +98,38 @@ function initBg() {
     const g1 = ctx.createRadialGradient(w * 0.3, h * 0.5, 0, w * 0.3, h * 0.5, w * 0.4)
     g1.addColorStop(0, 'rgba(100,60,200,0.04)')
     g1.addColorStop(1, 'transparent')
-    ctx.fillStyle = g1; ctx.fillRect(0, 0, w, h)
+    ctx.fillStyle = g1
+    ctx.fillRect(0, 0, w, h)
     const g2 = ctx.createRadialGradient(w * 0.7, h * 0.4, 0, w * 0.7, h * 0.4, w * 0.35)
     g2.addColorStop(0, 'rgba(60,100,200,0.03)')
     g2.addColorStop(1, 'transparent')
-    ctx.fillStyle = g2; ctx.fillRect(0, 0, w, h)
+    ctx.fillStyle = g2
+    ctx.fillRect(0, 0, w, h)
 
     ctx.lineWidth = 0.5
     for (let i = 0; i < count; i++) {
       const p = dots[i]
       if (!p) continue
-      p.x += p.vx; p.y += p.vy
+      p.x += p.vx
+      p.y += p.vy
       if (p.x < 0 || p.x > w) p.vx *= -1
       if (p.y < 0 || p.y > h) p.vy *= -1
       // 粒子圆点（彩色）
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
-      ctx.fillStyle = getColor(p.color, p.a); ctx.fill()
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
+      ctx.fillStyle = getColor(p.color, p.a)
+      ctx.fill()
       // 连线
       for (let j = i + 1; j < count; j++) {
         const q = dots[j]
         if (!q) continue
-        const dx = p.x - q.x, dy = p.y - q.y
+        const dx = p.x - q.x,
+          dy = p.y - q.y
         const d = Math.sqrt(dx * dx + dy * dy)
         if (d < 140) {
-          ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y)
+          ctx.beginPath()
+          ctx.moveTo(p.x, p.y)
+          ctx.lineTo(q.x, q.y)
           ctx.strokeStyle = `rgba(140,160,255,${0.12 * (1 - d / 140)})`
           ctx.stroke()
         }
@@ -116,7 +138,10 @@ function initBg() {
     animId = requestAnimationFrame(draw)
   }
   draw()
-  window.addEventListener('resize', () => { w = c.width = c.offsetWidth; h = c.height = c.offsetHeight })
+  window.addEventListener('resize', () => {
+    w = c.width = c.offsetWidth
+    h = c.height = c.offsetHeight
+  })
 }
 
 onMounted(() => nextTick(() => initBg()))
@@ -136,13 +161,28 @@ onUnmounted(() => cancelAnimationFrame(animId))
         <h1>Log in to Aisight</h1>
         <p class="sub">Welcome back!</p>
 
-        <el-input v-model="loginForm.email" placeholder="Username" class="field" :prefix-icon="User" size="large" />
-        <el-input v-model="loginForm.password" placeholder="Password" show-password class="field" :prefix-icon="Lock" size="large" @focus="passwordFocused = true" @blur="passwordFocused = false" />
+        <el-input
+          v-model="loginForm.email"
+          placeholder="Username"
+          class="field"
+          :prefix-icon="User"
+          size="large"
+        />
+        <el-input
+          v-model="loginForm.password"
+          placeholder="Password"
+          show-password
+          class="field"
+          :prefix-icon="Lock"
+          size="large"
+          @focus="passwordFocused = true"
+          @blur="passwordFocused = false"
+        />
 
         <!-- Remember me -->
         <div class="remember-row">
           <label class="remember-label">
-            <input type="checkbox" v-model="rememberMe" class="remember-check" />
+            <input v-model="rememberMe" type="checkbox" class="remember-check" />
             <span class="check-box"></span>
             <span>Remember me</span>
           </label>
@@ -150,7 +190,8 @@ onUnmounted(() => cancelAnimationFrame(animId))
 
         <button class="btn-signin" :disabled="loginLoading" @click="doLogin">
           <span v-if="loginLoading" class="btn-loading">
-            <span class="spinner"></span> Signing in...
+            <span class="spinner"></span>
+            Signing in...
           </span>
           <span v-else>Sign In</span>
         </button>
@@ -176,7 +217,9 @@ onUnmounted(() => cancelAnimationFrame(animId))
   justify-content: center;
   position: relative;
   overflow: hidden;
-  transition: opacity 0.5s ease, transform 0.5s ease;
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s ease;
 }
 .lp.fade-out {
   opacity: 0;
@@ -201,6 +244,7 @@ onUnmounted(() => cancelAnimationFrame(animId))
   align-items: center;
   justify-content: flex-end;
   padding: 0 40px;
+  background: transparent;
 }
 
 /* 球体 — 融入页面左侧场景 */
@@ -227,8 +271,14 @@ onUnmounted(() => cancelAnimationFrame(animId))
   animation: cardIn 0.6s ease-out;
 }
 @keyframes cardIn {
-  from { opacity: 0; transform: translateX(30px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .card h1 {
@@ -260,12 +310,23 @@ onUnmounted(() => cancelAnimationFrame(animId))
 }
 .field :deep(.el-input__wrapper.is-focus) {
   border-color: rgba(140, 100, 255, 0.6) !important;
-  box-shadow: 0 0 0 3px rgba(140, 100, 255, 0.12), 0 0 20px rgba(140, 100, 255, 0.08) !important;
+  box-shadow:
+    0 0 0 3px rgba(140, 100, 255, 0.12),
+    0 0 20px rgba(140, 100, 255, 0.08) !important;
   animation: focusPulse 2s ease-in-out infinite !important;
 }
 @keyframes focusPulse {
-  0%, 100% { box-shadow: 0 0 0 3px rgba(140, 100, 255, 0.12), 0 0 20px rgba(140, 100, 255, 0.08); }
-  50%      { box-shadow: 0 0 0 4px rgba(140, 100, 255, 0.18), 0 0 28px rgba(140, 100, 255, 0.12); }
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px rgba(140, 100, 255, 0.12),
+      0 0 20px rgba(140, 100, 255, 0.08);
+  }
+  50% {
+    box-shadow:
+      0 0 0 4px rgba(140, 100, 255, 0.18),
+      0 0 28px rgba(140, 100, 255, 0.12);
+  }
 }
 .field :deep(.el-input__inner) {
   color: #fff !important;
@@ -297,7 +358,7 @@ onUnmounted(() => cancelAnimationFrame(animId))
   display: flex;
   align-items: center;
   gap: 8px;
-  color: rgba(255,255,255,0.4);
+  color: rgba(255, 255, 255, 0.4);
   font-size: 12px;
   cursor: pointer;
   user-select: none;
@@ -309,8 +370,8 @@ onUnmounted(() => cancelAnimationFrame(animId))
   width: 16px;
   height: 16px;
   border-radius: 4px;
-  border: 1.5px solid rgba(255,255,255,0.2);
-  background: rgba(255,255,255,0.04);
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.04);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -328,7 +389,7 @@ onUnmounted(() => cancelAnimationFrame(animId))
   font-weight: 700;
 }
 .remember-label:hover .check-box {
-  border-color: rgba(140,100,255,0.5);
+  border-color: rgba(140, 100, 255, 0.5);
 }
 
 /* ========== 渐变按钮（紫粉→青） ========== */
@@ -364,9 +425,15 @@ onUnmounted(() => cancelAnimationFrame(animId))
   cursor: wait;
 }
 @keyframes grad {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 .btn-loading {
   display: flex;
@@ -376,13 +443,15 @@ onUnmounted(() => cancelAnimationFrame(animId))
 .spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(255,255,255,0.3);
+  border: 2px solid rgba(255, 255, 255, 0.3);
   border-top-color: #fff;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ========== 底部 ========== */
@@ -392,21 +461,27 @@ onUnmounted(() => cancelAnimationFrame(animId))
   justify-content: space-between;
   gap: 6px;
 }
-.demo { color: rgba(255,255,255,0.18); font-size: 10px; }
+.demo {
+  color: rgba(255, 255, 255, 0.18);
+  font-size: 10px;
+}
 .forgot {
-  color: rgba(255,255,255,0.4);
+  color: rgba(255, 255, 255, 0.4);
   font-size: 12px;
   text-decoration: none;
   transition: color 0.2s;
 }
-.forgot:hover { color: rgba(140,100,255,0.8); text-decoration: underline; }
+.forgot:hover {
+  color: rgba(140, 100, 255, 0.8);
+  text-decoration: underline;
+}
 
 .copy {
   position: absolute;
   bottom: 16px;
   left: 50%;
   transform: translateX(-50%);
-  color: rgba(255,255,255,0.12);
+  color: rgba(255, 255, 255, 0.12);
   font-size: 11px;
   z-index: 1;
 }
@@ -426,7 +501,12 @@ onUnmounted(() => cancelAnimationFrame(animId))
     transform: none;
     margin-bottom: -40px;
   }
-  .orb-area:hover { transform: scale(1.03); }
-  .card { width: 90vw; max-width: 380px; }
+  .orb-area:hover {
+    transform: scale(1.03);
+  }
+  .card {
+    width: 90vw;
+    max-width: 380px;
+  }
 }
 </style>

@@ -28,9 +28,11 @@ import {
   batchTagTestCases,
   cloneTestCase,
   listCaseHistory,
+  listCaseActivities,
   discardTestCase,
   recoverTestCase,
 } from '../api/testcase'
+import type { CaseActivity } from '../api/testcase'
 import { apiClient } from '../api/client'
 import { uploadAttachment, listAttachments, deleteAttachment } from '../api/attachment'
 import {
@@ -60,6 +62,7 @@ type TableRow = {
   modulePath: string
   tags: string
   precondition: string
+  postcondition: string
   steps: string
   remark: string
   updatedBy: number
@@ -249,6 +252,7 @@ const caseForm = reactive({
   moduleId: 0,
   tags: '',
   precondition: '',
+  postcondition: '',
   steps: '',
   remark: '',
   priority: 'medium',
@@ -259,6 +263,7 @@ const caseAttachments = ref<CaseAttachment[]>([])
 const reviewAttachments = ref<CaseReviewAttachment[]>([])
 const reviewAttachmentsLoading = ref(false)
 const caseHistory = ref<any[]>([])
+const caseActivities = ref<CaseActivity[]>([])
 
 // ── Tags ──
 const projectTagOptions = ref<TagBrief[]>([])
@@ -461,6 +466,7 @@ function toRow(tc: TestCase): TableRow {
     modulePath: tc.module_path,
     tags: tc.tags,
     precondition: tc.precondition || '',
+    postcondition: tc.postcondition || '',
     steps: tc.steps,
     remark: tc.remark || '',
     updatedBy: tc.updated_by,
@@ -644,6 +650,7 @@ function openCreate() {
     modulePath: '/未规划用例',
     tags: '',
     precondition: '',
+    postcondition: '',
     steps: '',
     remark: '',
     priority: 'medium',
@@ -651,6 +658,7 @@ function openCreate() {
   stepRows.value = [{ action: '', expected: '' }]
   caseAttachments.value = []
   reviewAttachments.value = []
+  caseActivities.value = []
   selectedTagIds.value = []
   loadTagOptions()
   dialogVisible.value = true
@@ -667,6 +675,7 @@ async function openEdit(row: TableRow) {
     moduleId: row.moduleId || 0,
     tags: row.tags || '',
     precondition: row.precondition || '',
+    postcondition: row.postcondition || '',
     steps: row.steps,
     remark: row.remark || '',
     priority: row.priority || 'medium',
@@ -699,10 +708,17 @@ async function openEdit(row: TableRow) {
     } catch {
       caseHistory.value = []
     }
+    // Load activities
+    try {
+      caseActivities.value = await listCaseActivities(selectedProject.value, row.id)
+    } catch {
+      caseActivities.value = []
+    }
   } else {
     caseAttachments.value = []
     reviewAttachments.value = []
     caseHistory.value = []
+    caseActivities.value = []
   }
   dialogVisible.value = true
 }
@@ -736,6 +752,7 @@ async function submitCase() {
       tags: caseForm.tags.trim(),
       tag_ids: selectedTagIds.value,
       precondition: caseForm.precondition,
+      postcondition: caseForm.postcondition,
       steps: stepsText,
       remark: caseForm.remark,
       priority: caseForm.priority,
@@ -940,6 +957,14 @@ function formatRelativeTime(dateStr: string): string {
 
 const apiBaseUrl = apiClient.defaults.baseURL || 'http://localhost:8080/api/v1'
 const serverUrl = apiBaseUrl.replace(/\/api\/v1\/?$/, '')
+
+function getUserAvatarUrl(avatar?: string) {
+  const raw = (avatar || '').trim()
+  if (!raw) return ''
+  if (/^https?:\/\//i.test(raw)) return raw
+  const normalized = raw.startsWith('/') ? raw : `/${raw}`
+  return `${serverUrl}${normalized}`
+}
 
 function getAttachmentUrl(file: CaseAttachment) {
   let path = (file.file_path || '').replace(/\\/g, '/')
@@ -2225,14 +2250,11 @@ watch(selectedProject, (newId) => {
                   后置条件
                 </h3>
                 <textarea
+                  v-model="caseForm.postcondition"
                   class="stitch-textarea"
                   rows="3"
-                  disabled
-                  placeholder="后端暂不支持后置条件，展示占位用。"
-                >
-1. 跳转至首页仪表盘
-2. 本地 Token 已持久化存储</textarea
-                >
+                  placeholder="请输入后置条件..."
+                ></textarea>
               </section>
             </div>
 
@@ -2338,31 +2360,69 @@ watch(selectedProject, (newId) => {
               <div class="stitch-meta-list">
                 <div class="stitch-meta-row flex-between">
                   <span class="meta-label">当前版本</span>
-                  <span class="meta-value bold primary">v1.4.2</span>
+                  <span class="meta-value bold primary">{{ editingCaseRow?.version || 'V1' }}</span>
+                </div>
+                <div class="stitch-meta-row flex-between">
+                  <span class="meta-label">状态</span>
+                  <StatusBadge :value="editingCaseRow?.status || 'draft'" />
                 </div>
                 <div class="stitch-meta-row flex-between">
                   <span class="meta-label">维护者</span>
                   <div class="meta-user">
-                    <div class="meta-avatar">{{ caseForm.title ? 'L' : '管' }}</div>
-                    <span>林语</span>
+                    <img
+                      v-if="editingCaseRow?.updatedByAvatar"
+                      class="meta-avatar-img"
+                      :src="getUserAvatarUrl(editingCaseRow.updatedByAvatar)"
+                      :alt="editingCaseRow.updatedByName"
+                    />
+                    <div v-else class="meta-avatar">
+                      {{ (editingCaseRow?.updatedByName || '?')[0] }}
+                    </div>
+                    <span>{{ editingCaseRow?.updatedByName || '-' }}</span>
                   </div>
                 </div>
                 <div class="stitch-meta-row flex-between">
                   <span class="meta-label">更新于</span>
-                  <span class="meta-value">2023-10-24 14:30</span>
+                  <span class="meta-value">{{ editingCaseRow?.updatedAt || '-' }}</span>
+                </div>
+                <div class="stitch-meta-row flex-between">
+                  <span class="meta-label">创建人</span>
+                  <div class="meta-user">
+                    <img
+                      v-if="editingCaseRow?.createdByAvatar"
+                      class="meta-avatar-img"
+                      :src="getUserAvatarUrl(editingCaseRow.createdByAvatar)"
+                      :alt="editingCaseRow.createdByName"
+                    />
+                    <div v-else class="meta-avatar">
+                      {{ (editingCaseRow?.createdByName || '?')[0] }}
+                    </div>
+                    <span>{{ editingCaseRow?.createdByName || '-' }}</span>
+                  </div>
+                </div>
+                <div class="stitch-meta-row flex-between">
+                  <span class="meta-label">创建于</span>
+                  <span class="meta-value">{{ editingCaseRow?.createdAt || '-' }}</span>
                 </div>
 
-                <div class="stitch-meta-divider"></div>
-
-                <div class="stitch-meta-row">
-                  <div class="meta-label" style="font-size: 10px; text-transform: uppercase">
-                    历史缺陷关联
+                <template v-if="caseHistory.length > 0">
+                  <div class="stitch-meta-divider"></div>
+                  <div class="stitch-meta-row">
+                    <div class="meta-label" style="font-size: 10px; text-transform: uppercase">
+                      版本历史 ({{ caseHistory.length }})
+                    </div>
+                    <div class="meta-tags-wrap mt-2">
+                      <span
+                        v-for="h in caseHistory.slice(0, 5)"
+                        :key="h.id"
+                        class="meta-tag tag-secondary"
+                        :title="h.old_value"
+                      >
+                        {{ h.new_value || h.action }}
+                      </span>
+                    </div>
                   </div>
-                  <div class="meta-tags-wrap mt-2">
-                    <span class="meta-tag tag-error">BUG-4012</span>
-                    <span class="meta-tag tag-secondary">BUG-3921</span>
-                  </div>
-                </div>
+                </template>
               </div>
             </section>
 
@@ -2511,55 +2571,35 @@ watch(selectedProject, (newId) => {
             </section>
 
             <!-- Recent Activity -->
-            <section class="stitch-panel">
+            <section v-if="editingId" class="stitch-panel">
               <h3 class="stitch-subtitle">最新动态</h3>
-              <div class="stitch-timeline">
+              <div
+                v-if="caseActivities.length === 0"
+                class="text-xs text-outline"
+                style="padding: 8px 0"
+              >
+                暂无动态记录
+              </div>
+              <div v-else class="stitch-timeline">
                 <div class="timeline-line"></div>
-
-                <div class="timeline-item flex gap-4 relative">
+                <div
+                  v-for="act in caseActivities"
+                  :key="act.id"
+                  class="timeline-item flex gap-4 relative"
+                >
                   <div class="timeline-icon bg-secondary z-10 shrink-0">
-                    <span class="material-symbols-outlined text-white text-sm">edit</span>
+                    <span class="material-symbols-outlined text-white text-sm">{{ act.icon }}</span>
                   </div>
                   <div class="timeline-content flex-1">
                     <p class="text-xs leading-tight">
-                      <span class="font-bold text-secondary">李薇</span>
-                      更新了预期结果
+                      <span class="font-bold text-secondary">{{ act.actor_name }}</span>
+                      {{ act.action }}
+                      <span v-if="act.detail" class="font-mono bg-white-5">{{ act.detail }}</span>
                     </p>
-                    <p class="time italic">10 分钟前</p>
-                  </div>
-                </div>
-
-                <div class="timeline-item flex gap-4 relative">
-                  <div class="timeline-icon bg-normal border-outline z-10 shrink-0">
-                    <span class="material-symbols-outlined text-outline text-sm">add</span>
-                  </div>
-                  <div class="timeline-content flex-1">
-                    <p class="text-xs leading-tight">
-                      <span class="font-bold text-white">张强</span>
-                      添加了视觉辅助截图
-                    </p>
-                    <p class="time italic">1 小时前</p>
-                  </div>
-                </div>
-
-                <div class="timeline-item flex gap-4 relative">
-                  <div class="timeline-icon bg-primary z-10 shrink-0">
-                    <span class="material-symbols-outlined text-white text-sm">history</span>
-                  </div>
-                  <div class="timeline-content flex-1">
-                    <p class="text-xs leading-tight">
-                      版本自
-                      <span class="font-mono bg-white-5">v1.4.1</span>
-                      升至
-                      <span class="font-mono bg-white-5">v1.4.2</span>
-                    </p>
-                    <p class="time italic">昨天 16:45</p>
+                    <p class="time italic">{{ formatRelativeTime(act.created_at) }}</p>
                   </div>
                 </div>
               </div>
-              <button class="stitch-btn-link w-full mt-6 text-center text-outline">
-                查看完整审计日志
-              </button>
             </section>
 
             <!-- AI Bot -->

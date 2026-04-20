@@ -125,6 +125,31 @@ export async function listCaseHistory(
   return data
 }
 
+// ========== Activities ==========
+
+export interface CaseActivity {
+  id: number
+  actor_name: string
+  action: string
+  detail: string
+  icon: string
+  created_at: string
+}
+
+export async function listCaseActivities(
+  projectId: number,
+  testcaseId: number,
+  limit = 10,
+): Promise<CaseActivity[]> {
+  const { data } = await apiClient.get(
+    `/projects/${projectId}/testcases/${testcaseId}/activities`,
+    {
+      params: { limit },
+    },
+  )
+  return data || []
+}
+
 // ========== Relations ==========
 
 export async function listCaseRelations(projectId: number, testcaseId: number) {

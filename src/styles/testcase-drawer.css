@@ -567,6 +567,15 @@
   justify-content: center;
   font-size: 10px;
   font-weight: 700;
+  flex-shrink: 0;
+}
+
+.meta-avatar-img {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
 }
 
 .stitch-meta-divider {

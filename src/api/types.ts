@@ -54,6 +54,7 @@ export type TestCase = {
   module_path: string
   tags: string
   precondition: string
+  postcondition: string
   steps: string
   remark: string
   priority: string
