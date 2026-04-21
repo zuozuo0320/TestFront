@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { Bell } from 'lucide-vue-next'
+import { useAuthStore } from '../stores/auth'
 
-defineProps<{
+const props = defineProps<{
   userName: string
   avatarUrl: string
 }>()
@@ -10,6 +11,12 @@ defineEmits<{
   (e: 'open-profile'): void
   (e: 'logout'): void
 }>()
+
+const authStore = useAuthStore()
+
+function onAvatarError(event: Event) {
+  authStore.handleAvatarError(event, props.userName)
+}
 </script>
 
 <template>
@@ -34,19 +41,19 @@ defineEmits<{
         popper-class="user-popover-popper"
       >
         <template #reference>
-          <div class="user-box" style="cursor:pointer">
+          <div class="user-box" style="cursor: pointer">
             <div class="header-user-info">
               <span class="header-user-name">{{ userName || 'User' }}</span>
             </div>
             <div class="user-avatar-wrap">
-              <img class="user-avatar" :src="avatarUrl" alt="avatar" />
+              <img class="user-avatar" :src="avatarUrl" alt="avatar" @error="onAvatarError" />
             </div>
           </div>
         </template>
 
         <div class="user-popover-card">
           <div class="hover-user-row">
-            <img class="hover-avatar" :src="avatarUrl" alt="avatar" />
+            <img class="hover-avatar" :src="avatarUrl" alt="avatar" @error="onAvatarError" />
             <div class="hover-user-meta">
               <div class="hover-name">{{ userName || '示例用户' }}</div>
             </div>

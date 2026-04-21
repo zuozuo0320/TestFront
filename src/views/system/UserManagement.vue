@@ -1,270 +1,17 @@
-<template>
-  <div v-loading="usersLoading" class="um-root">
-
-    <div class="um-top-header">
-      <div class="um-header-left">
-        <h2 class="um-title">用户管理</h2>
-        <p class="um-subtitle">管理系统用户、角色权限与安全审计状态。</p>
-      </div>
-      <div class="um-header-right">
-        <div class="um-stats-panel">
-          <div class="um-stat-item">
-            <span class="um-stat-label">总用户</span>
-            <span class="um-stat-number um-stat-primary">{{ users.length }}</span>
-          </div>
-          <div class="um-stat-divider"></div>
-          <div class="um-stat-item">
-            <span class="um-stat-label">活跃用户</span>
-            <span class="um-stat-number um-stat-secondary">{{ activeUserCount }}</span>
-          </div>
-          <button class="um-add-btn" @click="openCreateUser">
-            <span class="um-add-icon">+</span>
-            添加用户
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <div class="um-dashboard-bento">
-      <div class="um-bento-card">
-        <div class="um-bento-bg-icon group-hover-icon"><el-icon><UserIcon /></el-icon></div>
-        <p class="um-bento-label">总用户量</p>
-        <div class="um-bento-value-row">
-          <h3 class="um-bento-value text-white">{{ users.length.toLocaleString() }}</h3>
-          <span class="um-bento-trend success">↑ 12%</span>
-        </div>
-      </div>
-      <div class="um-bento-card">
-        <div class="um-bento-bg-icon group-hover-icon"><el-icon><UserFilled /></el-icon></div>
-        <p class="um-bento-label">活跃用户</p>
-        <div class="um-bento-value-row">
-          <h3 class="um-bento-value text-secondary">{{ activeUserCount.toLocaleString() }}</h3>
-          <span class="um-bento-trend faint">76.6% 转化率</span>
-        </div>
-      </div>
-      <div class="um-bento-card col-span-2 flex-card">
-        <div class="um-role-dist-wrapper">
-          <p class="um-bento-label mb-md">角色分布</p>
-          <div class="um-role-bar">
-            <div v-for="rd in roleDistribution" :key="rd.name" class="um-role-segment" :style="{ width: rd.percent + '%', background: rd.color }"></div>
-          </div>
-          <div class="um-role-legends">
-            <span v-for="rd in roleDistribution" :key="rd.name" class="um-role-legend">
-              <span class="um-legend-dot" :style="{ background: rd.color }"></span>
-              {{ rd.displayName }} ({{ Math.round(rd.percent) }}%)
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- User List Panel -->
-    <div class="um-list-panel">
-      <div class="um-list-header">
-        <div class="um-list-h-left">
-          <h4 class="um-list-title">所有用户</h4>
-          <span class="um-live-badge">实时更新</span>
-        </div>
-        <div class="um-list-h-right">
-          <button class="um-action-btn"><el-icon><Filter /></el-icon></button>
-          <button class="um-action-btn"><el-icon><Download /></el-icon></button>
-        </div>
-      </div>
-
-      <div class="um-table-wrapper">
-        <table class="um-table">
-          <thead>
-            <tr>
-              <th>用户信息</th>
-              <th>角色级别</th>
-              <th>最后登录</th>
-              <th>状态</th>
-              <th class="text-right">管理操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="u in pagedUsers" :key="u.id" class="um-tr">
-              <td>
-                <div class="um-user-cell">
-                  <div class="um-avatar-glass">
-                    <img :src="resolveAvatarUrl(u.avatar, u.name)" />
-                  </div>
-                  <div class="um-user-text">
-                    <p class="um-name">{{ u.name }}</p>
-                    <p class="um-email">{{ u.email }}</p>
-                  </div>
-                </div>
-              </td>
-              <td>
-                <span class="um-role-badge" :style="{ color: getRoleAccentColor(u), backgroundColor: `${getRoleAccentColor(u)}1A`, borderColor: `${getRoleAccentColor(u)}33` }">
-                  {{ u.role_names[0] || u.role || '未分配' }}
-                </span>
-              </td>
-              <td>
-                <p class="um-time">{{ getMockRelativeTime(u.id) }}</p>
-                <p class="um-ip">IP: {{ getMockIp(u.id) }}</p>
-              </td>
-              <td>
-                <div class="um-status-cell">
-                  <span class="um-status-dot" :class="u.active ? 'active' : 'disabled'"></span>
-                  <span class="um-status-text" :class="u.active ? 'text-success' : 'text-error'">{{ u.active ? '已启用' : '已冻结' }}</span>
-                </div>
-              </td>
-              <td class="text-right">
-                <div class="action-group">
-                  <button class="action-btn action-edit icon-only" title="编辑" @click="openEditUser(u)">
-                    <el-icon class="btn-icon"><Edit /></el-icon>
-                    <span>编辑</span>
-                  </button>
-                  <button class="action-btn action-clone icon-only" title="重置密码" @click="openResetPwd(u)">
-                    <el-icon class="btn-icon"><Clock /></el-icon>
-                    <span>重置密码</span>
-                  </button>
-                  <button
-                    class="action-btn action-clone icon-only"
-                    :title="u.active ? '冻结' : '解冻'"
-                    :disabled="isAdmin(u)"
-                    @click="!isAdmin(u) && toggleFreeze(u)"
-                  >
-                    <el-icon class="btn-icon"><CircleClose v-if="u.active" /><CircleCheck v-else /></el-icon>
-                    <span>{{ u.active ? '冻结' : '解冻' }}</span>
-                  </button>
-                  <button
-                    class="action-btn action-delete icon-only"
-                    title="删除"
-                    :disabled="isAdmin(u)"
-                    @click="!isAdmin(u) && removeUser(u)"
-                  >
-                    <el-icon class="btn-icon"><Delete /></el-icon>
-                    <span>删除</span>
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <div v-if="!usersLoading && filteredUsers.length === 0" class="um-empty">暂无用户</div>
-      </div>
-
-      <div v-if="filteredUsers.length > 0" class="um-pagination" style="justify-content: flex-end;">
-        <el-pagination
-          background
-          small
-          :current-page="userPage"
-          :page-size="userPageSize"
-          :total="filteredUsers.length"
-          layout="prev, pager, next"
-          @current-change="onUserPaginationCurrentChange"
-        />
-      </div>
-    </div>
-
-    <!-- Security Cards -->
-    <div class="um-security-section">
-      <div class="um-sec-panel sys-logs">
-        <div class="um-sec-header">
-          <h5 class="um-sec-title">系统安全日志</h5>
-          <button class="um-sec-link">查看全部</button>
-        </div>
-        <div class="um-log-list">
-          <div v-for="log in sysLogs" :key="log.id" class="um-log-row group">
-            <div class="um-log-dot" :class="log.type"></div>
-            <div class="um-log-content">
-              <p class="um-log-desc"><span class="text-white">{{ log.title }}:</span> {{ log.desc }}</p>
-              <span class="um-log-time">{{ log.time }}</span>
-            </div>
-            <button class="um-log-link"><el-icon><Edit /></el-icon></button> <!-- Fake external icon -->
-          </div>
-        </div>
-      </div>
-
-      <div class="um-sec-panel audit-status">
-        <el-icon class="um-audit-bg-icon"><Clock /></el-icon>
-        <h6 class="um-sec-title white-text mb-md">安全审查状态</h6>
-        <div class="um-audit-progress">
-          <div class="um-audit-bar-track">
-            <div class="um-audit-bar-fill"></div>
-          </div>
-          <span class="um-audit-pct">92%</span>
-        </div>
-        <p class="um-audit-desc">您的系统安全等级为“优”。当前有 12 个账号未开启多因素认证 (MFA)，建议立即执行审查。</p>
-        <button class="um-audit-btn">启动全员审查</button>
-      </div>
-    </div>
-
-    <!-- Dialogs -->
-    <el-dialog v-model="userDialogVisible" :title="editingUserId ? '编辑用户' : '新建用户'" width="640px" class="um-dialog">
-      <el-form label-position="top">
-        <el-form-item label="用户头像">
-          <div class="um-avatar-upload" @click="triggerAvatarInput">
-            <img v-if="avatarPreview" :src="avatarPreview" class="um-avatar-preview" />
-            <div v-else class="um-avatar-placeholder">
-              <span class="um-avatar-placeholder-icon">+</span>
-              <span class="um-avatar-placeholder-text">点击上传</span>
-            </div>
-            <input
-              ref="avatarInputRef"
-              type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp"
-              style="display: none"
-              @change="onAvatarSelected"
-            />
-          </div>
-          <span class="um-avatar-hint">支持 PNG/JPG/GIF/WebP，最大 2MB</span>
-        </el-form-item>
-        <el-form-item label="姓名">
-          <el-input v-model="userForm.name" placeholder="2-40字符" />
-        </el-form-item>
-        <el-form-item label="邮箱">
-          <el-input v-model="userForm.email" :disabled="!!editingUserId" placeholder="登录邮箱（创建后不可修改）" />
-        </el-form-item>
-        <el-form-item v-if="!editingUserId" label="初始密码">
-          <el-input v-model="userForm.password" type="password" show-password placeholder="≥8位，含大写+小写+数字" />
-        </el-form-item>
-        <el-form-item label="手机号">
-          <el-input v-model="userForm.phone" placeholder="选填" />
-        </el-form-item>
-        <el-form-item label="角色（必选，可多选）">
-          <el-select v-model="userForm.roleIds" multiple filterable placeholder="请选择角色" style="width: 100%">
-            <el-option v-for="r in editingUserId ? roles : creatableRoles" :key="r.id" :label="r.display_name || r.name" :value="r.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="项目（必选，可多选）">
-          <el-select v-model="userForm.projectIds" multiple filterable placeholder="请选择项目" style="width: 100%">
-            <el-option v-for="p in projects" :key="p.id" :label="p.name" :value="p.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-switch v-model="userForm.active" active-text="启用" inactive-text="冻结" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="userDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="savingUser" @click="submitUser">保存</el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog v-model="resetPwdDialogVisible" title="重置密码" width="440px" class="um-dialog">
-      <p style="margin-bottom: 12px; color: rgba(255, 255, 255, 0.6); font-size: 13px">
-        为用户【{{ resetPwdUserName }}】设置新密码
-      </p>
-      <el-form label-position="top">
-        <el-form-item label="新密码">
-          <el-input v-model="resetPwdForm.newPassword" type="password" show-password placeholder="≥8位，含大写+小写+数字" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="resetPwdDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="resettingPwd" @click="submitResetPwd">确认重置</el-button>
-      </template>
-    </el-dialog>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { User as UserIcon, UserFilled, Filter, Download, Edit, Clock, CircleClose, CircleCheck, Delete } from '@element-plus/icons-vue'
+import {
+  User as UserIcon,
+  UserFilled,
+  Filter,
+  Download,
+  Edit,
+  Clock,
+  CircleClose,
+  CircleCheck,
+  Delete,
+} from '@element-plus/icons-vue'
 import {
   listUsers,
   createUser,
@@ -276,6 +23,13 @@ import {
 } from '../../api/user'
 import { listProjects } from '../../api/project'
 import type { User, Role, Project } from '../../api/types'
+import { useAuthStore } from '../../stores/auth'
+
+const authStore = useAuthStore()
+
+function onAvatarError(event: Event, name?: string) {
+  authStore.handleAvatarError(event, name)
+}
 
 /** 用户行类型，扩展了角色/项目关联 ID 和角色名称列表 */
 type UserRow = User & { role_ids: number[]; project_ids: number[]; role_names: string[] }
@@ -293,11 +47,23 @@ const userPageSize = ref(10)
 const searchKeyword = ref('')
 
 const sysLogs = ref([
-  { id: 1, type: 'danger', title: '多地登录尝试拦截', desc: '用户 ID #9210 (na.li) 尝试从非法 IP 登录。', time: '2023-11-24 14:32:11' },
-  { id: 2, type: 'primary', title: '角色变更提醒', desc: '管理员 伟杰 将用户提升为 [QA 工程师]。', time: '2023-11-24 12:05:54' }
-]);
-const getMockRelativeTime = (id: number) => id % 2 === 0 ? '2分钟前' : '3天前';
-const getMockIp = (id: number) => id % 2 === 0 ? '192.168.1.45' : '18.23.4.192';
+  {
+    id: 1,
+    type: 'danger',
+    title: '多地登录尝试拦截',
+    desc: '用户 ID #9210 (na.li) 尝试从非法 IP 登录。',
+    time: '2023-11-24 14:32:11',
+  },
+  {
+    id: 2,
+    type: 'primary',
+    title: '角色变更提醒',
+    desc: '管理员 伟杰 将用户提升为 [QA 工程师]。',
+    time: '2023-11-24 12:05:54',
+  },
+])
+const getMockRelativeTime = (id: number) => (id % 2 === 0 ? '2分钟前' : '3天前')
+const getMockIp = (id: number) => (id % 2 === 0 ? '192.168.1.45' : '18.23.4.192')
 
 const filterRoleId = ref<number | ''>('')
 const filterStatus = ref<'' | 'active' | 'disabled'>('')
@@ -367,20 +133,9 @@ const pagedUsers = computed(() => {
 /** 创建时排除 admin 角色（仅编辑时可授予 admin） */
 const creatableRoles = computed(() => roles.value.filter((r) => r.name !== 'admin'))
 
-/** 根据头像字段或用户名生成头像 URL */
+/** 根据头像字段或用户名生成头像 URL（复用 auth store 的离线 SVG fallback） */
 function resolveAvatarUrl(avatar?: string, fallbackName?: string) {
-  const avatarRaw = (avatar || '').trim()
-  if (avatarRaw) {
-    if (/^https?:\/\//i.test(avatarRaw)) return avatarRaw
-    const envBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
-    if (envBase && /^https?:\/\//i.test(envBase)) {
-      const origin = envBase.replace(/\/api\/v1\/?$/, '')
-      return `${origin}${avatarRaw.startsWith('/') ? '' : '/'}${avatarRaw}`
-    }
-    return `http://localhost:8080${avatarRaw.startsWith('/') ? '' : '/'}${avatarRaw}`
-  }
-  const seed = encodeURIComponent((fallbackName || 'Aisight').trim() || 'Aisight')
-  return `https://api.dicebear.com/7.x/initials/svg?seed=${seed}`
+  return authStore.resolveAvatarUrl(avatar, fallbackName)
 }
 
 /** 加载用户列表，解析后端返回的 role_ids / project_ids，并补充 role_names */
@@ -575,11 +330,15 @@ async function submitUser() {
 async function toggleFreeze(row: UserRow) {
   const action = row.active ? '冻结' : '解冻'
   try {
-    await ElMessageBox.confirm(`确认${action}用户【${row.name}】？${row.active ? '冻结后该用户将无法登录。' : ''}`, `${action}确认`, {
-      confirmButtonText: action,
-      cancelButtonText: '取消',
-      type: 'warning',
-    })
+    await ElMessageBox.confirm(
+      `确认${action}用户【${row.name}】？${row.active ? '冻结后该用户将无法登录。' : ''}`,
+      `${action}确认`,
+      {
+        confirmButtonText: action,
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
   } catch {
     return
   }
@@ -706,6 +465,351 @@ onMounted(async () => {
 })
 </script>
 
+<template>
+  <div v-loading="usersLoading" class="um-root">
+    <div class="um-top-header">
+      <div class="um-header-left">
+        <h2 class="um-title">用户管理</h2>
+        <p class="um-subtitle">管理系统用户、角色权限与安全审计状态。</p>
+      </div>
+      <div class="um-header-right">
+        <div class="um-stats-panel">
+          <div class="um-stat-item">
+            <span class="um-stat-label">总用户</span>
+            <span class="um-stat-number um-stat-primary">{{ users.length }}</span>
+          </div>
+          <div class="um-stat-divider"></div>
+          <div class="um-stat-item">
+            <span class="um-stat-label">活跃用户</span>
+            <span class="um-stat-number um-stat-secondary">{{ activeUserCount }}</span>
+          </div>
+          <button class="um-add-btn" @click="openCreateUser">
+            <span class="um-add-icon">+</span>
+            添加用户
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="um-dashboard-bento">
+      <div class="um-bento-card">
+        <div class="um-bento-bg-icon group-hover-icon">
+          <el-icon><UserIcon /></el-icon>
+        </div>
+        <p class="um-bento-label">总用户量</p>
+        <div class="um-bento-value-row">
+          <h3 class="um-bento-value text-white">{{ users.length.toLocaleString() }}</h3>
+          <span class="um-bento-trend success">↑ 12%</span>
+        </div>
+      </div>
+      <div class="um-bento-card">
+        <div class="um-bento-bg-icon group-hover-icon">
+          <el-icon><UserFilled /></el-icon>
+        </div>
+        <p class="um-bento-label">活跃用户</p>
+        <div class="um-bento-value-row">
+          <h3 class="um-bento-value text-secondary">{{ activeUserCount.toLocaleString() }}</h3>
+          <span class="um-bento-trend faint">76.6% 转化率</span>
+        </div>
+      </div>
+      <div class="um-bento-card col-span-2 flex-card">
+        <div class="um-role-dist-wrapper">
+          <p class="um-bento-label mb-md">角色分布</p>
+          <div class="um-role-bar">
+            <div
+              v-for="rd in roleDistribution"
+              :key="rd.name"
+              class="um-role-segment"
+              :style="{ width: rd.percent + '%', background: rd.color }"
+            ></div>
+          </div>
+          <div class="um-role-legends">
+            <span v-for="rd in roleDistribution" :key="rd.name" class="um-role-legend">
+              <span class="um-legend-dot" :style="{ background: rd.color }"></span>
+              {{ rd.displayName }} ({{ Math.round(rd.percent) }}%)
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- User List Panel -->
+    <div class="um-list-panel">
+      <div class="um-list-header">
+        <div class="um-list-h-left">
+          <h4 class="um-list-title">所有用户</h4>
+          <span class="um-live-badge">实时更新</span>
+        </div>
+        <div class="um-list-h-right">
+          <button class="um-action-btn">
+            <el-icon><Filter /></el-icon>
+          </button>
+          <button class="um-action-btn">
+            <el-icon><Download /></el-icon>
+          </button>
+        </div>
+      </div>
+
+      <div class="um-table-wrapper">
+        <table class="um-table">
+          <thead>
+            <tr>
+              <th>用户信息</th>
+              <th>角色级别</th>
+              <th>最后登录</th>
+              <th>状态</th>
+              <th class="text-right">管理操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="u in pagedUsers" :key="u.id" class="um-tr">
+              <td>
+                <div class="um-user-cell">
+                  <div class="um-avatar-glass">
+                    <img
+                      :src="resolveAvatarUrl(u.avatar, u.name)"
+                      :alt="u.name"
+                      @error="onAvatarError($event, u.name)"
+                    />
+                  </div>
+                  <div class="um-user-text">
+                    <p class="um-name">{{ u.name }}</p>
+                    <p class="um-email">{{ u.email }}</p>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span
+                  class="um-role-badge"
+                  :style="{
+                    color: getRoleAccentColor(u),
+                    backgroundColor: `${getRoleAccentColor(u)}1A`,
+                    borderColor: `${getRoleAccentColor(u)}33`,
+                  }"
+                >
+                  {{ u.role_names[0] || u.role || '未分配' }}
+                </span>
+              </td>
+              <td>
+                <p class="um-time">{{ getMockRelativeTime(u.id) }}</p>
+                <p class="um-ip">IP: {{ getMockIp(u.id) }}</p>
+              </td>
+              <td>
+                <div class="um-status-cell">
+                  <span class="um-status-dot" :class="u.active ? 'active' : 'disabled'"></span>
+                  <span class="um-status-text" :class="u.active ? 'text-success' : 'text-error'">
+                    {{ u.active ? '已启用' : '已冻结' }}
+                  </span>
+                </div>
+              </td>
+              <td class="text-right">
+                <div class="action-group">
+                  <button
+                    class="action-btn action-edit icon-only"
+                    title="编辑"
+                    @click="openEditUser(u)"
+                  >
+                    <el-icon class="btn-icon"><Edit /></el-icon>
+                    <span>编辑</span>
+                  </button>
+                  <button
+                    class="action-btn action-clone icon-only"
+                    title="重置密码"
+                    @click="openResetPwd(u)"
+                  >
+                    <el-icon class="btn-icon"><Clock /></el-icon>
+                    <span>重置密码</span>
+                  </button>
+                  <button
+                    class="action-btn action-clone icon-only"
+                    :title="u.active ? '冻结' : '解冻'"
+                    :disabled="isAdmin(u)"
+                    @click="!isAdmin(u) && toggleFreeze(u)"
+                  >
+                    <el-icon class="btn-icon">
+                      <CircleClose v-if="u.active" />
+                      <CircleCheck v-else />
+                    </el-icon>
+                    <span>{{ u.active ? '冻结' : '解冻' }}</span>
+                  </button>
+                  <button
+                    class="action-btn action-delete icon-only"
+                    title="删除"
+                    :disabled="isAdmin(u)"
+                    @click="!isAdmin(u) && removeUser(u)"
+                  >
+                    <el-icon class="btn-icon"><Delete /></el-icon>
+                    <span>删除</span>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-if="!usersLoading && filteredUsers.length === 0" class="um-empty">暂无用户</div>
+      </div>
+
+      <div v-if="filteredUsers.length > 0" class="um-pagination" style="justify-content: flex-end">
+        <el-pagination
+          background
+          small
+          :current-page="userPage"
+          :page-size="userPageSize"
+          :total="filteredUsers.length"
+          layout="prev, pager, next"
+          @current-change="onUserPaginationCurrentChange"
+        />
+      </div>
+    </div>
+
+    <!-- Security Cards -->
+    <div class="um-security-section">
+      <div class="um-sec-panel sys-logs">
+        <div class="um-sec-header">
+          <h5 class="um-sec-title">系统安全日志</h5>
+          <button class="um-sec-link">查看全部</button>
+        </div>
+        <div class="um-log-list">
+          <div v-for="log in sysLogs" :key="log.id" class="um-log-row group">
+            <div class="um-log-dot" :class="log.type"></div>
+            <div class="um-log-content">
+              <p class="um-log-desc">
+                <span class="text-white">{{ log.title }}:</span>
+                {{ log.desc }}
+              </p>
+              <span class="um-log-time">{{ log.time }}</span>
+            </div>
+            <button class="um-log-link">
+              <el-icon><Edit /></el-icon>
+            </button>
+            <!-- Fake external icon -->
+          </div>
+        </div>
+      </div>
+
+      <div class="um-sec-panel audit-status">
+        <el-icon class="um-audit-bg-icon"><Clock /></el-icon>
+        <h6 class="um-sec-title white-text mb-md">安全审查状态</h6>
+        <div class="um-audit-progress">
+          <div class="um-audit-bar-track">
+            <div class="um-audit-bar-fill"></div>
+          </div>
+          <span class="um-audit-pct">92%</span>
+        </div>
+        <p class="um-audit-desc">
+          您的系统安全等级为“优”。当前有 12 个账号未开启多因素认证 (MFA)，建议立即执行审查。
+        </p>
+        <button class="um-audit-btn">启动全员审查</button>
+      </div>
+    </div>
+
+    <!-- Dialogs -->
+    <el-dialog
+      v-model="userDialogVisible"
+      :title="editingUserId ? '编辑用户' : '新建用户'"
+      width="640px"
+      class="um-dialog"
+    >
+      <el-form label-position="top">
+        <el-form-item label="用户头像">
+          <div class="um-avatar-upload" @click="triggerAvatarInput">
+            <img v-if="avatarPreview" :src="avatarPreview" class="um-avatar-preview" />
+            <div v-else class="um-avatar-placeholder">
+              <span class="um-avatar-placeholder-icon">+</span>
+              <span class="um-avatar-placeholder-text">点击上传</span>
+            </div>
+            <input
+              ref="avatarInputRef"
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp"
+              style="display: none"
+              @change="onAvatarSelected"
+            />
+          </div>
+          <span class="um-avatar-hint">支持 PNG/JPG/GIF/WebP，最大 2MB</span>
+        </el-form-item>
+        <el-form-item label="姓名">
+          <el-input v-model="userForm.name" placeholder="2-40字符" />
+        </el-form-item>
+        <el-form-item label="邮箱">
+          <el-input
+            v-model="userForm.email"
+            :disabled="!!editingUserId"
+            placeholder="登录邮箱（创建后不可修改）"
+          />
+        </el-form-item>
+        <el-form-item v-if="!editingUserId" label="初始密码">
+          <el-input
+            v-model="userForm.password"
+            type="password"
+            show-password
+            placeholder="≥8位，含大写+小写+数字"
+          />
+        </el-form-item>
+        <el-form-item label="手机号">
+          <el-input v-model="userForm.phone" placeholder="选填" />
+        </el-form-item>
+        <el-form-item label="角色（必选，可多选）">
+          <el-select
+            v-model="userForm.roleIds"
+            multiple
+            filterable
+            placeholder="请选择角色"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="r in editingUserId ? roles : creatableRoles"
+              :key="r.id"
+              :label="r.display_name || r.name"
+              :value="r.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="项目（必选，可多选）">
+          <el-select
+            v-model="userForm.projectIds"
+            multiple
+            filterable
+            placeholder="请选择项目"
+            style="width: 100%"
+          >
+            <el-option v-for="p in projects" :key="p.id" :label="p.name" :value="p.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-switch v-model="userForm.active" active-text="启用" inactive-text="冻结" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="userDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="savingUser" @click="submitUser">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="resetPwdDialogVisible" title="重置密码" width="440px" class="um-dialog">
+      <p style="margin-bottom: 12px; color: rgba(255, 255, 255, 0.6); font-size: 13px">
+        为用户【{{ resetPwdUserName }}】设置新密码
+      </p>
+      <el-form label-position="top">
+        <el-form-item label="新密码">
+          <el-input
+            v-model="resetPwdForm.newPassword"
+            type="password"
+            show-password
+            placeholder="≥8位，含大写+小写+数字"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="resetPwdDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="resettingPwd" @click="submitResetPwd">
+          确认重置
+        </el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
 <style scoped>
 /* ── Typography & Variables ── */
 .um-root {
@@ -725,7 +829,11 @@ onMounted(async () => {
   --border-light: rgba(74, 68, 85, 0.1);
   --border-lighter: rgba(74, 68, 85, 0.05);
 
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    sans-serif;
   color: var(--text-on-surface);
   line-height: 1.5;
   flex: 1;
@@ -738,11 +846,21 @@ onMounted(async () => {
 }
 
 /* Utilities */
-.text-white { color: #fff; }
-.text-secondary { color: var(--secondary); }
-.text-success { color: var(--success); }
-.text-error { color: var(--error); }
-.mb-md { margin-bottom: 16px; }
+.text-white {
+  color: #fff;
+}
+.text-secondary {
+  color: var(--secondary);
+}
+.text-success {
+  color: var(--success);
+}
+.text-error {
+  color: var(--error);
+}
+.mb-md {
+  margin-bottom: 16px;
+}
 
 /* ── Top Header (与角色管理统一) ── */
 .um-top-header {
@@ -752,7 +870,10 @@ onMounted(async () => {
   gap: 24px;
   flex-wrap: wrap;
 }
-.um-header-left { flex: 1; min-width: 200px; }
+.um-header-left {
+  flex: 1;
+  min-width: 200px;
+}
 .um-title {
   font-size: 28px;
   font-weight: 600;
@@ -766,7 +887,11 @@ onMounted(async () => {
   margin: 0;
   font-weight: 300;
 }
-.um-header-right { display: flex; align-items: center; flex-shrink: 0; }
+.um-header-right {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
 
 /* Stats panel — glass container (与角色管理统一) */
 .um-stats-panel {
@@ -779,7 +904,9 @@ onMounted(async () => {
   backdrop-filter: blur(12px);
   border: 1px solid rgba(74, 68, 85, 0.15);
 }
-.um-stat-item { text-align: center; }
+.um-stat-item {
+  text-align: center;
+}
 .um-stat-label {
   display: block;
   font-size: 10px;
@@ -788,10 +915,21 @@ onMounted(async () => {
   color: #958da1;
   margin-bottom: 4px;
 }
-.um-stat-number { font-size: 24px; font-weight: 700; }
-.um-stat-primary { color: #d2bbff; }
-.um-stat-secondary { color: #adc6ff; }
-.um-stat-divider { width: 1px; height: 32px; background: rgba(74, 68, 85, 0.2); }
+.um-stat-number {
+  font-size: 24px;
+  font-weight: 700;
+}
+.um-stat-primary {
+  color: #d2bbff;
+}
+.um-stat-secondary {
+  color: #adc6ff;
+}
+.um-stat-divider {
+  width: 1px;
+  height: 32px;
+  background: rgba(74, 68, 85, 0.2);
+}
 
 /* Add button — inside the glass panel (与角色管理统一) */
 .um-add-btn {
@@ -810,9 +948,16 @@ onMounted(async () => {
   transition: all 0.2s;
   white-space: nowrap;
 }
-.um-add-btn:hover { filter: brightness(1.15); }
-.um-add-btn:active { transform: scale(0.95); }
-.um-add-icon { font-size: 16px; font-weight: 700; }
+.um-add-btn:hover {
+  filter: brightness(1.15);
+}
+.um-add-btn:active {
+  transform: scale(0.95);
+}
+.um-add-icon {
+  font-size: 16px;
+  font-weight: 700;
+}
 
 /* ── Bento Grid ── */
 .um-dashboard-bento {
@@ -827,7 +972,9 @@ onMounted(async () => {
   position: relative;
   overflow: hidden;
 }
-.um-bento-card.col-span-2 { grid-column: span 2; }
+.um-bento-card.col-span-2 {
+  grid-column: span 2;
+}
 .um-bento-bg-icon {
   position: absolute;
   top: 16px;
@@ -836,7 +983,9 @@ onMounted(async () => {
   opacity: 0.1;
   transition: opacity 0.3s;
 }
-.um-bento-card:hover .um-bento-bg-icon { opacity: 0.2; }
+.um-bento-card:hover .um-bento-bg-icon {
+  opacity: 0.2;
+}
 .um-bento-label {
   font-size: 12px;
   font-weight: 600;
@@ -856,11 +1005,21 @@ onMounted(async () => {
   margin: 0;
   line-height: 1;
 }
-.um-bento-trend { font-size: 12px; font-weight: 500; margin-bottom: 4px; }
-.um-bento-trend.success { color: var(--success); }
-.um-bento-trend.faint { color: #64748b; }
+.um-bento-trend {
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.um-bento-trend.success {
+  color: var(--success);
+}
+.um-bento-trend.faint {
+  color: #64748b;
+}
 
-.um-role-dist-wrapper { flex: 1; }
+.um-role-dist-wrapper {
+  flex: 1;
+}
 .um-role-bar {
   display: flex;
   width: 100%;
@@ -869,7 +1028,9 @@ onMounted(async () => {
   overflow: hidden;
   background: var(--bg-card-high);
 }
-.um-role-segment { height: 100%; }
+.um-role-segment {
+  height: 100%;
+}
 .um-role-legends {
   display: flex;
   gap: 16px;
@@ -878,8 +1039,16 @@ onMounted(async () => {
   font-weight: 500;
   color: var(--text-slate);
 }
-.um-role-legend { display: flex; align-items: center; gap: 6px; }
-.um-legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+.um-role-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.um-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
 
 /* ── User List Panel ── */
 .um-list-panel {
@@ -895,8 +1064,16 @@ onMounted(async () => {
   align-items: center;
   border-bottom: 1px solid var(--border-light);
 }
-.um-list-h-left { display: flex; align-items: center; gap: 16px; }
-.um-list-title { font-size: 18px; font-weight: 600; margin: 0; }
+.um-list-h-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.um-list-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
 .um-live-badge {
   background: var(--bg-card-high);
   color: var(--primary);
@@ -905,7 +1082,10 @@ onMounted(async () => {
   font-size: 10px;
   font-weight: 700;
 }
-.um-list-h-right { display: flex; gap: 8px; }
+.um-list-h-right {
+  display: flex;
+  gap: 8px;
+}
 .um-action-btn {
   background: var(--bg-card-high);
   border: none;
@@ -918,10 +1098,19 @@ onMounted(async () => {
   justify-content: center;
   transition: color 0.2s;
 }
-.um-action-btn:hover { color: #fff; }
+.um-action-btn:hover {
+  color: #fff;
+}
 
-.um-table-wrapper { width: 100%; overflow-x: auto; }
-.um-table { width: 100%; border-collapse: collapse; text-align: left; }
+.um-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+.um-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
 .um-table th {
   padding: 16px 24px;
   font-size: 11px;
@@ -931,14 +1120,22 @@ onMounted(async () => {
   color: #64748b;
   border-bottom: 1px solid var(--border-lighter);
 }
-.um-tr { transition: background 0.2s; }
-.um-tr:hover { background: rgba(255, 255, 255, 0.02); }
+.um-tr {
+  transition: background 0.2s;
+}
+.um-tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
 .um-tr td {
   padding: 16px 24px;
   border-bottom: 1px solid var(--border-lighter);
   vertical-align: middle;
 }
-.um-user-cell { display: flex; align-items: center; gap: 12px; }
+.um-user-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 .um-avatar-glass {
   width: 40px;
   height: 40px;
@@ -947,9 +1144,22 @@ onMounted(async () => {
   background: rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(12px);
 }
-.um-avatar-glass img { width: 100%; height: 100%; object-fit: cover; }
-.um-name { font-size: 14px; font-weight: 600; color: var(--text-on-surface); margin: 0; }
-.um-email { font-size: 11px; color: #64748b; margin: 0; }
+.um-avatar-glass img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.um-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-on-surface);
+  margin: 0;
+}
+.um-email {
+  font-size: 11px;
+  color: #64748b;
+  margin: 0;
+}
 
 .um-role-badge {
   display: inline-block;
@@ -961,14 +1171,39 @@ onMounted(async () => {
   border: 1px solid transparent;
 }
 
-.um-time { font-size: 12px; color: var(--text-on-surface-variant); margin: 0; }
-.um-ip { font-size: 10px; color: #475569; margin: 0; }
+.um-time {
+  font-size: 12px;
+  color: var(--text-on-surface-variant);
+  margin: 0;
+}
+.um-ip {
+  font-size: 10px;
+  color: #475569;
+  margin: 0;
+}
 
-.um-status-cell { display: flex; align-items: center; gap: 8px; }
-.um-status-dot { width: 8px; height: 8px; border-radius: 50%; }
-.um-status-dot.active { background: var(--success); box-shadow: 0 0 8px rgba(16, 185, 129, 0.5); }
-.um-status-dot.disabled { background: var(--error); box-shadow: 0 0 8px rgba(239, 68, 68, 0.5); }
-.um-status-text { font-size: 12px; font-weight: 500; }
+.um-status-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.um-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.um-status-dot.active {
+  background: var(--success);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+.um-status-dot.disabled {
+  background: var(--error);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+.um-status-text {
+  font-size: 12px;
+  font-weight: 500;
+}
 
 /* 操作按钮使用全局 .action-btn 样式 */
 .um-tr .action-group {
@@ -978,7 +1213,12 @@ onMounted(async () => {
   gap: 2px;
 }
 
-.um-empty { text-align: center; padding: 48px; color: #64748b; font-size: 14px; }
+.um-empty {
+  text-align: center;
+  padding: 48px;
+  color: #64748b;
+  font-size: 14px;
+}
 
 .um-pagination {
   padding: 16px 24px;
@@ -997,7 +1237,10 @@ onMounted(async () => {
   --el-pagination-button-disabled-bg-color: transparent;
   --el-pagination-hover-color: #fff;
 }
-.um-pagination :deep(.btn-prev), .um-pagination :deep(.btn-next) { color: #64748b; }
+.um-pagination :deep(.btn-prev),
+.um-pagination :deep(.btn-next) {
+  color: #64748b;
+}
 .um-pagination :deep(.el-pager li) {
   background: transparent;
   color: #64748b;
@@ -1007,7 +1250,9 @@ onMounted(async () => {
   background: var(--primary-container) !important;
   color: #fff;
 }
-.um-pagination :deep(.el-pager li:hover) { background: var(--bg-card-high); }
+.um-pagination :deep(.el-pager li:hover) {
+  background: var(--bg-card-high);
+}
 
 /* ── Security Cards ── */
 .um-security-section {
@@ -1033,7 +1278,9 @@ onMounted(async () => {
   letter-spacing: 0.1em;
   margin: 0;
 }
-.um-sec-title.white-text { color: #fff; }
+.um-sec-title.white-text {
+  color: #fff;
+}
 .um-sec-link {
   background: none;
   border: none;
@@ -1043,9 +1290,15 @@ onMounted(async () => {
   text-transform: uppercase;
   cursor: pointer;
 }
-.um-sec-link:hover { text-decoration: underline; }
+.um-sec-link:hover {
+  text-decoration: underline;
+}
 
-.um-log-list { display: flex; flex-direction: column; gap: 16px; }
+.um-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
 .um-log-row {
   display: flex;
   align-items: flex-start;
@@ -1054,14 +1307,35 @@ onMounted(async () => {
   border-radius: 8px;
   transition: background 0.2s;
 }
-.um-log-row:hover { background: rgba(255, 255, 255, 0.03); }
-.um-log-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 4px; }
-.um-log-dot.danger { background: var(--error); }
-.um-log-dot.primary { background: var(--secondary); }
+.um-log-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+.um-log-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 4px;
+}
+.um-log-dot.danger {
+  background: var(--error);
+}
+.um-log-dot.primary {
+  background: var(--secondary);
+}
 
-.um-log-content { flex: 1; }
-.um-log-desc { font-size: 12px; color: var(--text-on-surface); margin: 0 0 4px 0; }
-.um-log-time { font-size: 10px; font-weight: 600; color: #475569; }
+.um-log-content {
+  flex: 1;
+}
+.um-log-desc {
+  font-size: 12px;
+  color: var(--text-on-surface);
+  margin: 0 0 4px 0;
+}
+.um-log-time {
+  font-size: 10px;
+  font-weight: 600;
+  color: #475569;
+}
 .um-log-link {
   background: none;
   border: none;
@@ -1070,7 +1344,9 @@ onMounted(async () => {
   opacity: 0;
   transition: opacity 0.2s;
 }
-.um-log-row:hover .um-log-link { opacity: 1; }
+.um-log-row:hover .um-log-link {
+  opacity: 1;
+}
 
 .audit-status {
   background: linear-gradient(to bottom right, rgba(124, 58, 237, 0.2), rgba(5, 102, 217, 0.2));
@@ -1105,7 +1381,11 @@ onMounted(async () => {
   height: 100%;
   background: var(--primary);
 }
-.um-audit-pct { font-size: 12px; font-weight: 700; color: var(--primary); }
+.um-audit-pct {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+}
 .um-audit-desc {
   font-size: 11px;
   color: var(--text-slate);
@@ -1130,11 +1410,18 @@ onMounted(async () => {
   position: relative;
   z-index: 1;
 }
-.um-audit-btn:hover { background: rgba(255, 255, 255, 0.1); }
+.um-audit-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
 
 /* Modals */
-.um-dialog :deep(.el-dialog) { background: #1e1e2d; border-radius: 12px; }
-.um-dialog :deep(.el-dialog__title) { color: #fff; }
+.um-dialog :deep(.el-dialog) {
+  background: #1e1e2d;
+  border-radius: 12px;
+}
+.um-dialog :deep(.el-dialog__title) {
+  color: #fff;
+}
 
 /* Avatar Upload */
 .um-avatar-upload {

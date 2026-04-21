@@ -1012,6 +1012,14 @@ function formatRelativeTime(dateStr: string): string {
   return dateStr.substring(0, 10)
 }
 
+function formatAbsoluteTime(dateStr: string): string {
+  if (!dateStr) return '-'
+  const date = new Date(dateStr)
+  if (Number.isNaN(date.getTime())) return dateStr
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 // ── Attachments ──
 
 const apiBaseUrl = apiClient.defaults.baseURL || 'http://localhost:8080/api/v1'
@@ -1023,6 +1031,10 @@ function getUserAvatarUrl(avatar?: string) {
   if (/^https?:\/\//i.test(raw)) return raw
   const normalized = raw.startsWith('/') ? raw : `/${raw}`
   return `${serverUrl}${normalized}`
+}
+
+function onAvatarLoadError(event: Event, name?: string) {
+  authStore.handleAvatarError(event, name)
 }
 
 function getAttachmentUrl(file: CaseAttachment) {
@@ -1649,9 +1661,6 @@ watch(selectedProject, (newId) => {
             <span class="sk"></span>
             <span class="sk"></span>
             <span class="sk"></span>
-            <span class="sk"></span>
-            <span class="sk"></span>
-            <span class="sk"></span>
             <span class="sk sk-op"></span>
           </div>
         </div>
@@ -1673,19 +1682,11 @@ watch(selectedProject, (newId) => {
               <th style="width: 120px">所属模块</th>
               <th style="width: 80px">评审结果</th>
               <th style="width: 70px">状态</th>
-              <th style="width: 100px">标签</th>
-              <th style="width: 100px">更新人</th>
-              <th style="width: 100px" class="sortable" @click="toggleSort('updated_at')">
-                更新时间
+              <th style="width: 160px">标签</th>
+              <th style="width: 200px" class="sortable" @click="toggleSort('updated_at')">
+                最后更新
                 <span class="sort-flag" :class="{ active: sortBy === 'updated_at' }">
                   {{ sortBy === 'updated_at' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕' }}
-                </span>
-              </th>
-              <th style="width: 100px">创建人</th>
-              <th style="width: 100px" class="sortable" @click="toggleSort('created_at')">
-                创建时间
-                <span class="sort-flag" :class="{ active: sortBy === 'created_at' }">
-                  {{ sortBy === 'created_at' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕' }}
                 </span>
               </th>
               <th style="width: 130px">操作</th>
@@ -1693,7 +1694,7 @@ watch(selectedProject, (newId) => {
           </thead>
           <tbody>
             <tr v-if="loadError">
-              <td colspan="13" class="empty-td">
+              <td colspan="10" class="empty-td">
                 {{ loadError }}
                 <el-button size="small" style="margin-left: 10px" @click="loadCases">
                   重试
@@ -1701,7 +1702,7 @@ watch(selectedProject, (newId) => {
               </td>
             </tr>
             <tr v-else-if="rows.length === 0">
-              <td colspan="13" class="empty-td testcase-empty-cell">
+              <td colspan="10" class="empty-td testcase-empty-cell">
                 <div class="testcase-empty-wrap">
                   <el-empty description="暂无数据" :image-size="140">
                     <el-button type="primary" plain @click="openCreate">去新建</el-button>
@@ -1810,42 +1811,25 @@ watch(selectedProject, (newId) => {
                 <span v-else style="color: var(--tp-gray-500)">-</span>
               </td>
               <td>
-                <div class="table-user">
+                <div
+                  class="table-meta-cell"
+                  :title="`更新人：${r.updatedByName}\n更新于：${formatAbsoluteTime(r.updatedAt)}\n创建人：${r.createdByName}\n创建于：${formatAbsoluteTime(r.createdAt)}`"
+                >
                   <img
                     v-if="r.updatedByAvatar"
                     class="table-user-avatar-img"
                     :src="serverUrl + r.updatedByAvatar"
                     :alt="r.updatedByName"
+                    @error="onAvatarLoadError($event, r.updatedByName)"
                   />
                   <div v-else class="table-user-avatar">
                     {{ r.updatedByName ? r.updatedByName.substring(0, 1).toUpperCase() : 'U' }}
                   </div>
-                  <span class="table-user-name">{{ r.updatedByName }}</span>
-                </div>
-              </td>
-              <td>
-                <span style="color: var(--tp-gray-500); font-size: 12px">
-                  {{ formatRelativeTime(r.updatedAt) }}
-                </span>
-              </td>
-              <td>
-                <div class="table-user">
-                  <img
-                    v-if="r.createdByAvatar"
-                    class="table-user-avatar-img"
-                    :src="serverUrl + r.createdByAvatar"
-                    :alt="r.createdByName"
-                  />
-                  <div v-else class="table-user-avatar">
-                    {{ r.createdByName ? r.createdByName.substring(0, 1).toUpperCase() : 'C' }}
+                  <div class="table-meta-text">
+                    <span class="table-meta-name">{{ r.updatedByName }}</span>
+                    <span class="table-meta-time">{{ formatRelativeTime(r.updatedAt) }}</span>
                   </div>
-                  <span class="table-user-name">{{ r.createdByName }}</span>
                 </div>
-              </td>
-              <td>
-                <span style="color: var(--tp-gray-500); font-size: 12px">
-                  {{ formatRelativeTime(r.createdAt) }}
-                </span>
               </td>
               <td>
                 <div class="action-group">
@@ -2268,51 +2252,57 @@ watch(selectedProject, (newId) => {
                 <!-- Tags -->
                 <div class="stitch-form-item col-span-full">
                   <label>标签</label>
-                  <div class="tag-selector-wrap">
-                    <div class="tag-selected-list">
+                  <el-select
+                    v-model="selectedTagIds"
+                    multiple
+                    filterable
+                    collapse-tags
+                    :collapse-tags-tooltip="false"
+                    :max-collapse-tags="99"
+                    placeholder="搜索或选择标签..."
+                    class="tag-selector"
+                    :reserve-keyword="true"
+                    no-data-text="无匹配标签"
+                  >
+                    <template #tag="{ data, deleteTag, selectDisabled }">
                       <span
-                        v-for="tid in selectedTagIds"
-                        :key="tid"
+                        v-for="item in data"
+                        :key="item.value"
                         class="tag-selected-item"
                         :style="{
                           backgroundColor:
-                            (projectTagOptions.find((t) => t.id === tid)?.color || '#3B82F6') +
-                            '20',
-                          color: projectTagOptions.find((t) => t.id === tid)?.color || '#3B82F6',
+                            (projectTagOptions.find((t) => t.id === item.value)?.color ||
+                              '#3B82F6') + '20',
+                          color:
+                            projectTagOptions.find((t) => t.id === item.value)?.color || '#3B82F6',
                           borderColor:
-                            (projectTagOptions.find((t) => t.id === tid)?.color || '#3B82F6') +
-                            '40',
+                            (projectTagOptions.find((t) => t.id === item.value)?.color ||
+                              '#3B82F6') + '40',
                         }"
                       >
-                        {{ projectTagOptions.find((t) => t.id === tid)?.name || tid }}
+                        {{
+                          projectTagOptions.find((t) => t.id === item.value)?.name ||
+                          item.currentLabel
+                        }}
                         <button
+                          v-if="!selectDisabled && !item.isDisabled"
                           class="tag-remove-btn"
-                          @click="selectedTagIds = selectedTagIds.filter((id) => id !== tid)"
+                          @click.stop="deleteTag($event, item)"
                         >
                           &times;
                         </button>
                       </span>
-                    </div>
-                    <el-select
-                      v-model="selectedTagIds"
-                      multiple
-                      filterable
-                      placeholder="搜索或选择标签..."
-                      class="tag-selector"
-                      :reserve-keyword="true"
-                      no-data-text="无匹配标签"
+                    </template>
+                    <el-option
+                      v-for="opt in projectTagOptions"
+                      :key="opt.id"
+                      :label="opt.name"
+                      :value="opt.id"
                     >
-                      <el-option
-                        v-for="opt in projectTagOptions"
-                        :key="opt.id"
-                        :label="opt.name"
-                        :value="opt.id"
-                      >
-                        <span class="tag-option-dot" :style="{ backgroundColor: opt.color }"></span>
-                        <span>{{ opt.name }}</span>
-                      </el-option>
-                    </el-select>
-                  </div>
+                      <span class="tag-option-dot" :style="{ backgroundColor: opt.color }"></span>
+                      <span>{{ opt.name }}</span>
+                    </el-option>
+                  </el-select>
                 </div>
 
                 <!-- Rich text for condition (Actually precondition) -->
@@ -2517,6 +2507,7 @@ watch(selectedProject, (newId) => {
                       class="meta-avatar-img"
                       :src="getUserAvatarUrl(editingCaseRow.updatedByAvatar)"
                       :alt="editingCaseRow.updatedByName"
+                      @error="onAvatarLoadError($event, editingCaseRow.updatedByName)"
                     />
                     <div v-else class="meta-avatar">
                       {{ (editingCaseRow?.updatedByName || '?')[0] }}
@@ -2536,6 +2527,7 @@ watch(selectedProject, (newId) => {
                       class="meta-avatar-img"
                       :src="getUserAvatarUrl(editingCaseRow.createdByAvatar)"
                       :alt="editingCaseRow.createdByName"
+                      @error="onAvatarLoadError($event, editingCaseRow.createdByName)"
                     />
                     <div v-else class="meta-avatar">
                       {{ (editingCaseRow?.createdByName || '?')[0] }}
@@ -2716,12 +2708,10 @@ watch(selectedProject, (newId) => {
             <!-- Recent Activity -->
             <section v-if="editingId" class="stitch-panel">
               <h3 class="stitch-subtitle">最新动态</h3>
-              <div
-                v-if="caseActivities.length === 0"
-                class="text-xs text-outline"
-                style="padding: 8px 0"
-              >
-                暂无动态记录
+              <div v-if="caseActivities.length === 0" class="stitch-empty-state">
+                <span class="material-symbols-outlined">history</span>
+                <span>暂无动态记录</span>
+                <span class="stitch-empty-state-sub">编辑或执行后将在此显示</span>
               </div>
               <div v-else class="stitch-timeline">
                 <div class="timeline-line"></div>
@@ -2979,19 +2969,6 @@ watch(selectedProject, (newId) => {
   text-decoration: underline;
 }
 
-/* Tag selector in case drawer */
-.tag-selector-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.tag-selected-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
 .tag-selected-item {
   display: inline-flex;
   align-items: center;
@@ -3025,6 +3002,41 @@ watch(selectedProject, (newId) => {
   border-radius: 50%;
   margin-right: 8px;
   vertical-align: middle;
+}
+
+/* tag-selector 内部微调：让自定义 chip 在输入框内更紧凑 */
+.tag-selector :deep(.el-select__selection) {
+  gap: 4px;
+}
+.tag-selector :deep(.el-select__input) {
+  min-width: 80px;
+}
+
+/* 列表表格「最后更新」合并单元格 */
+.table-meta-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.table-meta-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.35;
+}
+.table-meta-name {
+  color: var(--tp-gray-200, #e2e8f0);
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 140px;
+}
+.table-meta-time {
+  color: var(--tp-gray-500, #94a3b8);
+  font-size: 11px;
 }
 
 /* ── Review attachments (read-only evidences) ── */

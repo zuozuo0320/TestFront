@@ -1,0 +1,863 @@
+/* ============================================================
+   layout-enhance.css
+   视觉升级 override 层 —— 必须在 layout.css 之后加载。
+   目标：消除"框框堆砌感"，让 Sidebar / Header 与 WorkbenchPage
+   同款的语义化 accent + radial glow + 分层阴影语言。
+   ============================================================ */
+
+/* ───────────────────────────────
+   A. Top Header（顶部品牌栏）
+   ─────────────────────────────── */
+.layout > .top-header,
+.top-header {
+  background: linear-gradient(180deg, rgba(167, 139, 250, 0.035) 0%, rgba(0, 0, 0, 0) 100%);
+  border-bottom: 1px solid var(--tp-border-subtle);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.02) inset,
+    0 4px 16px rgba(0, 0, 0, 0.28);
+}
+
+/* Logo 加微光 */
+.top-header .brand .logo {
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.25),
+    0 2px 10px rgba(124, 58, 237, 0.35);
+  transition:
+    box-shadow 0.22s ease,
+    transform 0.22s ease;
+}
+.top-header .brand:hover .logo {
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.45),
+    0 4px 14px rgba(124, 58, 237, 0.5);
+  transform: translateY(-1px);
+}
+
+/* 品牌文字渐变 */
+.top-header .brand .name {
+  background: linear-gradient(120deg, #ffffff 0%, #c8b5ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: 0.02em;
+}
+
+/* 右侧按钮组：加分隔竖线 */
+.top-header .header-right {
+  gap: 10px;
+  position: relative;
+}
+.top-header .header-right .user-box::before {
+  content: '';
+  display: inline-block;
+  width: 1px;
+  height: 20px;
+  margin-right: 4px;
+  background: var(--tp-border-subtle);
+}
+
+/* 通知按钮 hover + 未读红点占位（保持 design 紧凑一致性） */
+.top-header .header-icon-btn {
+  position: relative;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--tp-border-subtle);
+  color: rgba(230, 235, 245, 0.65);
+}
+.top-header .header-icon-btn:hover {
+  background: var(--tp-accent-primary-soft);
+  border-color: var(--tp-accent-primary-border);
+  color: var(--tp-accent-primary);
+}
+/* 放置在 .top-header .header-icon-btn 上的红点可以用 data-attr 开启：
+   <button class="header-icon-btn" data-dot>…</button> */
+.top-header .header-icon-btn[data-dot]::after {
+  content: '';
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--tp-accent-danger);
+  box-shadow: 0 0 0 2px #0c1017;
+}
+
+/* 用户区 hover 卡片化 */
+.top-header .user-box {
+  padding: 4px 8px 4px 10px;
+  border-radius: 10px;
+  gap: 10px;
+  transition: background 0.18s ease;
+}
+.top-header .user-box:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.top-header .user-avatar {
+  border: 2px solid rgba(167, 139, 250, 0.35);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.3),
+    0 2px 10px rgba(124, 58, 237, 0.2);
+}
+
+/* ───────────────────────────────
+   B. Sidebar 主容器（去除"一个大框"感）
+   ─────────────────────────────── */
+.main-nav {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.015) 0%, transparent 40%), var(--tp-surface-card);
+  border: 1px solid var(--tp-border-subtle);
+  box-shadow: var(--tp-shadow-card);
+  border-radius: 14px;
+  position: relative;
+  overflow: hidden;
+}
+/* 顶部一根细细的 accent gradient line —— 点睛 */
+.main-nav::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(167, 139, 250, 0.45) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+/* ───────────────────────────────
+   C. Sidebar 项目切换卡
+   ─────────────────────────────── */
+.nav-header-card {
+  position: relative;
+  overflow: hidden;
+  padding: 12px 14px !important;
+  background: linear-gradient(
+    135deg,
+    rgba(167, 139, 250, 0.08) 0%,
+    rgba(96, 165, 250, 0.04) 100%
+  ) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition:
+    transform 0.22s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease !important;
+}
+/* 角落 radial glow */
+.nav-header-card::after {
+  content: '';
+  position: absolute;
+  top: -30px;
+  right: -30px;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: rgba(167, 139, 250, 0.35);
+  opacity: 0.18;
+  filter: blur(36px);
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+}
+.nav-header-card:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(167, 139, 250, 0.14) 0%,
+    rgba(96, 165, 250, 0.06) 100%
+  ) !important;
+  border-color: var(--tp-accent-primary-border) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.15);
+}
+.nav-header-card:hover::after {
+  opacity: 0.3;
+}
+
+.nav-header-icon {
+  background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 2px 8px rgba(124, 58, 237, 0.35);
+  border: 1px solid rgba(167, 139, 250, 0.45);
+}
+
+.nav-header-title {
+  background: linear-gradient(120deg, #ffffff 0%, #d2bbff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.01em;
+}
+
+/* ───────────────────────────────
+   D. Sidebar 导航项（重点：active 态重新设计）
+   ─────────────────────────────── */
+.main-nav-item {
+  padding: 9px 12px !important;
+  border-left: none !important;
+  border-radius: 10px !important;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    padding-left 0.22s ease !important;
+}
+
+.main-nav-item:hover {
+  background: rgba(167, 139, 250, 0.06) !important;
+  border-left-color: transparent !important;
+  color: #e1dcf0 !important;
+}
+.main-nav-item:hover .nav-icon {
+  color: var(--tp-accent-primary);
+}
+
+/* Active —— 左侧 3px 渐变 accent bar + 微弱 radial glow + icon 填充 */
+.main-nav-item.active {
+  position: relative;
+  background: linear-gradient(
+    90deg,
+    rgba(167, 139, 250, 0.16) 0%,
+    rgba(167, 139, 250, 0.04) 100%
+  ) !important;
+  border-left: none !important;
+  color: #ede0ff !important;
+  font-weight: 600 !important;
+  box-shadow:
+    inset 0 0 20px rgba(167, 139, 250, 0.06),
+    0 2px 10px rgba(124, 58, 237, 0.08) !important;
+}
+.main-nav-item.active::before {
+  content: '' !important;
+  display: block !important;
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #a78bfa 0%, #7c3aed 100%);
+  box-shadow: 0 0 8px rgba(167, 139, 250, 0.6);
+}
+.main-nav-item.active .nav-icon {
+  color: var(--tp-accent-primary);
+  filter: drop-shadow(0 0 6px rgba(167, 139, 250, 0.35));
+}
+
+/* ───────────────────────────────
+   E. Sub-navigation（系统管理下级）
+   ─────────────────────────────── */
+.sub-nav-item {
+  position: relative;
+  margin-left: 16px !important;
+  border-left: none !important;
+  padding: 7px 12px !important;
+  border-radius: 8px !important;
+  transition: all 0.18s ease !important;
+}
+.sub-nav-item::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  width: 6px;
+  height: 1px;
+  background: var(--tp-border-subtle);
+  transform: translateY(-50%);
+  transition:
+    background 0.18s ease,
+    width 0.18s ease;
+}
+.sub-nav-item:hover {
+  background: rgba(167, 139, 250, 0.06) !important;
+  color: #e1dcf0 !important;
+}
+.sub-nav-item:hover::before {
+  background: rgba(167, 139, 250, 0.45);
+  width: 10px;
+}
+.sub-nav-item.active {
+  background: rgba(167, 139, 250, 0.1) !important;
+  color: #ede0ff !important;
+  font-weight: 600 !important;
+}
+.sub-nav-item.active::before {
+  background: var(--tp-accent-primary);
+  width: 10px;
+  height: 2px;
+  box-shadow: 0 0 6px rgba(167, 139, 250, 0.5);
+}
+
+/* ───────────────────────────────
+   F. Sidebar 底部分隔线 & 折叠按钮
+   ─────────────────────────────── */
+.nav-bottom-group {
+  border-top: 1px solid var(--tp-border-subtle) !important;
+  padding-top: 16px !important;
+}
+.nav-bottom-group::before {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(167, 139, 250, 0.35),
+    transparent
+  ) !important;
+}
+
+.nav-collapse-btn {
+  padding: 9px 12px !important;
+  border-radius: 10px !important;
+  transition: all 0.18s ease !important;
+}
+.nav-collapse-btn:hover {
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: var(--tp-accent-primary) !important;
+}
+
+/* ───────────────────────────────
+   G. 项目切换 Dropdown
+   ─────────────────────────────── */
+.nav-project-dropdown {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%),
+    var(--tp-surface-elevated) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  box-shadow: var(--tp-shadow-card-hover) !important;
+  border-radius: 12px !important;
+}
+.nav-project-dropdown-item {
+  border-radius: 8px !important;
+  transition: all 0.15s ease !important;
+}
+.nav-project-dropdown-item:hover {
+  background: rgba(167, 139, 250, 0.08) !important;
+}
+.nav-project-dropdown-item.selected {
+  background: rgba(167, 139, 250, 0.12) !important;
+  position: relative;
+}
+.nav-project-dropdown-item.selected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--tp-accent-primary);
+}
+
+/* ───────────────────────────────
+   H. 目录树节点（测试用例页）
+   ─────────────────────────────── */
+.nav-tree-node-row {
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+.nav-tree-node-row:hover {
+  background: rgba(167, 139, 250, 0.05);
+}
+.nav-tree-node-row.active {
+  background: rgba(167, 139, 250, 0.1) !important;
+  color: #ede0ff !important;
+}
+.nav-tree-node-row.active .nav-tree-icon {
+  color: var(--tp-accent-primary);
+}
+
+/* ───────────────────────────────
+   I. 智能洞察指标卡（列表页上方）
+   消除扁平感，复用工作台一致的 radial glow + trend chip
+   ─────────────────────────────── */
+.insight-card {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0) 55%), #14141c !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border-radius: 14px !important;
+  padding: 18px 20px !important;
+  min-height: 108px !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 8px 24px rgba(0, 0, 0, 0.25);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+.insight-card::before {
+  content: '';
+  position: absolute;
+  top: -40%;
+  right: -20%;
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.18) 0%, rgba(124, 58, 237, 0) 70%);
+  pointer-events: none;
+  opacity: 0.85;
+  transition: opacity 0.3s ease;
+  z-index: 0;
+}
+.insight-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(124, 58, 237, 0.22) !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 14px 32px rgba(0, 0, 0, 0.35) !important;
+}
+.insight-card:hover::before {
+  opacity: 1;
+}
+.insight-card > .insight-left,
+.insight-card > .insight-right {
+  position: relative;
+  z-index: 1;
+}
+
+/* Trend 文字 chip 化：语义色 + 底色 + 边 */
+.insight-trend {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 4px;
+  margin-top: 18px !important;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px !important;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  line-height: 1.4;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  width: fit-content;
+}
+.trend-grey {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.7) !important;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.trend-green {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399 !important;
+  border-color: rgba(16, 185, 129, 0.22);
+}
+.trend-red {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171 !important;
+  border-color: rgba(239, 68, 68, 0.22);
+}
+
+/* Icon wrap 加微光 */
+.insight-icon-wrap {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+/* 指标卡 grid 间距更紧凑一点 */
+.insights-cards {
+  gap: 14px !important;
+}
+
+/* ───────────────────────────────
+   J. 用例详情页 - 表单输入区加大呼吸空间
+   ─────────────────────────────── */
+
+/* 前置/后置条件 textarea：从 80 加到 110，允许用户写更多 */
+.stitch-textarea {
+  min-height: 110px !important;
+  padding: 10px 14px !important;
+  line-height: 1.6 !important;
+}
+/* 备注区的 no-border 专用：保持无边框、最小高度加大 */
+.stitch-textarea.no-border {
+  min-height: 120px !important;
+}
+
+/* 测试步骤表格：强制 table-layout fixed 确保 40/40 等宽，单元格垂直顶对齐 */
+.stitch-table {
+  table-layout: fixed !important;
+}
+.stitch-table td {
+  vertical-align: top !important;
+  padding: 10px 14px !important;
+}
+.stitch-table .col-num {
+  vertical-align: middle !important;
+}
+
+/* 步骤内 textarea：最小高度 52，多行体验 */
+.stitch-table-input {
+  min-height: 52px !important;
+  line-height: 1.55 !important;
+  padding: 8px 10px !important;
+}
+
+/* ───────────────────────────────
+   K. 用例详情页 - 右侧版本追踪 K-V 严格对齐
+   ─────────────────────────────── */
+.stitch-meta-row.flex-between {
+  justify-content: space-between !important;
+  gap: 12px;
+}
+.stitch-meta-row.flex-between > .meta-label {
+  flex-shrink: 0;
+}
+.stitch-meta-row.flex-between > .meta-value,
+.stitch-meta-row.flex-between > .meta-user {
+  text-align: right;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+}
+/* meta-user 里有头像 + 文本，用 flex 把头像+名字靠右 */
+.stitch-meta-row.flex-between > .meta-user {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+  overflow: visible;
+}
+.stitch-meta-row.flex-between > .meta-user > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+/* ───────────────────────────────
+   L. 详情页 - 面包屑 & 表单 label 间距
+   ─────────────────────────────── */
+.stitch-header-left {
+  gap: 14px !important;
+}
+.stitch-breadcrumb {
+  opacity: 0.85;
+}
+.stitch-form-item {
+  gap: 10px !important;
+}
+.stitch-form-item label {
+  font-size: 12px !important;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* ───────────────────────────────
+   M. 详情页 - 上传区对比度增强
+   ─────────────────────────────── */
+.stitch-panel .upload-area {
+  position: relative;
+  border-radius: 10px;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+.stitch-panel .upload-area:hover {
+  background: rgba(167, 139, 250, 0.04);
+}
+/* FileUploader 内部 dashed 区（覆盖子组件外观而不改子组件代码） */
+.stitch-panel .upload-area .el-upload-dragger,
+.stitch-panel .upload-area [class*='upload'][class*='drag'] {
+  border-color: rgba(167, 139, 250, 0.35) !important;
+  background: rgba(167, 139, 250, 0.03) !important;
+  transition: all 0.22s ease;
+}
+.stitch-panel .upload-area .el-upload-dragger:hover,
+.stitch-panel .upload-area [class*='upload'][class*='drag']:hover {
+  border-color: rgba(167, 139, 250, 0.65) !important;
+  background: rgba(167, 139, 250, 0.08) !important;
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.1);
+}
+
+/* ───────────────────────────────
+   N. 详情页 - AI 智检助手卡片强化
+   ─────────────────────────────── */
+.stitch-ai-panel {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(167, 139, 250, 0.16) 0%,
+      rgba(96, 165, 250, 0.06) 50%,
+      rgba(0, 0, 0, 0) 100%
+    ),
+    rgba(20, 20, 28, 0.9) !important;
+  border: 1px solid rgba(167, 139, 250, 0.22) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 10px 28px rgba(124, 58, 237, 0.18);
+}
+.stitch-ai-panel::before {
+  content: '';
+  position: absolute;
+  top: -60px;
+  right: -60px;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle, rgba(167, 139, 250, 0.28) 0%, rgba(167, 139, 250, 0) 70%);
+  pointer-events: none;
+}
+.stitch-ai-panel > * {
+  position: relative;
+  z-index: 1;
+}
+.stitch-ai-panel .ai-icon {
+  background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 2px 10px rgba(124, 58, 237, 0.45);
+  border: 1px solid rgba(167, 139, 250, 0.45);
+}
+
+/* ───────────────────────────────
+   O. 详情页 - 空状态视觉美化
+   ─────────────────────────────── */
+.stitch-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 20px 12px;
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 12px;
+  text-align: center;
+}
+.stitch-empty-state .material-symbols-outlined {
+  font-size: 32px;
+  opacity: 0.35;
+}
+.stitch-empty-state-sub {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 11px;
+}
+
+/* ───────────────────────────────
+   P. 评审列表页 - 字号体系对齐用例列表
+   用例列表基线：标题 20 / 副 13 / 指标 value 28 / label 13 / trend 11
+   ─────────────────────────────── */
+
+/* 页面主标题 28 → 20，与 .insights-title 对齐 */
+.case-review-page .pipeline-title {
+  font-size: 20px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  margin: 0 0 4px !important;
+}
+/* 副标题 14 → 13 + 对比度 0.72，与 .insights-desc 对齐 */
+.case-review-page .pipeline-subtitle {
+  font-size: 13px !important;
+  color: rgba(255, 255, 255, 0.72) !important;
+  letter-spacing: 0.2px;
+}
+
+/* 统计卡片 label 10 uppercase → 13 mixed-case，与 .insight-label 对齐 */
+.case-review-page .stat-label-pl {
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  margin: 0 0 10px !important;
+}
+
+/* 统计卡片数字 36 → 28，与 .insight-value 对齐 */
+.case-review-page .stat-num {
+  font-size: 28px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 统计卡片副文字 chip 化，与 .insight-trend 对齐 */
+.case-review-page .stat-sub {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.2px;
+  line-height: 1.4;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.case-review-page .stat-sub.primary {
+  background: rgba(167, 139, 250, 0.14);
+  color: #c4b5fd !important;
+  border-color: rgba(167, 139, 250, 0.22);
+}
+.case-review-page .stat-sub.emerald {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399 !important;
+  border-color: rgba(16, 185, 129, 0.22);
+}
+.case-review-page .stat-sub.error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171 !important;
+  border-color: rgba(239, 68, 68, 0.22);
+}
+
+/* 区块标题 16 → 15，空状态标题 18 → 16，保持与列表一致紧凑 */
+.case-review-page .table-section-title {
+  font-size: 15px !important;
+}
+.case-review-page .empty-title-pl {
+  font-size: 16px !important;
+}
+.case-review-page .empty-desc-pl {
+  font-size: 13px !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* 评审列表表格字段：10px uppercase → 11px 正常大小写，对齐 el-table 基线 */
+.case-review-page .pipeline-table th {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  color: rgba(255, 255, 255, 0.55) !important;
+}
+.case-review-page .pipeline-table td {
+  font-size: 13px !important;
+}
+
+/* ───────────────────────────────
+   Q. 测试智编列表页 - 字号体系对齐用例列表
+   基线：标题 20 / 副 13 / 指标 value 28 / label 13 / desc 11
+   ─────────────────────────────── */
+
+/* 主标题 1.875rem(30) → 20，对齐 .insights-title */
+.ai-page-header-left h1 {
+  font-size: 20px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+}
+
+/* 副标题 0.9rem(14.4) → 13，对齐 .insights-desc */
+.ai-page-header-left .ai-subtitle {
+  font-size: 13px !important;
+  color: rgba(255, 255, 255, 0.72) !important;
+  font-weight: 400 !important;
+  letter-spacing: 0.2px;
+  margin-top: 4px !important;
+}
+
+/* 面包屑：提升对比度，但保持紧凑 */
+.ai-breadcrumb {
+  font-size: 11px !important;
+  color: rgba(255, 255, 255, 0.55) !important;
+  letter-spacing: 0.08em !important;
+}
+.ai-breadcrumb .current {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+.ai-breadcrumb .material-symbols-outlined {
+  font-size: 12px !important;
+}
+
+/* 指标卡 label 0.6rem(9.6) uppercase → 13 mixed-case，对齐 .insight-label */
+.ai-stat-label {
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+/* label 内的小图标保持可见但比例协调 */
+.ai-stat-label .material-symbols-outlined {
+  font-size: 15px !important;
+}
+
+/* 指标卡数值 1.8rem(28.8) → 28，对齐 .insight-value */
+.ai-stat-value {
+  font-size: 28px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 6px !important;
+}
+
+/* 指标卡描述 0.7rem(11.2) → 11，与 trend 对齐 */
+.ai-stat-desc {
+  font-size: 11px !important;
+  color: rgba(255, 255, 255, 0.55) !important;
+  letter-spacing: 0.2px;
+}
+
+/* 快速入口卡：标题 h4 加大以拉齐视觉权重 */
+.ai-quickstart-card h4 {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  margin: 6px 0 4px !important;
+}
+.ai-quickstart-card p {
+  font-size: 13px !important;
+  color: rgba(255, 255, 255, 0.55) !important;
+  line-height: 1.5 !important;
+}
+
+/* 表格表头字段：0.6rem uppercase → 11px 正常大小写，对齐 el-table 基线 */
+.ai-table thead th {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  color: rgba(255, 255, 255, 0.55) !important;
+}
+
+/* 表格单元格：0.85rem(13.6) → 13，对齐 el-table 正文基线 */
+.ai-table tbody td {
+  font-size: 13px !important;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* 行内 inline 样式里的 0.85rem/0.8rem/0.75rem 片段覆盖：提升整体文字易读性 */
+.ai-table tbody td .ai-task-name {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+.ai-table tbody td .ai-task-id {
+  font-size: 11px !important;
+}
+
+/* 表格页脚字号对齐 el-pagination 的 12/13 节奏 */
+.ai-table-footer .info {
+  font-size: 12px !important;
+}
+
+/* ───────────────────────────────
+   S. 表格字色统一 - 所有列表页共用设计令牌
+   基线：表头 --tp-gray-500 (0.50 柔灰) / 正文 --tp-gray-800 (0.85 亮白)
+   避免各页表头色值分散（0.55 / 0.85 / 继承默认）导致视觉不一致
+   ─────────────────────────────── */
+
+/* 用例列表（Element Plus el-table） */
+.el-table th.el-table__cell {
+  color: var(--tp-gray-500) !important;
+}
+.el-table td.el-table__cell {
+  color: var(--tp-gray-800) !important;
+}
+
+/* 评审列表（原生 pipeline-table, scoped） */
+.case-review-page .pipeline-table th {
+  color: var(--tp-gray-500) !important;
+}
+.case-review-page .pipeline-table td {
+  color: var(--tp-gray-800) !important;
+}
+
+/* 测试智编（原生 ai-table） */
+.ai-table thead th {
+  color: var(--tp-gray-500) !important;
+}
+.ai-table tbody td {
+  color: var(--tp-gray-800) !important;
+}

@@ -3,6 +3,9 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { listRoles, createRole, updateRoleById, listUsers } from '../../api/user'
 import type { Role, User } from '../../api/types'
+import { useAuthStore } from '../../stores/auth'
+
+const authStore = useAuthStore()
 
 /** 预置角色标识名集合（与后端 model.IsPresetSystemRole 保持一致） */
 const PRESET_ROLES = new Set(['admin', 'manager', 'tester', 'reviewer', 'developer', 'readonly'])
@@ -54,10 +57,12 @@ function roleUserCountMap(): Record<string, number> {
 const drawerUsers = computed(() => {
   if (!drawerRole.value) return []
   const roleName = drawerRole.value.name.toLowerCase()
-  const all = allUsers.value.filter(u => (u.role || '').toLowerCase() === roleName)
+  const all = allUsers.value.filter((u) => (u.role || '').toLowerCase() === roleName)
   const kw = drawerSearch.value.trim().toLowerCase()
   if (!kw) return all
-  return all.filter(u => (u.name || '').toLowerCase().includes(kw) || (u.email || '').toLowerCase().includes(kw))
+  return all.filter(
+    (u) => (u.name || '').toLowerCase().includes(kw) || (u.email || '').toLowerCase().includes(kw),
+  )
 })
 
 function openUserDrawer(role: Role) {
@@ -72,8 +77,7 @@ function closeUserDrawer() {
 
 function getAvatarUrl(name: string) {
   const seedSource = name.split('(')[0] ?? 'User'
-  const seed = encodeURIComponent(seedSource.trim() || 'User')
-  return `https://api.dicebear.com/7.x/initials/svg?seed=${seed}`
+  return authStore.fallbackAvatarUrl(seedSource.trim() || 'User')
 }
 
 const roleForm = reactive({
@@ -124,7 +128,6 @@ async function loadRoles() {
     rolesLoading.value = false
   }
 }
-
 
 /** 打开创建角色弹窗，重置表单 */
 function openCreateRole() {
@@ -183,7 +186,7 @@ onMounted(() => loadRoles())
 </script>
 
 <template>
-  <div class="rm-root" v-loading="rolesLoading">
+  <div v-loading="rolesLoading" class="rm-root">
     <!-- Header Section -->
     <div class="rm-header">
       <div class="rm-header-left">
@@ -211,18 +214,16 @@ onMounted(() => loadRoles())
 
     <!-- Roles Bento Grid -->
     <div class="rm-grid">
-      <div
-        v-for="role in roles"
-        :key="role.id"
-        class="rm-card"
-      >
+      <div v-for="role in roles" :key="role.id" class="rm-card">
         <!-- Hover accent bar -->
         <div class="rm-card-accent"></div>
 
         <!-- Card top: icon + user badge -->
         <div class="rm-card-top">
           <div class="rm-card-icon">
-            <span class="material-symbols-outlined rm-icon-filled">{{ getRoleIcon(role.name) }}</span>
+            <span class="material-symbols-outlined rm-icon-filled">
+              {{ getRoleIcon(role.name) }}
+            </span>
           </div>
           <div class="rm-badge">
             <span class="rm-badge-icon">👥</span>
@@ -236,11 +237,9 @@ onMounted(() => loadRoles())
 
         <!-- Permission tags -->
         <div class="rm-perm-tags">
-          <span
-            v-for="perm in getRolePerms(role.name)"
-            :key="perm"
-            class="rm-perm-tag"
-          >{{ perm }}</span>
+          <span v-for="perm in getRolePerms(role.name)" :key="perm" class="rm-perm-tag">
+            {{ perm }}
+          </span>
         </div>
 
         <!-- Action buttons -->
@@ -274,7 +273,9 @@ onMounted(() => loadRoles())
           <div class="drawer-header">
             <div class="drawer-title-area">
               <div class="drawer-title-row">
-                <span class="material-symbols-outlined rm-icon-filled drawer-title-icon">{{ getRoleIcon(drawerRole?.name || '') }}</span>
+                <span class="material-symbols-outlined rm-icon-filled drawer-title-icon">
+                  {{ getRoleIcon(drawerRole?.name || '') }}
+                </span>
                 <h2 class="drawer-title">{{ drawerRole?.display_name || drawerRole?.name }}</h2>
               </div>
               <p class="drawer-subtitle">用户列表 ({{ drawerUsers.length }})</p>
@@ -296,11 +297,7 @@ onMounted(() => loadRoles())
 
           <!-- User list -->
           <div class="drawer-list">
-            <div
-              v-for="(user, idx) in drawerUsers"
-              :key="idx"
-              class="drawer-user-item"
-            >
+            <div v-for="(user, idx) in drawerUsers" :key="idx" class="drawer-user-item">
               <div class="drawer-user-info">
                 <div class="drawer-avatar">
                   <img :src="getAvatarUrl(user.name)" :alt="user.name" />
@@ -333,18 +330,19 @@ onMounted(() => loadRoles())
     >
       <el-form label-position="top">
         <el-form-item label="角色标识名（英文，唯一）">
-          <el-input
-            v-model="roleForm.name"
-            :disabled="editingIsPreset"
-            placeholder="如 qa_lead"
-          />
+          <el-input v-model="roleForm.name" :disabled="editingIsPreset" placeholder="如 qa_lead" />
           <div v-if="editingIsPreset" class="form-hint">预置角色标识名不可修改</div>
         </el-form-item>
         <el-form-item label="显示名称（中文）">
           <el-input v-model="roleForm.display_name" placeholder="如 QA 负责人" />
         </el-form-item>
         <el-form-item label="角色描述">
-          <el-input v-model="roleForm.description" type="textarea" :rows="3" placeholder="角色职责说明" />
+          <el-input
+            v-model="roleForm.description"
+            type="textarea"
+            :rows="3"
+            placeholder="角色职责说明"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -374,7 +372,11 @@ onMounted(() => loadRoles())
   -webkit-font-smoothing: antialiased;
 }
 .rm-icon-filled {
-  font-variation-settings: 'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+  font-variation-settings:
+    'FILL' 1,
+    'wght' 300,
+    'GRAD' 0,
+    'opsz' 24;
 }
 
 /* ── Root ── */

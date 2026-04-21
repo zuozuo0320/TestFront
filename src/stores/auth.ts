@@ -39,6 +39,44 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('tp-user-id')
   }
 
+  // 本地离线头像：基于姓名首字符生成 SVG data URI，不依赖外网
+  const AVATAR_PALETTE = [
+    '#7C3AED',
+    '#3B82F6',
+    '#14B8A6',
+    '#F59E0B',
+    '#EF4444',
+    '#EC4899',
+    '#8B5CF6',
+    '#06B6D4',
+    '#10B981',
+    '#F97316',
+  ]
+
+  function pickColor(seed: string): string {
+    let hash = 0
+    for (let i = 0; i < seed.length; i++) {
+      hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
+    }
+    return AVATAR_PALETTE[hash % AVATAR_PALETTE.length] || AVATAR_PALETTE[0]!
+  }
+
+  function extractInitial(name: string): string {
+    const trimmed = (name || '').trim()
+    if (!trimmed) return 'A'
+    // 中文/日韩等非 ASCII 字符直接取首字
+    const first = Array.from(trimmed)[0] || 'A'
+    return first.toUpperCase()
+  }
+
+  function fallbackAvatarUrl(name?: string) {
+    const seed = (name || 'Aisight').trim() || 'Aisight'
+    const initial = extractInitial(seed)
+    const bg = pickColor(seed)
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><rect width="128" height="128" fill="${bg}"/><text x="50%" y="50%" dy=".1em" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-family="'PingFang SC','Microsoft YaHei',system-ui,sans-serif" font-size="56" font-weight="600">${initial}</text></svg>`
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+  }
+
   function resolveAvatarUrl(avatar?: string, fallbackName?: string) {
     const avatarRaw = (avatar || '').trim()
     if (avatarRaw) {
@@ -50,8 +88,16 @@ export const useAuthStore = defineStore('auth', () => {
       }
       return `http://localhost:8080${avatarRaw.startsWith('/') ? '' : '/'}${avatarRaw}`
     }
-    const seed = encodeURIComponent((fallbackName || 'Aisight').trim() || 'Aisight')
-    return `https://api.dicebear.com/7.x/initials/svg?seed=${seed}`
+    return fallbackAvatarUrl(fallbackName)
+  }
+
+  // 用作 <img @error="...(e, name)"> 以便上传头像文件 404 时自动 fallback 到本地 SVG 首字母
+  function handleAvatarError(event: Event, name?: string) {
+    const img = event.target as HTMLImageElement | null
+    if (!img) return
+    const fallback = fallbackAvatarUrl(name)
+    if (img.src === fallback) return // 防止死循环
+    img.src = fallback
   }
 
   const avatarUrl = computed(() => {
@@ -68,6 +114,8 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     logout,
     resolveAvatarUrl,
+    fallbackAvatarUrl,
+    handleAvatarError,
     avatarUrl,
   }
 })

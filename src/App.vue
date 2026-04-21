@@ -8,28 +8,23 @@ import { updateMyProfile, uploadMyAvatar, getMyProfile } from './api/user'
 import type { User } from './api/types'
 import { useProjectStore } from './stores/project'
 import type { TopMenu, SystemMenu } from './stores/project'
+import { useAuthStore } from './stores/auth'
 
 const route = useRoute()
 const router = useRouter()
 const projectStore = useProjectStore()
+const authStore = useAuthStore()
+
+function onAvatarError(event: Event) {
+  authStore.handleAvatarError(event, currentUser.value?.name)
+}
 
 // ── Auth ──
 
 const currentUser = ref<User | null>(null)
 
 const userAvatarUrl = computed(() => {
-  const avatar = (currentUser.value as any)?.avatar || ''
-  if (avatar && /^https?:\/\//i.test(avatar)) return avatar
-  if (avatar) {
-    const envBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
-    if (envBase && /^https?:\/\//i.test(envBase)) {
-      const origin = envBase.replace(/\/api\/v1\/?$/, '')
-      return `${origin}${avatar.startsWith('/') ? '' : '/'}${avatar}`
-    }
-    return `http://localhost:8080${avatar.startsWith('/') ? '' : '/'}${avatar}`
-  }
-  const seed = encodeURIComponent((currentUser.value?.name || 'Aisight').trim() || 'Aisight')
-  return `https://api.dicebear.com/7.x/initials/svg?seed=${seed}`
+  return authStore.resolveAvatarUrl((currentUser.value as any)?.avatar, currentUser.value?.name)
 })
 
 function logout() {
@@ -139,8 +134,14 @@ async function onAvatarFileChange(file: any) {
   const raw = file?.raw as File | undefined
   if (!raw) return
   const allowed = ['image/jpeg', 'image/png', 'image/webp']
-  if (!allowed.includes(raw.type)) { ElMessage.warning('仅支持 JPG/PNG/WEBP'); return }
-  if (raw.size > 2 * 1024 * 1024) { ElMessage.warning('头像不能超过 2MB'); return }
+  if (!allowed.includes(raw.type)) {
+    ElMessage.warning('仅支持 JPG/PNG/WEBP')
+    return
+  }
+  if (raw.size > 2 * 1024 * 1024) {
+    ElMessage.warning('头像不能超过 2MB')
+    return
+  }
   try {
     savingProfile.value = true
     const data = await uploadMyAvatar(raw)
@@ -193,7 +194,7 @@ watch(
 </script>
 
 <template>
-  <div class="page" v-if="routerReady">
+  <div v-if="routerReady" class="page">
     <!-- Login page: no shell, just RouterView -->
     <template v-if="isLoginRoute">
       <RouterView />
@@ -232,7 +233,12 @@ watch(
         <el-form label-position="top" class="profile-form">
           <el-form-item label="头像">
             <div class="profile-avatar-uploader">
-              <img class="profile-avatar-preview" :src="userAvatarUrl" alt="avatar" />
+              <img
+                class="profile-avatar-preview"
+                :src="userAvatarUrl"
+                alt="avatar"
+                @error="onAvatarError"
+              />
               <el-upload
                 class="avatar-upload"
                 :show-file-list="false"
@@ -253,7 +259,9 @@ watch(
         </el-form>
         <template #footer>
           <el-button @click="profileDialogVisible = false">取消</el-button>
-          <el-button type="primary" :loading="savingProfile" @click="saveProfile">保存资料</el-button>
+          <el-button type="primary" :loading="savingProfile" @click="saveProfile">
+            保存资料
+          </el-button>
         </template>
       </el-dialog>
     </template>

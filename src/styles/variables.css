@@ -1,6 +1,12 @@
 /* ========== 1. Design Tokens / CSS Variables ========== */
 :root {
-  font-family: 'Inter', 'Noto Sans SC', -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  font-family:
+    'Inter',
+    'Noto Sans SC',
+    -apple-system,
+    'Segoe UI',
+    'Microsoft YaHei',
+    sans-serif;
   color: rgba(225, 228, 235, 0.9);
 
   /* Brand Colors — Design B 深蓝灰 + 紫色点缀 */
@@ -11,23 +17,23 @@
   --tp-primary-shadow: rgba(124, 58, 237, 0.25);
 
   /* Semantic Colors */
-  --tp-success: #10B981;
+  --tp-success: #10b981;
   --tp-success-light: rgba(16, 185, 129, 0.15);
-  --tp-warning: #F59E0B;
+  --tp-warning: #f59e0b;
   --tp-warning-light: rgba(245, 158, 11, 0.15);
-  --tp-danger: #EF4444;
+  --tp-danger: #ef4444;
   --tp-danger-light: rgba(239, 68, 68, 0.15);
-  --tp-info: #8B95A5;
+  --tp-info: #8b95a5;
   --tp-info-light: rgba(139, 149, 165, 0.15);
 
   /* Level Colors */
-  --tp-p0: #F87171;
+  --tp-p0: #f87171;
   --tp-p0-bg: rgba(239, 68, 68, 0.15);
-  --tp-p1: #FBBF24;
+  --tp-p1: #fbbf24;
   --tp-p1-bg: rgba(245, 158, 11, 0.15);
-  --tp-p2: #60A5FA;
+  --tp-p2: #60a5fa;
   --tp-p2-bg: rgba(59, 130, 246, 0.15);
-  --tp-p3: #9CA3AF;
+  --tp-p3: #9ca3af;
   --tp-p3-bg: rgba(107, 114, 128, 0.15);
 
   /* Neutral — 冷蓝灰色调 (Design B 深海军蓝风格) */
@@ -36,7 +42,7 @@
   --tp-gray-200: rgba(255, 255, 255, 0.08);
   --tp-gray-300: rgba(255, 255, 255, 0.12);
   --tp-gray-400: rgba(200, 210, 225, 0.35);
-  --tp-gray-500: rgba(200, 210, 225, 0.50);
+  --tp-gray-500: rgba(200, 210, 225, 0.5);
   --tp-gray-600: rgba(200, 210, 225, 0.65);
   --tp-gray-700: rgba(215, 222, 235, 0.75);
   --tp-gray-800: rgba(225, 230, 240, 0.85);
@@ -87,6 +93,31 @@
   --tp-space-8: 32px;
   --tp-space-10: 40px;
   --tp-space-12: 48px;
+
+  /* ── Expressive Accent Palette (Tailwind 400 tone, 深色友好) ── */
+  --tp-accent-primary: #a78bfa;
+  --tp-accent-primary-soft: rgba(167, 139, 250, 0.14);
+  --tp-accent-primary-border: rgba(167, 139, 250, 0.22);
+  --tp-accent-success: #34d399;
+  --tp-accent-success-soft: rgba(52, 211, 153, 0.14);
+  --tp-accent-success-border: rgba(52, 211, 153, 0.22);
+  --tp-accent-danger: #fb7185;
+  --tp-accent-danger-soft: rgba(251, 113, 133, 0.14);
+  --tp-accent-danger-border: rgba(251, 113, 133, 0.22);
+  --tp-accent-info: #60a5fa;
+  --tp-accent-info-soft: rgba(96, 165, 250, 0.14);
+  --tp-accent-info-border: rgba(96, 165, 250, 0.22);
+  --tp-accent-warning: #fbbf24;
+  --tp-accent-warning-soft: rgba(251, 191, 36, 0.14);
+  --tp-accent-warning-border: rgba(251, 191, 36, 0.22);
+
+  /* ── Layered Borders（玻璃态微光） ── */
+  --tp-border-subtle: rgba(255, 255, 255, 0.06);
+  --tp-border-strong: rgba(255, 255, 255, 0.12);
+
+  /* ── Layered Shadows ── */
+  --tp-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.16);
+  --tp-shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.3), 0 10px 28px rgba(0, 0, 0, 0.28);
 }
 
 /* ========== Element Plus Dark Theme Overrides for Style B ========== */

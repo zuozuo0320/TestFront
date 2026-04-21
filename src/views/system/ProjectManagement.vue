@@ -14,6 +14,13 @@ import {
 import { listMembers, addMember, removeMember } from '../../api/projectMember'
 import { listUsers } from '../../api/user'
 import type { Project, ProjectMember, User } from '../../api/types'
+import { useAuthStore } from '../../stores/auth'
+
+const authStore = useAuthStore()
+
+function onAvatarError(event: Event, name?: string) {
+  authStore.handleAvatarError(event, name)
+}
 
 const SEED_PROJECT_NAME = 'AiSight Demo'
 const PROTECTED_ROLE_KEYS = new Set(['admin', 'manager'])
@@ -159,18 +166,7 @@ function isProtectedMember(m: ProjectMember) {
   return getMemberRoleNames(m).some((roleName) => isProtectedRoleName(roleName))
 }
 function resolveAvatarUrl(avatar?: string, fallbackName?: string) {
-  const avatarRaw = (avatar || '').trim()
-  if (avatarRaw) {
-    if (/^https?:\/\//i.test(avatarRaw)) return avatarRaw
-    const envBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
-    if (envBase && /^https?:\/\//i.test(envBase)) {
-      const origin = envBase.replace(/\/api\/v1\/?$/, '')
-      return `${origin}${avatarRaw.startsWith('/') ? '' : '/'}${avatarRaw}`
-    }
-    return `http://localhost:8080${avatarRaw.startsWith('/') ? '' : '/'}${avatarRaw}`
-  }
-  const seed = encodeURIComponent((fallbackName || 'AiSight').trim() || 'AiSight')
-  return `https://api.dicebear.com/7.x/initials/svg?seed=${seed}`
+  return authStore.resolveAvatarUrl(avatar, fallbackName)
 }
 
 async function loadProjects() {
@@ -483,6 +479,7 @@ void Search // suppress unused import warning
                     v-if="p.avatar"
                     :src="resolveAvatarUrl(p.avatar)"
                     class="pm-project-avatar-img"
+                    @error="onAvatarError($event, p.name)"
                   />
                   <span
                     v-else
@@ -497,7 +494,11 @@ void Search // suppress unused import warning
             </td>
             <td class="pm-td">
               <div class="pm-owner-cell">
-                <img class="pm-owner-avatar" :src="getProjectOwnerAvatar(p)" />
+                <img
+                  class="pm-owner-avatar"
+                  :src="getProjectOwnerAvatar(p)"
+                  @error="onAvatarError($event, getProjectOwnerName(p))"
+                />
                 <span class="pm-owner-name">{{ getProjectOwnerName(p) }}</span>
               </div>
             </td>
@@ -790,7 +791,9 @@ void Search // suppress unused import warning
           <span class="mb-card-name">{{ m.user?.name || '-' }}</span>
           <span class="mb-card-email">{{ m.user?.email || '' }}</span>
           <div class="mb-card-roles">
-            <span v-if="isProjectOwnerMember(m)" class="mb-role-pill mb-role-pill--owner">负责人</span>
+            <span v-if="isProjectOwnerMember(m)" class="mb-role-pill mb-role-pill--owner">
+              负责人
+            </span>
             <span
               v-for="(roleName, ridx) in getMemberRoleNames(m)"
               :key="`${m.user_id}-${ridx}`"

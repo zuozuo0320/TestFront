@@ -11,6 +11,13 @@ import {
   globalTreeExpanded,
   globalTreeActions,
 } from '../composables/useTestCaseTree'
+import { useAuthStore } from '../stores/auth'
+
+const authStore = useAuthStore()
+
+function onAvatarError(event: Event, name?: string) {
+  authStore.handleAvatarError(event, name)
+}
 
 type TopMenu = 'workbench' | 'project' | 'plan' | 'testcases' | 'e2e' | 'system'
 type SystemMenu = 'users' | 'roles' | 'projects' | 'tags'
@@ -163,6 +170,7 @@ const systemNavItems: { key: SystemMenu; label: string }[] = [
               v-if="currentProjectAvatar"
               :src="currentProjectAvatar"
               class="nav-header-avatar-img"
+              @error="onAvatarError($event, currentProjectName)"
             />
             <span
               v-else
@@ -211,6 +219,7 @@ const systemNavItems: { key: SystemMenu; label: string }[] = [
                     v-if="resolveAvatarUrl(p.avatar)"
                     :src="resolveAvatarUrl(p.avatar)"
                     class="nav-project-item-avatar"
+                    @error="onAvatarError($event, p.name)"
                   />
                   <span
                     v-else
