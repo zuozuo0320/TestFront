@@ -125,16 +125,18 @@ function updateField(field: 'name' | 'color' | 'description', value: string) {
 </style>
 <style>
 .tm-dialog .el-dialog {
-  background: var(--bg-dialog);
-  border-radius: 12px;
+  background: var(--tp-surface-elevated, #1c1c22);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
 }
 .tm-dialog .el-dialog__header {
-  color: var(--text-primary);
+  color: #e8e8f0;
 }
 .tm-dialog .el-dialog__title {
-  color: var(--text-primary);
+  color: #e8e8f0;
+  font-weight: 600;
 }
 .tm-dialog .el-form-item__label {
-  color: var(--text-secondary);
+  color: #9ca3af;
 }
 </style>

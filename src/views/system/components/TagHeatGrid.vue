@@ -1,172 +1,125 @@
 <script setup lang="ts">
 /**
- * 标签热度统计网格 — 展示用例数 TOP5 的标签卡片
+ * Top 5 热度图 — 完全参考设计图 code.html
  *
- * 每张卡片显示：标签名称、排名、关联用例数、热度进度条
- * 不足 5 个标签时用空卡片补位，引导用户创建更多标签
+ * 每行：mono序号 + 全宽track(gradient fill + border-left-2) + 彩色计数
  */
 import type { Tag } from '../../../api/tag'
 
 defineProps<{
-  topTags: Tag[] // 热度 TOP5 标签列表（由父组件计算后传入）
-  maxCaseCount: number // 最大用例数（用于计算热度条百分比）
-  rankBarColors: string[] // 排名对应的颜色数组（第1名~第5名）
+  topTags: Tag[]
+  maxCaseCount: number
+  rankBarColors: string[]
 }>()
+
+function formatCount(n: number): string {
+  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
+  return String(n)
+}
 </script>
 
 <template>
-  <section class="tm-section">
-    <div class="tm-section-header">
-      <h3 class="tm-section-title">标签热度统计</h3>
-      <span class="tm-section-badge">REAL-TIME METRICS</span>
-    </div>
-    <div class="tm-heat-grid">
-      <div v-for="(t, idx) in topTags" :key="t.id" class="tm-heat-card">
-        <div class="tm-heat-top">
-          <span
-            class="tm-heat-tag-badge"
-            :style="{ backgroundColor: t.color + '1a', color: t.color }"
-          >
-            #{{ t.name }}
-          </span>
-          <span class="tm-heat-rank">RANK {{ String(idx + 1).padStart(2, '0') }}</span>
-        </div>
-        <div class="tm-heat-value">
-          <span class="tm-heat-number">{{ t.case_count.toLocaleString() }}</span>
-          <span class="tm-heat-label">用例</span>
-        </div>
-        <div class="tm-heat-bar-track">
-          <div
-            class="tm-heat-bar-fill"
-            :style="{
-              width:
-                t.case_count > 0 ? Math.max((t.case_count / maxCaseCount) * 100, 15) + '%' : '0%',
-              backgroundColor: rankBarColors[idx] || t.color,
-            }"
-          ></div>
+  <div class="hm-list">
+    <div v-for="(t, idx) in topTags.slice(0, 5)" :key="t.id" class="hm-row">
+      <span class="hm-rank">{{ String(idx + 1).padStart(2, '0') }}</span>
+      <div class="hm-bar-track">
+        <div
+          class="hm-bar-fill"
+          :style="{
+            width:
+              t.case_count > 0 ? Math.max((t.case_count / maxCaseCount) * 100, 15) + '%' : '15%',
+            '--bar-color': rankBarColors[idx] || t.color,
+          }"
+        >
+          <span class="hm-bar-label">{{ t.name }}</span>
         </div>
       </div>
-      <!-- 空卡片补位 -->
-      <div
-        v-for="n in Math.max(0, 5 - topTags.length)"
-        :key="'ph-' + n"
-        class="tm-heat-card tm-heat-card--empty"
-      >
-        <div class="tm-heat-top">
-          <span class="tm-heat-rank" style="opacity: 0.3">
-            RANK {{ String(topTags.length + n).padStart(2, '0') }}
-          </span>
-        </div>
-        <div class="tm-heat-value">
-          <span class="tm-heat-number" style="opacity: 0.2">--</span>
-        </div>
-        <p class="tm-heat-empty-hint">创建更多标签以解锁排行</p>
-        <div class="tm-heat-bar-track">
-          <div class="tm-heat-bar-fill" style="width: 0"></div>
+      <span class="hm-count" :style="{ color: rankBarColors[idx] || t.color }">
+        {{ formatCount(t.case_count) }}
+      </span>
+    </div>
+    <!-- 空行补位 -->
+    <div v-for="n in Math.max(0, 5 - topTags.length)" :key="'ph-' + n" class="hm-row hm-row--empty">
+      <span class="hm-rank">{{ String(topTags.length + n).padStart(2, '0') }}</span>
+      <div class="hm-bar-track">
+        <div class="hm-bar-fill hm-bar-fill--empty" style="width: 15%">
+          <span class="hm-bar-label">—</span>
         </div>
       </div>
+      <span class="hm-count" style="color: var(--outline, #958da1)">0</span>
     </div>
-  </section>
+  </div>
 </template>
 
 <style scoped>
-.tm-section-header {
+.hm-list {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 1;
+}
+.hm-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
+  gap: 12px;
 }
-.tm-section-title {
-  font-size: 14px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  margin: 0;
+.hm-row--empty {
+  opacity: 0.35;
 }
-.tm-section-badge {
-  font-size: 10px;
-  color: var(--purple-light);
-  font-weight: 500;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
+.hm-rank {
+  flex-shrink: 0;
+  width: 16px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--on-surface-variant, #ccc3d8);
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
 }
-.tm-heat-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 16px;
-}
-.tm-heat-card {
-  background: var(--bg-card);
-  padding: 20px;
-  border-radius: 12px;
-  border: 1px solid var(--border-faint);
-  transition: all 0.25s;
-}
-.tm-heat-card:hover {
-  border-color: var(--purple-20);
-}
-.tm-heat-card--empty {
-  opacity: 0.4;
-}
-.tm-heat-empty-hint {
-  font-size: 10px;
-  color: var(--text-muted);
-  margin: 8px 0 0;
-  font-style: italic;
-}
-.tm-heat-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 12px;
-}
-.tm-heat-tag-badge {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 700;
-  max-width: 100px;
+.hm-bar-track {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  background: var(--surface-container, #1d1f2b);
+  border-radius: 6px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  position: relative;
 }
-.tm-heat-rank {
-  font-size: 11px;
-  color: var(--text-secondary-50);
-  text-transform: uppercase;
-  font-weight: 500;
-}
-.tm-heat-value {
-  display: flex;
-  align-items: flex-end;
-  gap: 6px;
-}
-.tm-heat-number {
-  font-size: 24px;
-  font-weight: 600;
-  letter-spacing: -0.04em;
-}
-.tm-heat-label {
-  font-size: 10px;
-  color: var(--text-muted);
-  margin-bottom: 4px;
-}
-.tm-heat-bar-track {
-  margin-top: 16px;
-  height: 4px;
-  width: 100%;
-  background: var(--bg-card-high);
-  border-radius: 99px;
-  overflow: hidden;
-}
-.tm-heat-bar-fill {
+.hm-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
   height: 100%;
-  border-radius: 99px;
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--bar-color) 20%, transparent),
+    color-mix(in srgb, var(--bar-color) 60%, transparent)
+  );
+  border-left: 2px solid var(--bar-color);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
   transition: width 0.6s ease;
 }
-@media (max-width: 1200px) {
-  .tm-heat-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
+.hm-bar-fill--empty {
+  background: rgba(255, 255, 255, 0.03);
+  border-left: none;
+}
+.hm-bar-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  z-index: 1;
+}
+.hm-count {
+  flex-shrink: 0;
+  width: 32px;
+  text-align: right;
+  font-size: 14px;
+  font-weight: 600;
 }
 </style>

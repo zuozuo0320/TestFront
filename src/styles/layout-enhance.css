@@ -6,6 +6,80 @@
    ============================================================ */
 
 /* ───────────────────────────────
+   0. 整体紧凑化：收紧顶/右/左留白
+   ─────────────────────────────── */
+.main {
+  padding: 8px !important;
+  gap: 10px !important;
+  min-height: calc(100vh - 56px) !important;
+}
+.content-wrap {
+  height: calc(100vh - 56px - 16px) !important;
+}
+.right-table {
+  padding: 10px 14px !important;
+}
+
+/* 智能洞察区块紧凑化 */
+.insights-section {
+  margin-bottom: 12px !important;
+}
+.insights-header {
+  margin-bottom: 10px !important;
+}
+.insights-cards {
+  gap: 10px !important;
+}
+
+/* 侧栏顶部留白收紧 + 高度同步 */
+.main-nav {
+  padding: 10px 12px !important;
+  height: calc(100vh - 56px - 16px) !important;
+}
+.main-nav.collapsed {
+  padding: 10px 8px !important;
+}
+
+/* 指标卡高度收紧 */
+.insight-card {
+  padding: 12px 16px !important;
+  min-height: 88px !important;
+}
+.insight-value {
+  margin: 6px 0 !important;
+  font-size: 24px !important;
+}
+.insight-trend {
+  margin-top: 8px !important;
+}
+.insight-icon-wrap {
+  width: 38px !important;
+  height: 38px !important;
+}
+.insight-icon-wrap .material-symbols-outlined {
+  font-size: 20px !important;
+}
+
+/* 智能洞察标题紧凑化 */
+.insights-title {
+  font-size: 18px !important;
+}
+.insights-desc {
+  font-size: 12px !important;
+}
+.insights-title-area {
+  gap: 2px !important;
+}
+
+/* 表格行高收紧 */
+.el-table td.el-table__cell {
+  padding: 6px 0 !important;
+}
+.el-table th.el-table__cell {
+  padding: 8px 0 !important;
+}
+
+/* ───────────────────────────────
    A. Top Header（顶部品牌栏）
    ─────────────────────────────── */
 .layout > .top-header,

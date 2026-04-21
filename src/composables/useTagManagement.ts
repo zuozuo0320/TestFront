@@ -330,15 +330,61 @@ export function useTagManagement() {
   // ── 辅助函数 ──
 
   /**
-   * 根据标签关联的用例数量返回对应的 Material 图标名称
-   * 用例数越多图标越“醒目”，体现标签的重要程度
+   * 根据标签名称关键词匹配合适的 Material 图标
+   * 匹配不到时按名称哈希从图标池中选取，确保每个标签图标各异
    */
+  const iconKeywords: [RegExp, string][] = [
+    [/p0|critical|严重|紧急|blocker/i, 'priority_high'],
+    [/p1|高|high/i, 'warning'],
+    [/bug|缺陷|defect/i, 'bug_report'],
+    [/ui|界面|前端|样式/i, 'palette'],
+    [/api|接口|后端|auth|鉴权/i, 'api'],
+    [/支付|pay|payment|金额/i, 'credit_card'],
+    [/回归|regression/i, 'cycle'],
+    [/冒烟|smoke|核心/i, 'local_fire_department'],
+    [/性能|perf|压力|负载/i, 'speed'],
+    [/安全|security|漏洞/i, 'shield'],
+    [/自动化|auto|script|脚本/i, 'terminal'],
+    [/数据|data|database|db/i, 'database'],
+    [/登录|login|注册|register/i, 'person'],
+    [/搜索|search|查询/i, 'manage_search'],
+    [/通知|notify|消息|message/i, 'notifications'],
+    [/导入|导出|import|export|excel/i, 'import_export'],
+    [/版本|version|v\d/i, 'new_releases'],
+    [/稳定|stable|发布|release/i, 'verified'],
+    [/开发|dev|develop/i, 'code'],
+    [/测试|test|验证/i, 'science'],
+    [/容量|capacity|容灾/i, 'storage'],
+    [/并发|concurrent|多线程/i, 'hub'],
+    [/遗留|legacy|待处理|todo/i, 'bookmark'],
+    [/优化|optimize|改进/i, 'auto_fix_high'],
+  ]
+  const iconPool = [
+    'sell',
+    'label',
+    'tag',
+    'bookmark',
+    'flag',
+    'star',
+    'bolt',
+    'category',
+    'extension',
+    'widgets',
+    'tune',
+    'view_module',
+    'dashboard',
+    'grid_view',
+    'layers',
+  ]
   function getTagIcon(tag: Tag): string {
-    const c = tag.case_count || 0
-    if (c > 100) return 'verified' // > 100 用例：金牌认证图标
-    if (c > 50) return 'check_circle' // > 50 用例：勾选图标
-    if (c > 10) return 'sell' // > 10 用例：价签图标
-    return 'label' // 其他：普通标签图标
+    const name = tag.name || ''
+    for (const [re, icon] of iconKeywords) {
+      if (re.test(name)) return icon
+    }
+    // 名称哈希取余，确保同一标签始终同一图标
+    let hash = 0
+    for (let i = 0; i < name.length; i++) hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0
+    return iconPool[Math.abs(hash) % iconPool.length]!
   }
 
   return {

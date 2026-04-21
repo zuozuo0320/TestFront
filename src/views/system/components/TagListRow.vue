@@ -1,188 +1,226 @@
 <script setup lang="ts">
 /**
- * 标签列表行组件 — 展示单个标签的详细信息
+ * 标签卡片 — 完全参考设计图 code.html
  *
- * 每行显示：
- *   - 左侧：图标 + 标签名称 + 状态徽章（使用中/未使用） + 描述
- *   - 中间：用例数 + 创建人（头像 + 姓名）
- *   - 右侧：编辑/删除操作按钮
- *
- * 左侧边框颜色通过 CSS 变量 --row-accent 动态设置为标签颜色
+ * glass-panel + border-l-2 accent + icon box + uppercase name + delete hover
+ * Stats: Linked Cases + divider + 创建人
  */
-import { Edit, Delete } from '@element-plus/icons-vue'
 import type { Tag } from '../../../api/tag'
 
 defineProps<{
-  tag: Tag // 标签完整数据
-  serverUrl: string // 服务端基础地址（拼接头像 URL）
-  tagIcon: string // Material 图标名称（由父组件根据用例数计算）
+  tag: Tag
+  serverUrl: string
+  tagIcon: string
 }>()
 
 const emit = defineEmits<{
-  edit: [tag: Tag] // 点击编辑按钮
-  delete: [tag: Tag] // 点击删除按钮
+  edit: [tag: Tag]
+  delete: [tag: Tag]
 }>()
+
+function formatCount(n: number): string {
+  if (n >= 10000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
+  if (n >= 1000) return n.toLocaleString()
+  return String(n)
+}
 </script>
 
 <template>
-  <div class="tm-tag-row" :style="{ '--row-accent': tag.color }">
-    <div class="tm-tag-info">
-      <div class="tm-tag-name-row">
-        <span class="material-symbols-outlined tm-tag-icon" :style="{ color: tag.color }">
-          {{ tagIcon }}
-        </span>
-        <h4 class="tm-tag-name">{{ tag.name }}</h4>
-        <span
-          :class="[
-            'tm-tag-status-badge',
-            tag.case_count > 0 ? 'tm-status--active' : 'tm-status--idle',
-          ]"
+  <div class="tc-card" :style="{ '--accent': tag.color }">
+    <!-- Top row: icon + meta + actions -->
+    <div class="tc-top">
+      <div class="tc-left">
+        <div class="tc-icon-box">
+          <span
+            class="material-symbols-outlined"
+            style="font-variation-settings: 'FILL' 1; font-size: 18px"
+          >
+            {{ tagIcon }}
+          </span>
+        </div>
+        <div class="tc-meta">
+          <h4 class="tc-name">{{ tag.name }}</h4>
+          <p class="tc-desc">{{ tag.description || '暂无描述' }}</p>
+        </div>
+      </div>
+      <div class="tc-actions">
+        <button type="button" class="tc-act-btn" title="编辑" @click="emit('edit', tag)">
+          <span class="material-symbols-outlined" style="font-size: 20px">edit</span>
+        </button>
+        <button
+          type="button"
+          class="tc-act-btn tc-act-btn--del"
+          title="删除"
+          @click="emit('delete', tag)"
         >
-          {{ tag.case_count > 0 ? '使用中' : '未使用' }}
-        </span>
+          <span class="material-symbols-outlined" style="font-size: 20px">delete</span>
+        </button>
       </div>
-      <p class="tm-tag-desc">{{ tag.description || '暂无描述' }}</p>
     </div>
-    <div class="tm-tag-stats">
-      <div class="tm-stat-cell">
-        <p class="tm-stat-label">用例数</p>
-        <p class="tm-stat-value">{{ tag.case_count }}</p>
+
+    <!-- Stats row -->
+    <div class="tc-stats">
+      <div class="tc-stat">
+        <span class="tc-stat-label">关联用例</span>
+        <span class="tc-stat-value tc-stat-value--primary">{{ formatCount(tag.case_count) }}</span>
       </div>
-      <div class="tm-stat-cell">
-        <p class="tm-stat-label">创建人</p>
-        <p class="tm-stat-value tm-stat-creator">
+      <div class="tc-divider"></div>
+      <div class="tc-stat">
+        <span class="tc-stat-label">创建人</span>
+        <span class="tc-stat-value tc-stat-value--creator">
           <img
             v-if="tag.created_by_avatar"
-            class="tm-creator-avatar"
+            class="tc-avatar"
             :src="serverUrl + tag.created_by_avatar"
             :alt="tag.created_by_name"
           />
           {{ tag.created_by_name || '-' }}
-        </p>
+        </span>
       </div>
-    </div>
-    <div class="action-group">
-      <button
-        type="button"
-        class="action-btn action-edit icon-only"
-        title="编辑"
-        @click="emit('edit', tag)"
-      >
-        <el-icon class="btn-icon"><Edit /></el-icon>
-        <span>编辑</span>
-      </button>
-      <button
-        type="button"
-        class="action-btn action-delete icon-only"
-        title="删除"
-        @click="emit('delete', tag)"
-      >
-        <el-icon class="btn-icon"><Delete /></el-icon>
-        <span>删除</span>
-      </button>
     </div>
   </div>
 </template>
 
 <style scoped>
-.tm-tag-row {
+.tc-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(74, 68, 85, 0.15);
+  border-left: 2px solid var(--accent);
+  border-radius: 12px;
+  padding: 20px;
+  transition: background 0.15s;
+  cursor: default;
+}
+.tc-card:hover {
+  background: var(--surface-container, #1d1f2b);
+}
+
+/* ── Top row ── */
+.tc-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+.tc-left {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px 20px;
-  border-radius: 12px;
-  background: var(--bg-row);
-  border-left: 3px solid var(--row-accent, var(--purple));
-  transition: all 0.25s;
+  gap: 12px;
+  min-width: 0;
 }
-.tm-tag-row:hover {
-  background: var(--bg-card-high);
+.tc-icon-box {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.tm-tag-info {
+.tc-meta {
   flex: 1;
   min-width: 0;
 }
-.tm-tag-name-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 4px;
-}
-.tm-tag-icon {
-  font-size: 18px;
-}
-.tm-tag-name {
-  font-size: 14px;
+.tc-name {
+  font-size: 16px;
   font-weight: 600;
+  color: #fff;
   margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   white-space: nowrap;
-}
-.tm-tag-status-badge {
-  font-size: 10px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-.tm-status--active {
-  background-color: var(--green-15);
-  color: var(--green);
-}
-.tm-status--idle {
-  background-color: var(--slate-15);
-  color: var(--slate);
-}
-.tm-tag-desc {
-  font-size: 12px;
-  color: var(--text-secondary);
-  font-weight: 300;
-  margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
-.tm-tag-stats {
-  display: flex;
-  align-items: center;
-  gap: 32px;
-  padding: 0 24px;
-  border-left: 1px solid var(--border-subtle);
-  border-right: 1px solid var(--border-subtle);
-}
-.tm-stat-cell {
-  text-align: center;
-  min-width: 60px;
-}
-.tm-stat-label {
-  font-size: 10px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  margin: 0 0 2px;
-  font-weight: 500;
-}
-.tm-stat-value {
-  font-size: 14px;
-  font-weight: 600;
-  margin: 0;
-}
-.tm-stat-creator {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.tc-desc {
   font-size: 12px;
-  font-weight: 500;
+  color: var(--on-surface-variant, #ccc3d8);
+  margin: 2px 0 0;
+  font-weight: 300;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.tm-creator-avatar {
+
+/* ── Hover actions ── */
+.tc-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+.tc-card:hover .tc-actions {
+  opacity: 1;
+}
+.tc-act-btn {
+  background: none;
+  border: none;
+  color: var(--outline, #958da1);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s;
+}
+.tc-act-btn:hover {
+  color: #fff;
+}
+.tc-act-btn--del:hover {
+  color: #ef4444;
+}
+
+/* ── Stats row ── */
+.tc-stats {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 24px;
+}
+.tc-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tc-stat-label {
+  font-size: 12px;
+  color: var(--on-surface-variant, #ccc3d8);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 400;
+}
+.tc-stat-value {
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.tc-stat-value--primary {
+  color: var(--primary, #d2bbff);
+  text-shadow: 0 0 10px rgba(210, 187, 255, 0.5);
+}
+.tc-stat-value--creator {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--on-surface, #e1e1f2);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tc-divider {
+  width: 1px;
+  height: 32px;
+  background: rgba(74, 68, 85, 0.3);
+  flex-shrink: 0;
+}
+.tc-avatar {
   width: 18px;
   height: 18px;
   border-radius: 50%;
   object-fit: cover;
-}
-.action-group {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 2px;
+  border: 1px solid rgba(74, 68, 85, 0.3);
 }
 </style>
