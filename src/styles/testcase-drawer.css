@@ -452,6 +452,28 @@
   color: rgb(248, 113, 113);
 }
 
+.stitch-btn-step-menu {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+}
+
+.stitch-step-row:hover .stitch-btn-step-menu {
+  opacity: 1;
+}
+
+.stitch-btn-step-menu:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+}
+
 /* Notes Textarea */
 .stitch-textarea-wrap {
   border: 1px solid rgba(74, 68, 85, 0.3);
@@ -861,6 +883,22 @@
 
 .ai-btn:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+.ai-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(176, 138, 221, 0.2);
+  border-top-color: #b08add;
+  border-radius: 50%;
+  animation: ai-spin 0.8s linear infinite;
+  margin: 0 auto;
+}
+
+@keyframes ai-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .stitch-uploader-btn {

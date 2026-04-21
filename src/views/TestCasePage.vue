@@ -10,6 +10,7 @@ import {
   globalModuleTree,
   globalModuleCaseCount,
   globalUnplannedCount,
+  globalTotalCaseCount,
   globalSelectedModulePath,
   globalSelectedModuleId,
   globalTreeActions,
@@ -31,8 +32,9 @@ import {
   listCaseActivities,
   discardTestCase,
   recoverTestCase,
+  analyzeTestCase,
 } from '../api/testcase'
-import type { CaseActivity } from '../api/testcase'
+import type { CaseActivity, AIAnalyzeResult } from '../api/testcase'
 import { apiClient } from '../api/client'
 import { uploadAttachment, listAttachments, deleteAttachment } from '../api/attachment'
 import {
@@ -264,6 +266,31 @@ const reviewAttachments = ref<CaseReviewAttachment[]>([])
 const reviewAttachmentsLoading = ref(false)
 const caseHistory = ref<any[]>([])
 const caseActivities = ref<CaseActivity[]>([])
+
+// ── AI Analyze ──
+const aiAnalyzing = ref(false)
+const aiResult = ref<AIAnalyzeResult | null>(null)
+const aiError = ref('')
+
+async function runAIAnalyze() {
+  if (!selectedProject.value || !editingId.value) return
+  aiAnalyzing.value = true
+  aiResult.value = null
+  aiError.value = ''
+  try {
+    aiResult.value = await analyzeTestCase(selectedProject.value, editingId.value)
+  } catch (e: any) {
+    aiError.value = e?.response?.data?.message || 'AI 分析失败，请稍后重试'
+  } finally {
+    aiAnalyzing.value = false
+  }
+}
+
+function getScoreColor(score: number): string {
+  if (score >= 80) return '#4caf50'
+  if (score >= 60) return '#ff9800'
+  return '#f44336'
+}
 
 // ── Tags ──
 const projectTagOptions = ref<TagBrief[]>([])
@@ -524,8 +551,16 @@ async function loadTreeData() {
 
     // 同步到全局状态供 Sidebar 使用
     globalModuleTree.value = processApiTree(rawData)
-    globalModuleCaseCount.value = (res as any).counts || {}
-    globalUnplannedCount.value = (res as any).unplannedCount || 0
+    const counts: Record<string, number> = (res as any).counts || {}
+    const unplanned: number = (res as any).unplannedCount || 0
+    globalModuleCaseCount.value = counts
+    globalUnplannedCount.value = unplanned
+    // 计算全部用例总数：顶层目录累计 + 未规划
+    const rootTotal = globalModuleTree.value.reduce(
+      (sum: number, node: any) => sum + (node.case_count || 0),
+      0,
+    )
+    globalTotalCaseCount.value = rootTotal + unplanned
   } catch (e) {
     console.error('Failed to load tree:', e)
   }
@@ -643,6 +678,9 @@ function applyAdvancedFilters() {
 function openCreate() {
   editingId.value = null
   editingCaseRow.value = null
+  aiResult.value = null
+  aiError.value = ''
+  aiAnalyzing.value = false
   Object.assign(caseForm, {
     title: '',
     level: 'P1',
@@ -667,6 +705,9 @@ function openCreate() {
 async function openEdit(row: TableRow) {
   editingId.value = row.id
   editingCaseRow.value = row
+  aiResult.value = null
+  aiError.value = ''
+  aiAnalyzing.value = false
   Object.assign(caseForm, {
     title: row.title,
     level: row.level || 'P1',
@@ -793,8 +834,20 @@ function toggleSelectRow(id: number) {
 
 async function onBatchDelete() {
   if (!selectedProject.value || selectedIds.value.length === 0) return
+  const nonDraftCount = rows.value.filter(
+    (r) => selectedIds.value.includes(r.id) && r.status !== 'draft',
+  ).length
+  const draftCount = selectedIds.value.length - nonDraftCount
+  if (draftCount === 0) {
+    ElMessage.warning(`选中的 ${selectedIds.value.length} 条用例均为非草稿状态，无法删除`)
+    return
+  }
+  const msg =
+    nonDraftCount > 0
+      ? `选中 ${selectedIds.value.length} 条用例，其中 ${nonDraftCount} 条为非草稿状态将被跳过，实际删除 ${draftCount} 条。确认继续？`
+      : `确认批量删除 ${draftCount} 条用例？`
   try {
-    await ElMessageBox.confirm(`确认批量删除 ${selectedIds.value.length} 条用例？`, '批量删除', {
+    await ElMessageBox.confirm(msg, '批量删除', {
       confirmButtonText: '删除',
       cancelButtonText: '取消',
       type: 'warning',
@@ -803,13 +856,19 @@ async function onBatchDelete() {
     return
   }
   try {
-    await batchDeleteTestCases(selectedProject.value, selectedIds.value)
-    ElMessage.success(`已删除 ${selectedIds.value.length} 条用例`)
+    const res = await batchDeleteTestCases(selectedProject.value, selectedIds.value)
+    const deleted = res?.deleted ?? 0
+    const skipped = res?.skipped ?? 0
+    if (skipped > 0) {
+      ElMessage.success(`已删除 ${deleted} 条，${skipped} 条非草稿用例已跳过`)
+    } else {
+      ElMessage.success(`已删除 ${deleted} 条用例`)
+    }
     selectedIds.value = []
     selectAll.value = false
     await loadCases()
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '批量删除失败')
+    ElMessage.error(e?.response?.data?.message || '批量删除失败')
   }
 }
 
@@ -1150,6 +1209,10 @@ async function onImportXlsx(e: Event) {
 
 async function onDelete(row: TableRow) {
   if (!selectedProject.value) return
+  if (row.status !== 'draft') {
+    ElMessage.warning('仅草稿状态的用例可以删除')
+    return
+  }
   try {
     await ElMessageBox.confirm(`确认删除用例【${row.title}】？`, '删除确认', {
       confirmButtonText: '删除',
@@ -1166,7 +1229,7 @@ async function onDelete(row: TableRow) {
     if (page.value > maxAfterDelete) page.value = maxAfterDelete
     await loadCases()
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '删除失败')
+    ElMessage.error(e?.response?.data?.message || '删除失败')
   }
 }
 
@@ -1205,6 +1268,33 @@ function removeStepRow(index: number) {
     return
   }
   stepRows.value.splice(index, 1)
+}
+function copyStepRow(index: number) {
+  const src = stepRows.value[index]
+  if (!src) return
+  stepRows.value.splice(index + 1, 0, { action: src.action, expected: src.expected })
+}
+function insertStepAbove(index: number) {
+  stepRows.value.splice(index, 0, { action: '', expected: '' })
+}
+function insertStepBelow(index: number) {
+  stepRows.value.splice(index + 1, 0, { action: '', expected: '' })
+}
+function onStepMenuCommand(cmd: string, index: number) {
+  switch (cmd) {
+    case 'copy':
+      copyStepRow(index)
+      break
+    case 'insertAbove':
+      insertStepAbove(index)
+      break
+    case 'insertBelow':
+      insertStepBelow(index)
+      break
+    case 'delete':
+      removeStepRow(index)
+      break
+  }
 }
 
 function onStepDragStart(index: number) {
@@ -2313,9 +2403,62 @@ watch(selectedProject, (newId) => {
                         ></textarea>
                       </td>
                       <td class="col-op text-center">
-                        <button class="stitch-btn-del" @click="removeStepRow(idx)">
-                          <span class="material-symbols-outlined">delete</span>
-                        </button>
+                        <el-dropdown
+                          trigger="click"
+                          placement="bottom-end"
+                          @command="(cmd: string) => onStepMenuCommand(cmd, idx)"
+                        >
+                          <button class="stitch-btn-step-menu" title="更多操作">
+                            <span class="material-symbols-outlined" style="font-size: 18px">
+                              more_vert
+                            </span>
+                          </button>
+                          <template #dropdown>
+                            <el-dropdown-menu>
+                              <el-dropdown-item command="insertAbove">
+                                <span
+                                  class="material-symbols-outlined"
+                                  style="font-size: 16px; margin-right: 6px; vertical-align: middle"
+                                >
+                                  arrow_upward
+                                </span>
+                                在上方插入
+                              </el-dropdown-item>
+                              <el-dropdown-item command="insertBelow">
+                                <span
+                                  class="material-symbols-outlined"
+                                  style="font-size: 16px; margin-right: 6px; vertical-align: middle"
+                                >
+                                  arrow_downward
+                                </span>
+                                在下方插入
+                              </el-dropdown-item>
+                              <el-dropdown-item command="copy">
+                                <span
+                                  class="material-symbols-outlined"
+                                  style="font-size: 16px; margin-right: 6px; vertical-align: middle"
+                                >
+                                  content_copy
+                                </span>
+                                复制步骤
+                              </el-dropdown-item>
+                              <el-dropdown-item command="delete" divided>
+                                <span
+                                  class="material-symbols-outlined"
+                                  style="
+                                    font-size: 16px;
+                                    margin-right: 6px;
+                                    vertical-align: middle;
+                                    color: #ff5252;
+                                  "
+                                >
+                                  delete
+                                </span>
+                                <span style="color: #ff5252">删除步骤</span>
+                              </el-dropdown-item>
+                            </el-dropdown-menu>
+                          </template>
+                        </el-dropdown>
                       </td>
                     </tr>
                   </tbody>
@@ -2613,19 +2756,116 @@ watch(selectedProject, (newId) => {
                 <div>
                   <h4 class="text-sm font-bold text-white leading-none">AI 智检助手</h4>
                   <span class="text-xs text-primary-dim uppercase tracking-wider">
-                    智能审计可用
+                    {{ aiAnalyzing ? '分析中...' : aiResult ? '分析完成' : '智能审计可用' }}
                   </span>
                 </div>
               </div>
-              <p class="text-xs text-variant leading-relaxed mb-4">
-                我已分析您的测试步骤。发现步骤 02
-                可能存在冗余，是否需要自动优化步骤逻辑以提高执行效率？
-              </p>
-              <button
-                class="ai-btn w-full py-2 bg-white-10 hover:bg-white-20 text-xs font-bold text-primary-dim rounded-lg transition-all border border-white-10"
-              >
-                执行智能优化
-              </button>
+
+              <!-- Loading -->
+              <div v-if="aiAnalyzing" style="text-align: center; padding: 16px 0">
+                <div class="ai-spinner"></div>
+                <p class="text-xs text-variant" style="margin-top: 8px">
+                  正在进行 AI 质量分析，请稍候...
+                </p>
+              </div>
+
+              <!-- Error -->
+              <div v-else-if="aiError" style="margin-bottom: 12px">
+                <p class="text-xs" style="color: #f44336; margin-bottom: 8px">{{ aiError }}</p>
+                <button
+                  class="ai-btn w-full py-2 bg-white-10 hover:bg-white-20 text-xs font-bold text-primary-dim rounded-lg transition-all border border-white-10"
+                  @click="runAIAnalyze"
+                >
+                  重新检测
+                </button>
+              </div>
+
+              <!-- Result -->
+              <div v-else-if="aiResult">
+                <div style="display: flex; gap: 8px; margin-bottom: 12px">
+                  <div
+                    v-for="dim in [
+                      { label: '覆盖率', score: aiResult.coverage.score },
+                      { label: '边界值', score: aiResult.boundary.score },
+                      { label: '质量', score: aiResult.quality.score },
+                    ]"
+                    :key="dim.label"
+                    style="
+                      flex: 1;
+                      text-align: center;
+                      padding: 8px 4px;
+                      border-radius: 8px;
+                      background: rgba(255, 255, 255, 0.04);
+                    "
+                  >
+                    <div class="text-xs text-variant" style="margin-bottom: 4px">
+                      {{ dim.label }}
+                    </div>
+                    <div
+                      style="font-size: 18px; font-weight: 700"
+                      :style="{ color: getScoreColor(dim.score) }"
+                    >
+                      {{ dim.score }}
+                    </div>
+                  </div>
+                </div>
+
+                <p
+                  v-if="aiResult.summary"
+                  class="text-xs text-variant"
+                  style="margin-bottom: 8px; line-height: 1.5"
+                >
+                  {{ aiResult.summary }}
+                </p>
+
+                <div
+                  v-if="
+                    aiResult.coverage.issues.length ||
+                    aiResult.boundary.issues.length ||
+                    aiResult.quality.suggestions.length
+                  "
+                  style="margin-bottom: 12px"
+                >
+                  <div
+                    v-for="issue in [
+                      ...aiResult.coverage.issues.map((i) => ({ text: i, type: 'coverage' })),
+                      ...aiResult.boundary.issues.map((i) => ({ text: i, type: 'boundary' })),
+                      ...aiResult.quality.suggestions.map((i) => ({ text: i, type: 'quality' })),
+                    ]"
+                    :key="issue.text"
+                    class="text-xs"
+                    style="padding: 3px 0; color: rgba(255, 255, 255, 0.6); line-height: 1.4"
+                  >
+                    <span style="margin-right: 4px">
+                      {{
+                        issue.type === 'coverage' ? '📋' : issue.type === 'boundary' ? '⚠️' : '💡'
+                      }}
+                    </span>
+                    {{ issue.text }}
+                  </div>
+                </div>
+
+                <button
+                  class="ai-btn w-full py-2 bg-white-10 hover:bg-white-20 text-xs font-bold text-primary-dim rounded-lg transition-all border border-white-10"
+                  @click="runAIAnalyze"
+                >
+                  重新检测
+                </button>
+              </div>
+
+              <!-- Initial state -->
+              <div v-else>
+                <p class="text-xs text-variant leading-relaxed mb-4">
+                  基于当前用例内容，AI
+                  将从覆盖率、边界值、综合质量三个维度进行分析，给出评分和改进建议。
+                </p>
+                <button
+                  class="ai-btn w-full py-2 bg-white-10 hover:bg-white-20 text-xs font-bold text-primary-dim rounded-lg transition-all border border-white-10"
+                  @click="runAIAnalyze"
+                >
+                  开始检测
+                </button>
+              </div>
             </section>
           </div>
         </div>

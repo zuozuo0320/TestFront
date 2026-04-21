@@ -5,6 +5,7 @@ import {
   globalModuleTree,
   globalModuleCaseCount,
   globalUnplannedCount,
+  globalTotalCaseCount,
   globalSelectedModulePath,
   globalSelectedModuleId,
   globalTreeExpanded,
@@ -82,13 +83,36 @@ function onModuleClick(node: any) {
   globalSelectedModuleId.value = id
 }
 
-/** 聚合目录树：包含“全部用例”和“未规划用例”作为顶层节点，确保对齐 */
+const moduleSearchKey = ref('')
+
+/** 递归过滤目录树，保留匹配节点及其祖先路径 */
+function filterTree(nodes: any[], keyword: string): any[] {
+  if (!keyword) return nodes
+  const kw = keyword.toLowerCase()
+  const result: any[] = []
+  for (const node of nodes) {
+    const nameMatch = (node.name || '').toLowerCase().includes(kw)
+    const filteredChildren = node.children ? filterTree(node.children, keyword) : []
+    if (nameMatch || filteredChildren.length > 0) {
+      result.push({
+        ...node,
+        children: filteredChildren.length > 0 ? filteredChildren : node.children,
+      })
+    }
+  }
+  return result
+}
+
+/** 聚合目录树：包含“全部用例”和“未规划用例”作为顶层节点，支持搜索过滤 */
 const combinedTree = computed(() => {
-  return [
+  const kw = moduleSearchKey.value.trim()
+  const virtualNodes = [
     { id: 0, name: '全部用例', path: '', icon: 'grid_view', isVirtual: true },
     { id: -1, name: '未规划用例', path: '/未规划用例', icon: 'description', isVirtual: true },
-    ...globalModuleTree.value,
   ]
+  if (!kw) return [...virtualNodes, ...globalModuleTree.value]
+  const filtered = filterTree(globalModuleTree.value, kw)
+  return [...virtualNodes, ...filtered]
 })
 
 function handleClickOutside(e: MouseEvent) {
@@ -251,6 +275,53 @@ const systemNavItems: { key: SystemMenu; label: string }[] = [
           </button>
         </div>
 
+        <div class="nav-tree-search" style="padding: 0 8px 6px">
+          <div style="position: relative">
+            <span
+              class="material-symbols-outlined"
+              style="
+                position: absolute;
+                left: 8px;
+                top: 50%;
+                transform: translateY(-50%);
+                font-size: 16px;
+                color: rgba(255, 255, 255, 0.4);
+                pointer-events: none;
+              "
+            >
+              search
+            </span>
+            <input
+              v-model="moduleSearchKey"
+              type="text"
+              placeholder="搜索目录…"
+              style="
+                width: 100%;
+                padding: 5px 8px 5px 28px;
+                border-radius: 6px;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                background: rgba(255, 255, 255, 0.06);
+                color: rgba(255, 255, 255, 0.85);
+                font-size: 12px;
+                outline: none;
+                transition: border-color 0.2s;
+              "
+              @focus="
+                ($event.target as HTMLInputElement).style.borderColor = 'rgba(255,255,255,0.3)'
+              "
+              @blur="
+                ($event.target as HTMLInputElement).style.borderColor = 'rgba(255,255,255,0.12)'
+              "
+            />
+          </div>
+          <div
+            v-if="moduleSearchKey.trim() && combinedTree.length <= 2"
+            style="padding: 8px 4px; font-size: 12px; color: rgba(255, 255, 255, 0.4)"
+          >
+            未找到匹配目录
+          </div>
+        </div>
+
         <div class="nav-tree-scroll">
           <el-tree
             ref="moduleTreeRef"
@@ -259,7 +330,7 @@ const systemNavItems: { key: SystemMenu; label: string }[] = [
             :props="{ label: 'name', children: 'children' }"
             node-key="id"
             :indent="16"
-            :default-expand-all="globalTreeExpanded"
+            :default-expand-all="globalTreeExpanded || !!moduleSearchKey.trim()"
             :expand-on-click-node="false"
             highlight-current
             @node-click="onModuleClick"
@@ -288,7 +359,7 @@ const systemNavItems: { key: SystemMenu; label: string }[] = [
                       data.id === -1
                         ? globalUnplannedCount
                         : data.id === 0
-                          ? ''
+                          ? globalTotalCaseCount
                           : globalModuleCaseCount[data.path] || 0
                     }}
                   </span>

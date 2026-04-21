@@ -195,3 +195,20 @@ export async function recoverTestCase(projectId: number, testcaseId: number) {
   const { data } = await apiClient.post(`/projects/${projectId}/testcase/${testcaseId}/recover`)
   return data
 }
+
+// ========== AI Analyze ==========
+
+export interface AIAnalyzeResult {
+  coverage: { score: number; issues: string[] }
+  boundary: { score: number; issues: string[] }
+  quality: { score: number; suggestions: string[] }
+  summary: string
+}
+
+export async function analyzeTestCase(
+  projectId: number,
+  testcaseId: number,
+): Promise<AIAnalyzeResult | null> {
+  const { data } = await apiClient.post(`/projects/${projectId}/testcases/${testcaseId}/analyze`)
+  return data?.result || null
+}

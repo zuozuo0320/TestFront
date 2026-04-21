@@ -4,6 +4,7 @@ import { ref, reactive } from 'vue'
 export const globalModuleTree = ref<any[]>([])
 export const globalModuleCaseCount = ref<Record<string, number>>({})
 export const globalUnplannedCount = ref(0)
+export const globalTotalCaseCount = ref(0)
 export const globalSelectedModulePath = ref('')
 export const globalSelectedModuleId = ref<number | 0>(0)
 export const globalTreeExpanded = ref(true)
