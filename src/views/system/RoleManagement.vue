@@ -24,7 +24,7 @@ const ROLE_ICONS: Record<string, string> = {
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   admin: ['用户管理', 'API 访问', '系统配置'],
   manager: ['项目管理', '成员分配', '配置模块'],
-  tester: ['用例执行', '缺陷提交', '截图上传'],
+  tester: ['用例执行', '缺陷提交', '参与评审'],
   reviewer: ['用例审核', '状态修改', '评审报告'],
   readonly: ['数据查看', '报表导出'],
   developer: ['用例查看', '缺陷认领', '日志查看'],

@@ -6,7 +6,26 @@ import type { User, Role } from './types'
 /** 获取用户列表 */
 export async function listUsers() {
   const { data } = await apiClient.get('/users')
-  return (Array.isArray(data) ? data : data.users ?? []) as User[]
+  return (Array.isArray(data) ? data : (data.users ?? [])) as User[]
+}
+
+/** 用户检索接口返回的最小字段，用于评审人 / 被指派人等下拉选择 */
+export interface UserLookup {
+  id: number
+  name: string
+  email: string
+  avatar: string
+}
+
+/**
+ * 查询可选用户列表（轻量版）。
+ * 所有认证用户可调用，仅返回已启用用户的 id/name/email/avatar，
+ * 不包含角色、项目归属、状态等敏感信息，遵循最小权限原则。
+ */
+export async function listUsersLookup(keyword?: string) {
+  const params = keyword ? { keyword } : undefined
+  const { data } = await apiClient.get('/users/lookup', { params })
+  return (Array.isArray(data) ? data : []) as UserLookup[]
 }
 
 /** 创建用户（含初始密码） */
@@ -49,7 +68,9 @@ export async function deleteUserById(userId: number) {
 
 /** 管理员重置用户密码 */
 export async function resetUserPassword(userId: number, newPassword: string) {
-  const { data } = await apiClient.put(`/users/${userId}/reset-password`, { new_password: newPassword })
+  const { data } = await apiClient.put(`/users/${userId}/reset-password`, {
+    new_password: newPassword,
+  })
   return data
 }
 
@@ -58,11 +79,15 @@ export async function resetUserPassword(userId: number, newPassword: string) {
 /** 获取角色列表 */
 export async function listRoles() {
   const { data } = await apiClient.get('/roles')
-  return (Array.isArray(data) ? data : data.roles ?? []) as Role[]
+  return (Array.isArray(data) ? data : (data.roles ?? [])) as Role[]
 }
 
 /** 创建角色 */
-export async function createRole(payload: { name: string; display_name?: string; description?: string }) {
+export async function createRole(payload: {
+  name: string
+  display_name?: string
+  description?: string
+}) {
   const { data } = await apiClient.post<Role>('/roles', payload)
   return data
 }
@@ -91,11 +116,7 @@ export async function getMyProfile() {
 }
 
 /** 更新当前用户资料 */
-export async function updateMyProfile(payload: {
-  name?: string
-  phone?: string
-  avatar?: string
-}) {
+export async function updateMyProfile(payload: { name?: string; phone?: string; avatar?: string }) {
   const { data } = await apiClient.put<User>('/users/me/profile', payload)
   return data
 }

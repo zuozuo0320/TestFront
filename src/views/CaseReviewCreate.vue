@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useProjectStore } from '../stores/project'
-import { listUsers } from '../api/user'
+import { listUsersLookup } from '../api/user'
 import {
   createReview,
   linkItems,
@@ -97,10 +97,12 @@ const assignedUserIds = ref<Set<number>>(new Set())
 
 async function loadUsers() {
   try {
-    const resp = await listUsers()
-    allUsers.value = resp || []
-  } catch {
+    allUsers.value = await listUsersLookup()
+  } catch (e: unknown) {
     allUsers.value = []
+    const err = e as { response?: { data?: { message?: string } }; message?: string }
+    const msg = err?.response?.data?.message || err?.message
+    if (msg) ElMessage.warning(msg)
   }
 }
 function toggleUser(id: number) {
@@ -123,28 +125,49 @@ const submitting = ref(false)
 
 const qualityChecks = computed(() => [
   {
-    label: '评审人员已就绪',
-    desc: `已指派 ${assignedUserIds.value.size} 名评审人`,
-    ok: assignedUserIds.value.size > 0,
+    label: '基础信息已填写',
+    desc: form.name ? `计划名称: ${form.name}` : '未填写计划名称',
+    ok: !!form.name.trim(),
+    step: 1, // 失败时跳回第 1 步
+    errorTip: '请填写计划名称',
   },
   {
     label: '用例关联完整',
     desc: `${selectedCaseIds.value.size} 条测试用例已选择`,
     ok: selectedCaseIds.value.size > 0,
+    step: 2,
+    errorTip: '请至少选择一条用例加入评审',
   },
   {
-    label: '基础信息已填写',
-    desc: form.name ? `计划名称: ${form.name}` : '未填写计划名称',
-    ok: !!form.name.trim(),
+    label: '评审人员已就绪',
+    desc: `已指派 ${assignedUserIds.value.size} 名评审人`,
+    ok: assignedUserIds.value.size > 0,
+    step: 3,
+    errorTip: '请至少指派一名评审人',
   },
 ])
 
+/** 所有自检项是否全部通过 */
+const allChecksPassed = computed(() => qualityChecks.value.every((c) => c.ok))
+
+/**
+ * 从 axios 错误中提取后端真实消息
+ * 优先级：后端返回的 message > axios 默认 message > 兜底文案
+ */
+function extractErrorMessage(e: unknown, fallback: string): string {
+  const err = e as { response?: { data?: { message?: string; error?: string } }; message?: string }
+  return err?.response?.data?.message || err?.response?.data?.error || err?.message || fallback
+}
+
 async function handleActivate() {
-  if (!form.name.trim()) {
-    ElMessage.warning('请填写计划名称')
-    currentStep.value = 1
+  // 提交前前端校验：任何一项自检未通过，跳回对应步骤并提示
+  const failed = qualityChecks.value.find((c) => !c.ok)
+  if (failed) {
+    ElMessage.warning(failed.errorTip)
+    currentStep.value = failed.step
     return
   }
+
   submitting.value = true
   try {
     const payload: CreateReviewPayload = {
@@ -164,8 +187,8 @@ async function handleActivate() {
     }
     ElMessage.success('评审计划已创建并激活')
     router.push('/case-reviews')
-  } catch (e: any) {
-    ElMessage.error(e?.message || '创建失败')
+  } catch (e) {
+    ElMessage.error(extractErrorMessage(e, '创建评审计划失败'))
   } finally {
     submitting.value = false
   }
@@ -647,7 +670,9 @@ onMounted(() => {
         <button
           v-else
           class="footer-btn primary activate"
+          :class="{ 'not-ready': !allChecksPassed }"
           :disabled="submitting"
+          :title="allChecksPassed ? '' : '还有自检项未通过，点击后将自动跳转到对应步骤'"
           @click="handleActivate"
         >
           <span class="material-symbols-outlined" style="font-size: 18px">bolt</span>
@@ -1766,6 +1791,29 @@ onMounted(() => {
 }
 .footer-btn.activate {
   background: linear-gradient(135deg, var(--tp-primary, #7c3aed), var(--tp-info, #0566d9));
+}
+/* 自检未通过时的视觉提示（仍可点击，点击后跳转到对应步骤） */
+.footer-btn.activate.not-ready {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.4), rgba(5, 102, 217, 0.4));
+  box-shadow: none;
+  position: relative;
+}
+.footer-btn.activate.not-ready::after {
+  content: '!';
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  background: #f59e0b;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.5);
 }
 .footer-btn:disabled {
   opacity: 0.5;

@@ -22,8 +22,21 @@ function onAvatarError(event: Event, name?: string) {
 type TopMenu = 'workbench' | 'project' | 'plan' | 'testcases' | 'e2e' | 'system'
 type SystemMenu = 'users' | 'roles' | 'projects' | 'tags'
 
-/** 无权访问系统管理的角色集合（FR-02-22） */
+/** 无权访问系统管理一级菜单的角色集合（FR-02-22） */
 const NO_SYSTEM_ROLES = new Set(['readonly', 'developer', 'reviewer'])
+
+/**
+ * 系统管理子菜单的角色白名单：
+ * - 用户管理 / 角色管理：仅 admin
+ * - 项目管理：admin + manager
+ * - 标签管理：admin + manager + tester
+ */
+const SYSTEM_ITEM_ALLOWED_ROLES: Record<SystemMenu, Set<string>> = {
+  users: new Set(['admin']),
+  roles: new Set(['admin']),
+  projects: new Set(['admin', 'manager']),
+  tags: new Set(['admin', 'manager', 'tester']),
+}
 
 const props = defineProps<{
   topMenu: TopMenu
@@ -152,12 +165,22 @@ const navItems: { key: TopMenu; label: string; icon: string }[] = [
   { key: 'project', label: '缺陷管理', icon: 'bug_report' },
 ]
 
-const systemNavItems: { key: SystemMenu; label: string }[] = [
+const ALL_SYSTEM_NAV_ITEMS: { key: SystemMenu; label: string }[] = [
   { key: 'users', label: '用户管理' },
   { key: 'roles', label: '角色管理' },
   { key: 'projects', label: '项目管理' },
   { key: 'tags', label: '标签管理' },
 ]
+
+/**
+ * 根据当前用户角色过滤系统管理子菜单，
+ * 依据 SYSTEM_ITEM_ALLOWED_ROLES 白名单逐项判定。
+ * 防止非授权角色看到自己无权操作的入口。
+ */
+const systemNavItems = computed(() => {
+  const role = (props.userRole || '').toLowerCase()
+  return ALL_SYSTEM_NAV_ITEMS.filter((item) => SYSTEM_ITEM_ALLOWED_ROLES[item.key].has(role))
+})
 </script>
 
 <template>

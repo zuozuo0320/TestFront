@@ -5,7 +5,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import { useProjectStore } from '../stores/project'
 import { apiClient } from '../api/client'
-import { listUsers } from '../api/user'
+import { listUsersLookup } from '../api/user'
 import {
   listReviews,
   createReview,
@@ -13,6 +13,7 @@ import {
   closeReview,
   copyReview,
   getReview,
+  getReviewSummary,
   listReviewItems,
   linkItems,
   submitItemReview,
@@ -20,6 +21,7 @@ import {
   type CaseReviewItem,
   type CreateReviewPayload,
   type ReviewListParams,
+  type ReviewSummary,
 } from '../api/caseReview'
 import { listTestCases } from '../api/testcase'
 
@@ -48,10 +50,11 @@ const allUsers = ref<{ id: number; name: string; email: string }[]>([])
 
 async function loadUsers() {
   try {
-    const resp = await listUsers()
-    allUsers.value = (resp as any)?.items || resp || []
-  } catch {
-    ElMessage.error('加载用户列表失败')
+    allUsers.value = await listUsersLookup()
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } }; message?: string }
+    const msg = err?.response?.data?.message || err?.message || '加载用户列表失败'
+    ElMessage.error(msg)
   }
 }
 
@@ -115,6 +118,7 @@ watch(
 
 onMounted(() => {
   fetchReviews()
+  fetchSummary()
   loadUsers()
   handleRouteIntent()
 })
@@ -238,6 +242,7 @@ async function handleCreate() {
     ElMessage.success('评审计划创建成功')
     createDialogVisible.value = false
     fetchReviews()
+    fetchSummary()
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.message || '创建失败')
   } finally {
@@ -254,6 +259,7 @@ async function handleDelete(review: CaseReview) {
     await deleteReview(selectedProjectId.value!, review.id)
     ElMessage.success('已删除')
     fetchReviews()
+    fetchSummary()
   } catch (e: any) {
     // 如果是用户取消确认，e 为 'cancel'，不做处理
     if (e === 'cancel' || e?.toString?.() === 'cancel') return
@@ -269,6 +275,7 @@ async function handleClose(review: CaseReview) {
     await closeReview(selectedProjectId.value!, review.id)
     ElMessage.success('已关闭')
     fetchReviews()
+    fetchSummary()
   } catch {
     /* cancelled */
   }
@@ -279,6 +286,7 @@ async function handleCopy(review: CaseReview) {
     await copyReview(selectedProjectId.value!, review.id, { include_cases: true })
     ElMessage.success('已复制')
     fetchReviews()
+    fetchSummary()
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.message || '复制失败')
   }
@@ -437,23 +445,39 @@ function reviewResultType(result: string) {
   return map[result] || 'info'
 }
 
-// ── 统计卡片（当前页聚合） ──
-const statsPending = computed(() =>
-  reviews.value.reduce((sum, r) => sum + (r.pending_count || 0), 0),
-)
-const statsInProgress = computed(
-  () => reviews.value.filter((r) => r.status === 'in_progress').length,
-)
-const statsApproved = computed(() =>
-  reviews.value.reduce((sum, r) => sum + (r.approved_count || 0), 0),
-)
-const statsRejected = computed(() =>
-  reviews.value.reduce((sum, r) => sum + (r.rejected_count || 0), 0),
-)
-// 用例维度总量（待评审 + 已批准 + 已拒绝），用于进度条比例计算
-const statsTotalCases = computed(
-  () => statsPending.value + statsApproved.value + statsRejected.value,
-)
+// ── 统计卡片：调用后端 /summary 接口，获取项目级全局统计──
+// 这是计划维度的计数（未开始/进行中/已完成/已关闭），与分页无关。
+const summary = ref<ReviewSummary>({
+  total_plans: 0,
+  not_started_plans: 0,
+  in_progress_plans: 0,
+  completed_plans: 0,
+  closed_plans: 0,
+  my_pending_items: 0,
+})
+
+async function fetchSummary() {
+  if (!selectedProjectId.value) return
+  try {
+    summary.value = await getReviewSummary(selectedProjectId.value)
+  } catch {
+    /* 汇总失败不阻止列表展示，保持静默 */
+  }
+}
+
+/** 统计卡进度条宽度：按占"全部计划"的比例渲染 */
+function barWidth(count: number): number {
+  const total = summary.value.total_plans
+  if (!total || total <= 0) return 0
+  return Math.round((count / total) * 100)
+}
+
+/** "已完成"卡副标：当已完成 > 0 且还有其它计划时，展示完成率 */
+const completedRateLabel = computed(() => {
+  const { completed_plans: done, total_plans: total } = summary.value
+  if (!done || !total || total <= 0) return ''
+  return `${Math.round((done / total) * 100)}% 完成率`
+})
 
 // ── 分页辅助 ──
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
@@ -533,88 +557,73 @@ function statusBadgeClass(status: string) {
       </div>
     </div>
 
-    <!-- ─── 统计卡片 ─── -->
+    <!-- ─── 统计卡片（计划维度：未开始/进行中/已完成/已关闭） ─── -->
     <div class="stats-grid">
+      <!-- 未开始 -->
       <div class="stat-card-pl">
         <div class="stat-bg-icon">
           <span class="material-symbols-outlined">pending_actions</span>
         </div>
-        <p class="stat-label-pl">待评审</p>
+        <p class="stat-label-pl">未开始</p>
         <div class="stat-value-row">
-          <span class="stat-num">{{ statsPending }}</span>
+          <span class="stat-num">{{ summary.not_started_plans }}</span>
+          <span class="stat-sub-hint">个计划</span>
         </div>
         <div class="stat-bar-track">
           <div
             class="stat-bar-fill bar-secondary"
-            :style="{
-              width:
-                (statsTotalCases > 0 ? Math.round((statsPending / statsTotalCases) * 100) : 0) +
-                '%',
-            }"
+            :style="{ width: barWidth(summary.not_started_plans) + '%' }"
           ></div>
         </div>
       </div>
+      <!-- 进行中 -->
       <div class="stat-card-pl">
         <div class="stat-bg-icon icon-primary">
           <span class="material-symbols-outlined">sync</span>
         </div>
-        <p class="stat-label-pl">评审中</p>
+        <p class="stat-label-pl">进行中</p>
         <div class="stat-value-row">
-          <span class="stat-num">{{ statsInProgress }}</span>
-          <span class="stat-sub primary">Active</span>
+          <span class="stat-num">{{ summary.in_progress_plans }}</span>
+          <span v-if="summary.in_progress_plans > 0" class="stat-sub primary">进行中</span>
         </div>
         <div class="stat-bar-track">
           <div
             class="stat-bar-fill bar-primary"
-            :style="{ width: (total > 0 ? Math.round((statsInProgress / total) * 100) : 0) + '%' }"
+            :style="{ width: barWidth(summary.in_progress_plans) + '%' }"
           ></div>
         </div>
       </div>
+      <!-- 已完成 -->
       <div class="stat-card-pl">
         <div class="stat-bg-icon icon-emerald">
           <span class="material-symbols-outlined">check_circle</span>
         </div>
-        <p class="stat-label-pl">已批准</p>
+        <p class="stat-label-pl">已完成</p>
         <div class="stat-value-row">
-          <span class="stat-num">{{ statsApproved }}</span>
-          <span class="stat-sub emerald">
-            {{
-              reviews.length > 0 && statsApproved > 0
-                ? Math.round(
-                    (statsApproved / (statsApproved + statsRejected + statsPending || 1)) * 100,
-                  ) + '% passing'
-                : ''
-            }}
-          </span>
+          <span class="stat-num">{{ summary.completed_plans }}</span>
+          <span v-if="completedRateLabel" class="stat-sub emerald">{{ completedRateLabel }}</span>
         </div>
         <div class="stat-bar-track">
           <div
             class="stat-bar-fill bar-emerald"
-            :style="{
-              width:
-                (statsTotalCases > 0 ? Math.round((statsApproved / statsTotalCases) * 100) : 0) +
-                '%',
-            }"
+            :style="{ width: barWidth(summary.completed_plans) + '%' }"
           ></div>
         </div>
       </div>
+      <!-- 已关闭 -->
       <div class="stat-card-pl">
         <div class="stat-bg-icon icon-error">
           <span class="material-symbols-outlined">cancel</span>
         </div>
-        <p class="stat-label-pl">已拒绝</p>
+        <p class="stat-label-pl">已关闭</p>
         <div class="stat-value-row">
-          <span class="stat-num">{{ statsRejected }}</span>
-          <span v-if="statsRejected > 0" class="stat-sub error">Action required</span>
+          <span class="stat-num">{{ summary.closed_plans }}</span>
+          <span v-if="summary.closed_plans > 0" class="stat-sub-hint">不再可编辑</span>
         </div>
         <div class="stat-bar-track">
           <div
             class="stat-bar-fill bar-error"
-            :style="{
-              width:
-                (statsTotalCases > 0 ? Math.round((statsRejected / statsTotalCases) * 100) : 0) +
-                '%',
-            }"
+            :style="{ width: barWidth(summary.closed_plans) + '%' }"
           ></div>
         </div>
       </div>
@@ -640,6 +649,14 @@ function statusBadgeClass(status: string) {
             >
               <span class="material-symbols-outlined" style="font-size: 16px">{{ tab.icon }}</span>
               {{ tab.label }}
+              <!-- "我评审的" 显示待评审条目数徽标（source: summary.my_pending_items） -->
+              <span
+                v-if="tab.key === 'assigned' && summary.my_pending_items > 0"
+                class="view-tab-badge"
+                :class="{ 'badge-active': viewMode === tab.key }"
+              >
+                {{ summary.my_pending_items > 99 ? '99+' : summary.my_pending_items }}
+              </span>
             </button>
           </div>
           <el-select v-model="filterStatus" placeholder="状态" clearable class="filter-select-pl">
@@ -707,7 +724,7 @@ function statusBadgeClass(status: string) {
                       {{
                         review.approved_count + review.rejected_count + review.needs_update_count
                       }}
-                      / {{ review.case_total_count }} Units
+                      / {{ review.case_total_count }} 条
                     </span>
                   </div>
                   <div class="progress-bar-track">
@@ -1255,6 +1272,31 @@ function statusBadgeClass(status: string) {
 }
 .stat-sub.error {
   color: var(--tp-danger, #ffb4ab);
+}
+/* 淡灰辅助文本，用于 "个计划" / "不再可编辑" 等提示 */
+.stat-sub-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 400;
+}
+/* "我评审的" tab 右侧的未读数徽标 */
+.view-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 9999px;
+  background: var(--tp-danger, #ef4444);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  margin-left: 4px;
+}
+.view-tab-badge.badge-active {
+  background: rgba(255, 255, 255, 0.25);
 }
 .stat-bar-track {
   margin-top: 16px;

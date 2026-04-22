@@ -50,6 +50,12 @@ const {
 const rankBarColors = ['#ef4444', '#f59e0b', '#adc6ff', '#d2bbff', '#10b981']
 const batchExpanded = ref(false)
 
+/** 切换到"最近更新"标签：同时切换 tab 和将排序字段置为创建时间 */
+function switchToRecent() {
+  activeTab.value = 'recent'
+  sortBy.value = 'created_at'
+}
+
 // 柱状图数据：取用例数 TOP 7
 const pulseData = computed(() => {
   const sorted = [...tags.value].sort((a, b) => b.case_count - a.case_count).slice(0, 7)
@@ -165,10 +171,7 @@ const pulseData = computed(() => {
           <button
             type="button"
             :class="['tm-tab', { active: activeTab === 'recent' }]"
-            @click="
-              activeTab = 'recent'
-              sortBy = 'created_at'
-            "
+            @click="switchToRecent"
           >
             最近更新 (7天内)
           </button>
