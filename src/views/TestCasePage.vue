@@ -1022,7 +1022,7 @@ function formatAbsoluteTime(dateStr: string): string {
 
 // ── Attachments ──
 
-const apiBaseUrl = apiClient.defaults.baseURL || 'http://localhost:8080/api/v1'
+const apiBaseUrl = apiClient.defaults.baseURL || '/api/v1'
 const serverUrl = apiBaseUrl.replace(/\/api\/v1\/?$/, '')
 
 function getUserAvatarUrl(avatar?: string) {

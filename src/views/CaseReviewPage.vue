@@ -27,7 +27,7 @@ import { listTestCases } from '../api/testcase'
 const projectStore = useProjectStore()
 const route = useRoute()
 const router = useRouter()
-const apiBaseUrl = apiClient.defaults.baseURL || 'http://localhost:8080/api/v1'
+const apiBaseUrl = apiClient.defaults.baseURL || '/api/v1'
 const serverUrl = apiBaseUrl.replace(/\/api\/v1\/?$/, '')
 
 const selectedProjectId = computed(() => projectStore.selectedProjectId)
@@ -124,7 +124,6 @@ function handleSearch() {
   page.value = 1
   fetchReviews()
 }
-
 
 // ── 创建评审 ──
 const createDialogVisible = ref(false)
@@ -262,7 +261,6 @@ async function handleDelete(review: CaseReview) {
   }
 }
 
-
 async function handleClose(review: CaseReview) {
   try {
     await ElMessageBox.confirm(`确定关闭评审计划「${review.name}」？关闭后不可编辑。`, '关闭确认', {
@@ -327,7 +325,6 @@ const detailLinkDialogVisible = ref(false)
 const detailLinkLoading = ref(false)
 const detailLinkCases = ref<number[]>([])
 const detailAvailableCases = ref<{ id: number; title: string }[]>([])
-
 
 async function loadDetailItems(reviewId: number) {
   if (!selectedProjectId.value) return
@@ -454,7 +451,9 @@ const statsRejected = computed(() =>
   reviews.value.reduce((sum, r) => sum + (r.rejected_count || 0), 0),
 )
 // 用例维度总量（待评审 + 已批准 + 已拒绝），用于进度条比例计算
-const statsTotalCases = computed(() => statsPending.value + statsApproved.value + statsRejected.value)
+const statsTotalCases = computed(
+  () => statsPending.value + statsApproved.value + statsRejected.value,
+)
 
 // ── 分页辅助 ──
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
@@ -537,39 +536,87 @@ function statusBadgeClass(status: string) {
     <!-- ─── 统计卡片 ─── -->
     <div class="stats-grid">
       <div class="stat-card-pl">
-        <div class="stat-bg-icon"><span class="material-symbols-outlined">pending_actions</span></div>
+        <div class="stat-bg-icon">
+          <span class="material-symbols-outlined">pending_actions</span>
+        </div>
         <p class="stat-label-pl">待评审</p>
         <div class="stat-value-row">
           <span class="stat-num">{{ statsPending }}</span>
         </div>
-        <div class="stat-bar-track"><div class="stat-bar-fill bar-secondary" :style="{ width: (statsTotalCases > 0 ? Math.round(statsPending / statsTotalCases * 100) : 0) + '%' }"></div></div>
+        <div class="stat-bar-track">
+          <div
+            class="stat-bar-fill bar-secondary"
+            :style="{
+              width:
+                (statsTotalCases > 0 ? Math.round((statsPending / statsTotalCases) * 100) : 0) +
+                '%',
+            }"
+          ></div>
+        </div>
       </div>
       <div class="stat-card-pl">
-        <div class="stat-bg-icon icon-primary"><span class="material-symbols-outlined">sync</span></div>
+        <div class="stat-bg-icon icon-primary">
+          <span class="material-symbols-outlined">sync</span>
+        </div>
         <p class="stat-label-pl">评审中</p>
         <div class="stat-value-row">
           <span class="stat-num">{{ statsInProgress }}</span>
           <span class="stat-sub primary">Active</span>
         </div>
-        <div class="stat-bar-track"><div class="stat-bar-fill bar-primary" :style="{ width: (total > 0 ? Math.round(statsInProgress / total * 100) : 0) + '%' }"></div></div>
+        <div class="stat-bar-track">
+          <div
+            class="stat-bar-fill bar-primary"
+            :style="{ width: (total > 0 ? Math.round((statsInProgress / total) * 100) : 0) + '%' }"
+          ></div>
+        </div>
       </div>
       <div class="stat-card-pl">
-        <div class="stat-bg-icon icon-emerald"><span class="material-symbols-outlined">check_circle</span></div>
+        <div class="stat-bg-icon icon-emerald">
+          <span class="material-symbols-outlined">check_circle</span>
+        </div>
         <p class="stat-label-pl">已批准</p>
         <div class="stat-value-row">
           <span class="stat-num">{{ statsApproved }}</span>
-          <span class="stat-sub emerald">{{ reviews.length > 0 && statsApproved > 0 ? Math.round((statsApproved / (statsApproved + statsRejected + statsPending || 1)) * 100) + '% passing' : '' }}</span>
+          <span class="stat-sub emerald">
+            {{
+              reviews.length > 0 && statsApproved > 0
+                ? Math.round(
+                    (statsApproved / (statsApproved + statsRejected + statsPending || 1)) * 100,
+                  ) + '% passing'
+                : ''
+            }}
+          </span>
         </div>
-        <div class="stat-bar-track"><div class="stat-bar-fill bar-emerald" :style="{ width: (statsTotalCases > 0 ? Math.round(statsApproved / statsTotalCases * 100) : 0) + '%' }"></div></div>
+        <div class="stat-bar-track">
+          <div
+            class="stat-bar-fill bar-emerald"
+            :style="{
+              width:
+                (statsTotalCases > 0 ? Math.round((statsApproved / statsTotalCases) * 100) : 0) +
+                '%',
+            }"
+          ></div>
+        </div>
       </div>
       <div class="stat-card-pl">
-        <div class="stat-bg-icon icon-error"><span class="material-symbols-outlined">cancel</span></div>
+        <div class="stat-bg-icon icon-error">
+          <span class="material-symbols-outlined">cancel</span>
+        </div>
         <p class="stat-label-pl">已拒绝</p>
         <div class="stat-value-row">
           <span class="stat-num">{{ statsRejected }}</span>
           <span v-if="statsRejected > 0" class="stat-sub error">Action required</span>
         </div>
-        <div class="stat-bar-track"><div class="stat-bar-fill bar-error" :style="{ width: (statsTotalCases > 0 ? Math.round(statsRejected / statsTotalCases * 100) : 0) + '%' }"></div></div>
+        <div class="stat-bar-track">
+          <div
+            class="stat-bar-fill bar-error"
+            :style="{
+              width:
+                (statsTotalCases > 0 ? Math.round((statsRejected / statsTotalCases) * 100) : 0) +
+                '%',
+            }"
+          ></div>
+        </div>
       </div>
     </div>
 
@@ -595,23 +642,13 @@ function statusBadgeClass(status: string) {
               {{ tab.label }}
             </button>
           </div>
-          <el-select
-            v-model="filterStatus"
-            placeholder="状态"
-            clearable
-            class="filter-select-pl"
-          >
+          <el-select v-model="filterStatus" placeholder="状态" clearable class="filter-select-pl">
             <el-option label="未开始" value="not_started" />
             <el-option label="进行中" value="in_progress" />
             <el-option label="已完成" value="completed" />
             <el-option label="已关闭" value="closed" />
           </el-select>
-          <el-select
-            v-model="filterMode"
-            placeholder="模式"
-            clearable
-            class="filter-select-pl"
-          >
+          <el-select v-model="filterMode" placeholder="模式" clearable class="filter-select-pl">
             <el-option label="独审" value="single" />
             <el-option label="会签" value="parallel" />
           </el-select>
@@ -643,7 +680,9 @@ function statusBadgeClass(status: string) {
               <td>
                 <div class="review-name-cell">
                   <span class="review-name">{{ review.name }}</span>
-                  <span class="review-id-sub">ID: #{{ review.id }} · {{ modeLabel(review.review_mode) }}</span>
+                  <span class="review-id-sub">
+                    ID: #{{ review.id }} · {{ modeLabel(review.review_mode) }}
+                  </span>
                 </div>
               </td>
               <td>
@@ -654,7 +693,9 @@ function statusBadgeClass(status: string) {
                     :src="getUserAvatarUrl(review.created_by_avatar)"
                     :alt="review.created_by_name || '创建人头像'"
                   />
-                  <div v-else class="avatar-circle">{{ getInitials(review.created_by_name || '') }}</div>
+                  <div v-else class="avatar-circle">
+                    {{ getInitials(review.created_by_name || '') }}
+                  </div>
                   <span class="person-name">{{ review.created_by_name || '—' }}</span>
                 </div>
               </td>
@@ -662,7 +703,12 @@ function statusBadgeClass(status: string) {
                 <div class="progress-cell-pl">
                   <div class="progress-top-row">
                     <span class="progress-pct">{{ getProgressPercent(review) }}%</span>
-                    <span class="progress-count">{{ review.approved_count + review.rejected_count + review.needs_update_count }} / {{ review.case_total_count }} Units</span>
+                    <span class="progress-count">
+                      {{
+                        review.approved_count + review.rejected_count + review.needs_update_count
+                      }}
+                      / {{ review.case_total_count }} Units
+                    </span>
                   </div>
                   <div class="progress-bar-track">
                     <div
@@ -680,10 +726,18 @@ function statusBadgeClass(status: string) {
               </td>
               <td class="td-right">
                 <div class="row-actions" @click.stop>
-                  <button class="action-btn action-edit icon-only" title="查看详情" @click="router.push(`/case-reviews/${review.id}`)">
+                  <button
+                    class="action-btn action-edit icon-only"
+                    title="查看详情"
+                    @click="router.push(`/case-reviews/${review.id}`)"
+                  >
                     <span class="material-symbols-outlined">visibility</span>
                   </button>
-                  <button class="action-btn action-clone icon-only" title="复制" @click="handleCopy(review)">
+                  <button
+                    class="action-btn action-clone icon-only"
+                    title="复制"
+                    @click="handleCopy(review)"
+                  >
                     <span class="material-symbols-outlined">content_copy</span>
                   </button>
                   <button
@@ -694,7 +748,11 @@ function statusBadgeClass(status: string) {
                   >
                     <span class="material-symbols-outlined">block</span>
                   </button>
-                  <button class="action-btn action-delete icon-only" title="删除" @click="handleDelete(review)">
+                  <button
+                    class="action-btn action-delete icon-only"
+                    title="删除"
+                    @click="handleDelete(review)"
+                  >
                     <span class="material-symbols-outlined">delete</span>
                   </button>
                 </div>
@@ -717,7 +775,9 @@ function statusBadgeClass(status: string) {
 
       <!-- 分页器 -->
       <div v-if="total > 0" class="pagination-bar-pl">
-        <span class="pagination-info">显示 {{ startItem }}-{{ endItem }} 条，共 {{ total }} 条任务</span>
+        <span class="pagination-info">
+          显示 {{ startItem }}-{{ endItem }} 条，共 {{ total }} 条任务
+        </span>
         <div class="pagination-btns">
           <button class="page-btn" :disabled="page <= 1" @click="goPage(page - 1)">
             <span class="material-symbols-outlined">chevron_left</span>
@@ -728,7 +788,9 @@ function statusBadgeClass(status: string) {
             class="page-btn"
             :class="{ active: p === page }"
             @click="goPage(p)"
-          >{{ p }}</button>
+          >
+            {{ p }}
+          </button>
           <button class="page-btn" :disabled="page >= totalPages" @click="goPage(page + 1)">
             <span class="material-symbols-outlined">chevron_right</span>
           </button>
@@ -1065,7 +1127,9 @@ function statusBadgeClass(status: string) {
   border: 1px solid rgba(74, 68, 85, 0.35);
   border-radius: 8px;
   padding: 6px 12px;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 .pipeline-search-box:focus-within {
   border-color: rgba(124, 58, 237, 0.5);
@@ -1148,9 +1212,18 @@ function statusBadgeClass(status: string) {
 .stat-bg-icon .material-symbols-outlined {
   font-size: 56px;
 }
-.stat-bg-icon.icon-primary { color: var(--tp-primary, #d2bbff); opacity: 0.08; }
-.stat-bg-icon.icon-emerald { color: #34d399; opacity: 0.08; }
-.stat-bg-icon.icon-error { color: var(--tp-danger, #ffb4ab); opacity: 0.08; }
+.stat-bg-icon.icon-primary {
+  color: var(--tp-primary, #d2bbff);
+  opacity: 0.08;
+}
+.stat-bg-icon.icon-emerald {
+  color: #34d399;
+  opacity: 0.08;
+}
+.stat-bg-icon.icon-error {
+  color: var(--tp-danger, #ffb4ab);
+  opacity: 0.08;
+}
 .stat-label-pl {
   font-size: 10px;
   font-weight: 600;
@@ -1174,9 +1247,15 @@ function statusBadgeClass(status: string) {
   font-size: 11px;
   font-weight: 400;
 }
-.stat-sub.primary { color: var(--tp-primary-light, #d2bbff); }
-.stat-sub.emerald { color: #34d399; }
-.stat-sub.error { color: var(--tp-danger, #ffb4ab); }
+.stat-sub.primary {
+  color: var(--tp-primary-light, #d2bbff);
+}
+.stat-sub.emerald {
+  color: #34d399;
+}
+.stat-sub.error {
+  color: var(--tp-danger, #ffb4ab);
+}
 .stat-bar-track {
   margin-top: 16px;
   height: 3px;
@@ -1189,10 +1268,18 @@ function statusBadgeClass(status: string) {
   height: 100%;
   border-radius: 4px;
 }
-.bar-secondary { background: var(--tp-info, #adc6ff); }
-.bar-primary { background: var(--tp-primary, #d2bbff); }
-.bar-emerald { background: #34d399; }
-.bar-error { background: var(--tp-danger, #ffb4ab); }
+.bar-secondary {
+  background: var(--tp-info, #adc6ff);
+}
+.bar-primary {
+  background: var(--tp-primary, #d2bbff);
+}
+.bar-emerald {
+  background: #34d399;
+}
+.bar-error {
+  background: var(--tp-danger, #ffb4ab);
+}
 
 /* ── 表格容器 ── */
 .table-container-pl {
@@ -1284,7 +1371,6 @@ function statusBadgeClass(status: string) {
   font-size: 12px !important;
 }
 
-
 /* ── 表格滚动区 ── */
 .table-scroll-area {
   position: relative;
@@ -1305,8 +1391,12 @@ function statusBadgeClass(status: string) {
   animation: spin 1s linear infinite;
 }
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ── 原生表格 ── */

@@ -59,7 +59,8 @@ function resolveAvatarUrl(avatar?: string) {
     const origin = envBase.replace(/\/api\/v1\/?$/, '')
     return `${origin}${raw.startsWith('/') ? '' : '/'}${raw}`
   }
-  return `http://localhost:8080${raw.startsWith('/') ? '' : '/'}${raw}`
+  // 默认返回相对路径：dev 下 /uploads 走 Vite proxy，生产由反向代理处理
+  return `${raw.startsWith('/') ? '' : '/'}${raw}`
 }
 
 const currentProjectAvatar = computed(() => resolveAvatarUrl(currentProject.value?.avatar))

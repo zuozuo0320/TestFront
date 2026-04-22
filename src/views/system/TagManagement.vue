@@ -36,7 +36,6 @@ const {
   sortedTags,
   maxCaseCount,
   selectedProject,
-  loadTags,
   onSearch,
   onSearchDebounce,
   openCreate,
@@ -105,14 +104,6 @@ const pulseData = computed(() => {
               @input="onSearchDebounce"
             />
             <div v-if="loading" class="tm-search-spinner"></div>
-          </div>
-          <div class="tm-topnav-icons">
-            <button type="button" class="tm-icon-btn" title="刷新" @click="() => loadTags()">
-              <span class="material-symbols-outlined">refresh</span>
-            </button>
-            <button type="button" class="tm-icon-btn" title="设置">
-              <span class="material-symbols-outlined">settings</span>
-            </button>
           </div>
         </div>
       </header>
@@ -396,47 +387,58 @@ const pulseData = computed(() => {
   align-items: center;
   gap: 24px;
 }
+/* 与用例评审页 .pipeline-search-box 保持一致：flex 容器承载边框/背景，图标 inline */
 .tm-search-box {
-  position: relative;
   display: flex;
   align-items: center;
-  width: 256px;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(74, 68, 85, 0.35);
+  border-radius: 8px;
+  padding: 6px 12px;
+  width: 390px;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    background 0.2s;
+}
+.tm-search-box:focus-within {
+  border-color: rgba(124, 58, 237, 0.5);
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.12);
+  background: rgba(255, 255, 255, 0.07);
 }
 .tm-search-icon {
-  position: absolute;
-  left: 12px;
   font-size: 18px;
-  color: var(--outline);
+  color: rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+  transition: color 0.2s;
+}
+.tm-search-box:focus-within .tm-search-icon {
+  color: rgba(124, 58, 237, 0.8);
 }
 .tm-search-input {
-  width: 100%;
-  background: var(--surface-container-lowest);
-  border: 1px solid rgba(74, 68, 85, 0.3);
-  color: var(--on-surface);
-  font-size: 14px;
-  border-radius: 8px;
-  padding: 8px 40px 8px 36px;
-  font-family: inherit;
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
   outline: none;
-  transition: border-color 0.2s;
-}
-.tm-search-input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 1px var(--primary);
+  color: rgba(255, 255, 255, 0.9);
+  caret-color: #a78bfa;
+  font-size: 13px;
+  font-family: inherit;
 }
 .tm-search-input::placeholder {
-  color: var(--outline);
+  color: rgba(255, 255, 255, 0.3);
 }
 .tm-search-spinner {
-  position: absolute;
-  right: 12px;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  border: 2px solid var(--primary);
+  border: 2px solid rgba(124, 58, 237, 0.8);
   border-top-color: transparent;
   animation: tm-spin 0.8s linear infinite;
-  opacity: 0.5;
+  flex-shrink: 0;
+  opacity: 0.85;
 }
 @keyframes tm-spin {
   to {

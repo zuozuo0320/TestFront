@@ -86,7 +86,8 @@ export const useAuthStore = defineStore('auth', () => {
         const origin = envBase.replace(/\/api\/v1\/?$/, '')
         return `${origin}${avatarRaw.startsWith('/') ? '' : '/'}${avatarRaw}`
       }
-      return `http://localhost:8080${avatarRaw.startsWith('/') ? '' : '/'}${avatarRaw}`
+      // 默认返回相对路径：dev 下 /uploads 走 Vite proxy，生产由反向代理处理
+      return `${avatarRaw.startsWith('/') ? '' : '/'}${avatarRaw}`
     }
     return fallbackAvatarUrl(fallbackName)
   }

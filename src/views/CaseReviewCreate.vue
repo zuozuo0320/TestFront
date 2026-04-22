@@ -4,7 +4,12 @@ import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useProjectStore } from '../stores/project'
 import { listUsers } from '../api/user'
-import { createReview, linkItems, type CreateReviewPayload, type LinkItemEntry } from '../api/caseReview'
+import {
+  createReview,
+  linkItems,
+  type CreateReviewPayload,
+  type LinkItemEntry,
+} from '../api/caseReview'
 import { listTestCases } from '../api/testcase'
 
 const router = useRouter()
@@ -108,9 +113,7 @@ function toggleUser(id: number) {
 function removeUser(id: number) {
   assignedUserIds.value.delete(id)
 }
-const assignedUsers = computed(() =>
-  allUsers.value.filter((u) => assignedUserIds.value.has(u.id)),
-)
+const assignedUsers = computed(() => allUsers.value.filter((u) => assignedUserIds.value.has(u.id)))
 const availableUsers = computed(() =>
   allUsers.value.filter((u) => !assignedUserIds.value.has(u.id)),
 )
@@ -175,7 +178,7 @@ function getInitials(name: string) {
 }
 
 /** 根据头像字段或用户名生成头像 URL */
-function resolveAvatarUrl(avatar?: string, fallbackName?: string) {
+function resolveAvatarUrl(avatar?: string, _fallbackName?: string) {
   const avatarRaw = (avatar || '').trim()
   if (avatarRaw) {
     if (/^https?:\/\//i.test(avatarRaw)) return avatarRaw
@@ -184,12 +187,15 @@ function resolveAvatarUrl(avatar?: string, fallbackName?: string) {
       const origin = envBase.replace(/\/api\/v1\/?$/, '')
       return `${origin}${avatarRaw.startsWith('/') ? '' : '/'}${avatarRaw}`
     }
-    return `http://localhost:8080${avatarRaw.startsWith('/') ? '' : '/'}${avatarRaw}`
+    // 默认返回相对路径：dev 下 /uploads 走 Vite proxy，生产由反向代理处理
+    return `${avatarRaw.startsWith('/') ? '' : '/'}${avatarRaw}`
   }
   return ''
 }
 
-const casesTotalPages = computed(() => Math.max(1, Math.ceil(casesTotal.value / casesPageSize.value)))
+const casesTotalPages = computed(() =>
+  Math.max(1, Math.ceil(casesTotal.value / casesPageSize.value)),
+)
 
 onMounted(() => {
   loadUsers()
@@ -209,7 +215,10 @@ onMounted(() => {
       <!-- Stepper -->
       <div class="stepper">
         <div class="stepper-line"></div>
-        <div class="stepper-line-active" :style="{ width: ((currentStep - 1) / 3) * 100 + '%' }"></div>
+        <div
+          class="stepper-line-active"
+          :style="{ width: ((currentStep - 1) / 3) * 100 + '%' }"
+        ></div>
         <div
           v-for="step in steps"
           :key="step.num"
@@ -218,7 +227,9 @@ onMounted(() => {
           @click="goStep(step.num)"
         >
           <div class="step-circle">
-            <span v-if="step.num < currentStep" class="material-symbols-outlined step-check">check</span>
+            <span v-if="step.num < currentStep" class="material-symbols-outlined step-check">
+              check
+            </span>
             <span v-else>{{ step.num }}</span>
           </div>
           <span class="step-label">{{ step.label }}</span>
@@ -228,7 +239,6 @@ onMounted(() => {
 
     <!-- ─── 步骤内容区 ─── -->
     <div class="wizard-content">
-
       <!-- ════ Step 1: 基础信息 ════ -->
       <div v-if="currentStep === 1" class="step-body">
         <div class="step-grid">
@@ -242,7 +252,12 @@ onMounted(() => {
               </div>
               <div class="form-group">
                 <label class="form-label">战略目标</label>
-                <textarea v-model="form.description" class="form-textarea" placeholder="定义本轮评审的核心重点..." rows="4"></textarea>
+                <textarea
+                  v-model="form.description"
+                  class="form-textarea"
+                  placeholder="定义本轮评审的核心重点..."
+                  rows="4"
+                ></textarea>
               </div>
               <div class="form-group">
                 <label class="form-label">评审模式</label>
@@ -253,7 +268,12 @@ onMounted(() => {
                     独审模式
                   </label>
                   <label class="mode-radio" :class="{ selected: form.review_mode === 'parallel' }">
-                    <input v-model="form.review_mode" type="radio" value="parallel" class="sr-only" />
+                    <input
+                      v-model="form.review_mode"
+                      type="radio"
+                      value="parallel"
+                      class="sr-only"
+                    />
                     <span class="material-symbols-outlined" style="font-size: 16px">group</span>
                     会签模式
                   </label>
@@ -271,7 +291,11 @@ onMounted(() => {
                 <div v-for="user in allUsers.slice(0, 5)" :key="user.id" class="reviewer-card-mini">
                   <div class="reviewer-card-mini-left">
                     <div class="reviewer-avatar">
-                      <img v-if="resolveAvatarUrl(user.avatar)" :src="resolveAvatarUrl(user.avatar)" class="avatar-img" />
+                      <img
+                        v-if="resolveAvatarUrl(user.avatar)"
+                        :src="resolveAvatarUrl(user.avatar)"
+                        class="avatar-img"
+                      />
                       <span v-else>{{ getInitials(user.name) }}</span>
                     </div>
                     <div>
@@ -305,7 +329,12 @@ onMounted(() => {
           <div class="filter-bar-inner">
             <div class="search-box-wz">
               <span class="material-symbols-outlined search-icon-wz">search</span>
-              <input v-model="casesSearch" class="search-input-wz" placeholder="搜索用例 ID 或标题..." @keyup.enter="fetchCases" />
+              <input
+                v-model="casesSearch"
+                class="search-input-wz"
+                placeholder="搜索用例 ID 或标题..."
+                @keyup.enter="fetchCases"
+              />
             </div>
             <div class="filter-btns">
               <button class="filter-btn">所有模块</button>
@@ -325,7 +354,12 @@ onMounted(() => {
             <button class="selection-action" @click="selectAllPage">全选当前页</button>
             <button class="selection-action danger" @click="clearSelection">清除选择</button>
           </div>
-          <span class="selection-range">显示范围: {{ (casesPage - 1) * casesPageSize + 1 }}-{{ Math.min(casesPage * casesPageSize, casesTotal) }} / {{ casesTotal }}</span>
+          <span class="selection-range">
+            显示范围: {{ (casesPage - 1) * casesPageSize + 1 }}-{{
+              Math.min(casesPage * casesPageSize, casesTotal)
+            }}
+            / {{ casesTotal }}
+          </span>
         </div>
         <!-- 表格 -->
         <div class="card-glass table-wrap">
@@ -351,20 +385,40 @@ onMounted(() => {
               >
                 <td class="td-check">
                   <div class="custom-check" :class="{ checked: selectedCaseIds.has(tc.id) }">
-                    <span v-if="selectedCaseIds.has(tc.id)" class="material-symbols-outlined" style="font-size: 14px">check</span>
+                    <span
+                      v-if="selectedCaseIds.has(tc.id)"
+                      class="material-symbols-outlined"
+                      style="font-size: 14px"
+                    >
+                      check
+                    </span>
                   </div>
                 </td>
                 <td class="td-id">TC-{{ tc.id }}</td>
                 <td class="td-title">{{ tc.title }}</td>
                 <td class="td-module">
-                  <span class="module-tag">{{ (tc.module_path || '未分类').split('/').pop() }}</span>
+                  <span class="module-tag">
+                    {{ (tc.module_path || '未分类').split('/').pop() }}
+                  </span>
                 </td>
                 <td>
-                  <span class="priority-tag" :class="(tc.level || 'P2').toLowerCase()">{{ tc.level || 'P2' }}</span>
+                  <span class="priority-tag" :class="(tc.level || 'P2').toLowerCase()">
+                    {{ tc.level || 'P2' }}
+                  </span>
                 </td>
                 <td>
                   <span class="status-dot" :class="tc.status || 'draft'"></span>
-                  <span class="status-text">{{ tc.status === 'active' ? '已生效' : tc.status === 'pending' ? '待评审' : tc.status === 'discarded' ? '已废弃' : '草稿' }}</span>
+                  <span class="status-text">
+                    {{
+                      tc.status === 'active'
+                        ? '已生效'
+                        : tc.status === 'pending'
+                          ? '待评审'
+                          : tc.status === 'discarded'
+                            ? '已废弃'
+                            : '草稿'
+                    }}
+                  </span>
                 </td>
                 <td class="td-date">{{ tc.updated_at?.slice(0, 10) || '—' }}</td>
               </tr>
@@ -376,7 +430,11 @@ onMounted(() => {
         </div>
         <!-- 分页 -->
         <div v-if="casesTotal > 0" class="wz-pagination">
-          <button class="page-btn-wz" :disabled="casesPage <= 1" @click="casesGoPage(casesPage - 1)">
+          <button
+            class="page-btn-wz"
+            :disabled="casesPage <= 1"
+            @click="casesGoPage(casesPage - 1)"
+          >
             <span class="material-symbols-outlined">chevron_left</span>
           </button>
           <button
@@ -385,8 +443,14 @@ onMounted(() => {
             class="page-btn-wz"
             :class="{ active: p === casesPage }"
             @click="casesGoPage(p)"
-          >{{ p }}</button>
-          <button class="page-btn-wz" :disabled="casesPage >= casesTotalPages" @click="casesGoPage(casesPage + 1)">
+          >
+            {{ p }}
+          </button>
+          <button
+            class="page-btn-wz"
+            :disabled="casesPage >= casesTotalPages"
+            @click="casesGoPage(casesPage + 1)"
+          >
             <span class="material-symbols-outlined">chevron_right</span>
           </button>
         </div>
@@ -412,7 +476,11 @@ onMounted(() => {
               >
                 <div class="reviewer-card-top">
                   <div class="reviewer-avatar-lg">
-                    <img v-if="resolveAvatarUrl(user.avatar)" :src="resolveAvatarUrl(user.avatar)" class="avatar-img" />
+                    <img
+                      v-if="resolveAvatarUrl(user.avatar)"
+                      :src="resolveAvatarUrl(user.avatar)"
+                      class="avatar-img"
+                    />
                     <span v-else>{{ getInitials(user.name) }}</span>
                   </div>
                   <div class="reviewer-card-info">
@@ -425,7 +493,9 @@ onMounted(() => {
                     <span>当前工作负载</span>
                     <span class="load-pct low">空闲</span>
                   </div>
-                  <div class="load-bar-track"><div class="load-bar-fill low" style="width: 20%"></div></div>
+                  <div class="load-bar-track">
+                    <div class="load-bar-fill low" style="width: 20%"></div>
+                  </div>
                 </div>
               </div>
               <div v-if="availableUsers.length === 0" class="empty-hint">所有人员已指派</div>
@@ -444,7 +514,11 @@ onMounted(() => {
                 <div v-for="user in assignedUsers" :key="user.id" class="assigned-item">
                   <div class="assigned-item-left">
                     <div class="reviewer-avatar-sm">
-                      <img v-if="resolveAvatarUrl(user.avatar)" :src="resolveAvatarUrl(user.avatar)" class="avatar-img" />
+                      <img
+                        v-if="resolveAvatarUrl(user.avatar)"
+                        :src="resolveAvatarUrl(user.avatar)"
+                        class="avatar-img"
+                      />
                       <span v-else>{{ getInitials(user.name) }}</span>
                     </div>
                     <div>
@@ -457,7 +531,7 @@ onMounted(() => {
                   </button>
                 </div>
                 <!-- 拖拽占位 -->
-                <div class="drop-placeholder" @click="">
+                <div class="drop-placeholder">
                   <span class="material-symbols-outlined" style="font-size: 28px">add_circle</span>
                   <span>点击左侧人员卡片添加</span>
                 </div>
@@ -479,7 +553,9 @@ onMounted(() => {
           <!-- 左：摘要 -->
           <div class="step-main">
             <div class="summary-card">
-              <div class="summary-card-bg"><span class="material-symbols-outlined">dashboard_customize</span></div>
+              <div class="summary-card-bg">
+                <span class="material-symbols-outlined">dashboard_customize</span>
+              </div>
               <div class="summary-grid">
                 <div>
                   <label class="summary-label">计划名称</label>
@@ -487,7 +563,9 @@ onMounted(() => {
                   <div class="summary-meta">
                     <div>
                       <label class="summary-label">评审模式</label>
-                      <p class="summary-value">{{ form.review_mode === 'single' ? '独审模式' : '会签模式' }}</p>
+                      <p class="summary-value">
+                        {{ form.review_mode === 'single' ? '独审模式' : '会签模式' }}
+                      </p>
                     </div>
                     <div>
                       <label class="summary-label">描述</label>
@@ -505,8 +583,12 @@ onMounted(() => {
                     <p class="summary-big-num">{{ assignedUserIds.size }}</p>
                   </div>
                   <div class="summary-avatars">
-                    <div v-for="u in assignedUsers.slice(0, 4)" :key="u.id" class="summary-avatar">{{ getInitials(u.name) }}</div>
-                    <span v-if="assignedUsers.length > 4" class="summary-avatar more">+{{ assignedUsers.length - 4 }}</span>
+                    <div v-for="u in assignedUsers.slice(0, 4)" :key="u.id" class="summary-avatar">
+                      {{ getInitials(u.name) }}
+                    </div>
+                    <span v-if="assignedUsers.length > 4" class="summary-avatar more">
+                      +{{ assignedUsers.length - 4 }}
+                    </span>
                     <span class="summary-avatar-label">已指派评审人员</span>
                   </div>
                 </div>
@@ -521,7 +603,12 @@ onMounted(() => {
                 <span class="checklist-badge">自动核验中</span>
               </h3>
               <ul class="checklist-items">
-                <li v-for="(check, i) in qualityChecks" :key="i" class="checklist-item" :class="{ ok: check.ok }">
+                <li
+                  v-for="(check, i) in qualityChecks"
+                  :key="i"
+                  class="checklist-item"
+                  :class="{ ok: check.ok }"
+                >
                   <span class="material-symbols-outlined check-icon" :class="{ filled: check.ok }">
                     {{ check.ok ? 'check_circle' : 'radio_button_unchecked' }}
                   </span>
@@ -534,7 +621,9 @@ onMounted(() => {
             </div>
             <!-- 提示 -->
             <div class="activate-hint">
-              <p>"一旦激活，评审计划将正式进入执行阶段。所有参与者将收到通知并可开始进行用例评审。"</p>
+              <p>
+                "一旦激活，评审计划将正式进入执行阶段。所有参与者将收到通知并可开始进行用例评审。"
+              </p>
             </div>
           </div>
         </div>
@@ -555,7 +644,12 @@ onMounted(() => {
           下一步
           <span class="material-symbols-outlined" style="font-size: 18px">arrow_forward</span>
         </button>
-        <button v-else class="footer-btn primary activate" :disabled="submitting" @click="handleActivate">
+        <button
+          v-else
+          class="footer-btn primary activate"
+          :disabled="submitting"
+          @click="handleActivate"
+        >
           <span class="material-symbols-outlined" style="font-size: 18px">bolt</span>
           {{ submitting ? '创建中...' : '激活评审' }}
         </button>
@@ -578,8 +672,12 @@ onMounted(() => {
 }
 
 /* ── 标题 + 步骤条 ── */
-.wizard-header { margin-bottom: 32px; }
-.wizard-title-area { margin-bottom: 28px; }
+.wizard-header {
+  margin-bottom: 32px;
+}
+.wizard-title-area {
+  margin-bottom: 28px;
+}
 .wizard-title {
   font-size: 28px;
   font-weight: 600;
@@ -653,7 +751,9 @@ onMounted(() => {
   color: #fff;
   border: none;
 }
-.step-check { font-size: 18px; }
+.step-check {
+  font-size: 18px;
+}
 .step-label {
   font-size: 10px;
   text-transform: uppercase;
@@ -670,11 +770,22 @@ onMounted(() => {
 }
 
 /* ── 内容区 ── */
-.wizard-content { flex: 1; padding-bottom: 100px; }
-.step-body { animation: fadeIn 0.3s ease; }
+.wizard-content {
+  flex: 1;
+  padding-bottom: 100px;
+}
+.step-body {
+  animation: fadeIn 0.3s ease;
+}
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .step-grid {
@@ -682,8 +793,12 @@ onMounted(() => {
   grid-template-columns: 1fr 380px;
   gap: 24px;
 }
-.step-main { min-width: 0; }
-.step-side { min-width: 0; }
+.step-main {
+  min-width: 0;
+}
+.step-side {
+  min-width: 0;
+}
 
 /* ── 通用卡片 ── */
 .card-glass {
@@ -709,7 +824,9 @@ onMounted(() => {
   padding: 16px;
   opacity: 0.06;
 }
-.card-bg-icon .material-symbols-outlined { font-size: 96px; }
+.card-bg-icon .material-symbols-outlined {
+  font-size: 96px;
+}
 .card-title-primary {
   font-size: 18px;
   font-weight: 600;
@@ -731,7 +848,9 @@ onMounted(() => {
 }
 
 /* ── 表单 ── */
-.form-group { margin-bottom: 20px; }
+.form-group {
+  margin-bottom: 20px;
+}
 .form-label {
   display: block;
   font-size: 10px;
@@ -741,7 +860,8 @@ onMounted(() => {
   margin-bottom: 8px;
   font-weight: 600;
 }
-.form-input, .form-textarea {
+.form-input,
+.form-textarea {
   width: 100%;
   background: var(--tp-surface-card, #131317);
   border: none;
@@ -752,13 +872,17 @@ onMounted(() => {
   outline: none;
   transition: box-shadow 0.2s;
 }
-.form-input:focus, .form-textarea:focus {
+.form-input:focus,
+.form-textarea:focus {
   box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.4);
 }
-.form-input::placeholder, .form-textarea::placeholder {
+.form-input::placeholder,
+.form-textarea::placeholder {
   color: rgba(149, 141, 161, 0.4);
 }
-.form-textarea { resize: none; }
+.form-textarea {
+  resize: none;
+}
 
 .mode-radio-group {
   display: flex;
@@ -794,7 +918,11 @@ onMounted(() => {
 }
 
 /* ── 评审人预览（Step1右侧） ── */
-.reviewer-list { display: flex; flex-direction: column; gap: 12px; }
+.reviewer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 .reviewer-card-mini {
   display: flex;
   align-items: center;
@@ -829,14 +957,25 @@ onMounted(() => {
   color: #fff;
   flex-shrink: 0;
 }
-.reviewer-name-mini { font-size: 14px; font-weight: 600; color: #fff; margin: 0; }
+.reviewer-name-mini {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+}
 .avatar-img {
   width: 100%;
   height: 100%;
   border-radius: inherit;
   object-fit: cover;
 }
-.reviewer-role-mini { font-size: 10px; color: var(--tp-gray-400, #958da1); margin: 3px 0 0; text-transform: uppercase; letter-spacing: 0.08em; }
+.reviewer-role-mini {
+  font-size: 10px;
+  color: var(--tp-gray-400, #958da1);
+  margin: 3px 0 0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
 .reviewer-status-badge {
   font-size: 10px;
   font-weight: 700;
@@ -896,7 +1035,10 @@ onMounted(() => {
 }
 
 /* ── Step 2: 用例选择 ── */
-.filter-bar { margin-bottom: 16px; padding: 16px 24px; }
+.filter-bar {
+  margin-bottom: 16px;
+  padding: 16px 24px;
+}
 .filter-bar-inner {
   display: flex;
   align-items: center;
@@ -920,7 +1062,10 @@ onMounted(() => {
   transition: all 0.15s;
   white-space: nowrap;
 }
-.filter-btn:hover { border-color: rgba(124, 58, 237, 0.3); color: #fff; }
+.filter-btn:hover {
+  border-color: rgba(124, 58, 237, 0.3);
+  color: #fff;
+}
 .filter-btn.icon-btn {
   display: flex;
   align-items: center;
@@ -929,10 +1074,14 @@ onMounted(() => {
   border-color: transparent;
   color: #fff;
 }
-.filter-btn.icon-btn:hover { opacity: 0.9; }
+.filter-btn.icon-btn:hover {
+  opacity: 0.9;
+}
 
 /* 模块标签 */
-.td-module { white-space: nowrap; }
+.td-module {
+  white-space: nowrap;
+}
 .module-tag {
   font-size: 11px;
   padding: 3px 8px;
@@ -949,10 +1098,18 @@ onMounted(() => {
   margin-right: 6px;
   vertical-align: middle;
 }
-.status-dot.active { background: #10b981; }
-.status-dot.pending { background: #f59e0b; }
-.status-dot.draft { background: #6c757d; }
-.status-dot.discarded { background: #ef4444; }
+.status-dot.active {
+  background: #10b981;
+}
+.status-dot.pending {
+  background: #f59e0b;
+}
+.status-dot.draft {
+  background: #6c757d;
+}
+.status-dot.discarded {
+  background: #ef4444;
+}
 .status-text {
   font-size: 12px;
   color: var(--tp-gray-300, #ccc3d8);
@@ -967,7 +1124,10 @@ onMounted(() => {
   padding: 6px 12px;
   max-width: 400px;
 }
-.search-icon-wz { font-size: 18px; color: var(--tp-gray-400, #958da1); }
+.search-icon-wz {
+  font-size: 18px;
+  color: var(--tp-gray-400, #958da1);
+}
 .search-input-wz {
   background: transparent;
   border: none;
@@ -976,7 +1136,9 @@ onMounted(() => {
   font-size: 13px;
   flex: 1;
 }
-.search-input-wz::placeholder { color: var(--tp-gray-500, #605770); }
+.search-input-wz::placeholder {
+  color: var(--tp-gray-500, #605770);
+}
 
 .selection-bar {
   display: flex;
@@ -988,8 +1150,16 @@ onMounted(() => {
   padding: 10px 20px;
   margin-bottom: 16px;
 }
-.selection-left { display: flex; align-items: center; gap: 16px; }
-.selection-count { font-size: 13px; font-weight: 500; color: var(--tp-info, #adc6ff); }
+.selection-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.selection-count {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tp-info, #adc6ff);
+}
 .selection-action {
   background: none;
   border: none;
@@ -997,12 +1167,26 @@ onMounted(() => {
   font-size: 12px;
   cursor: pointer;
 }
-.selection-action.danger { color: var(--tp-danger, #ffb4ab); }
-.selection-range { font-size: 12px; color: var(--tp-gray-400, #958da1); }
+.selection-action.danger {
+  color: var(--tp-danger, #ffb4ab);
+}
+.selection-range {
+  font-size: 12px;
+  color: var(--tp-gray-400, #958da1);
+}
 
-.table-wrap { padding: 0; overflow: hidden; }
-.wz-table { width: 100%; border-collapse: collapse; text-align: left; }
-.wz-table thead tr { background: rgba(255, 255, 255, 0.03); }
+.table-wrap {
+  padding: 0;
+  overflow: hidden;
+}
+.wz-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.wz-table thead tr {
+  background: rgba(255, 255, 255, 0.03);
+}
 .wz-table th {
   padding: 14px 24px;
   font-size: 10px;
@@ -1011,13 +1195,30 @@ onMounted(() => {
   letter-spacing: 0.12em;
   color: var(--tp-gray-400, #958da1);
 }
-.th-check { width: 48px; }
-.th-right { text-align: right; }
-.wz-row { cursor: pointer; transition: background 0.15s; border-bottom: 1px solid rgba(74, 68, 85, 0.05); }
-.wz-row:hover { background: rgba(255, 255, 255, 0.02); }
-.wz-row.selected { background: rgba(124, 58, 237, 0.06); border-left: 2px solid var(--tp-info, #adc6ff); }
-.wz-table td { padding: 14px 24px; }
-.td-check { width: 48px; }
+.th-check {
+  width: 48px;
+}
+.th-right {
+  text-align: right;
+}
+.wz-row {
+  cursor: pointer;
+  transition: background 0.15s;
+  border-bottom: 1px solid rgba(74, 68, 85, 0.05);
+}
+.wz-row:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+.wz-row.selected {
+  background: rgba(124, 58, 237, 0.06);
+  border-left: 2px solid var(--tp-info, #adc6ff);
+}
+.wz-table td {
+  padding: 14px 24px;
+}
+.td-check {
+  width: 48px;
+}
 .custom-check {
   width: 18px;
   height: 18px;
@@ -1033,18 +1234,42 @@ onMounted(() => {
   border-color: var(--tp-primary, #7c3aed);
   color: #fff;
 }
-.td-id { font-family: monospace; font-size: 12px; color: var(--tp-info, #adc6ff); }
-.td-title { color: #fff; font-size: 13px; }
-.td-date { text-align: right; font-size: 12px; color: var(--tp-gray-400, #958da1); }
-.td-empty { text-align: center; padding: 40px; color: var(--tp-gray-400, #958da1); font-size: 13px; }
+.td-id {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--tp-info, #adc6ff);
+}
+.td-title {
+  color: #fff;
+  font-size: 13px;
+}
+.td-date {
+  text-align: right;
+  font-size: 12px;
+  color: var(--tp-gray-400, #958da1);
+}
+.td-empty {
+  text-align: center;
+  padding: 40px;
+  color: var(--tp-gray-400, #958da1);
+  font-size: 13px;
+}
 .priority-tag {
   font-size: 11px;
   font-weight: 700;
 }
-.priority-tag.p0 { color: #ef4444; }
-.priority-tag.p1 { color: #f59e0b; }
-.priority-tag.p2 { color: var(--tp-gray-300, #ccc3d8); }
-.priority-tag.p3 { color: var(--tp-gray-400, #958da1); }
+.priority-tag.p0 {
+  color: #ef4444;
+}
+.priority-tag.p1 {
+  color: #f59e0b;
+}
+.priority-tag.p2 {
+  color: var(--tp-gray-300, #ccc3d8);
+}
+.priority-tag.p3 {
+  color: var(--tp-gray-400, #958da1);
+}
 
 .wz-pagination {
   display: flex;
@@ -1067,17 +1292,44 @@ onMounted(() => {
   cursor: pointer;
   transition: all 0.15s;
 }
-.page-btn-wz .material-symbols-outlined { font-size: 16px; }
-.page-btn-wz:hover:not(:disabled) { background: rgba(255, 255, 255, 0.05); }
-.page-btn-wz.active { background: var(--tp-primary, #7c3aed); color: #fff; border-color: transparent; }
-.page-btn-wz:disabled { opacity: 0.3; cursor: default; }
+.page-btn-wz .material-symbols-outlined {
+  font-size: 16px;
+}
+.page-btn-wz:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+}
+.page-btn-wz.active {
+  background: var(--tp-primary, #7c3aed);
+  color: #fff;
+  border-color: transparent;
+}
+.page-btn-wz:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
 
 /* ── Step 3: 指派评审人 ── */
-.step3-header { margin-bottom: 24px; }
-.step3-title { font-size: 22px; font-weight: 600; color: #fff; margin: 0 0 6px; }
-.step3-sub { font-size: 14px; color: var(--tp-gray-400, #958da1); font-weight: 300; margin: 0; }
+.step3-header {
+  margin-bottom: 24px;
+}
+.step3-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0 0 6px;
+}
+.step3-sub {
+  font-size: 14px;
+  color: var(--tp-gray-400, #958da1);
+  font-weight: 300;
+  margin: 0;
+}
 
-.reviewer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.reviewer-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
 .reviewer-card {
   background: var(--tp-surface-card, #1d1f2b);
   border: 1px solid rgba(74, 68, 85, 0.15);
@@ -1090,7 +1342,12 @@ onMounted(() => {
   background: var(--tp-surface-elevated, #272935);
   border-color: rgba(124, 58, 237, 0.3);
 }
-.reviewer-card-top { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.reviewer-card-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
 .reviewer-avatar-lg {
   width: 44px;
   height: 44px;
@@ -1104,11 +1361,23 @@ onMounted(() => {
   color: #fff;
   flex-shrink: 0;
 }
-.reviewer-card-name { font-size: 14px; font-weight: 600; color: #fff; margin: 0; }
-.reviewer-card-role { font-size: 11px; color: var(--tp-gray-400, #958da1); margin: 2px 0 0; }
-.reviewer-card-info { flex: 1; }
+.reviewer-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+}
+.reviewer-card-role {
+  font-size: 11px;
+  color: var(--tp-gray-400, #958da1);
+  margin: 2px 0 0;
+}
+.reviewer-card-info {
+  flex: 1;
+}
 
-.load-bar-wrap { }
+.load-bar-wrap {
+}
 .load-bar-labels {
   display: flex;
   justify-content: space-between;
@@ -1118,9 +1387,15 @@ onMounted(() => {
   color: var(--tp-gray-400, #958da1);
   margin-bottom: 4px;
 }
-.load-pct.low { color: #34d399; }
-.load-pct.medium { color: #f59e0b; }
-.load-pct.high { color: var(--tp-danger, #ffb4ab); }
+.load-pct.low {
+  color: #34d399;
+}
+.load-pct.medium {
+  color: #f59e0b;
+}
+.load-pct.high {
+  color: var(--tp-danger, #ffb4ab);
+}
 .load-bar-track {
   height: 4px;
   width: 100%;
@@ -1132,9 +1407,15 @@ onMounted(() => {
   height: 100%;
   border-radius: 4px;
 }
-.load-bar-fill.low { background: #34d399; }
-.load-bar-fill.medium { background: #f59e0b; }
-.load-bar-fill.high { background: var(--tp-danger, #ffb4ab); }
+.load-bar-fill.low {
+  background: #34d399;
+}
+.load-bar-fill.medium {
+  background: #f59e0b;
+}
+.load-bar-fill.high {
+  background: var(--tp-danger, #ffb4ab);
+}
 
 /* 已指派面板 */
 .assigned-panel {
@@ -1150,9 +1431,26 @@ onMounted(() => {
   padding: 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
-.assigned-title { font-size: 15px; font-weight: 600; color: #fff; margin: 0; }
-.assigned-sub { font-size: 10px; color: var(--tp-gray-400, #958da1); margin: 4px 0 0; text-transform: uppercase; letter-spacing: 0.1em; }
-.assigned-list { padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 10px; }
+.assigned-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+}
+.assigned-sub {
+  font-size: 10px;
+  color: var(--tp-gray-400, #958da1);
+  margin: 4px 0 0;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.assigned-list {
+  padding: 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 .assigned-item {
   display: flex;
   align-items: center;
@@ -1162,7 +1460,11 @@ onMounted(() => {
   border-radius: 10px;
   border-left: 2px solid var(--tp-primary, #7c3aed);
 }
-.assigned-item-left { display: flex; align-items: center; gap: 10px; }
+.assigned-item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .reviewer-avatar-sm {
   width: 28px;
   height: 28px;
@@ -1175,8 +1477,17 @@ onMounted(() => {
   font-weight: 700;
   color: #fff;
 }
-.assigned-name { font-size: 13px; font-weight: 500; color: #fff; margin: 0; }
-.assigned-role { font-size: 10px; color: var(--tp-gray-400, #958da1); margin: 0; }
+.assigned-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  margin: 0;
+}
+.assigned-role {
+  font-size: 10px;
+  color: var(--tp-gray-400, #958da1);
+  margin: 0;
+}
 .remove-btn {
   background: none;
   border: none;
@@ -1187,8 +1498,13 @@ onMounted(() => {
   opacity: 0;
   transition: all 0.15s;
 }
-.assigned-item:hover .remove-btn { opacity: 1; }
-.remove-btn:hover { background: rgba(239, 68, 68, 0.15); color: var(--tp-danger, #ffb4ab); }
+.assigned-item:hover .remove-btn {
+  opacity: 1;
+}
+.remove-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--tp-danger, #ffb4ab);
+}
 
 .drop-placeholder {
   border: 2px dashed rgba(255, 255, 255, 0.08);
@@ -1218,7 +1534,10 @@ onMounted(() => {
   font-size: 12px;
   color: var(--tp-gray-400, #958da1);
 }
-.stat-bold { color: #fff; font-weight: 600; }
+.stat-bold {
+  color: #fff;
+  font-weight: 600;
+}
 
 /* ── Step 4: 确认 ── */
 .summary-card {
@@ -1236,7 +1555,9 @@ onMounted(() => {
   padding: 24px;
   opacity: 0.06;
 }
-.summary-card-bg .material-symbols-outlined { font-size: 96px; }
+.summary-card-bg .material-symbols-outlined {
+  font-size: 96px;
+}
 .summary-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1263,9 +1584,18 @@ onMounted(() => {
   font-weight: 300;
   margin: 0;
 }
-.summary-meta { display: flex; flex-direction: column; gap: 16px; }
-.summary-stats { display: flex; flex-direction: column; gap: 16px; }
-.summary-stat-item {}
+.summary-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.summary-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.summary-stat-item {
+}
 .summary-big-num {
   font-size: 32px;
   font-weight: 700;
@@ -1292,9 +1622,18 @@ onMounted(() => {
   color: #fff;
   margin-left: -8px;
 }
-.summary-avatar:first-child { margin-left: 0; }
-.summary-avatar.more { background: var(--tp-gray-700, #323440); color: var(--tp-gray-400, #958da1); }
-.summary-avatar-label { margin-left: 12px; font-size: 11px; color: var(--tp-gray-400, #958da1); }
+.summary-avatar:first-child {
+  margin-left: 0;
+}
+.summary-avatar.more {
+  background: var(--tp-gray-700, #323440);
+  color: var(--tp-gray-400, #958da1);
+}
+.summary-avatar-label {
+  margin-left: 12px;
+  font-size: 11px;
+  color: var(--tp-gray-400, #958da1);
+}
 
 /* 质量自检 */
 .checklist-panel {
@@ -1319,13 +1658,42 @@ onMounted(() => {
   padding: 3px 8px;
   border-radius: 4px;
 }
-.checklist-items { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; }
-.checklist-item { display: flex; align-items: flex-start; gap: 10px; }
-.checklist-item:not(.ok) { opacity: 0.45; }
-.check-icon { font-size: 20px; color: var(--tp-gray-400, #958da1); }
-.check-icon.filled { color: #10b981; font-variation-settings: 'FILL' 1; }
-.check-label { font-size: 13px; font-weight: 500; color: #fff; margin: 0; }
-.check-desc { font-size: 11px; color: var(--tp-gray-400, #958da1); font-weight: 300; margin: 2px 0 0; }
+.checklist-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.checklist-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.checklist-item:not(.ok) {
+  opacity: 0.45;
+}
+.check-icon {
+  font-size: 20px;
+  color: var(--tp-gray-400, #958da1);
+}
+.check-icon.filled {
+  color: #10b981;
+  font-variation-settings: 'FILL' 1;
+}
+.check-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  margin: 0;
+}
+.check-desc {
+  font-size: 11px;
+  color: var(--tp-gray-400, #958da1);
+  font-weight: 300;
+  margin: 2px 0 0;
+}
 
 .activate-hint {
   margin-top: 16px;
@@ -1357,7 +1725,12 @@ onMounted(() => {
   padding: 16px 28px;
   z-index: 10;
 }
-.footer-left, .footer-right { display: flex; gap: 12px; align-items: center; }
+.footer-left,
+.footer-right {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
 .footer-btn {
   display: flex;
   align-items: center;
@@ -1375,7 +1748,10 @@ onMounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: var(--tp-gray-300, #ccc3d8);
 }
-.footer-btn.outline:hover { border-color: rgba(255, 255, 255, 0.2); color: #fff; }
+.footer-btn.outline:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
 .footer-btn.primary {
   background: linear-gradient(135deg, var(--tp-primary, #7c3aed), var(--tp-info, #0566d9));
   color: #fff;
@@ -1385,9 +1761,15 @@ onMounted(() => {
   transform: translateY(-1px);
   box-shadow: 0 6px 20px rgba(124, 58, 237, 0.35);
 }
-.footer-btn.primary:active { transform: scale(0.97); }
+.footer-btn.primary:active {
+  transform: scale(0.97);
+}
 .footer-btn.activate {
   background: linear-gradient(135deg, var(--tp-primary, #7c3aed), var(--tp-info, #0566d9));
 }
-.footer-btn:disabled { opacity: 0.5; cursor: default; transform: none !important; }
+.footer-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  transform: none !important;
+}
 </style>

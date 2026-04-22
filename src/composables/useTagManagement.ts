@@ -29,7 +29,7 @@ export function useTagManagement() {
   const projectStore = useProjectStore()
   const selectedProject = computed(() => projectStore.selectedProjectId) // 当前选中的项目 ID
   // 构造服务端基础地址（去除 /api/v1 后缀），用于拼接头像等静态资源 URL
-  const apiBaseUrl = apiClient.defaults.baseURL || 'http://localhost:8080/api/v1'
+  const apiBaseUrl = apiClient.defaults.baseURL || '/api/v1'
   const serverUrl = apiBaseUrl.replace(/\/api\/v1\/?$/, '')
 
   // ── 列表状态 ──

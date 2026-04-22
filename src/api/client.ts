@@ -2,8 +2,11 @@ import axios from 'axios'
 
 const envBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
 
+// 默认走相对路径 '/api/v1'：dev 下由 Vite proxy 转发到 127.0.0.1:8080，
+// 部署下由网关/反向代理统一处理。局域网访问时前端同源（http://<ip>:5173）
+// 自动拼 /api/v1 命中 proxy，无需切换 baseURL。
 export const apiClient = axios.create({
-  baseURL: envBase && envBase.length > 0 ? envBase : 'http://localhost:8080/api/v1',
+  baseURL: envBase && envBase.length > 0 ? envBase : '/api/v1',
   timeout: 12000,
 })
 
