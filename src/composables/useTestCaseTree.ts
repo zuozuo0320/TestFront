@@ -1,7 +1,17 @@
 import { ref, reactive } from 'vue'
+import type { ModuleTreeNode } from '../api/types'
+
+/**
+ * 带 path 字段的模块树节点：在原 API 节点上补 path（从根拼接的路径）
+ * 与 children 同步收敛到带 path 的类型，方便 Sidebar 过滤/高亮。
+ */
+export type ModuleTreeNodeWithPath = Omit<ModuleTreeNode, 'children'> & {
+  path: string
+  children: ModuleTreeNodeWithPath[]
+}
 
 // Global states holding the tree data derived from TestCasePage (when mounted/loaded)
-export const globalModuleTree = ref<any[]>([])
+export const globalModuleTree = ref<ModuleTreeNodeWithPath[]>([])
 export const globalModuleCaseCount = ref<Record<string, number>>({})
 export const globalUnplannedCount = ref(0)
 export const globalTotalCaseCount = ref(0)

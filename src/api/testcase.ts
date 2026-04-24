@@ -29,6 +29,7 @@ export interface TestCasePayload {
   module_path?: string
   tags?: string
   precondition?: string
+  postcondition?: string
   steps?: string
   remark?: string
   priority?: string
@@ -38,6 +39,12 @@ export async function listTestCases(projectId: number, params: TestCaseListParam
   const { data } = await apiClient.get<TestCaseListResp>(`/projects/${projectId}/testcases`, {
     params,
   })
+  return data
+}
+
+/** 按 ID 查询单条用例，主要用于评审详情页回显 steps / precondition / postcondition */
+export async function getTestCase(projectId: number, testcaseId: number) {
+  const { data } = await apiClient.get<TestCase>(`/projects/${projectId}/testcases/${testcaseId}`)
   return data
 }
 

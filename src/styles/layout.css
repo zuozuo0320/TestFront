@@ -3117,6 +3117,27 @@
   background: rgba(179, 136, 255, 0.08);
 }
 
+/* AI 评审按钮：用主紫色突出，与"复制/关闭/删除"等灰色 icon 形成层级对比 */
+.action-ai {
+  color: var(--tp-primary-light);
+}
+
+.action-ai:hover:not(:disabled) {
+  color: #ffffff;
+  background: rgba(124, 58, 237, 0.25);
+}
+
+/* 通用旋转动画：用例评审 AI 评审按钮 / 其它 loading 图标共用 */
+.spin-anim {
+  animation: spin-rotate 0.8s linear infinite;
+}
+
+@keyframes spin-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ========== 12b. Floating Batch Action Bar (Stitch Design) ========== */
 
 .batch-float-overlay {

@@ -13,6 +13,22 @@ import {
 } from '../composables/useTestCaseTree'
 import { useAuthStore } from '../stores/auth'
 
+/**
+ * Sidebar 侧栏菜单节点：兼容两种形态：
+ *   1. 真实模块树节点（来自 globalModuleTree，带 case_count / children）
+ *   2. 虚拟节点（"全部用例" id=0 / "未规划用例" id=-1，带 isVirtual + icon）
+ * 只用于菜单渲染/过滤，不再依赖上游 API 类型，避免泛型交集引出的不兼容性。
+ */
+type MenuTreeNode = {
+  id: number
+  name: string
+  path: string
+  children?: MenuTreeNode[]
+  icon?: string
+  isVirtual?: boolean
+  case_count?: number
+}
+
 const authStore = useAuthStore()
 
 function onAvatarError(event: Event, name?: string) {
@@ -89,7 +105,7 @@ function toggleDropdown() {
 }
 
 // 点击外部关闭
-function onModuleClick(node: any) {
+function onModuleClick(node: MenuTreeNode) {
   const path = node.path || ''
   const id = node.id
 
@@ -107,10 +123,10 @@ function onModuleClick(node: any) {
 const moduleSearchKey = ref('')
 
 /** 递归过滤目录树，保留匹配节点及其祖先路径 */
-function filterTree(nodes: any[], keyword: string): any[] {
+function filterTree(nodes: MenuTreeNode[], keyword: string): MenuTreeNode[] {
   if (!keyword) return nodes
   const kw = keyword.toLowerCase()
-  const result: any[] = []
+  const result: MenuTreeNode[] = []
   for (const node of nodes) {
     const nameMatch = (node.name || '').toLowerCase().includes(kw)
     const filteredChildren = node.children ? filterTree(node.children, keyword) : []

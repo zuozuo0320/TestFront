@@ -23,7 +23,10 @@ import {
   type ReviewListParams,
   type ReviewSummary,
 } from '../api/caseReview'
+import { runPlanAIGate, type PlanRunReport } from '../api/caseReviewV02'
+import ReviewAIReportDialog from '../components/ReviewAIReportDialog.vue'
 import { listTestCases } from '../api/testcase'
+import { extractErrorMessage, isElMessageBoxCancel } from '../utils/error'
 
 // ── Stores ──
 const projectStore = useProjectStore()
@@ -151,8 +154,7 @@ async function loadCasesForLink() {
   loadingCases.value = true
   try {
     const resp = await listTestCases(selectedProjectId.value, { page: 1, pageSize: 200 })
-    availableCases.value =
-      (resp as any)?.items?.map((c: any) => ({ id: c.id, title: c.title })) || []
+    availableCases.value = (resp?.items || []).map((c) => ({ id: c.id, title: c.title }))
   } catch {
     /* ignore */
   }
@@ -243,8 +245,8 @@ async function handleCreate() {
     createDialogVisible.value = false
     fetchReviews()
     fetchSummary()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.message || '创建失败')
+  } catch (e) {
+    ElMessage.error(extractErrorMessage(e, '创建失败'))
   } finally {
     creating.value = false
   }
@@ -260,10 +262,10 @@ async function handleDelete(review: CaseReview) {
     ElMessage.success('已删除')
     fetchReviews()
     fetchSummary()
-  } catch (e: any) {
-    // 如果是用户取消确认，e 为 'cancel'，不做处理
-    if (e === 'cancel' || e?.toString?.() === 'cancel') return
-    ElMessage.error(e?.response?.data?.message || '删除失败')
+  } catch (e) {
+    // 用户取消确认时不弹错提示
+    if (isElMessageBoxCancel(e)) return
+    ElMessage.error(extractErrorMessage(e, '删除失败'))
   }
 }
 
@@ -287,8 +289,52 @@ async function handleCopy(review: CaseReview) {
     ElMessage.success('已复制')
     fetchReviews()
     fetchSummary()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.message || '复制失败')
+  } catch (e) {
+    ElMessage.error(extractErrorMessage(e, '复制失败'))
+  }
+}
+
+// ── 计划级 AI 评审：对该任务下所有用例批量跑规则引擎 ──
+/** 每个 review 的 AI 评审 running 状态（按 id 追踪，互不影响，支持多行并行） */
+const aiRunningSet = ref<Set<number>>(new Set())
+/** 最近一次 AI 评审报告（由 ReviewAIReportDialog 展示聚合结果） */
+const aiReport = ref<PlanRunReport | null>(null)
+const aiReportVisible = ref(false)
+/** 报告弹窗点"查看详情"时跳转对应的评审详情页，并带上 itemId 便于高亮 */
+function handleJumpFromReport(itemId: number) {
+  const reviewId = aiReport.value?.review_id
+  if (!reviewId) return
+  aiReportVisible.value = false
+  router.push({ path: `/case-reviews/${reviewId}`, query: { itemId: String(itemId) } })
+}
+
+/** 对列表行触发计划级 AI 评审 */
+async function handleRunAI(review: CaseReview) {
+  const projectId = selectedProjectId.value
+  if (!projectId) return
+  if (aiRunningSet.value.has(review.id)) return
+  // 非终态才允许批量评审：closed / completed 禁止，避免把冻结的计划数据搅乱
+  if (review.status === 'closed' || review.status === 'completed') {
+    ElMessage.warning('计划已关闭或完成，无法再运行 AI 评审')
+    return
+  }
+  aiRunningSet.value = new Set(aiRunningSet.value).add(review.id)
+  try {
+    const report = await runPlanAIGate(projectId, review.id)
+    aiReport.value = report
+    aiReportVisible.value = true
+    // 刷新列表，让行上的 passed/failed 统计跟上
+    fetchReviews()
+    fetchSummary()
+    const tip = `AI 评审完成：${report.passed_count}/${report.total_count} 通过`
+    if (report.failed_count === 0 && report.error_count === 0) ElMessage.success(tip)
+    else ElMessage.warning(tip)
+  } catch (e) {
+    ElMessage.error(extractErrorMessage(e, 'AI 评审失败'))
+  } finally {
+    const next = new Set(aiRunningSet.value)
+    next.delete(review.id)
+    aiRunningSet.value = next
   }
 }
 
@@ -399,8 +445,8 @@ async function handleDetailLink() {
     detailLinkDialogVisible.value = false
     await refreshCurrentReviewDetail()
     fetchReviews()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.message || '关联失败')
+  } catch (e) {
+    ElMessage.error(extractErrorMessage(e, '关联失败'))
   } finally {
     detailLinkLoading.value = false
   }
@@ -420,8 +466,8 @@ async function handleSubmitReview(item: CaseReviewItem, result: 'approved' | 're
     reviewComment.value = ''
     await refreshCurrentReviewDetail()
     fetchReviews()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.message || '评审提交失败')
+  } catch (e) {
+    ElMessage.error(extractErrorMessage(e, '评审提交失败'))
   }
 }
 
@@ -531,6 +577,13 @@ function statusBadgeClass(status: string) {
 
 <template>
   <div class="case-review-page">
+    <!-- AI 评审报告弹窗（计划级批量评审完成后展示聚合结果） -->
+    <ReviewAIReportDialog
+      v-model="aiReportVisible"
+      :report="aiReport"
+      @jump="handleJumpFromReport"
+    />
+
     <!-- ─── 页面标题 ─── -->
     <div class="pipeline-header">
       <div class="pipeline-header-top">
@@ -749,6 +802,29 @@ function statusBadgeClass(status: string) {
                     @click="router.push(`/case-reviews/${review.id}`)"
                   >
                     <span class="material-symbols-outlined">visibility</span>
+                  </button>
+                  <button
+                    class="action-btn action-ai icon-only"
+                    :disabled="
+                      aiRunningSet.has(review.id) ||
+                      review.status === 'closed' ||
+                      review.status === 'completed'
+                    "
+                    :title="
+                      aiRunningSet.has(review.id)
+                        ? 'AI 评审中…'
+                        : review.status === 'closed' || review.status === 'completed'
+                          ? '计划已关闭/完成，无法再运行 AI 评审'
+                          : '对该任务下所有用例运行 AI 评审'
+                    "
+                    @click="handleRunAI(review)"
+                  >
+                    <span
+                      class="material-symbols-outlined"
+                      :class="{ 'spin-anim': aiRunningSet.has(review.id) }"
+                    >
+                      auto_awesome
+                    </span>
                   </button>
                   <button
                     class="action-btn action-clone icon-only"

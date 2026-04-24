@@ -43,10 +43,17 @@ import {
   type CaseReviewAttachment,
 } from '../api/caseReviewAttachment'
 import { importTestCases, exportReport } from '../api/xlsx'
-import { listTagOptions, createTag } from '../api/tag'
+import { listTagOptions } from '../api/tag'
 import type { TagBrief } from '../api/tag'
 import { getModuleTree, createModule, renameModule, deleteModule } from '../api/module'
-import type { TestCase, CaseAttachment, ModuleTreeNode as APIModuleTreeNode } from '../api/types'
+import type {
+  TestCase,
+  CaseAttachment,
+  ModuleTreeNode as APIModuleTreeNode,
+  CaseHistory,
+} from '../api/types'
+import type { ModuleTreeNodeWithPath } from '../composables/useTestCaseTree'
+import { extractErrorMessage, isElMessageBoxCancel } from '../utils/error'
 
 // ── Types ──
 
@@ -163,7 +170,11 @@ const kanbanColumns = computed(() => [
 
 // Flat module paths for filter dropdown
 type FlatModule = { id: number; name: string; path: string }
-function collectModulePaths(nodes: any[], paths: FlatModule[] = [], parentPath = ''): FlatModule[] {
+function collectModulePaths(
+  nodes: APIModuleTreeNode[],
+  paths: FlatModule[] = [],
+  parentPath = '',
+): FlatModule[] {
   for (const n of nodes) {
     const currentPath = parentPath + '/' + n.name
     paths.push({ id: n.id, name: n.name, path: currentPath })
@@ -195,8 +206,8 @@ async function onNodeMenuCommand(cmd: string, path: string, name: string, id?: n
       ElMessage.success('重命名成功')
       await loadTreeData()
       await loadCases({ skipTree: true })
-    } catch (e: any) {
-      ElMessage.error(e?.response?.data?.error || '重命名失败')
+    } catch (e: unknown) {
+      ElMessage.error(extractErrorMessage(e, '重命名失败'))
     }
   } else if (cmd === 'delete' && id) {
     try {
@@ -208,10 +219,9 @@ async function onNodeMenuCommand(cmd: string, path: string, name: string, id?: n
       }
       await loadTreeData()
       await loadCases({ skipTree: true })
-    } catch (e: any) {
-      if (e !== 'cancel') {
-        ElMessage.error(e?.response?.data?.error || '删除失败')
-      }
+    } catch (e: unknown) {
+      if (isElMessageBoxCancel(e)) return
+      ElMessage.error(extractErrorMessage(e, '删除失败'))
     }
   }
 }
@@ -264,7 +274,7 @@ const caseForm = reactive({
 const caseAttachments = ref<CaseAttachment[]>([])
 const reviewAttachments = ref<CaseReviewAttachment[]>([])
 const reviewAttachmentsLoading = ref(false)
-const caseHistory = ref<any[]>([])
+const caseHistory = ref<CaseHistory[]>([])
 const caseActivities = ref<CaseActivity[]>([])
 
 // ── AI Analyze ──
@@ -279,8 +289,8 @@ async function runAIAnalyze() {
   aiError.value = ''
   try {
     aiResult.value = await analyzeTestCase(selectedProject.value, editingId.value)
-  } catch (e: any) {
-    aiError.value = e?.response?.data?.message || 'AI 分析失败，请稍后重试'
+  } catch (e: unknown) {
+    aiError.value = extractErrorMessage(e, 'AI 分析失败，请稍后重试')
   } finally {
     aiAnalyzing.value = false
   }
@@ -308,34 +318,6 @@ async function loadTagOptions() {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function onTagQuickCreate(name: string) {
-  if (!selectedProject.value || !name.trim()) return
-  try {
-    const tag = await createTag(selectedProject.value, {
-      name: name.trim(),
-      color: '#3B82F6',
-    })
-    if (tag && tag.id) {
-      projectTagOptions.value.push({ id: tag.id, name: tag.name, color: tag.color })
-      selectedTagIds.value.push(tag.id)
-    }
-  } catch (e: any) {
-    // 409: 已存在，自动选中
-    if (e?.response?.status === 409) {
-      const existing = projectTagOptions.value.find(
-        (t) => t.name.toLowerCase() === name.trim().toLowerCase(),
-      )
-      if (existing && !selectedTagIds.value.includes(existing.id)) {
-        selectedTagIds.value.push(existing.id)
-        ElMessage.info('标签已存在，已为您自动选中')
-      }
-    } else {
-      ElMessage.error(e?.response?.data?.message || '创建标签失败')
-    }
-  }
-}
-
 const directoryForm = reactive({ parentPath: '/', parentId: 0, name: '' })
 
 // ── Computed ──
@@ -355,24 +337,23 @@ const activeFilterChips = computed(() => {
 })
 
 // 辅助函数：递归处理 API 返回的树节点，为其补全 path 字段并收集计数
-function processApiTree(nodes: APIModuleTreeNode[] | null | undefined, parentPath = ''): any[] {
+function processApiTree(
+  nodes: APIModuleTreeNode[] | null | undefined,
+  parentPath = '',
+): ModuleTreeNodeWithPath[] {
   if (!nodes || !Array.isArray(nodes)) return []
-  return nodes.map((n) => {
-    const currentPath = parentPath + '/' + n.name
-    const node: any = {
-      ...n,
-      path: currentPath,
-      children: n.children ? processApiTree(n.children, currentPath) : [],
-    }
-    return node
-  })
+  return nodes.map<ModuleTreeNodeWithPath>((n) => ({
+    ...n,
+    path: parentPath + '/' + n.name,
+    children: n.children ? processApiTree(n.children, parentPath + '/' + n.name) : [],
+  }))
 }
 
 const moduleTree = computed(() => processApiTree(moduleTreeRaw.value))
 
 const moduleCaseCount = computed(() => {
   const counts: Record<string, number> = {}
-  const traverse = (nodes: any[]) => {
+  const traverse = (nodes: ModuleTreeNodeWithPath[]) => {
     for (const n of nodes) {
       counts[n.path] = n.case_count
       if (n.children) traverse(n.children)
@@ -545,21 +526,34 @@ async function loadTreeData() {
   try {
     const res = await getModuleTree(selectedProject.value)
 
-    // 兼容逻辑：处理经 interceptor 脱壳后可能存在的不同结构
-    const rawData = (res as any).tree || (Array.isArray(res) ? res : [])
+    // 兼容逻辑：后端 / interceptor 可能返回以下三种形态之一：
+    //   - 纯数组：直接是 ModuleTreeNode[]
+    //   - 对象带 tree 字段：{ tree: [...], counts, unplannedCount }
+    //   - 对象带 data 字段：{ data: [...], counts, unplannedCount }（旧版 API 声明形态）
+    type TreeResponseShape = {
+      tree?: APIModuleTreeNode[]
+      data?: APIModuleTreeNode[]
+      counts?: Record<string, number>
+      unplannedCount?: number
+    }
+    const resp = res as TreeResponseShape | APIModuleTreeNode[] | undefined
+    const rawData: APIModuleTreeNode[] = Array.isArray(resp)
+      ? resp
+      : Array.isArray(resp?.tree)
+        ? resp.tree
+        : Array.isArray(resp?.data)
+          ? resp.data
+          : []
+    const counts: Record<string, number> = resp && !Array.isArray(resp) ? resp.counts || {} : {}
+    const unplanned: number = resp && !Array.isArray(resp) ? resp.unplannedCount || 0 : 0
     moduleTreeRaw.value = rawData
 
     // 同步到全局状态供 Sidebar 使用
     globalModuleTree.value = processApiTree(rawData)
-    const counts: Record<string, number> = (res as any).counts || {}
-    const unplanned: number = (res as any).unplannedCount || 0
     globalModuleCaseCount.value = counts
     globalUnplannedCount.value = unplanned
     // 计算全部用例总数：顶层目录累计 + 未规划
-    const rootTotal = globalModuleTree.value.reduce(
-      (sum: number, node: any) => sum + (node.case_count || 0),
-      0,
-    )
+    const rootTotal = globalModuleTree.value.reduce((sum, node) => sum + (node.case_count || 0), 0)
     globalTotalCaseCount.value = rootTotal + unplanned
   } catch (e) {
     console.error('Failed to load tree:', e)
@@ -600,19 +594,19 @@ async function loadCases(opts?: { skipTree?: boolean }) {
       module_id: exactModuleId,
       module_path: exactModuleId ? undefined : treeModulePath,
     })
-    const items = Array.isArray((data as any).items) ? (data as any).items : []
+    const items = Array.isArray(data.items) ? data.items : []
     rows.value = items.map(toRow)
-    total.value = Number((data as any).total) || 0
-    page.value = Number((data as any).page) || 1
+    total.value = Number(data.total) || 0
+    page.value = Number(data.page) || 1
     selectedIds.value = []
     selectAll.value = false
-    pageSize.value = Number((data as any).pageSize) || pageSize.value
+    pageSize.value = Number(data.pageSize) || pageSize.value
     // 仅在非纯目录切换时刷新树数据
     if (!opts?.skipTree) {
       await loadTreeData()
     }
-  } catch (e: any) {
-    loadError.value = e?.response?.data?.error || '加载用例失败，请重试'
+  } catch (e: unknown) {
+    loadError.value = extractErrorMessage(e, '加载用例失败，请重试')
     ElMessage.error(loadError.value)
   } finally {
     appLoading.value = false
@@ -744,8 +738,9 @@ async function openEdit(row: TableRow) {
     // Load history
     try {
       const resp = await listCaseHistory(selectedProject.value, row.id)
-      const items = (resp as any)?.items || resp
-      caseHistory.value = Array.isArray(items) ? items : []
+      const typedResp = resp as { items?: CaseHistory[] } | CaseHistory[] | undefined
+      const items = Array.isArray(typedResp) ? typedResp : typedResp?.items || []
+      caseHistory.value = items
     } catch {
       caseHistory.value = []
     }
@@ -808,8 +803,8 @@ async function submitCase() {
     }
     dialogVisible.value = false
     await loadCases()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '保存失败')
+  } catch (e: unknown) {
+    ElMessage.error(extractErrorMessage(e, '保存失败'))
   } finally {
     saving.value = false
   }
@@ -867,8 +862,8 @@ async function onBatchDelete() {
     selectedIds.value = []
     selectAll.value = false
     await loadCases()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.message || '批量删除失败')
+  } catch (e: unknown) {
+    ElMessage.error(extractErrorMessage(e, '批量删除失败'))
   }
 }
 
@@ -880,8 +875,8 @@ async function onBatchUpdateLevel(level: string) {
     selectedIds.value = []
     selectAll.value = false
     await loadCases()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '批量修改失败')
+  } catch (e: unknown) {
+    ElMessage.error(extractErrorMessage(e, '批量修改失败'))
   }
 }
 
@@ -899,8 +894,8 @@ async function onBatchMove() {
     selectAll.value = false
     batchMoveVisible.value = false
     await loadCases()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '批量移动失败')
+  } catch (e: unknown) {
+    ElMessage.error(extractErrorMessage(e, '批量移动失败'))
   }
 }
 
@@ -937,8 +932,8 @@ async function onBatchTagConfirm() {
     batchTagVisible.value = false
     clearBatchSelection()
     loadCases()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.message || '批量打标签失败')
+  } catch (e: unknown) {
+    ElMessage.error(extractErrorMessage(e, '批量打标签失败'))
   }
 }
 
@@ -958,8 +953,8 @@ async function onCloneCase(row: TableRow) {
     await cloneTestCase(selectedProject.value, row.id)
     ElMessage.success('复制成功')
     await loadCases()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '复制失败')
+  } catch (e: unknown) {
+    ElMessage.error(extractErrorMessage(e, '复制失败'))
   }
 }
 
@@ -974,10 +969,9 @@ async function onDiscard(row: TableRow) {
     await discardTestCase(selectedProject.value, row.id)
     ElMessage.success('已废弃')
     await loadCases()
-  } catch (e: any) {
-    if (e !== 'cancel') {
-      ElMessage.error(e?.response?.data?.error || '操作失败')
-    }
+  } catch (e: unknown) {
+    if (isElMessageBoxCancel(e)) return
+    ElMessage.error(extractErrorMessage(e, '操作失败'))
   }
 }
 
@@ -987,8 +981,8 @@ async function onRecover(row: TableRow) {
     await recoverTestCase(selectedProject.value, row.id)
     ElMessage.success('已恢复为草稿')
     await loadCases()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '恢复失败')
+  } catch (e: unknown) {
+    ElMessage.error(extractErrorMessage(e, '恢复失败'))
   }
 }
 
@@ -1079,10 +1073,10 @@ async function onUploadAttachment(file: File) {
   }
   try {
     const att = await uploadAttachment(selectedProject.value, editingId.value, file)
-    if (att) caseAttachments.value.push(att as any)
+    if (att) caseAttachments.value.push(att)
     ElMessage.success('附件上传成功')
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '上传失败')
+  } catch (e: unknown) {
+    ElMessage.error(extractErrorMessage(e, '上传失败'))
   }
 }
 
@@ -1092,8 +1086,8 @@ async function onRemoveAttachment(id: number) {
     await deleteAttachment(selectedProject.value, id)
     caseAttachments.value = caseAttachments.value.filter((a) => a.id !== id)
     ElMessage.success('附件已删除')
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '删除附件失败')
+  } catch (e: unknown) {
+    ElMessage.error(extractErrorMessage(e, '删除附件失败'))
   }
 }
 
@@ -1192,8 +1186,8 @@ async function onExportReport() {
       module_path: exactModuleId ? undefined : treeModulePath,
     })
     ElMessage.success('导出成功')
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '导出报表失败')
+  } catch (e: unknown) {
+    ElMessage.error(extractErrorMessage(e, '导出报表失败'))
   } finally {
     appLoading.value = false
   }
@@ -1208,12 +1202,13 @@ async function onImportXlsx(e: Event) {
   try {
     appLoading.value = true
     const resp = await importTestCases(selectedProject.value, file)
-    const created = (resp as any)?.created || 0
-    const skipped = (resp as any)?.skipped || 0
+    const typedResp = resp as { created?: number; skipped?: number } | undefined
+    const created = typedResp?.created || 0
+    const skipped = typedResp?.skipped || 0
     ElMessage.success(`导入完成：成功 ${created} 条，跳过 ${skipped} 条`)
     await loadCases()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '导入失败')
+  } catch (e: unknown) {
+    ElMessage.error(extractErrorMessage(e, '导入失败'))
   } finally {
     appLoading.value = false
   }
@@ -1240,8 +1235,8 @@ async function onDelete(row: TableRow) {
     const maxAfterDelete = Math.max(1, Math.ceil((total.value - 1) / pageSize.value))
     if (page.value > maxAfterDelete) page.value = maxAfterDelete
     await loadCases()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.message || '删除失败')
+  } catch (e: unknown) {
+    ElMessage.error(extractErrorMessage(e, '删除失败'))
   }
 }
 
@@ -1264,8 +1259,8 @@ async function submitDirectory() {
     ElMessage.success('创建成功')
     directoryDialogVisible.value = false
     await loadTreeData()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '创建失败')
+  } catch (e: unknown) {
+    ElMessage.error(extractErrorMessage(e, '创建失败'))
   }
 }
 

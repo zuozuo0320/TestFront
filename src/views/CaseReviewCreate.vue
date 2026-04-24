@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useProjectStore } from '../stores/project'
 import { listUsersLookup } from '../api/user'
 import {
@@ -10,8 +10,12 @@ import {
   type CreateReviewPayload,
   type LinkItemEntry,
 } from '../api/caseReview'
+import { getProjectSettings, updateProjectSettings } from '../api/caseReviewV02'
 import { listTestCases } from '../api/testcase'
+import type { TestCase } from '../api/types'
+import { extractErrorMessage } from '../utils/error'
 
+const route = useRoute()
 const router = useRouter()
 const projectStore = useProjectStore()
 const projectId = computed(() => projectStore.selectedProjectId)
@@ -48,7 +52,7 @@ const form = reactive({
 })
 
 // ── Step 2: 选择用例 ──
-const cases = ref<any[]>([])
+const cases = ref<TestCase[]>([])
 const casesTotal = ref(0)
 const casesPage = ref(1)
 const casesPageSize = ref(10)
@@ -81,7 +85,7 @@ function toggleCase(id: number) {
   }
 }
 function selectAllPage() {
-  cases.value.forEach((c: any) => selectedCaseIds.value.add(c.id))
+  cases.value.forEach((c) => selectedCaseIds.value.add(c.id))
 }
 function clearSelection() {
   selectedCaseIds.value.clear()
@@ -94,31 +98,83 @@ function casesGoPage(p: number) {
 // ── Step 3: 指派评审人 ──
 const allUsers = ref<{ id: number; name: string; email: string; avatar?: string }[]>([])
 const assignedUserIds = ref<Set<number>>(new Set())
+/** v0.2：主评人（唯一），必选；其余被指派的人均为 Shadow */
+const primaryReviewerId = ref<number | null>(null)
+/** v0.2：项目级 allow_self_review 开关，决定主评人是否允许等于用例作者 */
+const allowSelfReview = ref(false)
+const settingsLoading = ref(false)
 
 async function loadUsers() {
   try {
     allUsers.value = await listUsersLookup()
   } catch (e: unknown) {
     allUsers.value = []
-    const err = e as { response?: { data?: { message?: string } }; message?: string }
-    const msg = err?.response?.data?.message || err?.message
-    if (msg) ElMessage.warning(msg)
+    ElMessage.warning(extractErrorMessage(e, '加载用户列表失败'))
   }
 }
+
+/** 加入 / 移出指派列表；首个加入者自动成为 Primary，保持始终有 Primary */
 function toggleUser(id: number) {
   if (assignedUserIds.value.has(id)) {
-    assignedUserIds.value.delete(id)
-  } else {
-    assignedUserIds.value.add(id)
+    removeUser(id)
+    return
   }
+  assignedUserIds.value.add(id)
+  if (primaryReviewerId.value === null) primaryReviewerId.value = id
 }
+
+/** 移除指派：如果被移除的是 Primary，自动切到剩余第一个评审人 */
 function removeUser(id: number) {
   assignedUserIds.value.delete(id)
+  if (primaryReviewerId.value === id) {
+    const next = Array.from(assignedUserIds.value)[0]
+    primaryReviewerId.value = next ?? null
+  }
 }
+
+/** 将某个已指派用户提升为主评人 */
+function setPrimary(id: number) {
+  if (!assignedUserIds.value.has(id)) return
+  primaryReviewerId.value = id
+}
+
 const assignedUsers = computed(() => allUsers.value.filter((u) => assignedUserIds.value.has(u.id)))
 const availableUsers = computed(() =>
   allUsers.value.filter((u) => !assignedUserIds.value.has(u.id)),
 )
+const primaryReviewerName = computed(() => {
+  const uid = primaryReviewerId.value
+  if (uid === null) return ''
+  return allUsers.value.find((u) => u.id === uid)?.name ?? `#${uid}`
+})
+
+/** 加载项目级 allow_self_review 开关（影响 UI 的"允许自审"复选框初值） */
+async function loadSettings() {
+  if (!projectId.value) return
+  try {
+    const s = await getProjectSettings(projectId.value)
+    allowSelfReview.value = !!s.allow_self_review
+  } catch {
+    /* 静默：用默认值 false */
+  }
+}
+
+/** 勾选 / 取消"允许自审"：实时同步到后端，后续接口即刻生效 */
+async function onToggleAllowSelfReview(val: boolean) {
+  if (!projectId.value) return
+  settingsLoading.value = true
+  try {
+    const s = await updateProjectSettings(projectId.value, { allow_self_review: val })
+    allowSelfReview.value = !!s.allow_self_review
+    ElMessage.success(val ? '已允许自审' : '已禁止自审')
+  } catch (e) {
+    // 回滚 UI
+    allowSelfReview.value = !val
+    ElMessage.error(extractErrorMessage(e, '保存项目设置失败'))
+  } finally {
+    settingsLoading.value = false
+  }
+}
 
 // ── Step 4: 确认 & 提交 ──
 const submitting = ref(false)
@@ -145,19 +201,17 @@ const qualityChecks = computed(() => [
     step: 3,
     errorTip: '请至少指派一名评审人',
   },
+  {
+    label: '主评人已指定',
+    desc: primaryReviewerName.value ? `主评人：${primaryReviewerName.value}` : '未指定主评人',
+    ok: primaryReviewerId.value !== null,
+    step: 3,
+    errorTip: '请在已指派评审人中指定一名主评人',
+  },
 ])
 
 /** 所有自检项是否全部通过 */
 const allChecksPassed = computed(() => qualityChecks.value.every((c) => c.ok))
-
-/**
- * 从 axios 错误中提取后端真实消息
- * 优先级：后端返回的 message > axios 默认 message > 兜底文案
- */
-function extractErrorMessage(e: unknown, fallback: string): string {
-  const err = e as { response?: { data?: { message?: string; error?: string } }; message?: string }
-  return err?.response?.data?.message || err?.response?.data?.error || err?.message || fallback
-}
 
 async function handleActivate() {
   // 提交前前端校验：任何一项自检未通过，跳回对应步骤并提示
@@ -170,18 +224,23 @@ async function handleActivate() {
 
   submitting.value = true
   try {
+    const allReviewers = Array.from(assignedUserIds.value)
+    const primaryId = primaryReviewerId.value as number
+    const shadowIds = allReviewers.filter((id) => id !== primaryId)
     const payload: CreateReviewPayload = {
       name: form.name,
       description: form.description,
       review_mode: form.review_mode,
-      default_reviewer_ids: Array.from(assignedUserIds.value),
+      default_reviewer_ids: allReviewers,
+      default_primary_reviewer_id: primaryId,
     }
     const review = await createReview(projectId.value!, payload)
-    // 关联用例
+    // 关联用例：显式指定主评人 + 陪审
     if (selectedCaseIds.value.size > 0 && review?.id) {
       const entries: LinkItemEntry[] = Array.from(selectedCaseIds.value).map((id) => ({
         testcase_id: id,
-        reviewer_ids: Array.from(assignedUserIds.value),
+        primary_reviewer_id: primaryId,
+        shadow_reviewer_ids: shadowIds,
       }))
       await linkItems(projectId.value!, review.id, entries)
     }
@@ -220,9 +279,26 @@ const casesTotalPages = computed(() =>
   Math.max(1, Math.ceil(casesTotal.value / casesPageSize.value)),
 )
 
-onMounted(() => {
+/** 从 route query 解析预选用例 ID（兼容逗号分隔和数组形式） */
+function parsePreselectedIds(): number[] {
+  const raw = route.query.testcaseIds
+  const parts = Array.isArray(raw)
+    ? raw.flatMap((v) => String(v).split(','))
+    : raw
+      ? String(raw).split(',')
+      : []
+  return parts.map((v) => Number(v)).filter((v) => Number.isFinite(v) && v > 0)
+}
+
+onMounted(async () => {
   loadUsers()
-  fetchCases()
+  loadSettings()
+  await fetchCases()
+  // 若 URL 带 ?testcaseIds=1,2,3 则自动预选
+  const preIds = parsePreselectedIds()
+  if (preIds.length > 0) {
+    preIds.forEach((id) => selectedCaseIds.value.add(id))
+  }
 })
 </script>
 
@@ -530,11 +606,28 @@ onMounted(() => {
               <div class="assigned-header">
                 <div>
                   <h3 class="assigned-title">已指派人员</h3>
-                  <p class="assigned-sub">{{ assignedUsers.length }} 名评审人已就绪</p>
+                  <p class="assigned-sub">
+                    {{ assignedUsers.length }} 名评审人已就绪 · 主评人：
+                    <strong>{{ primaryReviewerName || '未指定' }}</strong>
+                  </p>
                 </div>
+                <label class="self-review-toggle" :title="settingsLoading ? '保存中…' : ''">
+                  <input
+                    type="checkbox"
+                    :checked="allowSelfReview"
+                    :disabled="settingsLoading"
+                    @change="onToggleAllowSelfReview(($event.target as HTMLInputElement).checked)"
+                  />
+                  <span>允许主评人是用例作者</span>
+                </label>
               </div>
               <div class="assigned-list">
-                <div v-for="user in assignedUsers" :key="user.id" class="assigned-item">
+                <div
+                  v-for="user in assignedUsers"
+                  :key="user.id"
+                  class="assigned-item"
+                  :class="{ 'is-primary': primaryReviewerId === user.id }"
+                >
                   <div class="assigned-item-left">
                     <div class="reviewer-avatar-sm">
                       <img
@@ -545,13 +638,29 @@ onMounted(() => {
                       <span v-else>{{ getInitials(user.name) }}</span>
                     </div>
                     <div>
-                      <p class="assigned-name">{{ user.name }}</p>
+                      <p class="assigned-name">
+                        {{ user.name }}
+                        <span v-if="primaryReviewerId === user.id" class="primary-badge">
+                          主评人
+                        </span>
+                        <span v-else class="shadow-badge">陪审</span>
+                      </p>
                       <p class="assigned-role">{{ user.email }}</p>
                     </div>
                   </div>
-                  <button class="remove-btn" @click="removeUser(user.id)">
-                    <span class="material-symbols-outlined" style="font-size: 14px">close</span>
-                  </button>
+                  <div class="assigned-item-actions">
+                    <button
+                      v-if="primaryReviewerId !== user.id"
+                      type="button"
+                      class="set-primary-btn"
+                      @click="setPrimary(user.id)"
+                    >
+                      设为主评人
+                    </button>
+                    <button type="button" class="remove-btn" @click="removeUser(user.id)">
+                      <span class="material-symbols-outlined" style="font-size: 14px">close</span>
+                    </button>
+                  </div>
                 </div>
                 <!-- 拖拽占位 -->
                 <div class="drop-placeholder">
@@ -1453,8 +1562,64 @@ onMounted(() => {
   height: 100%;
 }
 .assigned-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   padding: 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.self-review-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(204, 195, 216, 0.75);
+  cursor: pointer;
+  user-select: none;
+}
+.self-review-toggle input {
+  cursor: pointer;
+}
+.primary-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(124, 58, 237, 0.15);
+  color: #c4b5fd;
+  font-size: 10px;
+  font-weight: 600;
+}
+.shadow-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(148, 163, 184, 0.15);
+  color: rgba(204, 195, 216, 0.7);
+  font-size: 10px;
+  font-weight: 600;
+}
+.assigned-item.is-primary {
+  border-color: rgba(124, 58, 237, 0.45);
+  background: rgba(124, 58, 237, 0.06);
+}
+.assigned-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.set-primary-btn {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(124, 58, 237, 0.35);
+  background: transparent;
+  color: #c4b5fd;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.set-primary-btn:hover {
+  background: rgba(124, 58, 237, 0.1);
 }
 .assigned-title {
   font-size: 15px;

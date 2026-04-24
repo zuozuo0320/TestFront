@@ -1,4 +1,11 @@
+import type { AxiosRequestConfig } from 'axios'
+
 import { apiClient } from './client'
+
+/** 轻量请求选项：仅透出 signal，避免暴露整个 AxiosRequestConfig 造成滥用 */
+interface RequestOptions {
+  signal?: AxiosRequestConfig['signal']
+}
 
 // ─── 类型定义 ───
 
@@ -24,6 +31,12 @@ export interface CaseReview {
   created_by_avatar?: string
   reviewer_ids?: number[]
   reviewer_names?: string[]
+  // v0.2 新增：仲裁人 / AI 门禁 / 默认 Primary / 修订轮次
+  moderator_id?: number
+  moderator_name?: string
+  ai_enabled?: boolean
+  revision_round?: number
+  default_primary_reviewer_id?: number
   created_at: string
   updated_at: string
 }
@@ -47,6 +60,10 @@ export interface CaseReviewItem {
   created_at: string
   updated_at: string
   reviewers?: CaseReviewItemReviewer[]
+  // v0.2 新增：AI 门禁 / 修订轮次 / AI 报告关联
+  ai_gate_status?: string
+  ai_report_id?: number
+  revision_round?: number
 }
 
 export interface CaseReviewItemReviewer {
@@ -59,6 +76,8 @@ export interface CaseReviewItemReviewer {
   latest_result: string
   latest_comment: string
   reviewed_at: string | null
+  // v0.2 新增：角色（primary / shadow）
+  review_role?: string
 }
 
 export interface CaseReviewRecord {
@@ -127,6 +146,10 @@ export interface CreateReviewPayload {
   description?: string
   testcase_ids?: number[]
   auto_submit?: boolean
+  // v0.2 新增：默认 Primary、Moderator、AI 门禁开关
+  default_primary_reviewer_id?: number
+  moderator_id?: number
+  ai_enabled?: boolean
 }
 
 export interface UpdateReviewPayload {
@@ -141,18 +164,25 @@ export interface UpdateReviewPayload {
 export interface LinkItemEntry {
   testcase_id: number
   reviewer_ids?: number[]
+  // v0.2 新增：Primary 与 Shadow 的显式角色分配
+  primary_reviewer_id?: number
+  shadow_reviewer_ids?: number[]
 }
 
 // ─── API 函数 ───
 
 /** 评审计划列表 */
-export async function listReviews(projectId: number, params: ReviewListParams) {
+export async function listReviews(
+  projectId: number,
+  params: ReviewListParams,
+  options: RequestOptions = {},
+) {
   const { data } = await apiClient.get<{
     items: CaseReview[]
     total: number
     page: number
     pageSize: number
-  }>(`/projects/${projectId}/case-reviews`, { params })
+  }>(`/projects/${projectId}/case-reviews`, { params, signal: options.signal })
   return data
 }
 
@@ -181,8 +211,11 @@ export interface ReviewSummary {
 }
 
 /** 获取评审汇总：顶部卡片与徽标所需的项目级统计 */
-export async function getReviewSummary(projectId: number) {
-  const { data } = await apiClient.get<ReviewSummary>(`/projects/${projectId}/case-reviews/summary`)
+export async function getReviewSummary(projectId: number, options: RequestOptions = {}) {
+  const { data } = await apiClient.get<ReviewSummary>(
+    `/projects/${projectId}/case-reviews/summary`,
+    { signal: options.signal },
+  )
   return data
 }
 
@@ -226,13 +259,17 @@ export async function listReviewItems(
   projectId: number,
   reviewId: number,
   params: ReviewItemListParams,
+  options: RequestOptions = {},
 ) {
   const { data } = await apiClient.get<{
     items: CaseReviewItem[]
     total: number
     page: number
     pageSize: number
-  }>(`/projects/${projectId}/case-reviews/${reviewId}/items`, { params })
+  }>(`/projects/${projectId}/case-reviews/${reviewId}/items`, {
+    params,
+    signal: options.signal,
+  })
   return data
 }
 
