@@ -148,6 +148,7 @@ export interface CreateReviewPayload {
   auto_submit?: boolean
   // v0.2 新增：默认 Primary、Moderator、AI 门禁开关
   default_primary_reviewer_id?: number
+  default_shadow_reviewer_ids?: number[]
   moderator_id?: number
   ai_enabled?: boolean
 }

@@ -224,15 +224,17 @@ async function handleActivate() {
 
   submitting.value = true
   try {
-    const allReviewers = Array.from(assignedUserIds.value)
     const primaryId = primaryReviewerId.value as number
-    const shadowIds = allReviewers.filter((id) => id !== primaryId)
+    const selectedReviewerIds = Array.from(assignedUserIds.value)
+    const shadowIds = selectedReviewerIds.filter((id) => id !== primaryId)
+    const allReviewers = [primaryId, ...shadowIds]
     const payload: CreateReviewPayload = {
       name: form.name,
       description: form.description,
       review_mode: form.review_mode,
       default_reviewer_ids: allReviewers,
       default_primary_reviewer_id: primaryId,
+      default_shadow_reviewer_ids: shadowIds,
     }
     const review = await createReview(projectId.value!, payload)
     // 关联用例：显式指定主评人 + 陪审
@@ -384,8 +386,8 @@ onMounted(async () => {
           <div class="step-side">
             <div class="card-surface">
               <div class="card-bg-icon"><span class="material-symbols-outlined">groups</span></div>
-              <h2 class="card-title">可选评审人</h2>
-              <p class="card-desc">当前迭代的资源容量分配</p>
+              <h2 class="card-title">评审资源预览</h2>
+              <p class="card-desc">展示当前项目可参与评审的团队成员</p>
               <div class="reviewer-list">
                 <div v-for="user in allUsers.slice(0, 5)" :key="user.id" class="reviewer-card-mini">
                   <div class="reviewer-card-mini-left">
@@ -402,18 +404,14 @@ onMounted(async () => {
                       <p class="reviewer-role-mini">{{ user.email }}</p>
                     </div>
                   </div>
-                  <div class="reviewer-status-badge idle">空闲</div>
                 </div>
                 <div v-if="allUsers.length === 0" class="empty-hint">暂无可用评审人</div>
               </div>
               <!-- 底部容量进度条 -->
               <div class="capacity-section">
                 <div class="capacity-header">
-                  <span class="capacity-label">总容量 (Alpha 团队)</span>
-                  <span class="capacity-pct">82%</span>
-                </div>
-                <div class="capacity-track">
-                  <div class="capacity-fill" style="width: 82%"></div>
+                  <span class="capacity-label">可参与人员</span>
+                  <span class="capacity-pct">{{ allUsers.length }} 人</span>
                 </div>
               </div>
             </div>
@@ -1110,23 +1108,6 @@ onMounted(async () => {
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
-.reviewer-status-badge {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 4px 10px;
-  border-radius: 4px;
-  white-space: nowrap;
-}
-.reviewer-status-badge.idle {
-  background: rgba(5, 102, 217, 0.15);
-  color: var(--tp-info, #adc6ff);
-}
-.reviewer-status-badge.busy {
-  background: rgba(255, 183, 132, 0.15);
-  color: #ffb784;
-}
 /* 底部容量条 */
 .capacity-section {
   margin-top: 28px;
@@ -1147,19 +1128,6 @@ onMounted(async () => {
   font-size: 12px;
   font-weight: 600;
   color: var(--tp-primary-light, #d2bbff);
-}
-.capacity-track {
-  height: 4px;
-  width: 100%;
-  background: var(--tp-gray-700, #323440);
-  border-radius: 4px;
-  overflow: hidden;
-}
-.capacity-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--tp-primary, #7c3aed), var(--tp-info, #0566d9));
-  box-shadow: 0 0 8px rgba(124, 58, 237, 0.5);
-  border-radius: 4px;
 }
 .empty-hint {
   text-align: center;

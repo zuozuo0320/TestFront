@@ -560,8 +560,38 @@ function getUserAvatarUrl(avatar?: string) {
 
 function getProgressPercent(review: CaseReview) {
   if (review.case_total_count <= 0) return 0
-  const done = review.approved_count + review.rejected_count + review.needs_update_count
+  const done = getReviewedCount(review)
   return Math.round((done / review.case_total_count) * 100)
+}
+
+function getReviewedCount(review: CaseReview) {
+  return review.approved_count + review.rejected_count + review.needs_update_count
+}
+
+function getProgressPendingCount(review: CaseReview) {
+  return Math.max(review.case_total_count - getReviewedCount(review), 0)
+}
+
+function progressBarClass(review: CaseReview) {
+  if (review.rejected_count > 0) return 'bar-danger'
+  if (review.needs_update_count > 0) return 'bar-warning'
+  if (getProgressPercent(review) >= 100 && review.case_total_count > 0) return 'bar-complete'
+  return ''
+}
+
+function progressResultClass(review: CaseReview) {
+  if (review.rejected_count > 0) return 'result-danger'
+  if (review.needs_update_count > 0) return 'result-warning'
+  if (getProgressPercent(review) >= 100 && review.case_total_count > 0) return 'result-success'
+  return 'result-muted'
+}
+
+function progressResultLabel(review: CaseReview) {
+  if (review.case_total_count <= 0) return '暂无用例'
+  if (review.rejected_count > 0) return `${review.rejected_count} 条未通过`
+  if (review.needs_update_count > 0) return `${review.needs_update_count} 条需修改`
+  if (getProgressPercent(review) >= 100) return '全部通过'
+  return `${getProgressPendingCount(review)} 条待评审`
 }
 
 function statusBadgeClass(status: string) {
@@ -572,6 +602,19 @@ function statusBadgeClass(status: string) {
     closed: 'badge-muted',
   }
   return map[status] || 'badge-secondary'
+}
+
+function reviewStatusBadgeClass(review: CaseReview) {
+  if (review.status === 'completed' && review.rejected_count > 0) return 'badge-danger'
+  if (review.status === 'completed' && review.needs_update_count > 0) return 'badge-warning'
+  return statusBadgeClass(review.status)
+}
+
+function reviewStatusLabel(review: CaseReview) {
+  if (review.status === 'completed' && review.rejected_count > 0) return '已完成·有驳回'
+  if (review.status === 'completed' && review.needs_update_count > 0) return '已完成·需修改'
+  if (review.status === 'completed' && review.case_total_count > 0) return '已完成·通过'
+  return statusLabel(review.status)
 }
 </script>
 
@@ -774,24 +817,25 @@ function statusBadgeClass(status: string) {
                   <div class="progress-top-row">
                     <span class="progress-pct">{{ getProgressPercent(review) }}%</span>
                     <span class="progress-count">
-                      {{
-                        review.approved_count + review.rejected_count + review.needs_update_count
-                      }}
+                      {{ getReviewedCount(review) }}
                       / {{ review.case_total_count }} 条
                     </span>
                   </div>
                   <div class="progress-bar-track">
                     <div
                       class="progress-bar-fill"
-                      :class="{ 'bar-complete': getProgressPercent(review) >= 100 }"
+                      :class="progressBarClass(review)"
                       :style="{ width: getProgressPercent(review) + '%' }"
                     ></div>
+                  </div>
+                  <div class="progress-result" :class="progressResultClass(review)">
+                    {{ progressResultLabel(review) }}
                   </div>
                 </div>
               </td>
               <td>
-                <span class="status-badge-pl" :class="statusBadgeClass(review.status)">
-                  {{ statusLabel(review.status) }}
+                <span class="status-badge-pl" :class="reviewStatusBadgeClass(review)">
+                  {{ reviewStatusLabel(review) }}
                 </span>
               </td>
               <td class="td-right">
@@ -1634,7 +1678,30 @@ function statusBadgeClass(status: string) {
   transition: width 0.4s ease;
 }
 .progress-bar-fill.bar-complete {
-  background: #34d399;
+  background: var(--tp-success, #34d399);
+}
+.progress-bar-fill.bar-warning {
+  background: var(--tp-warning, #f59e0b);
+}
+.progress-bar-fill.bar-danger {
+  background: var(--tp-danger, #f87171);
+}
+.progress-result {
+  margin-top: 5px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.progress-result.result-muted {
+  color: var(--tp-gray-400, #958da1);
+}
+.progress-result.result-success {
+  color: var(--tp-success, #34d399);
+}
+.progress-result.result-warning {
+  color: var(--tp-warning, #f59e0b);
+}
+.progress-result.result-danger {
+  color: var(--tp-danger, #f87171);
 }
 
 /* 状态药片标签 */
@@ -1659,8 +1726,18 @@ function statusBadgeClass(status: string) {
 }
 .badge-success {
   background: rgba(52, 211, 153, 0.08);
-  color: #34d399;
+  color: var(--tp-success, #34d399);
   border: 1px solid rgba(52, 211, 153, 0.15);
+}
+.badge-warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--tp-warning, #f59e0b);
+  border: 1px solid rgba(245, 158, 11, 0.18);
+}
+.badge-danger {
+  background: rgba(248, 113, 113, 0.1);
+  color: var(--tp-danger, #f87171);
+  border: 1px solid rgba(248, 113, 113, 0.18);
 }
 .badge-muted {
   background: rgba(55, 56, 69, 0.5);
