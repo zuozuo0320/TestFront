@@ -140,7 +140,7 @@ export interface CreateReviewPayload {
   name: string
   module_id?: number
   review_mode: string
-  default_reviewer_ids: number[]
+  default_reviewer_ids?: number[]
   planned_start_at?: string
   planned_end_at?: string
   description?: string
@@ -157,6 +157,7 @@ export interface UpdateReviewPayload {
   name?: string
   module_id?: number
   review_mode?: string
+  default_reviewer_ids?: number[]
   planned_start_at?: string
   planned_end_at?: string
   description?: string

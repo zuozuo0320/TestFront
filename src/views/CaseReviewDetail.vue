@@ -499,7 +499,7 @@ async function loadCurrentTestCase() {
 }
 
 /** 把 steps 字符串切成结构化行：优先按换行切，其次按 `；` 或 `;`，最后兜底整段。 */
-function parseSteps(raw?: string): Array<{ no: string; action: string }> {
+function parseSteps(raw?: string): Array<{ no: string; action: string; expected: string }> {
   const text = (raw ?? '').trim()
   if (!text) return []
   // 先按换行切；若只有一行再用中英文分号切分
@@ -513,10 +513,14 @@ function parseSteps(raw?: string): Array<{ no: string; action: string }> {
       .map((p) => p.trim())
       .filter(Boolean)
   }
-  return parts.map((action, i) => ({
-    no: String(i + 1).padStart(2, '0'),
-    action,
-  }))
+  return parts.map((line, i) => {
+    const [action = '', ...expectedParts] = line.split('|')
+    return {
+      no: String(i + 1).padStart(2, '0'),
+      action: action.trim(),
+      expected: expectedParts.join('|').trim(),
+    }
+  })
 }
 
 const realSteps = computed(() => parseSteps(currentTestCase.value?.steps))
@@ -1157,8 +1161,6 @@ const reviewProgressPercent = computed(() => {
   return Math.min(100, Math.round((reviewedCaseCount.value / total) * 1000) / 10)
 })
 
-const currentRoundLabel = computed(() => `R${currentItem.value?.current_round_no || 1}`)
-const currentVersionLabel = computed(() => currentItem.value?.testcase_version || 'V1')
 const caseTitleText = computed(
   () =>
     currentTestCase.value?.title?.trim() ||
@@ -1257,17 +1259,9 @@ watch(
               {{ currentItem?.title_snapshot || review.name }}
             </h1>
           </div>
-          <div v-if="currentItem" class="rv2-summary-meta" aria-label="当前评审上下文">
-            <span class="rv2-context-chip">{{ currentRoundLabel }}</span>
-            <span class="rv2-context-chip">{{ currentVersionLabel }}</span>
-            <span class="rv2-context-chip" :class="resultClass(currentItem.final_result)">
-              {{ resultLabel(currentItem.final_result) }}
-            </span>
-            <span class="rv2-context-chip" :class="aiGateClass(currentItem.ai_gate_status)">
-              {{ aiGateLabel(currentItem.ai_gate_status) }}
-            </span>
-          </div>
-          <p v-else class="rv2-summary-desc">暂无评审用例，请先关联用例后再开始评审。</p>
+          <p v-if="!currentItem" class="rv2-summary-desc">
+            暂无评审用例，请先关联用例后再开始评审。
+          </p>
         </div>
         <div class="rv2-summary-r">
           <div class="rv2-progress-compact" aria-label="评审进度">
@@ -1648,12 +1642,26 @@ watch(
                 <div v-if="realSteps.length === 0" class="rv2-empty-steps">
                   用例尚未填写执行步骤
                 </div>
-                <ol v-else class="rv2-step-list">
-                  <li v-for="step in realSteps" :key="step.no" class="rv2-step">
-                    <span class="rv2-step-marker">{{ step.no }}</span>
-                    <p class="rv2-step-desc">{{ step.action }}</p>
-                  </li>
-                </ol>
+                <div v-else class="rv2-step-table-wrap">
+                  <table class="rv2-step-table">
+                    <thead>
+                      <tr>
+                        <th class="rv2-step-col-num">#</th>
+                        <th class="rv2-step-col-desc">操作描述</th>
+                        <th class="rv2-step-col-expect">预期结果</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="step in realSteps" :key="step.no" class="rv2-step-row">
+                        <td class="rv2-step-num">{{ step.no }}</td>
+                        <td class="rv2-step-text">{{ step.action || '—' }}</td>
+                        <td class="rv2-step-text rv2-step-expected">
+                          {{ step.expected || '—' }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </section>
             </section>
 
@@ -1662,7 +1670,6 @@ watch(
               <h2 class="rv2-panel-title">
                 <span class="material-symbols-outlined">attachment</span>
                 附件与证据
-                <span class="rv2-panel-count">{{ attachments.length }}</span>
               </h2>
               <input
                 ref="attachmentInputRef"
@@ -1730,16 +1737,26 @@ watch(
                       <span>{{ formatFileSize(att.file_size) }}</span>
                       <span v-if="att.uploader_name">· {{ att.uploader_name }}</span>
                     </div>
-                    <div class="rv2-attach-actions">
-                      <button class="rv2-mini-btn" @click="handleDownloadAttachment(att)">
-                        <span class="material-symbols-outlined">download</span>
-                        下载
-                      </button>
-                      <button class="rv2-mini-btn danger" @click="handleDeleteAttachment(att)">
-                        <span class="material-symbols-outlined">delete</span>
-                        删除
-                      </button>
-                    </div>
+                  </div>
+                  <div class="rv2-attach-actions">
+                    <button
+                      type="button"
+                      class="rv2-attach-action"
+                      title="下载附件"
+                      aria-label="下载附件"
+                      @click="handleDownloadAttachment(att)"
+                    >
+                      <span class="material-symbols-outlined">download</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="rv2-attach-action danger"
+                      title="删除附件"
+                      aria-label="删除附件"
+                      @click="handleDeleteAttachment(att)"
+                    >
+                      <span class="material-symbols-outlined">delete</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1984,7 +2001,7 @@ watch(
 
 .rv2-panel-btn,
 .rv2-finding-btn,
-.rv2-mini-btn,
+.rv2-attach-action,
 .rv2-nav-btn,
 .rv2-attach-inline-btn,
 .rv2-btn {
@@ -1992,7 +2009,6 @@ watch(
   align-items: center;
 }
 
-.rv2-context-chip,
 .rv2-case-status,
 .rv2-case-ai,
 .rv2-gate-status,
@@ -2059,13 +2075,15 @@ watch(
 /* ── 主内容区 ── */
 .rv2-main {
   flex: 1;
-  padding: 24px;
+  padding: clamp(16px, 1.4vw, 28px);
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  max-width: 1900px;
-  margin: 0 auto;
+  gap: 16px;
+  max-width: none;
+  margin: 0;
   width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 /* ── 顶部上下文条 ── */
@@ -2117,12 +2135,6 @@ watch(
   letter-spacing: normal;
   line-height: 1.25;
 }
-.rv2-summary-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
 .rv2-summary-desc {
   margin: 0;
   max-width: 640px;
@@ -2131,43 +2143,6 @@ watch(
   line-height: 1.7;
   color: var(--rv2-fg-muted);
   opacity: 0.85;
-}
-.rv2-context-chip {
-  min-height: 22px;
-  padding: 3px 8px;
-  border-radius: 4px;
-  background: rgba(204, 195, 216, 0.07);
-  border: 1px solid rgba(204, 195, 216, 0.1);
-  color: rgba(204, 195, 216, 0.76);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.25;
-}
-.rv2-context-chip.approved,
-.rv2-context-chip.passed {
-  color: var(--rv2-success);
-  background: rgba(16, 185, 129, 0.08);
-  border-color: rgba(16, 185, 129, 0.18);
-}
-.rv2-context-chip.rejected {
-  color: var(--rv2-error);
-  background: rgba(239, 68, 68, 0.08);
-  border-color: rgba(239, 68, 68, 0.2);
-}
-.rv2-context-chip.needs-update,
-.rv2-context-chip.failed {
-  color: var(--rv2-warning);
-  background: rgba(245, 158, 11, 0.09);
-  border-color: rgba(245, 158, 11, 0.2);
-}
-.rv2-context-chip.running {
-  color: var(--rv2-secondary);
-  background: rgba(5, 102, 217, 0.1);
-  border-color: rgba(173, 198, 255, 0.18);
-}
-.rv2-context-chip.pending,
-.rv2-context-chip.idle {
-  color: rgba(204, 195, 216, 0.58);
 }
 .rv2-summary-r {
   display: flex;
@@ -2248,14 +2223,21 @@ watch(
 
 /* ── body：左侧边栏 + 主内容 ── */
 .rv2-body {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
 }
 @media (min-width: 1100px) {
   .rv2-body {
-    flex-direction: row;
+    grid-template-columns: clamp(240px, 15vw, 320px) minmax(0, 1fr);
     align-items: flex-start;
+  }
+}
+@media (min-width: 1600px) {
+  .rv2-body {
+    grid-template-columns: clamp(280px, 15vw, 360px) minmax(0, 1fr);
   }
 }
 
@@ -2271,7 +2253,8 @@ watch(
 }
 @media (min-width: 1100px) {
   .rv2-sidebar {
-    width: 260px;
+    width: 100%;
+    height: calc(100vh - 112px);
     position: sticky;
     top: 88px;
     max-height: calc(100vh - 112px);
@@ -2360,43 +2343,48 @@ watch(
   text-align: center;
 }
 
-/* ── 70/30 主网格 ── */
+/* ── 主网格 ── */
 .rv2-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
   min-width: 0;
+  width: 100%;
 }
-@media (min-width: 1100px) {
+@media (min-width: 1180px) {
   .rv2-grid {
-    flex-direction: row;
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 24vw);
     align-items: flex-start;
   }
 }
+@media (min-width: 1600px) {
+  .rv2-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 22vw);
+  }
+}
 .rv2-left {
-  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
   min-width: 0;
 }
 .rv2-right {
-  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
   min-width: 0;
 }
-@media (min-width: 1100px) {
-  .rv2-left {
-    width: 70%;
-  }
+@media (min-width: 1180px) {
   .rv2-right {
-    width: 30%;
     position: sticky;
     top: 88px;
+    height: calc(100vh - 112px);
+    max-height: calc(100vh - 112px);
   }
+}
+.rv2-audit {
+  flex: 1;
+  min-height: 180px;
 }
 
 /* ── 基础面板 ── */
@@ -2404,7 +2392,7 @@ watch(
   background: var(--rv2-section);
   border: 1px solid var(--rv2-border-soft);
   border-radius: var(--rv2-radius);
-  padding: 24px;
+  padding: clamp(18px, 1.2vw, 24px);
   position: relative;
 }
 .rv2-panel-title {
@@ -2988,46 +2976,64 @@ watch(
   border: 1px dashed rgba(74, 68, 85, 0.24);
   border-radius: var(--rv2-radius-sm);
 }
-.rv2-step-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+.rv2-step-table-wrap {
+  overflow: hidden;
+  border: 1px solid rgba(74, 68, 85, 0.2);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.1);
 }
-.rv2-step {
-  display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
-  gap: 12px;
-  align-items: flex-start;
-  padding: 12px;
-  border-radius: var(--rv2-radius-sm);
-  background: rgba(12, 14, 24, 0.38);
-  border: 1px solid rgba(74, 68, 85, 0.14);
+.rv2-step-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
 }
-.rv2-step-marker {
-  width: 32px;
-  height: 26px;
-  border-radius: 4px;
-  background: var(--rv2-card-high);
-  border: 1px solid rgba(74, 68, 85, 0.26);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.rv2-step-table th {
+  padding: 12px 16px;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(74, 68, 85, 0.2);
+  color: var(--rv2-outline);
+  font-size: 12px;
+  font-weight: 500;
+}
+.rv2-step-row {
+  border-bottom: 1px solid rgba(74, 68, 85, 0.1);
+  transition: background 0.2s;
+}
+.rv2-step-row:last-child {
+  border-bottom: none;
+}
+.rv2-step-row:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+.rv2-step-table td {
+  padding: 12px 16px;
+  vertical-align: top;
+}
+.rv2-step-col-num {
+  width: 60px;
+}
+.rv2-step-col-desc,
+.rv2-step-col-expect {
+  width: 40%;
+}
+.rv2-step-num {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--rv2-muted-soft);
-}
-.rv2-step-desc {
-  margin: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--rv2-outline);
   font-size: 13px;
-  font-weight: 450;
-  line-height: 1.65;
+  font-weight: 600;
+}
+.rv2-step-text {
   color: var(--rv2-fg);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.65;
   word-break: break-word;
   overflow-wrap: break-word;
+}
+.rv2-step-expected {
+  color: var(--rv2-muted-soft);
 }
 /* ── 评审用例列表（左侧边栏内） ── */
 .rv2-case-row {
@@ -3202,14 +3208,23 @@ watch(
   cursor: not-allowed;
 }
 .rv2-attach-card {
+  position: relative;
   display: flex;
   align-items: stretch;
   gap: 12px;
-  padding: 12px;
+  padding: 12px 44px 12px 12px;
   min-height: 120px;
   background: var(--rv2-card);
   border: 1px solid var(--rv2-border-hairline);
   border-radius: var(--rv2-radius-sm);
+  transition:
+    border-color 0.16s,
+    background 0.16s;
+}
+.rv2-attach-card:hover,
+.rv2-attach-card:focus-within {
+  background: var(--rv2-card-high);
+  border-color: var(--rv2-border-muted);
 }
 .rv2-attach-card.has-preview {
   min-height: 132px;
@@ -3280,32 +3295,63 @@ watch(
   gap: 4px;
 }
 .rv2-attach-actions {
-  margin-top: auto;
+  position: absolute;
+  top: 10px;
+  right: 10px;
   display: flex;
-  gap: 8px;
-}
-.rv2-mini-btn {
   gap: 4px;
-  padding: 4px 10px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-2px);
+  transition:
+    opacity 0.16s,
+    transform 0.16s;
+}
+.rv2-attach-card:hover .rv2-attach-actions,
+.rv2-attach-card:focus-within .rv2-attach-actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.rv2-attach-action {
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
   border: none;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--rv2-primary);
-  font-size: 11px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--rv2-muted-soft);
   cursor: pointer;
-  transition: background 0.2s;
+  transition:
+    color 0.16s,
+    background 0.16s,
+    transform 0.16s;
 }
-.rv2-mini-btn .material-symbols-outlined {
-  font-size: 13px;
+.rv2-attach-action .material-symbols-outlined {
+  font-size: 16px;
 }
-.rv2-mini-btn:hover {
-  background: rgba(124, 58, 237, 0.2);
+.rv2-attach-action:hover,
+.rv2-attach-action:focus-visible {
+  background: var(--rv2-hover-tint);
+  color: var(--rv2-primary);
+  outline: none;
+  transform: translateY(-1px);
 }
-.rv2-mini-btn.danger {
+.rv2-attach-action.danger {
   color: var(--rv2-error);
 }
-.rv2-mini-btn.danger:hover {
-  background: rgba(239, 68, 68, 0.2);
+.rv2-attach-action.danger:hover,
+.rv2-attach-action.danger:focus-visible {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--rv2-error);
+}
+@media (hover: none) {
+  .rv2-attach-actions {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
 }
 .rv2-image-preview-body {
   display: flex;

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, type UploadFile } from 'element-plus'
 import AppHeader from './components/AppHeader.vue'
 import AppSidebar from './components/AppSidebar.vue'
 import { updateMyProfile, uploadMyAvatar, getMyProfile } from './api/user'
@@ -9,6 +9,7 @@ import type { User } from './api/types'
 import { useProjectStore } from './stores/project'
 import type { TopMenu, SystemMenu } from './stores/project'
 import { useAuthStore } from './stores/auth'
+import { extractErrorMessage } from './utils/error'
 
 const route = useRoute()
 const router = useRouter()
@@ -24,7 +25,7 @@ function onAvatarError(event: Event) {
 const currentUser = ref<User | null>(null)
 
 const userAvatarUrl = computed(() => {
-  return authStore.resolveAvatarUrl((currentUser.value as any)?.avatar, currentUser.value?.name)
+  return authStore.resolveAvatarUrl(currentUser.value?.avatar, currentUser.value?.name)
 })
 
 function logout() {
@@ -68,11 +69,20 @@ const routeToSystemMenu: Record<string, SystemMenu> = {
   '/system/tags': 'tags',
 }
 
+function resolveTopMenu(path: string): TopMenu | undefined {
+  if (routeToMenu[path]) return routeToMenu[path]
+  if (path.startsWith('/case-reviews/')) return 'plan'
+  if (path.startsWith('/ai-script/')) return 'e2e'
+  if (path.startsWith('/system/')) return 'system'
+  return undefined
+}
+
 // Sync topMenu/activeMenu from route
 watch(
   () => route.path,
   (path) => {
-    if (routeToMenu[path]) projectStore.topMenu = routeToMenu[path]
+    const matchedTopMenu = resolveTopMenu(path)
+    if (matchedTopMenu) projectStore.topMenu = matchedTopMenu
     if (routeToSystemMenu[path]) projectStore.activeMenu = routeToSystemMenu[path]
     projectStore.persistNavState()
   },
@@ -107,8 +117,8 @@ const profileForm = ref({ name: '', phone: '', avatar: '' })
 
 function openProfileCenter() {
   profileForm.value.name = currentUser.value?.name || ''
-  profileForm.value.phone = (currentUser.value as any)?.phone || ''
-  profileForm.value.avatar = (currentUser.value as any)?.avatar || ''
+  profileForm.value.phone = currentUser.value?.phone || ''
+  profileForm.value.avatar = currentUser.value?.avatar || ''
   profileDialogVisible.value = true
 }
 
@@ -123,15 +133,15 @@ async function saveProfile() {
     currentUser.value = { ...currentUser.value!, ...data }
     ElMessage.success('个人中心更新成功')
     profileDialogVisible.value = false
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '更新失败')
+  } catch (e: unknown) {
+    ElMessage.error(extractErrorMessage(e, '更新失败'))
   } finally {
     savingProfile.value = false
   }
 }
 
-async function onAvatarFileChange(file: any) {
-  const raw = file?.raw as File | undefined
+async function onAvatarFileChange(file: UploadFile) {
+  const raw = file.raw
   if (!raw) return
   const allowed = ['image/jpeg', 'image/png', 'image/webp']
   if (!allowed.includes(raw.type)) {
@@ -146,10 +156,10 @@ async function onAvatarFileChange(file: any) {
     savingProfile.value = true
     const data = await uploadMyAvatar(raw)
     profileForm.value.avatar = data.avatar
-    currentUser.value = { ...(currentUser.value as any), avatar: data.avatar }
+    if (currentUser.value) currentUser.value = { ...currentUser.value, avatar: data.avatar }
     ElMessage.success('头像上传成功')
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '上传失败')
+  } catch (e: unknown) {
+    ElMessage.error(extractErrorMessage(e, '上传失败'))
   } finally {
     savingProfile.value = false
   }

@@ -195,10 +195,35 @@ function parseRouteTestCaseIDs() {
   return Number.isFinite(testcaseId) && testcaseId > 0 ? [testcaseId] : []
 }
 
+function isCreationDraftReview(review: CaseReview) {
+  const reviewerCount = review.reviewer_ids?.length ?? review.reviewer_names?.length ?? 0
+  return (
+    review.status === 'not_started' &&
+    review.case_total_count === 0 &&
+    reviewerCount === 0 &&
+    !review.default_primary_reviewer_id
+  )
+}
+
+function continueCreateReview(reviewID: number) {
+  router.push({ name: 'CaseReviewCreate', query: { draftReviewId: String(reviewID) } })
+}
+
+function openReviewEntry(review: CaseReview) {
+  if (isCreationDraftReview(review)) {
+    continueCreateReview(review.id)
+    return
+  }
+  router.push(`/case-reviews/${review.id}`)
+}
+
 async function openReviewDetail(reviewID: number) {
   if (!selectedProjectId.value || reviewID <= 0) return
-
   const review = await getReview(selectedProjectId.value, reviewID)
+  if (isCreationDraftReview(review)) {
+    continueCreateReview(review.id)
+    return
+  }
   currentReview.value = review
   detailDrawerVisible.value = true
 }
@@ -788,7 +813,7 @@ function reviewStatusLabel(review: CaseReview) {
               v-for="review in reviews"
               :key="review.id"
               class="pipeline-row"
-              @click="router.push(`/case-reviews/${review.id}`)"
+              @click="openReviewEntry(review)"
             >
               <td>
                 <div class="review-name-cell">
@@ -842,8 +867,8 @@ function reviewStatusLabel(review: CaseReview) {
                 <div class="row-actions" @click.stop>
                   <button
                     class="action-btn action-edit icon-only"
-                    title="查看详情"
-                    @click="router.push(`/case-reviews/${review.id}`)"
+                    :title="isCreationDraftReview(review) ? '继续创建' : '查看详情'"
+                    @click="openReviewEntry(review)"
                   >
                     <span class="material-symbols-outlined">visibility</span>
                   </button>

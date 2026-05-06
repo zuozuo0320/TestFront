@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import { useProjectStore } from '../stores/project'
 import { listUsersLookup } from '../api/user'
 import {
   createReview,
+  getReview,
   linkItems,
-  type CreateReviewPayload,
+  updateReview,
   type LinkItemEntry,
 } from '../api/caseReview'
 import { getProjectSettings, updateProjectSettings } from '../api/caseReviewV02'
@@ -19,6 +20,43 @@ const route = useRoute()
 const router = useRouter()
 const projectStore = useProjectStore()
 const projectId = computed(() => projectStore.selectedProjectId)
+const activeReviewId = ref<number | null>(null)
+const creatingReview = ref(false)
+
+type ReviewMode = 'single' | 'parallel'
+
+interface CaseReviewCreateDraft {
+  version: number
+  savedAt: number
+  currentStep: number
+  form: {
+    name: string
+    description: string
+    review_mode: ReviewMode
+  }
+  selectedCaseIds: number[]
+  assignedUserIds: number[]
+  primaryReviewerId: number | null
+}
+
+const DRAFT_VERSION = 1
+const draftSaveTimer = ref<number | null>(null)
+const draftSavingEnabled = ref(false)
+const draftSavedAt = ref<number | null>(null)
+const draftStorageKey = computed(() =>
+  projectId.value && activeReviewId.value
+    ? `tp-case-review-create-draft:${projectId.value}:${activeReviewId.value}`
+    : '',
+)
+const draftStatusText = computed(() => {
+  if (!activeReviewId.value) return '完成第一步后创建评审任务'
+  if (!draftSavedAt.value) return `评审任务 #${activeReviewId.value} 已创建`
+  const time = new Date(draftSavedAt.value).toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+  return `任务 #${activeReviewId.value} 已自动保存 ${time}`
+})
 
 // ── Steps ──
 const currentStep = ref(1)
@@ -29,13 +67,19 @@ const steps = [
   { num: 4, label: '确认激活', icon: 'task_alt' },
 ]
 
-function goStep(n: number) {
+async function goStep(n: number) {
   if (n < 1 || n > 4) return
+  if (n > 1 && !activeReviewId.value) {
+    const ok = await ensureReviewCreated()
+    if (!ok) return
+  }
   currentStep.value = n
 }
-function nextStep() {
-  if (currentStep.value === 1 && !form.name.trim()) {
-    ElMessage.warning('请填写计划名称')
+async function nextStep() {
+  if (currentStep.value === 1) {
+    const ok = await ensureReviewCreated()
+    if (!ok) return
+    currentStep.value = 2
     return
   }
   if (currentStep.value < 4) currentStep.value++
@@ -48,8 +92,53 @@ function prevStep() {
 const form = reactive({
   name: '',
   description: '',
-  review_mode: 'single' as 'single' | 'parallel',
+  review_mode: 'single' as ReviewMode,
 })
+
+async function ensureReviewCreated() {
+  if (!projectId.value) return false
+  const name = form.name.trim()
+  if (!name) {
+    ElMessage.warning('请填写计划名称')
+    return false
+  }
+
+  creatingReview.value = true
+  try {
+    form.name = name
+    if (activeReviewId.value) {
+      await updateReview(projectId.value, activeReviewId.value, {
+        name,
+        description: form.description,
+        review_mode: form.review_mode,
+      })
+      saveDraftNow()
+      return true
+    }
+
+    const review = await createReview(projectId.value, {
+      name,
+      description: form.description,
+      review_mode: form.review_mode,
+      default_reviewer_ids: [],
+    })
+    activeReviewId.value = review.id
+    const nextQuery = { ...route.query, draftReviewId: String(review.id) }
+    delete nextQuery.reviewId
+    await router.replace({
+      name: 'CaseReviewCreate',
+      query: nextQuery,
+    })
+    saveDraftNow()
+    ElMessage.success('评审任务已创建，后续配置将保存到该任务')
+    return true
+  } catch (e) {
+    ElMessage.error(extractErrorMessage(e, '创建评审任务失败'))
+    return false
+  } finally {
+    creatingReview.value = false
+  }
+}
 
 // ── Step 2: 选择用例 ──
 const cases = ref<TestCase[]>([])
@@ -83,12 +172,15 @@ function toggleCase(id: number) {
   } else {
     selectedCaseIds.value.add(id)
   }
+  queueDraftSave()
 }
 function selectAllPage() {
   cases.value.forEach((c) => selectedCaseIds.value.add(c.id))
+  queueDraftSave()
 }
 function clearSelection() {
   selectedCaseIds.value.clear()
+  queueDraftSave()
 }
 function casesGoPage(p: number) {
   casesPage.value = p
@@ -121,6 +213,7 @@ function toggleUser(id: number) {
   }
   assignedUserIds.value.add(id)
   if (primaryReviewerId.value === null) primaryReviewerId.value = id
+  queueDraftSave()
 }
 
 /** 移除指派：如果被移除的是 Primary，自动切到剩余第一个评审人 */
@@ -130,12 +223,14 @@ function removeUser(id: number) {
     const next = Array.from(assignedUserIds.value)[0]
     primaryReviewerId.value = next ?? null
   }
+  queueDraftSave()
 }
 
 /** 将某个已指派用户提升为主评人 */
 function setPrimary(id: number) {
   if (!assignedUserIds.value.has(id)) return
   primaryReviewerId.value = id
+  queueDraftSave()
 }
 
 const assignedUsers = computed(() => allUsers.value.filter((u) => assignedUserIds.value.has(u.id)))
@@ -224,29 +319,30 @@ async function handleActivate() {
 
   submitting.value = true
   try {
+    if (!activeReviewId.value) {
+      const ok = await ensureReviewCreated()
+      if (!ok) return
+    }
     const primaryId = primaryReviewerId.value as number
     const selectedReviewerIds = Array.from(assignedUserIds.value)
     const shadowIds = selectedReviewerIds.filter((id) => id !== primaryId)
     const allReviewers = [primaryId, ...shadowIds]
-    const payload: CreateReviewPayload = {
+    await updateReview(projectId.value!, activeReviewId.value!, {
       name: form.name,
       description: form.description,
       review_mode: form.review_mode,
       default_reviewer_ids: allReviewers,
-      default_primary_reviewer_id: primaryId,
-      default_shadow_reviewer_ids: shadowIds,
-    }
-    const review = await createReview(projectId.value!, payload)
-    // 关联用例：显式指定主评人 + 陪审
-    if (selectedCaseIds.value.size > 0 && review?.id) {
+    })
+    if (selectedCaseIds.value.size > 0) {
       const entries: LinkItemEntry[] = Array.from(selectedCaseIds.value).map((id) => ({
         testcase_id: id,
         primary_reviewer_id: primaryId,
         shadow_reviewer_ids: shadowIds,
       }))
-      await linkItems(projectId.value!, review.id, entries)
+      await linkItems(projectId.value!, activeReviewId.value!, entries)
     }
     ElMessage.success('评审计划已创建并激活')
+    clearDraft()
     router.push('/case-reviews')
   } catch (e) {
     ElMessage.error(extractErrorMessage(e, '创建评审计划失败'))
@@ -292,7 +388,199 @@ function parsePreselectedIds(): number[] {
   return parts.map((v) => Number(v)).filter((v) => Number.isFinite(v) && v > 0)
 }
 
+function parseRouteDraftReviewId(): number | null {
+  const queryValue = route.query.draftReviewId || route.query.reviewId
+  const raw = Array.isArray(queryValue) ? queryValue[0] : queryValue
+  const id = Number(raw)
+  return Number.isFinite(id) && id > 0 ? Math.trunc(id) : null
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isReviewMode(value: unknown): value is ReviewMode {
+  return value === 'single' || value === 'parallel'
+}
+
+async function loadExistingReviewBase(reviewId: number) {
+  if (!projectId.value) return
+  try {
+    const review = await getReview(projectId.value, reviewId)
+    form.name = review.name
+    form.description = review.description || ''
+    form.review_mode = isReviewMode(review.review_mode) ? review.review_mode : 'single'
+  } catch (e) {
+    activeReviewId.value = null
+    ElMessage.warning(extractErrorMessage(e, '加载评审任务失败，请重新创建'))
+  }
+}
+
+function clearLegacyProjectDraft() {
+  if (!projectId.value) return
+  window.localStorage.removeItem(`tp-case-review-create-draft:${projectId.value}`)
+}
+
+function normalizeDraftIds(value: unknown): number[] {
+  if (!Array.isArray(value)) return []
+  return Array.from(
+    new Set(
+      value
+        .map((id) => Number(id))
+        .filter((id) => Number.isFinite(id) && id > 0)
+        .map((id) => Math.trunc(id)),
+    ),
+  )
+}
+
+function readDraft(): CaseReviewCreateDraft | null {
+  const key = draftStorageKey.value
+  if (!key) return null
+  const raw = window.localStorage.getItem(key)
+  if (!raw) return null
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!isRecord(parsed) || parsed.version !== DRAFT_VERSION) return null
+
+    const draftForm = isRecord(parsed.form) ? parsed.form : {}
+    const assignedIds = normalizeDraftIds(parsed.assignedUserIds)
+    const rawPrimary =
+      typeof parsed.primaryReviewerId === 'number' && Number.isFinite(parsed.primaryReviewerId)
+        ? Math.trunc(parsed.primaryReviewerId)
+        : null
+    const primaryId = rawPrimary !== null && assignedIds.includes(rawPrimary) ? rawPrimary : null
+    const stepValue =
+      typeof parsed.currentStep === 'number' && Number.isFinite(parsed.currentStep)
+        ? Math.trunc(parsed.currentStep)
+        : 1
+
+    return {
+      version: DRAFT_VERSION,
+      savedAt:
+        typeof parsed.savedAt === 'number' && Number.isFinite(parsed.savedAt)
+          ? parsed.savedAt
+          : Date.now(),
+      currentStep: Math.min(4, Math.max(1, stepValue)),
+      form: {
+        name: typeof draftForm.name === 'string' ? draftForm.name : '',
+        description: typeof draftForm.description === 'string' ? draftForm.description : '',
+        review_mode: isReviewMode(draftForm.review_mode) ? draftForm.review_mode : 'single',
+      },
+      selectedCaseIds: normalizeDraftIds(parsed.selectedCaseIds),
+      assignedUserIds: assignedIds,
+      primaryReviewerId: primaryId,
+    }
+  } catch {
+    window.localStorage.removeItem(key)
+    return null
+  }
+}
+
+function applyDraft(draft: CaseReviewCreateDraft) {
+  currentStep.value = draft.currentStep
+  form.name = draft.form.name
+  form.description = draft.form.description
+  form.review_mode = draft.form.review_mode
+  selectedCaseIds.value = new Set(draft.selectedCaseIds)
+  assignedUserIds.value = new Set(draft.assignedUserIds)
+  primaryReviewerId.value = draft.primaryReviewerId
+  draftSavedAt.value = draft.savedAt
+}
+
+function restoreDraft() {
+  const draft = readDraft()
+  if (!draft) return false
+  applyDraft(draft)
+  return true
+}
+
+function hasDraftContent() {
+  return (
+    currentStep.value > 1 ||
+    form.name.trim().length > 0 ||
+    form.description.trim().length > 0 ||
+    form.review_mode !== 'single' ||
+    selectedCaseIds.value.size > 0 ||
+    assignedUserIds.value.size > 0 ||
+    primaryReviewerId.value !== null
+  )
+}
+
+function saveDraftNow() {
+  if (!draftSavingEnabled.value) return
+  const key = draftStorageKey.value
+  if (!key) return
+  if (!hasDraftContent()) {
+    window.localStorage.removeItem(key)
+    draftSavedAt.value = null
+    return
+  }
+  const savedAt = Date.now()
+  const draft: CaseReviewCreateDraft = {
+    version: DRAFT_VERSION,
+    savedAt,
+    currentStep: currentStep.value,
+    form: {
+      name: form.name,
+      description: form.description,
+      review_mode: form.review_mode,
+    },
+    selectedCaseIds: Array.from(selectedCaseIds.value),
+    assignedUserIds: Array.from(assignedUserIds.value),
+    primaryReviewerId: primaryReviewerId.value,
+  }
+  try {
+    window.localStorage.setItem(key, JSON.stringify(draft))
+    draftSavedAt.value = savedAt
+  } catch {
+    draftSavedAt.value = null
+  }
+}
+
+function queueDraftSave() {
+  if (!draftSavingEnabled.value) return
+  if (draftSaveTimer.value !== null) {
+    window.clearTimeout(draftSaveTimer.value)
+  }
+  draftSaveTimer.value = window.setTimeout(() => {
+    saveDraftNow()
+    draftSaveTimer.value = null
+  }, 300)
+}
+
+function clearDraft() {
+  draftSavingEnabled.value = false
+  if (draftSaveTimer.value !== null) {
+    window.clearTimeout(draftSaveTimer.value)
+    draftSaveTimer.value = null
+  }
+  const key = draftStorageKey.value
+  if (key) window.localStorage.removeItem(key)
+  draftSavedAt.value = null
+}
+
+watch(
+  () => ({
+    currentStep: currentStep.value,
+    name: form.name,
+    description: form.description,
+    reviewMode: form.review_mode,
+    selectedCaseIds: Array.from(selectedCaseIds.value).sort((a, b) => a - b),
+    assignedUserIds: Array.from(assignedUserIds.value).sort((a, b) => a - b),
+    primaryReviewerId: primaryReviewerId.value,
+  }),
+  () => queueDraftSave(),
+)
+
 onMounted(async () => {
+  activeReviewId.value = parseRouteDraftReviewId()
+  if (!activeReviewId.value) clearLegacyProjectDraft()
+  const restored = activeReviewId.value ? restoreDraft() : false
+  if (activeReviewId.value && !restored) {
+    await loadExistingReviewBase(activeReviewId.value)
+  }
+  draftSavingEnabled.value = true
+  window.addEventListener('beforeunload', saveDraftNow)
   loadUsers()
   loadSettings()
   await fetchCases()
@@ -300,6 +588,17 @@ onMounted(async () => {
   const preIds = parsePreselectedIds()
   if (preIds.length > 0) {
     preIds.forEach((id) => selectedCaseIds.value.add(id))
+    queueDraftSave()
+  }
+  if (restored) ElMessage.success('已恢复未完成的评审草稿')
+})
+
+onBeforeUnmount(() => {
+  saveDraftNow()
+  window.removeEventListener('beforeunload', saveDraftNow)
+  if (draftSaveTimer.value !== null) {
+    window.clearTimeout(draftSaveTimer.value)
+    draftSaveTimer.value = null
   }
 })
 </script>
@@ -342,21 +641,25 @@ onMounted(async () => {
     <div class="wizard-content">
       <!-- ════ Step 1: 基础信息 ════ -->
       <div v-if="currentStep === 1" class="step-body">
-        <div class="step-grid">
+        <div class="step-grid step-grid-single">
           <!-- 左：表单 -->
           <div class="step-main">
             <div class="card-glass">
               <h2 class="card-title-primary">步骤 1：评审基础定义</h2>
               <div class="form-group">
-                <label class="form-label">计划标识</label>
-                <input v-model="form.name" class="form-input" placeholder="例如：Q3 安全加固专项" />
+                <label class="form-label">评审计划名称</label>
+                <input
+                  v-model="form.name"
+                  class="form-input"
+                  placeholder="例如：支付模块回归用例评审 / V2.3 发版前用例基线评审"
+                />
               </div>
               <div class="form-group">
-                <label class="form-label">战略目标</label>
+                <label class="form-label">评审说明</label>
                 <textarea
                   v-model="form.description"
                   class="form-textarea"
-                  placeholder="定义本轮评审的核心重点..."
+                  placeholder="说明本次评审范围、关注点和验收标准，例如：重点检查登录/支付链路用例覆盖率、前置条件完整性、预期结果是否可验证。"
                   rows="4"
                 ></textarea>
               </div>
@@ -378,40 +681,6 @@ onMounted(async () => {
                     <span class="material-symbols-outlined" style="font-size: 16px">group</span>
                     会签模式
                   </label>
-                </div>
-              </div>
-            </div>
-          </div>
-          <!-- 右：评审人预览 -->
-          <div class="step-side">
-            <div class="card-surface">
-              <div class="card-bg-icon"><span class="material-symbols-outlined">groups</span></div>
-              <h2 class="card-title">评审资源预览</h2>
-              <p class="card-desc">展示当前项目可参与评审的团队成员</p>
-              <div class="reviewer-list">
-                <div v-for="user in allUsers.slice(0, 5)" :key="user.id" class="reviewer-card-mini">
-                  <div class="reviewer-card-mini-left">
-                    <div class="reviewer-avatar">
-                      <img
-                        v-if="resolveAvatarUrl(user.avatar)"
-                        :src="resolveAvatarUrl(user.avatar)"
-                        class="avatar-img"
-                      />
-                      <span v-else>{{ getInitials(user.name) }}</span>
-                    </div>
-                    <div>
-                      <p class="reviewer-name-mini">{{ user.name }}</p>
-                      <p class="reviewer-role-mini">{{ user.email }}</p>
-                    </div>
-                  </div>
-                </div>
-                <div v-if="allUsers.length === 0" class="empty-hint">暂无可用评审人</div>
-              </div>
-              <!-- 底部容量进度条 -->
-              <div class="capacity-section">
-                <div class="capacity-header">
-                  <span class="capacity-label">可参与人员</span>
-                  <span class="capacity-pct">{{ allUsers.length }} 人</span>
                 </div>
               </div>
             </div>
@@ -767,11 +1036,20 @@ onMounted(async () => {
           <span class="material-symbols-outlined" style="font-size: 18px">arrow_back</span>
           上一步
         </button>
+        <span class="draft-status">
+          <span class="material-symbols-outlined">cloud_done</span>
+          {{ draftStatusText }}
+        </span>
       </div>
       <div class="footer-right">
         <button class="footer-btn outline" @click="router.push('/case-reviews')">取消</button>
-        <button v-if="currentStep < 4" class="footer-btn primary" @click="nextStep">
-          下一步
+        <button
+          v-if="currentStep < 4"
+          class="footer-btn primary"
+          :disabled="creatingReview"
+          @click="nextStep"
+        >
+          {{ creatingReview ? '创建中...' : '下一步' }}
           <span class="material-symbols-outlined" style="font-size: 18px">arrow_forward</span>
         </button>
         <button
@@ -925,6 +1203,9 @@ onMounted(async () => {
   grid-template-columns: 1fr 380px;
   gap: 24px;
 }
+.step-grid-single {
+  grid-template-columns: 1fr;
+}
 .step-main {
   min-width: 0;
 }
@@ -1049,85 +1330,11 @@ onMounted(async () => {
   border: 0;
 }
 
-/* ── 评审人预览（Step1右侧） ── */
-.reviewer-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.reviewer-card-mini {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 16px;
-  background: var(--tp-surface-elevated, #272935);
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.reviewer-card-mini:hover {
-  border-color: rgba(124, 58, 237, 0.3);
-  background: rgba(255, 255, 255, 0.03);
-}
-.reviewer-card-mini-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.reviewer-avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--tp-primary, #7c3aed), var(--tp-info, #0566d9));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 700;
-  color: #fff;
-  flex-shrink: 0;
-}
-.reviewer-name-mini {
-  font-size: 14px;
-  font-weight: 600;
-  color: #fff;
-  margin: 0;
-}
 .avatar-img {
   width: 100%;
   height: 100%;
   border-radius: inherit;
   object-fit: cover;
-}
-.reviewer-role-mini {
-  font-size: 10px;
-  color: var(--tp-gray-400, #958da1);
-  margin: 3px 0 0;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-/* 底部容量条 */
-.capacity-section {
-  margin-top: 28px;
-  padding-top: 24px;
-  border-top: 1px solid rgba(74, 68, 85, 0.1);
-}
-.capacity-header {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-.capacity-label {
-  font-size: 12px;
-  color: var(--tp-gray-400, #958da1);
-  font-weight: 300;
-}
-.capacity-pct {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--tp-primary-light, #d2bbff);
 }
 .empty-hint {
   text-align: center;
@@ -1888,6 +2095,17 @@ onMounted(async () => {
   display: flex;
   gap: 12px;
   align-items: center;
+}
+.draft-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--tp-gray-400, #958da1);
+}
+.draft-status .material-symbols-outlined {
+  font-size: 16px;
+  color: #34d399;
 }
 .footer-btn {
   display: flex;
