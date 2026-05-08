@@ -75,10 +75,11 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 18px;
-  border-radius: var(--tp-radius-md);
+  min-height: var(--tp-btn-height-md);
+  padding: 0 18px;
+  border-radius: var(--tp-btn-radius);
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: 650;
   cursor: pointer;
   transition: all var(--tp-transition);
   border: none;
@@ -86,37 +87,43 @@
 }
 
 .ai-btn:active {
-  transform: scale(0.96);
+  transform: scale(0.98);
 }
 
 .ai-btn-ghost {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--tp-gray-800);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--tp-btn-plain-bg);
+  color: var(--tp-gray-700);
+  border: 1px solid var(--tp-btn-plain-border);
 }
 
 .ai-btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--tp-surface-hover);
+  color: var(--tp-primary);
+  border-color: var(--tp-accent-primary-border);
 }
 
 .ai-btn-secondary {
-  background: var(--tp-surface-elevated);
-  color: var(--tp-gray-900);
+  background: var(--tp-btn-plain-bg);
+  color: var(--tp-gray-700);
+  border: 1px solid var(--tp-btn-plain-border);
 }
 
 .ai-btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--tp-surface-hover);
+  color: var(--tp-primary);
+  border-color: var(--tp-accent-primary-border);
 }
 
 .ai-btn-primary {
-  background: linear-gradient(135deg, var(--tp-primary), #0566d9);
-  color: #fff;
-  font-weight: 600;
-  box-shadow: 0 4px 20px var(--tp-primary-shadow);
+  background: var(--tp-btn-bg);
+  color: var(--tp-btn-text);
+  font-weight: 650;
+  box-shadow: var(--tp-btn-shadow);
 }
 
 .ai-btn-primary:hover {
-  box-shadow: 0 6px 28px var(--tp-primary-shadow);
+  background: var(--tp-btn-bg-hover);
+  box-shadow: var(--tp-btn-shadow-hover);
 }
 
 .ai-btn .material-symbols-outlined {
@@ -226,9 +233,10 @@
 }
 
 .ai-pagination button.active {
-  background: var(--tp-primary);
-  color: #fff;
+  background: var(--tp-btn-bg);
+  color: var(--tp-btn-text);
   font-weight: 700;
+  box-shadow: var(--tp-btn-shadow);
 }
 
 .ai-pagination .dots {
@@ -1600,4 +1608,202 @@
 .v1-file-type-badge.merge {
   background: rgba(139, 92, 246, 0.12);
   color: #c4b5fd;
+}
+
+.ai-page {
+  color: var(--tp-gray-900);
+}
+
+.ai-glass-panel,
+.ai-stat-card,
+.ai-validation-panel,
+.ai-quickstart-card,
+.ai-table-wrap,
+.ai-info-card,
+.ai-code-panel,
+.ai-metric-card,
+.ai-dialog,
+.ai-review-card,
+.ai-insight-card {
+  background: var(--tp-surface-card);
+  border-color: var(--tp-border-subtle);
+  box-shadow: var(--tp-shadow-card);
+  backdrop-filter: none;
+}
+
+.ai-page-header-left h1,
+.ai-task-name,
+.ai-table-footer .info strong,
+.ai-dialog-header h2,
+.ai-quickstart-card h4,
+.ai-info-card-title,
+.ai-stat-value,
+.ai-metric-value,
+.ai-review-title {
+  color: var(--tp-gray-900);
+}
+
+.ai-page-header-left .ai-subtitle,
+.ai-breadcrumb,
+.ai-table-title,
+.ai-table-footer .info,
+.ai-task-id,
+.ai-source-label,
+.ai-quickstart-card p,
+.ai-stat-label,
+.ai-stat-desc,
+.ai-metric-label,
+.ai-review-desc,
+.ai-timeline-meta,
+.ai-trace-item {
+  color: var(--tp-gray-600);
+}
+
+.ai-breadcrumb .current,
+.ai-code-copy-btn:hover,
+.ai-dialog-close:hover {
+  color: var(--tp-gray-900);
+}
+
+.ai-btn-ghost,
+.ai-btn-secondary,
+.ai-row-action-btn,
+.ai-pagination button,
+.ai-dialog-close {
+  background: var(--tp-surface-input);
+  border-color: var(--tp-border-subtle);
+  color: var(--tp-gray-700);
+}
+
+.ai-btn-ghost:hover,
+.ai-btn-secondary:hover,
+.ai-row-action-btn:hover,
+.ai-pagination button:hover,
+.ai-dialog-close:hover,
+.ai-sub-nav-item:hover,
+.v1-file-tab:hover {
+  background: var(--tp-surface-hover);
+  color: var(--tp-primary);
+}
+
+.ai-btn-primary,
+.ai-pagination button.active {
+  background: var(--tp-btn-bg);
+  color: var(--tp-btn-text);
+  box-shadow: var(--tp-btn-shadow);
+}
+
+.ai-btn-primary:hover {
+  background: var(--tp-btn-bg-hover);
+  box-shadow: var(--tp-btn-shadow-hover);
+}
+
+.ai-table-wrap,
+.ai-table-header,
+.ai-table thead th,
+.ai-table tbody td,
+.ai-table-footer,
+.ai-code-header,
+.ai-log-panel,
+.ai-dialog,
+.ai-dialog-header,
+.ai-dialog-footer,
+.ai-form-input,
+.ai-form-select,
+.ai-form-textarea,
+.ai-preview-box,
+.ai-actions-row {
+  border-color: var(--tp-border-subtle);
+}
+
+.ai-table thead th,
+.ai-table-footer,
+.ai-code-header {
+  background: var(--tp-surface-header);
+}
+
+.ai-table tbody tr:hover {
+  background: var(--tp-surface-row-hover);
+}
+
+.ai-case-tag,
+.ai-status-badge.primary,
+.ai-sub-nav-item.active,
+.ai-insight-card,
+.v1-file-tab.active,
+.v1-file-type-badge.page,
+.v1-file-type-badge.shared,
+.v1-file-type-badge.merge {
+  background: var(--tp-accent-primary-soft);
+  border-color: var(--tp-accent-primary-border);
+  color: var(--tp-primary);
+}
+
+.ai-status-badge.success,
+.v1-file-type-badge.spec,
+.v1-file-type-badge.create {
+  background: var(--tp-accent-success-soft);
+  border-color: var(--tp-accent-success-border);
+  color: var(--tp-accent-success);
+}
+
+.ai-status-badge.warning,
+.v1-file-type-badge.fixture,
+.v1-file-type-badge.update {
+  background: var(--tp-accent-warning-soft);
+  border-color: var(--tp-accent-warning-border);
+  color: var(--tp-accent-warning);
+}
+
+.ai-status-badge.danger,
+.ai-btn-danger-ghost {
+  background: var(--tp-accent-danger-soft);
+  border-color: var(--tp-accent-danger-border);
+  color: var(--tp-accent-danger);
+}
+
+.ai-status-badge.info {
+  background: var(--tp-surface-muted);
+  border-color: var(--tp-border-subtle);
+  color: var(--tp-gray-600);
+}
+
+.ai-log-line,
+.ai-code-body,
+.ai-preview-box,
+.ai-form-input,
+.ai-form-select,
+.ai-form-textarea,
+.v1-file-tabs {
+  background: var(--tp-surface-input);
+  color: var(--tp-gray-900);
+}
+
+.ai-form-input:focus,
+.ai-form-select:focus,
+.ai-form-textarea:focus {
+  border-color: var(--tp-primary);
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
+}
+
+.ai-timeline,
+.ai-trace-item {
+  border-color: var(--tp-border-subtle);
+}
+
+.ai-timeline-step:hover .ai-timeline-card,
+.ai-timeline-step.active .ai-timeline-card {
+  background: var(--tp-surface-hover);
+}
+
+.ai-screenshot-frame,
+.ai-log-panel {
+  background: var(--tp-surface-card);
+}
+
+.ai-toast {
+  background: var(--tp-surface-card);
+  border-color: var(--tp-border-subtle);
+  box-shadow: var(--tp-shadow-md);
+  color: var(--tp-gray-900);
 }

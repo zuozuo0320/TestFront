@@ -162,18 +162,20 @@ const emit = defineEmits<{
   gap: 8px;
   padding: 8px 24px;
   margin-left: 0;
-  border-radius: 10px;
+  border-radius: var(--tp-btn-radius);
   border: none;
-  background: var(--purple);
-  color: #fff;
+  background: var(--tp-btn-bg);
+  color: var(--tp-btn-text);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 650;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--tp-transition);
   white-space: nowrap;
+  box-shadow: var(--tp-btn-shadow);
 }
 .um-add-btn:hover {
-  filter: brightness(1.15);
+  background: var(--tp-btn-bg-hover);
+  box-shadow: var(--tp-btn-shadow-hover);
 }
 .um-add-btn:active {
   transform: scale(0.95);
@@ -181,5 +183,52 @@ const emit = defineEmits<{
 .um-add-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.tm-glass-panel {
+  background: var(--tp-surface-card, var(--glass-bg));
+  border-color: var(--tp-border-subtle, var(--border-subtle));
+  box-shadow: var(--tp-shadow-card, none);
+  backdrop-filter: none;
+}
+
+.tm-panel-title {
+  color: var(--tp-gray-900, var(--text-primary));
+}
+
+.tm-panel-desc,
+.tm-batch-checkbox {
+  color: var(--tp-gray-600, var(--text-secondary));
+}
+
+.tm-panel-icon {
+  background: var(--tp-accent-primary-soft, var(--purple-20));
+  color: var(--tp-primary, var(--purple-light));
+}
+
+.tm-batch-textarea {
+  background: var(--tp-surface-input, var(--bg-input));
+  border-color: var(--tp-border-subtle, var(--border-20));
+  color: var(--tp-gray-900, var(--text-primary));
+}
+
+.tm-batch-textarea:focus {
+  border-color: var(--tp-accent-primary-border, var(--purple-50));
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft, var(--purple-20));
+}
+
+.tm-batch-preview {
+  color: var(--tp-primary, var(--purple-light));
+}
+
+.um-add-btn {
+  background: var(--tp-btn-bg);
+  box-shadow: var(--tp-btn-shadow);
+}
+
+.um-add-btn:hover {
+  filter: none;
+  background: var(--tp-btn-bg-hover);
+  box-shadow: var(--tp-btn-shadow-hover);
 }
 </style>

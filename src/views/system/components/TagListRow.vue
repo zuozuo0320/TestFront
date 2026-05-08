@@ -84,17 +84,17 @@ function formatCount(n: number): string {
 <style scoped>
 .tc-card {
   position: relative;
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(74, 68, 85, 0.15);
-  border-left: 2px solid var(--accent);
+  background: var(--tp-surface-card);
+  backdrop-filter: none;
+  border: 1px solid var(--tp-border-subtle);
   border-radius: 12px;
   padding: 20px;
   transition: background 0.15s;
   cursor: default;
 }
 .tc-card:hover {
-  background: var(--surface-container, #1d1f2b);
+  background: var(--tp-surface-hover);
+  border-color: var(--tp-border-strong);
 }
 
 /* ── Top row ── */
@@ -222,5 +222,48 @@ function formatCount(n: number): string {
   border-radius: 50%;
   object-fit: cover;
   border: 1px solid rgba(74, 68, 85, 0.3);
+}
+
+.tc-card {
+  background: var(--tp-surface-card, var(--surface-container-low, #fff));
+  border-color: var(--tp-border-subtle, var(--glass-border));
+  box-shadow: var(--tp-shadow-card, none);
+  backdrop-filter: none;
+}
+
+.tc-card:hover {
+  background: var(--tp-surface-hover, var(--surface-container));
+}
+
+.tc-name,
+.tc-stat-value--creator {
+  color: var(--tp-gray-900, var(--on-surface));
+}
+
+.tc-desc,
+.tc-stat-label {
+  color: var(--tp-gray-600, var(--on-surface-variant));
+}
+
+.tc-act-btn:hover {
+  color: var(--tp-primary, var(--primary));
+}
+
+.tc-act-btn--del:hover {
+  color: var(--tp-accent-danger, #ef4444);
+}
+
+.tc-stat-value--primary {
+  color: var(--tp-primary, var(--primary));
+  text-shadow: none;
+}
+
+.tc-divider,
+.tc-avatar {
+  border-color: var(--tp-border-subtle, var(--border-subtle));
+}
+
+.tc-divider {
+  background: var(--tp-border-subtle, var(--border-subtle));
 }
 </style>

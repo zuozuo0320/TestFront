@@ -84,32 +84,32 @@
    ─────────────────────────────── */
 .layout > .top-header,
 .top-header {
-  background: linear-gradient(180deg, rgba(167, 139, 250, 0.035) 0%, rgba(0, 0, 0, 0) 100%);
+  background: rgba(250, 251, 252, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--tp-border-subtle);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.02) inset,
-    0 4px 16px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 8px 28px rgba(99, 102, 241, 0.08);
 }
 
 /* Logo 加微光 */
 .top-header .brand .logo {
   box-shadow:
-    0 0 0 1px rgba(167, 139, 250, 0.25),
-    0 2px 10px rgba(124, 58, 237, 0.35);
+    0 0 0 1px rgba(99, 102, 241, 0.22),
+    0 8px 20px rgba(99, 102, 241, 0.24);
   transition:
     box-shadow 0.22s ease,
     transform 0.22s ease;
 }
 .top-header .brand:hover .logo {
   box-shadow:
-    0 0 0 1px rgba(167, 139, 250, 0.45),
-    0 4px 14px rgba(124, 58, 237, 0.5);
+    0 0 0 1px rgba(99, 102, 241, 0.34),
+    0 10px 24px rgba(236, 72, 153, 0.22);
   transform: translateY(-1px);
 }
 
 /* 品牌文字渐变 */
 .top-header .brand .name {
-  background: linear-gradient(120deg, #ffffff 0%, #c8b5ff 100%);
+  background: linear-gradient(120deg, #6366f1 0%, #ec4899 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -133,9 +133,9 @@
 /* 通知按钮 hover + 未读红点占位（保持 design 紧凑一致性） */
 .top-header .header-icon-btn {
   position: relative;
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--tp-surface-card);
   border: 1px solid var(--tp-border-subtle);
-  color: rgba(230, 235, 245, 0.65);
+  color: var(--tp-gray-600);
 }
 .top-header .header-icon-btn:hover {
   background: var(--tp-accent-primary-soft);
@@ -153,7 +153,7 @@
   height: 7px;
   border-radius: 999px;
   background: var(--tp-accent-danger);
-  box-shadow: 0 0 0 2px #0c1017;
+  box-shadow: 0 0 0 2px var(--tp-surface-card);
 }
 
 /* 用户区 hover 卡片化 */
@@ -164,13 +164,13 @@
   transition: background 0.18s ease;
 }
 .top-header .user-box:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--tp-surface-hover);
 }
 .top-header .user-avatar {
-  border: 2px solid rgba(167, 139, 250, 0.35);
+  border: 2px solid rgba(99, 102, 241, 0.28);
   box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.3),
-    0 2px 10px rgba(124, 58, 237, 0.2);
+    0 0 0 1px rgba(255, 255, 255, 0.9),
+    0 8px 20px rgba(99, 102, 241, 0.14);
 }
 
 /* ───────────────────────────────
@@ -196,7 +196,7 @@
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(167, 139, 250, 0.45) 50%,
+    rgba(236, 72, 153, 0.42) 50%,
     transparent 100%
   );
   pointer-events: none;
@@ -211,11 +211,11 @@
   padding: 12px 14px !important;
   background: linear-gradient(
     135deg,
-    rgba(167, 139, 250, 0.08) 0%,
-    rgba(96, 165, 250, 0.04) 100%
+    rgba(99, 102, 241, 0.09) 0%,
+    rgba(236, 72, 153, 0.045) 100%
   ) !important;
   border: 1px solid var(--tp-border-subtle) !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 8px 22px rgba(99, 102, 241, 0.08);
   transition:
     transform 0.22s ease,
     border-color 0.22s ease,
@@ -230,7 +230,7 @@
   width: 110px;
   height: 110px;
   border-radius: 50%;
-  background: rgba(167, 139, 250, 0.35);
+  background: rgba(236, 72, 153, 0.28);
   opacity: 0.18;
   filter: blur(36px);
   pointer-events: none;
@@ -239,27 +239,27 @@
 .nav-header-card:hover {
   background: linear-gradient(
     135deg,
-    rgba(167, 139, 250, 0.14) 0%,
-    rgba(96, 165, 250, 0.06) 100%
+    rgba(99, 102, 241, 0.13) 0%,
+    rgba(236, 72, 153, 0.07) 100%
   ) !important;
   border-color: var(--tp-accent-primary-border) !important;
   transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.15);
+  box-shadow: 0 12px 28px rgba(99, 102, 241, 0.14);
 }
 .nav-header-card:hover::after {
   opacity: 0.3;
 }
 
 .nav-header-icon {
-  background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%) !important;
+  background: linear-gradient(135deg, #6366f1 0%, #ec4899 100%) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    0 2px 8px rgba(124, 58, 237, 0.35);
-  border: 1px solid rgba(167, 139, 250, 0.45);
+    0 8px 20px rgba(99, 102, 241, 0.28);
+  border: 1px solid rgba(99, 102, 241, 0.32);
 }
 
 .nav-header-title {
-  background: linear-gradient(120deg, #ffffff 0%, #d2bbff 100%);
+  background: linear-gradient(120deg, #111827 0%, #6366f1 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -280,9 +280,9 @@
 }
 
 .main-nav-item:hover {
-  background: rgba(167, 139, 250, 0.06) !important;
+  background: rgba(99, 102, 241, 0.08) !important;
   border-left-color: transparent !important;
-  color: #e1dcf0 !important;
+  color: var(--tp-primary) !important;
 }
 .main-nav-item:hover .nav-icon {
   color: var(--tp-accent-primary);
@@ -293,15 +293,15 @@
   position: relative;
   background: linear-gradient(
     90deg,
-    rgba(167, 139, 250, 0.16) 0%,
-    rgba(167, 139, 250, 0.04) 100%
+    rgba(99, 102, 241, 0.14) 0%,
+    rgba(236, 72, 153, 0.055) 100%
   ) !important;
   border-left: none !important;
-  color: #ede0ff !important;
+  color: var(--tp-primary-dark) !important;
   font-weight: 600 !important;
   box-shadow:
-    inset 0 0 20px rgba(167, 139, 250, 0.06),
-    0 2px 10px rgba(124, 58, 237, 0.08) !important;
+    inset 0 0 20px rgba(99, 102, 241, 0.06),
+    0 8px 18px rgba(99, 102, 241, 0.08) !important;
 }
 .main-nav-item.active::before {
   content: '' !important;
@@ -312,12 +312,12 @@
   bottom: 8px;
   width: 3px;
   border-radius: 999px;
-  background: linear-gradient(180deg, #a78bfa 0%, #7c3aed 100%);
-  box-shadow: 0 0 8px rgba(167, 139, 250, 0.6);
+  background: linear-gradient(180deg, #6366f1 0%, #ec4899 100%);
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.45);
 }
 .main-nav-item.active .nav-icon {
   color: var(--tp-accent-primary);
-  filter: drop-shadow(0 0 6px rgba(167, 139, 250, 0.35));
+  filter: drop-shadow(0 0 6px rgba(99, 102, 241, 0.24));
 }
 
 /* ───────────────────────────────
@@ -345,23 +345,23 @@
     width 0.18s ease;
 }
 .sub-nav-item:hover {
-  background: rgba(167, 139, 250, 0.06) !important;
-  color: #e1dcf0 !important;
+  background: rgba(99, 102, 241, 0.08) !important;
+  color: var(--tp-primary) !important;
 }
 .sub-nav-item:hover::before {
-  background: rgba(167, 139, 250, 0.45);
+  background: rgba(99, 102, 241, 0.45);
   width: 10px;
 }
 .sub-nav-item.active {
-  background: rgba(167, 139, 250, 0.1) !important;
-  color: #ede0ff !important;
+  background: rgba(99, 102, 241, 0.12) !important;
+  color: var(--tp-primary-dark) !important;
   font-weight: 600 !important;
 }
 .sub-nav-item.active::before {
   background: var(--tp-accent-primary);
   width: 10px;
   height: 2px;
-  box-shadow: 0 0 6px rgba(167, 139, 250, 0.5);
+  box-shadow: 0 0 6px rgba(99, 102, 241, 0.4);
 }
 
 /* ───────────────────────────────
@@ -372,12 +372,7 @@
   padding-top: 16px !important;
 }
 .nav-bottom-group::before {
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(167, 139, 250, 0.35),
-    transparent
-  ) !important;
+  background: linear-gradient(90deg, transparent, rgba(236, 72, 153, 0.28), transparent) !important;
 }
 
 .nav-collapse-btn {

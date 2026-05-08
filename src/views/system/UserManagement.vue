@@ -938,18 +938,21 @@ onMounted(async () => {
   gap: 8px;
   padding: 10px 20px;
   margin-left: 16px;
-  border-radius: 10px;
+  border-radius: var(--tp-btn-radius);
   border: none;
-  background: #7c3aed;
-  color: #fff;
+  background: var(--tp-btn-bg);
+  color: var(--tp-btn-text);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 650;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--tp-transition);
   white-space: nowrap;
+  box-shadow: var(--tp-btn-shadow);
 }
 .um-add-btn:hover {
-  filter: brightness(1.15);
+  background: var(--tp-btn-bg-hover);
+  filter: none;
+  box-shadow: var(--tp-btn-shadow-hover);
 }
 .um-add-btn:active {
   transform: scale(0.95);
@@ -1468,5 +1471,172 @@ onMounted(async () => {
   color: #64748b;
   margin-top: 6px;
   display: block;
+}
+
+.um-root {
+  --bg-main: var(--tp-surface-base);
+  --bg-card: var(--tp-surface-card);
+  --bg-card-high: var(--tp-surface-elevated);
+  --text-on-surface: var(--tp-gray-900);
+  --text-on-surface-variant: var(--tp-gray-700);
+  --text-slate: var(--tp-gray-500);
+  --primary: var(--tp-accent-primary);
+  --secondary: var(--tp-accent-info);
+  --tertiary: var(--tp-accent-warning);
+  --error: var(--tp-accent-danger);
+  --success: var(--tp-accent-success);
+  --primary-container: var(--tp-primary);
+  --secondary-container: var(--tp-accent-info);
+  --border-light: var(--tp-border-subtle);
+  --border-lighter: var(--tp-border-subtle);
+  background:
+    radial-gradient(circle at 12% 0%, var(--tp-ambient-primary), transparent 30%),
+    radial-gradient(circle at 88% 10%, var(--tp-ambient-info), transparent 28%),
+    var(--tp-surface-base);
+}
+
+.um-title,
+.text-white,
+.um-sec-title.white-text,
+.um-table th,
+.um-name,
+.um-log-desc {
+  color: var(--tp-gray-900);
+}
+
+.um-subtitle,
+.um-time,
+.um-email,
+.um-ip,
+.um-empty,
+.um-pagination,
+.um-pagination :deep(.btn-prev),
+.um-pagination :deep(.btn-next),
+.um-pagination :deep(.el-pager li),
+.um-log-time,
+.um-avatar-hint {
+  color: var(--tp-gray-500);
+}
+
+.um-stats-panel,
+.um-bento-card,
+.um-list-panel,
+.um-sec-panel,
+.audit-status {
+  background:
+    linear-gradient(180deg, var(--tp-surface-sheen), transparent 38%), var(--tp-surface-card);
+  border: 1px solid var(--tp-border-subtle);
+  box-shadow: var(--tp-shadow-card);
+}
+
+.um-bento-card:hover,
+.um-list-panel:hover,
+.um-sec-panel:hover {
+  border-color: var(--tp-border-strong);
+}
+
+.um-add-btn,
+.um-pagination :deep(.el-pager li.is-active) {
+  background: var(--tp-btn-bg) !important;
+  color: var(--tp-btn-text);
+  border-radius: var(--tp-btn-radius);
+  box-shadow: var(--tp-btn-shadow);
+}
+
+.um-add-btn:hover {
+  filter: none;
+  background: var(--tp-btn-bg-hover) !important;
+  box-shadow: var(--tp-btn-shadow-hover);
+}
+
+.um-add-btn:active {
+  transform: scale(0.98);
+}
+
+.um-action-btn,
+.um-avatar-glass,
+.um-role-bar,
+.um-audit-btn {
+  background: var(--tp-surface-input);
+  border: 1px solid var(--tp-border-subtle);
+}
+
+.um-action-btn:hover,
+.um-audit-btn:hover,
+.um-tr:hover,
+.um-log-row:hover {
+  background: var(--tp-surface-hover);
+}
+
+.um-table th,
+.um-tr td,
+.um-list-header,
+.um-pagination,
+.um-stat-divider {
+  border-color: var(--tp-border-subtle);
+}
+
+.um-stat-primary,
+.um-sec-link,
+.um-audit-pct {
+  color: var(--tp-accent-primary);
+}
+
+.um-stat-secondary {
+  color: var(--tp-accent-info);
+}
+
+.um-live-badge {
+  background: var(--tp-accent-primary-soft);
+  color: var(--tp-accent-primary);
+  border: 1px solid var(--tp-accent-primary-border);
+}
+
+.um-status-dot.active,
+.um-status-dot.disabled {
+  box-shadow: none;
+}
+
+.audit-status {
+  background:
+    linear-gradient(180deg, var(--tp-surface-sheen), transparent 38%), var(--tp-surface-card);
+}
+
+.um-dialog :deep(.el-dialog) {
+  background: var(--tp-surface-card);
+  border: 1px solid var(--tp-border-subtle);
+  box-shadow: var(--tp-shadow-md);
+}
+
+.um-dialog :deep(.el-dialog__title) {
+  color: var(--tp-gray-900);
+}
+
+.um-avatar-upload {
+  border-color: var(--tp-accent-primary-border);
+  background: var(--tp-surface-input);
+}
+
+.um-avatar-upload:hover {
+  border-color: var(--tp-border-strong);
+  box-shadow: none;
+}
+
+.um-avatar-placeholder {
+  background: var(--tp-accent-primary-soft);
+}
+
+.um-avatar-placeholder-icon,
+.um-avatar-placeholder-text {
+  color: var(--tp-accent-primary);
+}
+
+.um-add-btn:focus-visible,
+.um-action-btn:focus-visible,
+.um-sec-link:focus-visible,
+.um-audit-btn:focus-visible,
+.um-avatar-upload:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
 }
 </style>

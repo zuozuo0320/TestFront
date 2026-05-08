@@ -397,25 +397,24 @@ onUnmounted(() => cancelAnimationFrame(animId))
   width: 100%;
   height: 44px;
   border: none;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #c026d3, #a855f7, #7c3aed, #6366f1, #06b6d4);
-  background-size: 200% 200%;
-  animation: grad 4s ease infinite;
-  color: #fff;
+  border-radius: var(--tp-btn-radius);
+  background: var(--tp-btn-bg);
+  color: var(--tp-btn-text);
   font-weight: 700;
   font-size: 14px;
   letter-spacing: 0.5px;
   cursor: pointer;
-  transition: all 0.3s;
-  box-shadow: 0 4px 20px rgba(140, 80, 255, 0.3);
+  transition: all var(--tp-transition);
+  box-shadow: var(--tp-btn-shadow);
   margin-bottom: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .btn-signin:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(140, 80, 255, 0.45);
+  background: var(--tp-btn-bg-hover);
+  transform: none;
+  box-shadow: var(--tp-btn-shadow-hover);
 }
 .btn-signin:active:not(:disabled) {
   transform: translateY(0);

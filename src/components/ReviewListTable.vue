@@ -473,4 +473,84 @@ function reviewerSummary(review: CaseReview): string {
   justify-content: flex-end;
   gap: 4px;
 }
+
+.table-scroll-area {
+  overflow: auto;
+}
+
+.loading-overlay {
+  backdrop-filter: blur(6px);
+}
+
+.pipeline-table {
+  min-width: 920px;
+}
+
+.pipeline-table thead tr {
+  background: rgba(12, 14, 24, 0.72);
+}
+
+.pipeline-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgba(12, 14, 24, 0.92);
+  color: var(--tp-gray-600, #c8d2e1);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.pipeline-table tbody tr {
+  border-bottom-color: var(--tp-border-subtle, rgba(255, 255, 255, 0.06));
+  transition:
+    background var(--tp-transition),
+    box-shadow var(--tp-transition);
+}
+
+.pipeline-table tbody tr:hover {
+  background: rgba(124, 58, 237, 0.055);
+  box-shadow: inset 3px 0 0 var(--tp-primary, #7c3aed);
+}
+
+.pipeline-table td {
+  vertical-align: middle;
+}
+
+.person-cell {
+  min-width: 0;
+}
+
+.avatar-circle,
+.avatar-circle-img {
+  width: 26px;
+  height: 26px;
+}
+
+.progress-cell-pl {
+  width: 210px;
+}
+
+.progress-bar-track {
+  height: 6px;
+}
+
+.progress-bar-fill {
+  transition: width 0.32s ease;
+}
+
+.status-badge-pl {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  text-transform: none;
+}
+
+.row-actions {
+  gap: var(--tp-space-2, 8px);
+}
+
+.action-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft, rgba(167, 139, 250, 0.14));
+}
 </style>

@@ -462,18 +462,21 @@ onMounted(() => loadRoles())
   gap: 8px;
   padding: 10px 20px;
   margin-left: 16px;
-  border-radius: 10px;
+  border-radius: var(--tp-btn-radius);
   border: none;
-  background: #7c3aed;
-  color: #fff;
+  background: var(--tp-btn-bg);
+  color: var(--tp-btn-text);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 650;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--tp-transition);
   white-space: nowrap;
+  box-shadow: var(--tp-btn-shadow);
 }
 .rm-add-btn:hover {
-  filter: brightness(1.15);
+  background: var(--tp-btn-bg-hover);
+  filter: none;
+  box-shadow: var(--tp-btn-shadow-hover);
 }
 .rm-add-btn:active {
   transform: scale(0.95);
@@ -701,6 +704,109 @@ onMounted(() => loadRoles())
   color: rgba(255, 255, 255, 0.4);
   margin-top: 4px;
 }
+
+.rm-root {
+  background:
+    radial-gradient(circle at 12% 0%, var(--tp-ambient-primary), transparent 30%),
+    radial-gradient(circle at 88% 10%, var(--tp-ambient-info), transparent 28%),
+    var(--tp-surface-base);
+}
+
+.rm-stats-panel,
+.rm-card,
+.rm-card-empty {
+  background:
+    linear-gradient(180deg, var(--tp-surface-sheen), transparent 38%), var(--tp-surface-card);
+  border-color: var(--tp-border-subtle);
+  box-shadow: var(--tp-shadow-card);
+}
+
+.rm-card:hover,
+.rm-card-empty:hover {
+  background:
+    linear-gradient(180deg, var(--tp-surface-sheen-strong), transparent 38%), var(--tp-surface-card);
+  border-color: var(--tp-border-strong);
+}
+
+.rm-add-btn {
+  background: var(--tp-btn-bg);
+  border-radius: var(--tp-btn-radius);
+  box-shadow: var(--tp-btn-shadow);
+}
+
+.rm-add-btn:hover {
+  filter: none;
+  background: var(--tp-btn-bg-hover);
+  box-shadow: var(--tp-btn-shadow-hover);
+}
+
+.rm-add-btn:active {
+  transform: scale(0.98);
+}
+
+.rm-stat-primary,
+.rm-card-icon,
+.rm-card-empty:hover .rm-empty-plus {
+  color: var(--tp-accent-primary);
+}
+
+.rm-stat-secondary,
+.rm-badge {
+  color: var(--tp-accent-info);
+}
+
+.rm-card-icon {
+  background: var(--tp-accent-primary-soft);
+  border: 1px solid var(--tp-accent-primary-border);
+}
+
+.rm-badge {
+  background: var(--tp-accent-info-soft);
+  border-color: var(--tp-accent-info-border);
+}
+
+.rm-card-accent {
+  background: var(--tp-primary);
+  height: 100%;
+  opacity: 0.75;
+}
+
+.rm-card-name,
+.rm-card-empty:hover .rm-empty-title {
+  color: var(--tp-gray-900);
+}
+
+.rm-card-desc,
+.rm-empty-desc,
+.rm-empty-plus,
+.rm-empty-state,
+.form-hint,
+.rm-stat-label {
+  color: var(--tp-gray-500);
+}
+
+.rm-perm-tag,
+.rm-empty-icon,
+.rm-btn-edit,
+.rm-btn-view {
+  background: var(--tp-surface-input);
+  border: 1px solid var(--tp-border-subtle);
+  color: var(--tp-gray-700);
+}
+
+.rm-btn-edit:hover,
+.rm-btn-view:hover {
+  background: var(--tp-surface-hover);
+  color: var(--tp-gray-900);
+}
+
+.rm-add-btn:focus-visible,
+.rm-btn-edit:focus-visible,
+.rm-btn-view:focus-visible,
+.rm-card-empty:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
+}
 </style>
 
 <!-- Drawer 使用 teleport 到 body，必须单独放在 unscoped style 中 -->
@@ -884,22 +990,95 @@ onMounted(() => loadRoles())
 .drawer-footer-btn {
   width: 100%;
   padding: 14px 0;
-  border-radius: 12px;
+  border-radius: var(--tp-btn-radius);
   border: none;
-  background: #7c3aed;
-  color: #fff;
+  background: var(--tp-btn-bg);
+  color: var(--tp-btn-text);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 650;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.3);
-  transition: all 0.2s;
+  box-shadow: var(--tp-btn-shadow);
+  transition: all var(--tp-transition);
 }
 .drawer-footer-btn:hover {
-  filter: brightness(1.1);
+  background: var(--tp-btn-bg-hover);
+  filter: none;
+  box-shadow: var(--tp-btn-shadow-hover);
+}
+
+.drawer-overlay {
+  background: var(--tp-overlay-scrim);
+}
+
+.drawer-panel {
+  background: var(--tp-surface-card);
+  border-left-color: var(--tp-border-subtle);
+  box-shadow: var(--tp-shadow-md);
+}
+
+.drawer-title-icon,
+.drawer-footer-btn {
+  color: var(--tp-accent-primary);
+}
+
+.drawer-title,
+.drawer-user-name {
+  color: var(--tp-gray-900);
+}
+
+.drawer-subtitle,
+.drawer-close,
+.drawer-search-icon,
+.drawer-user-email,
+.drawer-empty {
+  color: var(--tp-gray-500);
+}
+
+.drawer-close:hover,
+.drawer-user-item:hover {
+  background: var(--tp-surface-hover);
+}
+
+.drawer-search-input,
+.drawer-user-item,
+.drawer-footer {
+  background: var(--tp-surface-input);
+  border-color: var(--tp-border-subtle);
+}
+
+.drawer-search-input {
+  border: 1px solid var(--tp-border-subtle);
+}
+
+.drawer-search-input:focus {
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
+}
+
+.drawer-avatar {
+  border-color: var(--tp-accent-primary-border);
+}
+
+.drawer-footer-btn {
+  background: var(--tp-btn-bg);
+  color: var(--tp-btn-text);
+  box-shadow: var(--tp-btn-shadow);
+}
+
+.drawer-footer-btn:hover {
+  filter: none;
+  background: var(--tp-btn-bg-hover);
+  box-shadow: var(--tp-btn-shadow-hover);
+}
+
+.drawer-close:focus-visible,
+.drawer-search-input:focus-visible,
+.drawer-footer-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
 }
 
 /* Transitions */

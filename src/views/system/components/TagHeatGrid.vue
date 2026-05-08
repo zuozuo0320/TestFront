@@ -94,7 +94,7 @@ function formatCount(n: number): string {
     color-mix(in srgb, var(--bar-color) 20%, transparent),
     color-mix(in srgb, var(--bar-color) 60%, transparent)
   );
-  border-left: 2px solid var(--bar-color);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bar-color) 36%, transparent);
   display: flex;
   align-items: center;
   padding: 0 12px;
@@ -121,5 +121,21 @@ function formatCount(n: number): string {
   text-align: right;
   font-size: 14px;
   font-weight: 600;
+}
+
+.hm-rank {
+  color: var(--tp-gray-500, var(--on-surface-variant));
+}
+
+.hm-bar-track {
+  background: var(--tp-surface-input, var(--surface-container));
+}
+
+.hm-bar-fill--empty {
+  background: var(--tp-surface-muted, rgba(255, 255, 255, 0.03));
+}
+
+.hm-bar-label {
+  color: var(--tp-gray-900, #fff);
 }
 </style>

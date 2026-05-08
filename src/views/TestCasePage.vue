@@ -1371,8 +1371,8 @@ watch(selectedProject, (newId) => {
       <div class="insights-section">
         <div class="insights-header">
           <div class="insights-title-area">
-            <h2 class="insights-title">智能洞察 (Intelligent Insights)</h2>
-            <p class="insights-desc">实时监控项目质量指标与测试进度。</p>
+            <h2 class="insights-title">用例质量概览</h2>
+            <p class="insights-desc">聚焦用例规模、通过率、缺陷与执行效率。</p>
           </div>
           <div class="insights-actions">
             <button class="insights-btn-primary" @click="onExportReport">
@@ -1406,11 +1406,17 @@ watch(selectedProject, (newId) => {
               <div class="insight-label">总用例数</div>
               <div class="insight-value">{{ metricTotal }}</div>
               <div class="insight-chart">
-                <div class="bar" style="height: 40%; background: #a78bfa"></div>
-                <div class="bar" style="height: 60%; background: #8b5cf6"></div>
-                <div class="bar" style="height: 80%; background: #7c3aed"></div>
-                <div class="bar" style="height: 50%; background: #6d28d9"></div>
-                <div class="bar" style="height: 100%; background: #c4b5fd"></div>
+                <div
+                  class="bar"
+                  style="height: 40%; background: var(--tp-accent-primary-soft)"
+                ></div>
+                <div class="bar" style="height: 60%; background: var(--tp-accent-info-soft)"></div>
+                <div class="bar" style="height: 80%; background: var(--tp-primary)"></div>
+                <div class="bar" style="height: 50%; background: var(--tp-primary-dark)"></div>
+                <div
+                  class="bar"
+                  style="height: 100%; background: var(--tp-accent-primary-border)"
+                ></div>
               </div>
             </div>
           </div>
@@ -1430,11 +1436,14 @@ watch(selectedProject, (newId) => {
                 <span style="font-size: 16px; font-weight: 500; margin-left: 2px">%</span>
               </div>
               <div class="insight-chart">
-                <div class="bar" style="height: 30%; background: #60a5fa"></div>
-                <div class="bar" style="height: 50%; background: #3b82f6"></div>
-                <div class="bar" style="height: 90%; background: #2563eb"></div>
-                <div class="bar" style="height: 70%; background: #93c5fd"></div>
-                <div class="bar" style="height: 60%; background: #1d4ed8"></div>
+                <div class="bar" style="height: 30%; background: var(--tp-accent-info-soft)"></div>
+                <div
+                  class="bar"
+                  style="height: 50%; background: var(--tp-accent-info-border)"
+                ></div>
+                <div class="bar" style="height: 90%; background: var(--tp-accent-info)"></div>
+                <div class="bar" style="height: 70%; background: var(--tp-primary-light)"></div>
+                <div class="bar" style="height: 60%; background: var(--tp-primary)"></div>
               </div>
             </div>
           </div>
@@ -1451,11 +1460,17 @@ watch(selectedProject, (newId) => {
               <div class="insight-label">活动缺陷</div>
               <div class="insight-value">12</div>
               <div class="insight-chart">
-                <div class="bar" style="height: 80%; background: #f87171"></div>
-                <div class="bar" style="height: 40%; background: #ef4444"></div>
-                <div class="bar" style="height: 60%; background: #b91c1c"></div>
-                <div class="bar" style="height: 30%; background: #fca5a5"></div>
-                <div class="bar" style="height: 50%; background: #dc2626"></div>
+                <div
+                  class="bar"
+                  style="height: 80%; background: var(--tp-accent-danger-border)"
+                ></div>
+                <div class="bar" style="height: 40%; background: var(--tp-accent-danger)"></div>
+                <div class="bar" style="height: 60%; background: var(--tp-danger)"></div>
+                <div
+                  class="bar"
+                  style="height: 30%; background: var(--tp-accent-danger-soft)"
+                ></div>
+                <div class="bar" style="height: 50%; background: var(--tp-accent-danger)"></div>
               </div>
             </div>
           </div>
@@ -1475,11 +1490,17 @@ watch(selectedProject, (newId) => {
                 <span style="font-size: 16px; font-weight: 500; margin-left: 2px">m</span>
               </div>
               <div class="insight-chart">
-                <div class="bar" style="height: 100%; background: #fb923c"></div>
-                <div class="bar" style="height: 80%; background: #f97316"></div>
-                <div class="bar" style="height: 60%; background: #fdba74"></div>
-                <div class="bar" style="height: 40%; background: #ea580c"></div>
-                <div class="bar" style="height: 30%; background: #c2410c"></div>
+                <div class="bar" style="height: 100%; background: var(--tp-accent-warning)"></div>
+                <div class="bar" style="height: 80%; background: var(--tp-warning)"></div>
+                <div
+                  class="bar"
+                  style="height: 60%; background: var(--tp-accent-warning-border)"
+                ></div>
+                <div class="bar" style="height: 40%; background: var(--tp-accent-warning)"></div>
+                <div
+                  class="bar"
+                  style="height: 30%; background: var(--tp-accent-warning-soft)"
+                ></div>
               </div>
             </div>
           </div>
@@ -1798,7 +1819,7 @@ watch(selectedProject, (newId) => {
                   <span
                     v-if="r.tagList.length > 3"
                     class="table-tag"
-                    style="background: rgba(255, 255, 255, 0.06); color: var(--tp-gray-400)"
+                    style="background: var(--tp-surface-muted); color: var(--tp-gray-500)"
                     :title="
                       r.tagList
                         .slice(3)
@@ -1987,7 +2008,7 @@ watch(selectedProject, (newId) => {
                 clearable
                 style="flex: 1"
               />
-              <span style="color: rgba(255, 255, 255, 0.3)">~</span>
+              <span style="color: var(--tp-gray-400)">~</span>
               <el-date-picker
                 v-model="createdBefore"
                 type="date"
@@ -2008,7 +2029,7 @@ watch(selectedProject, (newId) => {
                 clearable
                 style="flex: 1"
               />
-              <span style="color: rgba(255, 255, 255, 0.3)">~</span>
+              <span style="color: var(--tp-gray-400)">~</span>
               <el-date-picker
                 v-model="updatedBefore"
                 type="date"
@@ -2658,7 +2679,7 @@ watch(selectedProject, (newId) => {
                     v-if="!editingId"
                     style="
                       font-size: 10px;
-                      color: rgba(255, 255, 255, 0.4);
+                      color: var(--tp-gray-500);
                       text-align: center;
                       padding: 10px;
                     "
@@ -2786,7 +2807,7 @@ watch(selectedProject, (newId) => {
                       text-align: center;
                       padding: 8px 4px;
                       border-radius: 8px;
-                      background: rgba(255, 255, 255, 0.04);
+                      background: var(--tp-surface-muted);
                     "
                   >
                     <div class="text-xs text-variant" style="margin-bottom: 4px">
@@ -2825,7 +2846,7 @@ watch(selectedProject, (newId) => {
                     ]"
                     :key="issue.text"
                     class="text-xs"
-                    style="padding: 3px 0; color: rgba(255, 255, 255, 0.6); line-height: 1.4"
+                    style="padding: 3px 0; color: var(--tp-gray-600); line-height: 1.4"
                   >
                     <span style="margin-right: 4px">
                       {{
@@ -3043,14 +3064,14 @@ watch(selectedProject, (newId) => {
 /* ── Review attachments (read-only evidences) ── */
 .review-att-count {
   margin-left: 8px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--tp-gray-500);
   font-weight: 400;
 }
 .review-att-hint {
   margin-left: 8px;
   font-size: 11px;
   font-weight: 400;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--tp-gray-500);
 }
 .review-att-empty {
   display: flex;
@@ -3059,7 +3080,7 @@ watch(selectedProject, (newId) => {
   justify-content: center;
   gap: 6px;
   padding: 16px;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--tp-gray-500);
   font-size: 12px;
 }
 .review-att-empty .material-symbols-outlined {
@@ -3079,16 +3100,16 @@ watch(selectedProject, (newId) => {
   gap: 10px;
   padding: 10px 12px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--tp-surface-muted);
+  border: 1px solid var(--tp-border-subtle);
 }
 .review-att-icon {
   flex-shrink: 0;
   width: 32px;
   height: 32px;
   border-radius: 6px;
-  background: rgba(124, 58, 237, 0.15);
-  color: #d2bbff;
+  background: var(--tp-accent-primary-soft);
+  color: var(--tp-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3102,7 +3123,7 @@ watch(selectedProject, (newId) => {
 }
 .review-att-title {
   font-size: 13px;
-  color: #e5e5e5;
+  color: var(--tp-gray-900);
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -3117,14 +3138,14 @@ watch(selectedProject, (newId) => {
   border-radius: 4px;
   font-size: 10px;
   font-weight: 500;
-  background: rgba(124, 58, 237, 0.25);
-  color: #d2bbff;
+  background: var(--tp-accent-primary-soft);
+  color: var(--tp-primary);
   flex-shrink: 0;
 }
 .review-att-meta {
   margin-top: 2px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--tp-gray-500);
   display: flex;
   flex-wrap: wrap;
   gap: 2px 6px;
@@ -3134,9 +3155,9 @@ watch(selectedProject, (newId) => {
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  color: #d2bbff;
-  border: none;
+  background: var(--tp-surface-input);
+  color: var(--tp-primary);
+  border: 1px solid var(--tp-border-subtle);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -3144,7 +3165,7 @@ watch(selectedProject, (newId) => {
   transition: background 0.2s;
 }
 .review-att-btn:hover {
-  background: rgba(124, 58, 237, 0.25);
+  background: var(--tp-surface-hover);
 }
 .review-att-btn .material-symbols-outlined {
   font-size: 16px;
@@ -3155,7 +3176,574 @@ watch(selectedProject, (newId) => {
   transition: color 0.2s;
 }
 .case-title-link:hover {
-  color: var(--tp-primary-light, #7c3aed);
+  color: var(--tp-primary);
   text-decoration: underline;
+}
+
+.review-att-count,
+.review-att-hint,
+.review-att-empty,
+.review-att-meta {
+  color: var(--tp-gray-500);
+}
+
+.review-att-item {
+  background: var(--tp-surface-muted);
+  border-color: var(--tp-border-subtle);
+}
+
+.review-att-icon,
+.review-att-badge {
+  background: var(--tp-accent-primary-soft);
+  color: var(--tp-primary);
+}
+
+.review-att-title {
+  color: var(--tp-gray-900);
+}
+
+.review-att-btn {
+  background: var(--tp-surface-input);
+  color: var(--tp-primary);
+  border: 1px solid var(--tp-border-subtle);
+}
+
+.review-att-btn:hover {
+  background: var(--tp-surface-hover);
+}
+
+.case-title-link:hover {
+  color: var(--tp-primary);
+}
+
+.case-page .insight-card {
+  background:
+    linear-gradient(180deg, var(--tp-surface-sheen), transparent 40%), var(--tp-surface-card) !important;
+  border-color: var(--tp-border-subtle) !important;
+  box-shadow: var(--tp-shadow-card) !important;
+}
+
+.case-page .insight-card::before {
+  background: radial-gradient(circle, var(--tp-ambient-primary) 0%, transparent 68%);
+  opacity: 0.72;
+}
+
+.case-page .insight-card:hover {
+  transform: none;
+  border-color: var(--tp-border-strong) !important;
+  box-shadow: var(--tp-shadow-card) !important;
+}
+
+.case-page .insight-label,
+.case-page .trend-grey {
+  color: var(--tp-gray-600) !important;
+}
+
+.case-page .insight-value,
+.case-page .insights-title,
+.case-page .case-title-link,
+.case-page .table-meta-name {
+  color: var(--tp-gray-900) !important;
+}
+
+.case-page .insights-desc,
+.case-page .table-meta-time {
+  color: var(--tp-gray-500) !important;
+}
+
+.case-page .trend-grey {
+  background: var(--tp-surface-muted);
+  border-color: var(--tp-border-subtle);
+}
+
+.case-page .trend-green {
+  background: var(--tp-accent-success-soft);
+  border-color: var(--tp-accent-success-border);
+  color: var(--tp-accent-success) !important;
+}
+
+.case-page .trend-red {
+  background: var(--tp-accent-danger-soft);
+  border-color: var(--tp-accent-danger-border);
+  color: var(--tp-accent-danger) !important;
+}
+
+.case-page .insight-icon-wrap {
+  box-shadow: none !important;
+}
+
+.case-page .icon-purple {
+  background: var(--tp-accent-primary-soft);
+  color: var(--tp-primary);
+}
+
+.case-page .icon-blue {
+  background: var(--tp-accent-info-soft);
+  color: var(--tp-accent-info);
+}
+
+.case-page .icon-red {
+  background: var(--tp-accent-danger-soft);
+  color: var(--tp-accent-danger);
+}
+
+.case-page .icon-orange {
+  background: var(--tp-accent-warning-soft);
+  color: var(--tp-accent-warning);
+}
+
+.case-page .filter-search-input :deep(.el-input__wrapper),
+.case-page .filter-dropdown :deep(.el-select__wrapper) {
+  background: var(--tp-surface-input) !important;
+  border-color: var(--tp-border-subtle) !important;
+  box-shadow: none !important;
+}
+
+.case-page .filter-search-input :deep(.el-input__inner),
+.case-page .filter-dropdown :deep(.el-select__selected-item) {
+  color: var(--tp-gray-900) !important;
+}
+
+.case-page .filter-search-input :deep(.el-input__inner::placeholder),
+.case-page .filter-dropdown :deep(.el-select__placeholder) {
+  color: var(--tp-gray-400) !important;
+}
+
+.case-page .table-shell table {
+  border-spacing: 0 8px;
+}
+
+.case-page .table-shell th {
+  background: var(--tp-surface-header) !important;
+  color: var(--tp-gray-600) !important;
+}
+
+.case-page .table-shell tbody tr,
+.case-page .table-shell tbody tr.row-selected,
+.case-page .table-shell tbody tr .sticky-action {
+  background: var(--tp-surface-card) !important;
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.case-page .table-shell tbody tr:hover,
+.case-page .table-shell tbody tr:hover .sticky-action {
+  background: var(--tp-surface-row-hover) !important;
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.case-page .table-shell tbody td {
+  background: transparent !important;
+  border-top: 1px solid var(--tp-border-subtle) !important;
+  border-bottom: 1px solid var(--tp-border-subtle) !important;
+  color: var(--tp-gray-700) !important;
+}
+
+.case-page .table-shell tbody td:first-child {
+  border-left: 1px solid var(--tp-border-subtle) !important;
+}
+
+.case-page .table-shell tbody td:last-child {
+  border-right: 1px solid var(--tp-border-subtle) !important;
+}
+
+.case-page .table-shell tbody tr:hover td {
+  color: var(--tp-gray-900) !important;
+}
+
+.case-page .table-shell .id {
+  color: var(--tp-gray-500) !important;
+}
+
+.case-page .table-user-avatar {
+  background: var(--tp-accent-primary-soft);
+  color: var(--tp-primary);
+}
+
+.case-page .action-btn:hover {
+  background: var(--tp-surface-hover);
+  color: var(--tp-primary);
+}
+
+.case-page .right-table {
+  background: var(--tp-surface-base) !important;
+  padding: 16px 20px 20px !important;
+}
+
+.case-page .insights-header {
+  margin-bottom: 12px !important;
+}
+
+.case-page .insights-title {
+  font-size: 16px !important;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+
+.case-page .insights-desc {
+  margin-top: 2px;
+  line-height: 1.55;
+}
+
+.case-page .insights-cards {
+  gap: 16px !important;
+}
+
+.case-page .insight-card {
+  min-height: 106px !important;
+  padding: 16px 18px !important;
+  border-radius: var(--tp-radius-lg) !important;
+  background:
+    linear-gradient(180deg, var(--tp-surface-sheen), transparent 44%), var(--tp-surface-card) !important;
+}
+
+.case-page .insight-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--tp-shadow-card-hover) !important;
+}
+
+.case-page .insight-label {
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.case-page .insight-value {
+  margin: 8px 0 !important;
+  font-size: 28px !important;
+  letter-spacing: -0.03em;
+}
+
+.case-page .insight-trend {
+  margin-top: 14px !important;
+}
+
+.case-page .filter-bar {
+  margin-bottom: 12px !important;
+}
+
+.case-page .filter-icon-btn {
+  background: var(--tp-surface-card) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  color: var(--tp-gray-600) !important;
+  box-shadow: none !important;
+}
+
+.case-page .filter-icon-btn:hover {
+  background: var(--tp-surface-hover) !important;
+  border-color: var(--tp-border-strong) !important;
+  color: var(--tp-primary) !important;
+}
+
+.case-page .table-shell {
+  margin-top: 12px !important;
+  overflow: auto;
+  background: var(--tp-surface-card) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  border-radius: var(--tp-radius-lg) !important;
+  box-shadow: var(--tp-shadow-card);
+}
+
+.case-page .table-shell table {
+  border-spacing: 0 !important;
+}
+
+.case-page .table-shell thead tr {
+  background: var(--tp-surface-header) !important;
+}
+
+.case-page .table-shell th {
+  padding: 13px 14px !important;
+  border-bottom: 1px solid var(--tp-border-subtle) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+.case-page .table-shell tbody tr,
+.case-page .table-shell tbody tr:hover,
+.case-page .table-shell tbody tr.row-selected,
+.case-page .table-shell tbody tr .sticky-action,
+.case-page .table-shell tbody tr:hover .sticky-action {
+  box-shadow: none !important;
+}
+
+.case-page .table-shell tbody td {
+  padding: 15px 14px !important;
+  border-top: 0 !important;
+  border-bottom: 1px solid var(--tp-border-subtle) !important;
+}
+
+.case-page .table-shell tbody td:first-child {
+  border-left: 0 !important;
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+}
+
+.case-page .table-shell tbody td:last-child {
+  border-right: 0 !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+.case-page .table-shell tbody tr:last-child td {
+  border-bottom: 0 !important;
+}
+
+.case-page .table-shell tbody tr:hover {
+  background: var(--tp-surface-row-hover) !important;
+}
+
+.case-page .table-shell input[type='checkbox'] {
+  accent-color: var(--tp-primary);
+}
+
+.case-page .case-title-link {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.case-page .table-tag {
+  border-radius: 999px;
+  font-weight: 650;
+}
+
+.case-page .pager {
+  margin-top: 10px;
+  padding: 10px 0 0;
+}
+
+.case-page .pager :deep(.el-pagination.is-background .el-pager li.is-active) {
+  background: var(--tp-primary);
+}
+
+.case-page {
+  background: var(--tp-surface-base);
+}
+
+.case-page .right-table {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 22px 22px !important;
+}
+
+.case-page .insights-section {
+  padding: 14px;
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, var(--tp-surface-sheen), transparent 46%), var(--tp-surface-card);
+  box-shadow: var(--tp-shadow-card);
+}
+
+.case-page .insights-header {
+  align-items: center;
+  margin-bottom: 14px !important;
+  padding: 2px 2px 0;
+}
+
+.case-page .insights-title {
+  font-size: 17px !important;
+  font-weight: 760;
+  letter-spacing: -0.02em;
+}
+
+.case-page .insights-desc {
+  margin-top: 4px;
+  color: var(--tp-gray-600) !important;
+  font-size: 12px;
+}
+
+.case-page .insights-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.case-page .insights-btn-primary {
+  min-height: 34px;
+  border-radius: var(--tp-btn-radius);
+  transition:
+    background var(--tp-transition),
+    border-color var(--tp-transition),
+    color var(--tp-transition),
+    box-shadow var(--tp-transition);
+}
+
+.case-page .insights-btn-primary:first-child {
+  background: var(--tp-btn-plain-bg);
+  border: 1px solid var(--tp-btn-plain-border);
+  color: var(--tp-gray-700);
+}
+
+.case-page .insights-btn-primary:first-child:hover {
+  background: var(--tp-surface-hover);
+  border-color: var(--tp-accent-primary-border);
+  color: var(--tp-primary);
+}
+
+.case-page .insights-btn-primary:last-child {
+  background: var(--tp-btn-bg);
+  border: 1px solid var(--tp-btn-border);
+  color: var(--tp-btn-text);
+  box-shadow: var(--tp-btn-shadow);
+}
+
+.case-page .insights-btn-primary:last-child:hover {
+  background: var(--tp-btn-bg-hover);
+  box-shadow: var(--tp-btn-shadow-hover);
+}
+
+.case-page .insights-cards {
+  gap: 10px !important;
+}
+
+.case-page .insight-card {
+  min-height: 92px !important;
+  padding: 13px 14px !important;
+  border-color: var(--tp-border-subtle) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+
+.case-page .insight-card:hover {
+  transform: none;
+  border-color: var(--tp-border-strong) !important;
+  box-shadow: var(--tp-shadow-sm) !important;
+}
+
+.case-page .insight-card::before {
+  opacity: 0.55;
+}
+
+.case-page .insight-icon-wrap {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 10px;
+}
+
+.case-page .insight-trend {
+  margin-top: 12px !important;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px !important;
+}
+
+.case-page .insight-label {
+  font-size: 12px;
+}
+
+.case-page .insight-value {
+  margin: 6px 0 !important;
+  font-size: 26px !important;
+  font-weight: 780;
+}
+
+.case-page .insight-chart {
+  height: 18px;
+  gap: 3px;
+}
+
+.case-page .bar {
+  width: 4px;
+  border-radius: 999px;
+}
+
+.case-page .filter-bar {
+  margin-bottom: 0 !important;
+  padding: 10px;
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 14px;
+  background: var(--tp-surface-card);
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.case-page .filter-search-input :deep(.el-input__wrapper),
+.case-page .filter-dropdown :deep(.el-select__wrapper),
+.case-page .filter-icon-btn {
+  min-height: 34px;
+  border-radius: 10px !important;
+}
+
+.case-page .filter-bar-search {
+  max-width: none;
+}
+
+.case-page .filter-bar-selects {
+  gap: 8px;
+}
+
+.case-page .table-shell {
+  margin-top: 0 !important;
+  border-color: var(--tp-border-strong) !important;
+  border-radius: 16px !important;
+}
+
+.case-page .table-shell table {
+  min-width: 1120px;
+}
+
+.case-page .table-shell th {
+  height: 38px;
+  padding: 10px 14px !important;
+  color: var(--tp-gray-600) !important;
+  font-size: 11px !important;
+  letter-spacing: 0.04em;
+}
+
+.case-page .table-shell tbody td {
+  padding: 13px 14px !important;
+}
+
+.case-page .table-shell tbody tr {
+  transition:
+    background var(--tp-transition),
+    color var(--tp-transition);
+}
+
+.case-page .table-shell tbody tr:nth-child(even) {
+  background: var(--tp-gray-50) !important;
+}
+
+.case-page .table-shell tbody tr:hover {
+  background: var(--tp-accent-primary-soft) !important;
+}
+
+.case-page .case-title-link {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.case-page .table-meta-cell {
+  gap: 9px;
+}
+
+.case-page .table-user-avatar,
+.case-page .table-user-avatar-img {
+  width: 24px;
+  height: 24px;
+}
+
+.case-page .table-meta-name {
+  color: var(--tp-gray-800) !important;
+  font-size: 12px;
+}
+
+.case-page .table-meta-time {
+  font-size: 11px;
+}
+
+.case-page .action-group {
+  gap: 2px;
+}
+
+.case-page .action-btn.icon-only {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+.case-page .pager {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -4px;
+  padding: 0;
 }
 </style>

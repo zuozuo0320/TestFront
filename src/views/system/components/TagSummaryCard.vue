@@ -143,4 +143,38 @@ defineProps<{
   background: var(--bg-dot-more);
   color: var(--text-secondary);
 }
+
+.tm-summary-card {
+  background: var(--tp-surface-card, var(--bg-card-high));
+  border-color: var(--tp-border-subtle, var(--border-subtle));
+  box-shadow: var(--tp-shadow-card, none);
+}
+
+.tm-summary-glow {
+  background: var(--tp-accent-primary-soft, var(--purple-20));
+}
+
+.tm-summary-label,
+.tm-summary-metric-label {
+  color: var(--tp-gray-500, var(--text-muted));
+}
+
+.tm-summary-number,
+.tm-summary-metric-value {
+  color: var(--tp-gray-900, var(--text-primary));
+}
+
+.tm-summary-sub {
+  color: var(--tp-accent-success, var(--green));
+}
+
+.tm-summary-metrics,
+.tm-summary-dot {
+  border-color: var(--tp-border-subtle, var(--border-subtle));
+}
+
+.tm-summary-dot--more {
+  background: var(--tp-surface-muted, var(--bg-dot-more));
+  color: var(--tp-gray-600, var(--text-secondary));
+}
 </style>

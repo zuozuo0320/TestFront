@@ -204,7 +204,12 @@ const systemNavItems = computed(() => {
     <div class="nav-inner">
       <!-- Project Switcher Header -->
       <div class="nav-header">
-        <div class="nav-header-card" :class="{ active: dropdownOpen }" @click="toggleDropdown">
+        <button
+          type="button"
+          class="nav-header-card"
+          :class="{ active: dropdownOpen }"
+          @click="toggleDropdown"
+        >
           <div class="nav-header-icon">
             <img
               v-if="currentProjectAvatar"
@@ -237,22 +242,24 @@ const systemNavItems = computed(() => {
           >
             unfold_more
           </span>
-        </div>
+        </button>
 
         <!-- Dropdown panel -->
         <Transition name="dropdown-slide">
           <div v-if="dropdownOpen && !collapsed" class="nav-project-dropdown">
             <div class="nav-project-dropdown-label">切换项目</div>
             <div class="nav-project-dropdown-list">
-              <div
+              <button
                 v-for="p in projectStore.projects"
                 :key="p.id"
+                type="button"
                 class="nav-project-dropdown-item"
                 :class="{
                   selected: p.id === projectStore.selectedProjectId,
                   archived: p.status === 'archived',
                 }"
-                @click="p.status !== 'archived' && selectProject(p.id)"
+                :disabled="p.status === 'archived'"
+                @click="selectProject(p.id)"
               >
                 <div class="nav-project-item-icon">
                   <img
@@ -277,7 +284,7 @@ const systemNavItems = computed(() => {
                 >
                   check
                 </span>
-              </div>
+              </button>
             </div>
           </div>
         </Transition>
@@ -285,17 +292,15 @@ const systemNavItems = computed(() => {
 
       <!-- Main Navigation -->
       <nav class="nav-links">
-        <a
+        <button
           v-for="item in navItems"
           :key="item.key"
+          type="button"
           class="main-nav-item"
           :class="{ active: topMenu === item.key }"
-          role="button"
-          tabindex="0"
           :aria-current="topMenu === item.key ? 'page' : undefined"
           :title="collapsed ? item.label : undefined"
           @click="$emit('update:topMenu', item.key)"
-          @keydown.enter="$emit('update:topMenu', item.key)"
         >
           <span
             class="material-symbols-outlined nav-icon"
@@ -308,7 +313,7 @@ const systemNavItems = computed(() => {
             {{ item.icon }}
           </span>
           <span v-if="!collapsed" class="nav-label">{{ item.label }}</span>
-        </a>
+        </button>
       </nav>
 
       <!-- Test Cases Directory Tree (Visible only when TEST SUITES is active) -->
@@ -443,14 +448,12 @@ const systemNavItems = computed(() => {
       <!-- Bottom group -->
       <div class="nav-bottom-group">
         <template v-if="showSystemMenu">
-          <a
+          <button
+            type="button"
             class="main-nav-item"
             :class="{ active: topMenu === 'system' }"
-            role="button"
-            tabindex="0"
             :title="collapsed ? '系统管理' : undefined"
             @click="$emit('update:topMenu', 'system')"
-            @keydown.enter="$emit('update:topMenu', 'system')"
           >
             <span
               class="material-symbols-outlined nav-icon"
@@ -465,26 +468,25 @@ const systemNavItems = computed(() => {
               settings
             </span>
             <span v-if="!collapsed" class="nav-label">系统管理</span>
-          </a>
+          </button>
 
           <div v-if="topMenu === 'system' && !collapsed" class="sub-nav">
-            <div
+            <button
               v-for="sub in systemNavItems"
               :key="sub.key"
+              type="button"
               class="sub-nav-item"
               :class="{ active: activeMenu === sub.key }"
-              role="button"
-              tabindex="0"
               :aria-current="activeMenu === sub.key ? 'page' : undefined"
               @click="$emit('update:activeMenu', sub.key)"
-              @keydown.enter="$emit('update:activeMenu', sub.key)"
             >
               {{ sub.label }}
-            </div>
+            </button>
           </div>
         </template>
 
-        <div
+        <button
+          type="button"
           class="nav-collapse-btn"
           :title="collapsed ? '展开侧栏' : '收起侧栏'"
           @click="$emit('toggle-collapse')"
@@ -499,7 +501,7 @@ const systemNavItems = computed(() => {
             menu_open
           </span>
           <span v-if="!collapsed" class="nav-label">收起侧栏</span>
-        </div>
+        </button>
       </div>
     </div>
   </aside>
