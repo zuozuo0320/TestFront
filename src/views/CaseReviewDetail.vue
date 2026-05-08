@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   rerunAIGate,
@@ -31,10 +31,13 @@ import {
 } from '@/api/caseReviewAttachment'
 import { apiClient } from '@/api/client'
 import { useProjectStore } from '@/stores/project'
+import { useAuthStore } from '@/stores/auth'
 import { extractErrorMessage, isElMessageBoxCancel } from '@/utils/error'
 
 const route = useRoute()
+const router = useRouter()
 const projectStore = useProjectStore()
+const authStore = useAuthStore()
 
 const reviewId = computed(() => Number(route.params.reviewId) || 0)
 const projectId = computed(() => projectStore.selectedProjectId || 0)
@@ -65,7 +68,7 @@ const isActive = computed(
 )
 
 // 用户列表
-const allUsers = ref<{ id: number; name: string }[]>([])
+const allUsers = ref<{ id: number; name: string; avatar?: string }[]>([])
 // 可用用例列表
 const availableCases = ref<{ id: number; title: string }[]>([])
 
@@ -313,6 +316,7 @@ async function fetchItems() {
     const resp = await listReviewItems(projectId.value, reviewId.value, params)
     items.value = resp.items || []
     itemTotal.value = resp.total
+    restoreCurrentItemFromRoute()
   } catch {
     /* ignore */
   } finally {
@@ -322,10 +326,13 @@ async function fetchItems() {
 
 async function fetchUsers() {
   try {
-    const { data } = await apiClient.get<{ items: { id: number; name: string }[] }>('/users', {
-      params: { page: 1, pageSize: 200 },
-    })
-    allUsers.value = data.items || []
+    const { data } = await apiClient.get<{ id: number; name: string; avatar?: string }[]>(
+      '/users/lookup',
+      {
+        params: { page: 1, pageSize: 200 },
+      },
+    )
+    allUsers.value = data || []
   } catch {
     /* ignore */
   }
@@ -344,6 +351,45 @@ async function fetchAvailableCases() {
 }
 
 // ── 辅助函数 ──
+function routeItemId() {
+  const raw = route.query.itemId
+  const value = Array.isArray(raw) ? raw[0] : raw
+  const itemId = Number(value)
+  return Number.isFinite(itemId) && itemId > 0 ? itemId : 0
+}
+
+function restoreCurrentItemFromRoute() {
+  const itemId = routeItemId()
+  if (itemId) {
+    const index = items.value.findIndex((item) => item.id === itemId)
+    if (index >= 0) {
+      currentItemIndex.value = index
+      return
+    }
+  }
+  if (currentItemIndex.value >= items.value.length) {
+    currentItemIndex.value = Math.max(0, items.value.length - 1)
+  }
+}
+
+function syncCurrentItemToRoute(itemId: number) {
+  if (!itemId || routeItemId() === itemId) return
+  router
+    .replace({
+      path: route.path,
+      query: { ...route.query, itemId: String(itemId) },
+      hash: route.hash,
+    })
+    .catch(() => {
+      /* ignore */
+    })
+}
+
+function selectItemIndex(index: number) {
+  if (index < 0 || index >= items.value.length) return
+  currentItemIndex.value = index
+}
+
 function resultClass(result: string) {
   if (result === 'approved') return 'approved'
   if (result === 'rejected') return 'rejected'
@@ -355,9 +401,37 @@ function resultLabel(result: string) {
     pending: '待评审',
     approved: '通过',
     rejected: '拒绝',
-    needs_update: '需修改',
+    needs_update: '打回修订',
   }
   return map[result] || result
+}
+function resultIcon(result: string) {
+  const map: Record<string, string> = {
+    approved: 'check_circle',
+    rejected: 'block',
+    needs_update: 'edit_note',
+  }
+  return map[result] || 'pending_actions'
+}
+function reviewerUser(reviewerId: number) {
+  return allUsers.value.find((user) => user.id === reviewerId)
+}
+function reviewerName(record: CaseReviewRecord) {
+  return (
+    record.reviewer_name ||
+    reviewerUser(record.reviewer_id)?.name ||
+    `评审人 #${record.reviewer_id}`
+  )
+}
+function reviewerAvatarUrl(record: CaseReviewRecord) {
+  const name = reviewerName(record)
+  return authStore.resolveAvatarUrl(
+    record.reviewer_avatar || reviewerUser(record.reviewer_id)?.avatar,
+    name,
+  )
+}
+function onReviewerAvatarError(event: Event, name: string) {
+  authStore.handleAvatarError(event, name)
 }
 function aiGateClass(status?: string) {
   if (status === 'passed' || status === 'bypassed') return 'passed'
@@ -399,7 +473,7 @@ const sidebarCaseRows = computed(() =>
 
 // ── 导航 ──
 function goNextItem() {
-  if (currentItemIndex.value < items.value.length - 1) currentItemIndex.value++
+  selectItemIndex(currentItemIndex.value + 1)
 }
 
 // ── 关联用例 ──
@@ -951,12 +1025,12 @@ function fieldHasIssue(field: ReviewFieldKey) {
 }
 
 const REVIEW_FIELD_TARGET_ID: Record<ReviewFieldKey, string> = {
-  title: 'case-field-title',
+  title: 'case-summary-title',
   level: 'case-field-level',
   precondition: 'case-field-precondition',
   postcondition: 'case-field-postcondition',
   steps: 'case-field-steps',
-  case: 'case-field-title',
+  case: 'case-summary-title',
 }
 
 function focusReviewField(field: ReviewFieldKey) {
@@ -981,7 +1055,16 @@ const blockingFindingTotal = computed(
           (finding.severity === 'critical' || finding.severity === 'major'),
       ).length,
 )
-const latestRecord = computed(() => records.value[0] ?? null)
+const sortedAuditRecords = computed(() =>
+  [...records.value].sort(
+    (left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime(),
+  ),
+)
+const latestRecord = computed(() => sortedAuditRecords.value[0] ?? null)
+const auditTimelineRecords = computed(() => sortedAuditRecords.value.slice(0, 3))
+const auditHiddenCount = computed(() =>
+  Math.max(records.value.length - auditTimelineRecords.value.length, 0),
+)
 
 const DECISION_META: Record<
   ReviewDecision,
@@ -1121,10 +1204,10 @@ async function handleReopenDefect(d: CaseReviewDefect) {
 
 /** 上一条 / 下一条切换 */
 function goPrev() {
-  if (currentItemIndex.value > 0) currentItemIndex.value--
+  selectItemIndex(currentItemIndex.value - 1)
 }
 function goNext() {
-  if (currentItemIndex.value < items.value.length - 1) currentItemIndex.value++
+  selectItemIndex(currentItemIndex.value + 1)
 }
 const canGoPrev = computed(() => currentItemIndex.value > 0)
 const canGoNext = computed(() => currentItemIndex.value < items.value.length - 1)
@@ -1161,15 +1244,39 @@ const reviewProgressPercent = computed(() => {
   return Math.min(100, Math.round((reviewedCaseCount.value / total) * 1000) / 10)
 })
 
-const caseTitleText = computed(
-  () =>
-    currentTestCase.value?.title?.trim() ||
-    currentItem.value?.title_snapshot?.trim() ||
-    '未填写标题',
-)
+type PriorityTone = 'critical' | 'high' | 'medium' | 'low' | 'default'
+
+const PRIORITY_LABELS: Record<string, string> = {
+  blocker: '阻塞',
+  critical: '紧急',
+  urgent: '紧急',
+  high: '高',
+  medium: '中',
+  normal: '中',
+  low: '低',
+}
+
 const caseLevelText = computed(() => currentTestCase.value?.level?.trim() || '未选择等级')
-const casePriorityText = computed(() => currentTestCase.value?.priority?.trim() || '未设置优先级')
-const caseModuleText = computed(() => currentTestCase.value?.module_path?.trim() || '未关联模块')
+const casePriorityRaw = computed(() => currentTestCase.value?.priority?.trim() || '')
+const casePriorityText = computed(() => {
+  if (!casePriorityRaw.value) return '未设置'
+  const key = casePriorityRaw.value.toLowerCase()
+  return PRIORITY_LABELS[key] || casePriorityRaw.value
+})
+const casePriorityTone = computed<PriorityTone>(() => {
+  const key = casePriorityRaw.value.toLowerCase()
+  if (key === 'blocker' || key === 'critical' || key === 'urgent') return 'critical'
+  if (key === 'high') return 'high'
+  if (key === 'medium' || key === 'normal') return 'medium'
+  if (key === 'low') return 'low'
+  return 'default'
+})
+const caseModuleSegments = computed(() =>
+  (currentTestCase.value?.module_path || '')
+    .split('/')
+    .map((segment) => segment.trim())
+    .filter(Boolean),
+)
 
 /** 提交当前结论；存在严重/主要问题时，对"通过"增加二次确认，避免误放行。 */
 async function submitCurrentDecision() {
@@ -1227,12 +1334,20 @@ watch([projectId, reviewId], () => {
   }
 })
 
+watch(
+  () => route.query.itemId,
+  () => {
+    restoreCurrentItemFromRoute()
+  },
+)
+
 // 切换当前评审项时，自动拉取其历史记录、附件和 AI 门禁 defects
 watch(
   () => currentItem.value?.id,
   (id) => {
     syncReviewDecisionFromItem(currentItem.value)
     if (id) {
+      syncCurrentItemToRoute(id)
       loadCurrentItemRecords()
       loadAttachments()
       if (projectId.value && reviewId.value) {
@@ -1244,6 +1359,7 @@ watch(
       clearAttachmentPreviewUrls()
     }
   },
+  { immediate: true },
 )
 </script>
 
@@ -1253,7 +1369,7 @@ watch(
       <!-- ══ 顶部上下文条 ══ -->
       <section class="rv2-summary">
         <div class="rv2-summary-l">
-          <div class="rv2-summary-title-row">
+          <div id="case-summary-title" class="rv2-summary-title-row">
             <span class="rv2-tc-badge">{{ currentTestCaseTag }}</span>
             <h1 class="rv2-summary-title">
               {{ currentItem?.title_snapshot || review.name }}
@@ -1341,7 +1457,7 @@ watch(
               type="button"
               class="rv2-case-row"
               :class="{ active: index === currentItemIndex }"
-              @click="currentItemIndex = index"
+              @click="selectItemIndex(index)"
             >
               <span class="rv2-case-idx">{{ String(index + 1).padStart(2, '0') }}</span>
               <span class="rv2-case-main">
@@ -1499,31 +1615,9 @@ watch(
                   用例内容
                   <span v-if="testCaseLoading" class="rv2-loading">加载中…</span>
                 </h2>
-                <div class="rv2-field-stats" aria-label="用例字段数量">
-                  <span>前置 {{ preconditionItems.length }}</span>
-                  <span>后置 {{ postconditionItems.length }}</span>
-                  <span>步骤 {{ realSteps.length }}</span>
-                </div>
               </div>
 
               <section class="rv2-basic-fields" aria-label="基础信息">
-                <article
-                  id="case-field-title"
-                  class="rv2-basic-field rv2-basic-title"
-                  :class="{
-                    'has-issue': fieldHasIssue('title'),
-                    'is-field-focused': activeReviewField === 'title',
-                  }"
-                >
-                  <div class="rv2-field-head">
-                    <span class="material-symbols-outlined">title</span>
-                    <strong>标题</strong>
-                    <span v-if="fieldIssueCount('title')" class="rv2-field-issue">
-                      问题 {{ fieldIssueCount('title') }}
-                    </span>
-                  </div>
-                  <p>{{ caseTitleText }}</p>
-                </article>
                 <article
                   id="case-field-level"
                   class="rv2-basic-field"
@@ -1539,21 +1633,50 @@ watch(
                       问题 {{ fieldIssueCount('level') }}
                     </span>
                   </div>
-                  <p>{{ caseLevelText }}</p>
+                  <p class="rv2-field-value">
+                    <span class="rv2-value-tag rv2-level-tag">{{ caseLevelText }}</span>
+                  </p>
                 </article>
                 <article class="rv2-basic-field">
                   <div class="rv2-field-head">
-                    <span class="material-symbols-outlined">priority_high</span>
+                    <span class="material-symbols-outlined">flag</span>
                     <strong>优先级</strong>
                   </div>
-                  <p>{{ casePriorityText }}</p>
+                  <p class="rv2-field-value">
+                    <span class="rv2-value-tag rv2-priority-tag" :class="`is-${casePriorityTone}`">
+                      {{ casePriorityText }}
+                    </span>
+                  </p>
                 </article>
                 <article class="rv2-basic-field rv2-basic-module">
                   <div class="rv2-field-head">
                     <span class="material-symbols-outlined">account_tree</span>
                     <strong>模块</strong>
                   </div>
-                  <p>{{ caseModuleText }}</p>
+                  <div
+                    v-if="caseModuleSegments.length"
+                    class="rv2-module-path"
+                    :title="caseModuleSegments.join(' / ')"
+                  >
+                    <template
+                      v-for="(segment, index) in caseModuleSegments"
+                      :key="`${segment}-${index}`"
+                    >
+                      <span
+                        class="rv2-module-segment"
+                        :class="{ 'is-leaf': index === caseModuleSegments.length - 1 }"
+                      >
+                        {{ segment }}
+                      </span>
+                      <span
+                        v-if="index < caseModuleSegments.length - 1"
+                        class="rv2-module-separator"
+                      >
+                        /
+                      </span>
+                    </template>
+                  </div>
+                  <p v-else class="rv2-field-value">未关联模块</p>
                 </article>
               </section>
 
@@ -1826,28 +1949,76 @@ watch(
               </h2>
               <div v-if="records.length === 0 && !recordsLoading" class="rv2-audit-empty">
                 <span class="material-symbols-outlined">forum</span>
-                <span>暂无评审记录</span>
+                <strong>等待首次结论</strong>
+                <span>提交通过、拒绝或打回修订后，这里会生成可追溯记录。</span>
               </div>
-              <div v-else v-loading="recordsLoading">
+              <div v-else v-loading="recordsLoading" class="rv2-audit-content">
                 <div
                   v-if="latestRecord"
-                  class="rv2-audit-latest"
+                  class="rv2-audit-summary"
                   :class="`rv2-tl-${resultClass(latestRecord.result)}`"
                 >
-                  <div class="rv2-audit-latest-top">
-                    <span class="rv2-drawer-result" :class="resultClass(latestRecord.result)">
-                      {{ resultLabel(latestRecord.result) }}
+                  <span class="rv2-audit-summary-icon material-symbols-outlined">
+                    {{ resultIcon(latestRecord.result) }}
+                  </span>
+                  <div class="rv2-audit-summary-main">
+                    <span class="rv2-audit-kicker">最近结论</span>
+                    <strong>{{ resultLabel(latestRecord.result) }}</strong>
+                    <span class="rv2-audit-reviewer-line">
+                      <img
+                        class="rv2-audit-avatar"
+                        :src="reviewerAvatarUrl(latestRecord)"
+                        :alt="reviewerName(latestRecord)"
+                        @error="onReviewerAvatarError($event, reviewerName(latestRecord))"
+                      />
+                      <span>{{ reviewerName(latestRecord) }}</span>
                     </span>
-                    <span class="rv2-tl-time">{{ formatDate(latestRecord.created_at) }}</span>
                   </div>
-                  <div class="rv2-audit-latest-reviewer">
-                    {{ latestRecord.reviewer_name || `评审人 #${latestRecord.reviewer_id}` }}
-                  </div>
-                  <p v-if="latestRecord.comment" class="rv2-tl-desc">
-                    {{ latestRecord.comment }}
-                  </p>
-                  <p v-else class="rv2-tl-desc rv2-tl-muted">（无评审意见）</p>
+                  <time class="rv2-audit-time" :datetime="latestRecord.created_at">
+                    {{ formatDate(latestRecord.created_at) }}
+                  </time>
                 </div>
+                <ol class="rv2-audit-list">
+                  <li
+                    v-for="(rec, index) in auditTimelineRecords"
+                    :key="rec.id"
+                    class="rv2-audit-item"
+                    :class="`rv2-tl-${resultClass(rec.result)}`"
+                  >
+                    <span class="rv2-audit-node" :aria-label="`第 ${index + 1} 条记录`">
+                      <span class="material-symbols-outlined">{{ resultIcon(rec.result) }}</span>
+                    </span>
+                    <div class="rv2-audit-card">
+                      <div class="rv2-audit-card-head">
+                        <span class="rv2-drawer-result" :class="resultClass(rec.result)">
+                          {{ resultLabel(rec.result) }}
+                        </span>
+                        <time class="rv2-audit-time" :datetime="rec.created_at">
+                          {{ formatDate(rec.created_at) }}
+                        </time>
+                      </div>
+                      <div class="rv2-audit-reviewer-line">
+                        <img
+                          class="rv2-audit-avatar"
+                          :src="reviewerAvatarUrl(rec)"
+                          :alt="reviewerName(rec)"
+                          @error="onReviewerAvatarError($event, reviewerName(rec))"
+                        />
+                        <span>{{ reviewerName(rec) }}</span>
+                      </div>
+                      <p v-if="rec.comment" class="rv2-tl-desc">{{ rec.comment }}</p>
+                      <p v-else class="rv2-tl-desc rv2-tl-muted">未填写评审意见</p>
+                    </div>
+                  </li>
+                </ol>
+                <button
+                  v-if="currentItem && auditHiddenCount > 0"
+                  class="rv2-audit-more"
+                  @click="openRecordDrawer(currentItem)"
+                >
+                  去评审记录详情查看其余 {{ auditHiddenCount }} 条
+                  <span class="material-symbols-outlined">arrow_forward</span>
+                </button>
               </div>
             </section>
           </aside>
@@ -1892,27 +2063,73 @@ watch(
     <!-- 评审记录侧栏（从顶栏历史按钮打开） -->
     <el-drawer
       v-model="recordDrawerVisible"
-      :title="`评审记录 - ${recordDrawerItem?.title_snapshot || ''}`"
       direction="rtl"
-      size="420px"
+      size="440px"
+      class="rv2-record-drawer"
+      :with-header="false"
     >
-      <div v-loading="recordsLoading">
+      <div v-loading="recordsLoading" class="rv2-record-drawer-shell">
+        <header class="rv2-record-drawer-header">
+          <div class="rv2-record-drawer-title">
+            <span class="material-symbols-outlined">history</span>
+            <div>
+              <strong>评审记录</strong>
+              <span>{{ recordDrawerItem?.title_snapshot || '当前用例' }}</span>
+            </div>
+          </div>
+          <button
+            class="rv2-record-drawer-close"
+            type="button"
+            aria-label="关闭评审记录"
+            @click="recordDrawerVisible = false"
+          >
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </header>
         <div v-if="records.length === 0 && !recordsLoading" class="rv2-drawer-empty">
           <span class="material-symbols-outlined">history</span>
-          <p>暂无评审记录</p>
+          <strong>暂无评审记录</strong>
+          <p>提交评审结论后，这里会按时间倒序保留完整轨迹。</p>
         </div>
-        <div v-else class="rv2-drawer-list">
-          <div v-for="rec in records" :key="rec.id" class="rv2-drawer-item">
-            <div class="rv2-drawer-head">
-              <span class="rv2-drawer-result" :class="resultClass(rec.result)">
-                {{ resultLabel(rec.result) }}
-              </span>
-              <span class="rv2-drawer-round">R{{ rec.round_no }}</span>
-              <span class="rv2-drawer-time">{{ formatDate(rec.created_at) }}</span>
-            </div>
-            <div v-if="rec.comment" class="rv2-drawer-comment">{{ rec.comment }}</div>
+        <template v-else>
+          <div class="rv2-record-drawer-meta">
+            <span>{{ sortedAuditRecords.length }} 条记录</span>
+            <span v-if="latestRecord">最近 {{ formatDate(latestRecord.created_at) }}</span>
           </div>
-        </div>
+          <div class="rv2-drawer-list">
+            <article
+              v-for="rec in sortedAuditRecords"
+              :key="rec.id"
+              class="rv2-drawer-item"
+              :class="`rv2-tl-${resultClass(rec.result)}`"
+            >
+              <span class="rv2-drawer-node">
+                <span class="material-symbols-outlined">{{ resultIcon(rec.result) }}</span>
+              </span>
+              <div class="rv2-drawer-card">
+                <div class="rv2-drawer-head">
+                  <span class="rv2-drawer-result" :class="resultClass(rec.result)">
+                    {{ resultLabel(rec.result) }}
+                  </span>
+                  <time class="rv2-drawer-time" :datetime="rec.created_at">
+                    {{ formatDate(rec.created_at) }}
+                  </time>
+                </div>
+                <div class="rv2-audit-reviewer-line rv2-drawer-reviewer">
+                  <img
+                    class="rv2-audit-avatar"
+                    :src="reviewerAvatarUrl(rec)"
+                    :alt="reviewerName(rec)"
+                    @error="onReviewerAvatarError($event, reviewerName(rec))"
+                  />
+                  <span>{{ reviewerName(rec) }}</span>
+                </div>
+                <p v-if="rec.comment" class="rv2-drawer-comment">{{ rec.comment }}</p>
+                <p v-else class="rv2-drawer-comment rv2-drawer-comment-muted">未填写评审意见</p>
+              </div>
+            </article>
+          </div>
+        </template>
       </div>
     </el-drawer>
 
@@ -1981,8 +2198,13 @@ watch(
 
   --rv2-radius: 0.75rem; /* xl */
   --rv2-radius-sm: 0.5rem; /* lg */
+  --rv2-shadow-panel: 0 10px 30px rgba(0, 0, 0, 0.18);
+  --rv2-focus-ring: 0 0 0 3px rgba(210, 187, 255, 0.18);
 
   background: var(--rv2-bg);
+  background-image:
+    radial-gradient(circle at 18% 0%, rgba(124, 58, 237, 0.08), transparent 30%),
+    radial-gradient(circle at 82% 12%, rgba(5, 102, 217, 0.06), transparent 28%);
   color: var(--rv2-fg);
   font-family:
     'Inter',
@@ -2020,6 +2242,18 @@ watch(
   align-items: center;
   white-space: nowrap;
 }
+.rv2-panel-btn:focus-visible,
+.rv2-finding-btn:focus-visible,
+.rv2-attach-action:focus-visible,
+.rv2-nav-btn:focus-visible,
+.rv2-attach-inline-btn:focus-visible,
+.rv2-btn:focus-visible,
+.rv2-sidebar-filter:focus-visible,
+.rv2-case-row:focus-visible,
+.rv2-decision-option:focus-visible {
+  outline: none;
+  box-shadow: var(--rv2-focus-ring);
+}
 
 /* ── 面板标题内的操作按钮组 ── */
 .rv2-panel-actions {
@@ -2030,7 +2264,8 @@ watch(
 }
 .rv2-panel-btn {
   gap: 6px;
-  padding: 6px 12px;
+  min-height: 34px;
+  padding: 7px 12px;
   border-radius: var(--rv2-radius-sm);
   background: transparent;
   color: var(--rv2-fg-muted);
@@ -2040,12 +2275,17 @@ watch(
   letter-spacing: normal;
   text-transform: none;
   cursor: pointer;
-  transition: all 0.15s;
+  transition:
+    background 0.16s,
+    border-color 0.16s,
+    color 0.16s,
+    transform 0.16s;
 }
 .rv2-panel-btn:hover {
   color: var(--rv2-primary);
   border-color: rgba(210, 187, 255, 0.4);
   background: rgba(255, 255, 255, 0.03);
+  transform: translateY(-1px);
 }
 .rv2-panel-btn .material-symbols-outlined {
   font-size: 16px;
@@ -2089,13 +2329,26 @@ watch(
 /* ── 顶部上下文条 ── */
 .rv2-summary {
   position: relative;
-  background: var(--rv2-section);
-  border: 1px solid var(--rv2-border-soft);
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(210, 187, 255, 0.045), transparent 36%), var(--rv2-section);
+  border: 1px solid var(--rv2-border-muted);
   border-radius: var(--rv2-radius);
   padding: 16px 18px;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  box-shadow: var(--rv2-shadow-panel);
+}
+.rv2-summary::after {
+  position: absolute;
+  right: 18px;
+  bottom: 0;
+  left: 18px;
+  height: 1px;
+  content: '';
+  background: linear-gradient(90deg, transparent, rgba(210, 187, 255, 0.2), transparent);
+  pointer-events: none;
 }
 @media (min-width: 900px) {
   .rv2-summary {
@@ -2129,8 +2382,8 @@ watch(
 }
 .rv2-summary-title {
   margin: 0;
-  font-size: 20px;
-  font-weight: 600;
+  font-size: clamp(18px, 1.05vw, 22px);
+  font-weight: 720;
   color: var(--rv2-fg);
   letter-spacing: normal;
   line-height: 1.25;
@@ -2172,7 +2425,7 @@ watch(
   font-size: 12px;
 }
 .rv2-progress-track {
-  height: 4px;
+  height: 5px;
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.05);
   overflow: hidden;
@@ -2190,8 +2443,8 @@ watch(
 }
 .rv2-nav-btn {
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   border-radius: var(--rv2-radius-sm);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -2246,10 +2499,12 @@ watch(
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  background: var(--rv2-section);
-  border: 1px solid var(--rv2-border-soft);
+  background:
+    linear-gradient(180deg, rgba(204, 195, 216, 0.025), transparent 34%), var(--rv2-section);
+  border: 1px solid var(--rv2-border-muted);
   border-radius: var(--rv2-radius);
   overflow: hidden;
+  box-shadow: var(--rv2-shadow-panel);
 }
 @media (min-width: 1100px) {
   .rv2-sidebar {
@@ -2269,6 +2524,7 @@ watch(
   font-weight: 600;
   color: var(--rv2-fg-muted);
   letter-spacing: 0.02em;
+  background: rgba(12, 14, 24, 0.24);
   border-bottom: 1px solid var(--rv2-border-soft);
 }
 .rv2-sidebar-title-row {
@@ -2302,8 +2558,9 @@ watch(
 }
 .rv2-sidebar-filter {
   min-width: 0;
-  padding: 5px 8px;
-  border-radius: 4px;
+  min-height: 28px;
+  padding: 6px 8px;
+  border-radius: 7px;
   background: rgba(255, 255, 255, 0.025);
   border: 1px solid rgba(74, 68, 85, 0.12);
   color: var(--rv2-muted-soft);
@@ -2389,11 +2646,13 @@ watch(
 
 /* ── 基础面板 ── */
 .rv2-panel {
-  background: var(--rv2-section);
-  border: 1px solid var(--rv2-border-soft);
+  background:
+    linear-gradient(180deg, rgba(204, 195, 216, 0.025), transparent 38%), var(--rv2-section);
+  border: 1px solid var(--rv2-border-muted);
   border-radius: var(--rv2-radius);
   padding: clamp(18px, 1.2vw, 24px);
   position: relative;
+  box-shadow: var(--rv2-shadow-panel);
 }
 .rv2-panel-title {
   margin: 0 0 16px;
@@ -2401,11 +2660,11 @@ watch(
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-weight: 720;
+  letter-spacing: 0.04em;
+  text-transform: none;
   color: var(--rv2-fg-muted);
-  opacity: 0.85;
+  opacity: 0.92;
 }
 .rv2-panel-title .material-symbols-outlined {
   font-size: 18px;
@@ -2781,24 +3040,6 @@ watch(
 .rv2-case-fields-head .rv2-panel-title {
   margin: 0;
 }
-.rv2-field-stats {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.rv2-field-stats span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 22px;
-  padding: 3px 8px;
-  border-radius: 4px;
-  background: rgba(204, 195, 216, 0.06);
-  border: 1px solid rgba(204, 195, 216, 0.1);
-  color: rgba(204, 195, 216, 0.68);
-  font-size: 11px;
-  font-weight: 700;
-}
 .rv2-basic-fields {
   display: grid;
   grid-template-columns: 1fr;
@@ -2806,10 +3047,7 @@ watch(
 }
 @media (min-width: 900px) {
   .rv2-basic-fields {
-    grid-template-columns: minmax(0, 1.6fr) minmax(120px, 0.55fr) minmax(120px, 0.55fr) minmax(
-        160px,
-        0.9fr
-      );
+    grid-template-columns: minmax(120px, 0.7fr) minmax(120px, 0.7fr) minmax(180px, 1.2fr);
   }
 }
 .rv2-basic-field {
@@ -2853,11 +3091,71 @@ watch(
   line-height: 1.65;
   word-break: break-word;
 }
-.rv2-basic-title p {
-  font-size: 14px;
+.rv2-field-value {
+  display: flex;
+  align-items: center;
+  min-height: 26px;
+}
+.rv2-value-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(204, 195, 216, 0.12);
+  background: rgba(204, 195, 216, 0.06);
+  color: var(--rv2-fg);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.rv2-level-tag {
+  border-color: rgba(173, 198, 255, 0.2);
+  background: rgba(5, 102, 217, 0.1);
+  color: var(--rv2-secondary);
+}
+.rv2-priority-tag.is-critical,
+.rv2-priority-tag.is-high {
+  border-color: rgba(239, 68, 68, 0.22);
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--rv2-error);
+}
+.rv2-priority-tag.is-medium {
+  border-color: rgba(245, 158, 11, 0.22);
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--rv2-warning);
+}
+.rv2-priority-tag.is-low {
+  border-color: rgba(16, 185, 129, 0.2);
+  background: rgba(16, 185, 129, 0.08);
+  color: var(--rv2-success);
 }
 .rv2-basic-module p {
   color: rgba(225, 225, 242, 0.82);
+}
+.rv2-module-path {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  overflow: hidden;
+  color: rgba(204, 195, 216, 0.68);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.rv2-module-segment {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rv2-module-segment.is-leaf {
+  color: var(--rv2-fg);
+  font-weight: 700;
+}
+.rv2-module-separator {
+  flex-shrink: 0;
+  color: rgba(204, 195, 216, 0.35);
 }
 .rv2-conditions {
   display: grid;
@@ -3040,29 +3338,33 @@ watch(
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 11px 14px;
+  min-height: 64px;
+  padding: 12px 14px;
   width: 100%;
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
+  border-bottom-color: rgba(74, 68, 85, 0.08);
   text-align: left;
   color: var(--rv2-fg-muted);
   font-size: 13px;
   cursor: pointer;
   transition:
     background 0.15s,
+    border-color 0.15s,
     color 0.15s;
-  border-bottom: 1px solid rgba(74, 68, 85, 0.08);
 }
 .rv2-case-row:last-child {
-  border-bottom: none;
+  border-bottom-color: transparent;
 }
 .rv2-case-row:hover {
   background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(210, 187, 255, 0.14);
   color: var(--rv2-fg);
 }
 .rv2-case-row.active {
-  background: linear-gradient(90deg, rgba(124, 58, 237, 0.16), rgba(124, 58, 237, 0.045));
-  box-shadow: inset 3px 0 0 var(--rv2-primary-strong);
+  background: rgba(124, 58, 237, 0.13);
+  border-color: rgba(210, 187, 255, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(210, 187, 255, 0.08);
   color: var(--rv2-fg);
 }
 .rv2-case-idx {
@@ -3391,8 +3693,9 @@ watch(
   width: 100%;
   display: flex;
   align-items: flex-start;
-  gap: 9px;
-  padding: 10px 11px;
+  gap: 11px;
+  min-height: 58px;
+  padding: 12px;
   border-radius: var(--rv2-radius-sm);
   border: 1px solid rgba(74, 68, 85, 0.2);
   background: rgba(255, 255, 255, 0.02);
@@ -3402,33 +3705,54 @@ watch(
   transition:
     border-color 0.16s,
     background 0.16s,
-    color 0.16s;
+    color 0.16s,
+    transform 0.16s;
 }
 .rv2-decision-option:hover {
   border-color: rgba(210, 187, 255, 0.28);
   background: rgba(124, 58, 237, 0.07);
   color: var(--rv2-fg);
+  transform: translateY(-1px);
 }
 .rv2-decision-option.active {
   color: var(--rv2-fg);
   border-color: rgba(210, 187, 255, 0.48);
   background: rgba(124, 58, 237, 0.12);
-  box-shadow: inset 3px 0 0 var(--rv2-primary-strong);
+  box-shadow: inset 0 0 0 1px rgba(210, 187, 255, 0.08);
 }
 .rv2-decision-option.decision-rejected.active {
   border-color: rgba(239, 68, 68, 0.42);
   background: rgba(239, 68, 68, 0.08);
-  box-shadow: inset 3px 0 0 var(--rv2-error);
+  box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.1);
 }
 .rv2-decision-option.decision-needs_update.active {
   border-color: rgba(245, 158, 11, 0.42);
   background: rgba(245, 158, 11, 0.08);
-  box-shadow: inset 3px 0 0 var(--rv2-warning);
+  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.12);
 }
 .rv2-decision-option .material-symbols-outlined {
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: 1px;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(204, 195, 216, 0.07);
   font-size: 18px;
+}
+.rv2-decision-option.active .material-symbols-outlined {
+  background: rgba(210, 187, 255, 0.14);
+  color: var(--rv2-primary);
+}
+.rv2-decision-option.decision-rejected.active .material-symbols-outlined {
+  background: rgba(239, 68, 68, 0.14);
+  color: var(--rv2-error);
+}
+.rv2-decision-option.decision-needs_update.active .material-symbols-outlined {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--rv2-warning);
 }
 .rv2-decision-option strong,
 .rv2-decision-option small {
@@ -3534,51 +3858,227 @@ watch(
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 32px;
+  justify-content: center;
+  gap: 10px;
+  min-height: 210px;
+  padding: 28px 18px;
+  text-align: center;
   color: var(--rv2-fg-muted);
-  opacity: 0.5;
-  font-size: 12px;
+  border: 1px dashed var(--rv2-border-muted);
+  border-radius: var(--rv2-radius-sm);
+  background: rgba(12, 14, 24, 0.24);
 }
 .rv2-audit-empty .material-symbols-outlined {
-  font-size: 32px;
-  opacity: 0.4;
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(204, 195, 216, 0.08);
+  color: var(--rv2-muted-soft);
+  font-size: 22px;
 }
-.rv2-audit-latest {
+.rv2-audit-empty strong {
+  color: var(--rv2-fg);
+  font-size: 13px;
+  font-weight: 700;
+}
+.rv2-audit-empty span:not(.material-symbols-outlined) {
+  max-width: 220px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--rv2-muted-faint);
+}
+.rv2-audit-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.rv2-audit-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
   padding: 12px;
   border-radius: var(--rv2-radius-sm);
-  background: rgba(12, 14, 24, 0.42);
-  border: 1px solid rgba(74, 68, 85, 0.16);
+  background: rgba(12, 14, 24, 0.46);
+  border: 1px solid var(--rv2-border-soft);
 }
-.rv2-audit-latest.rv2-tl-approved {
-  border-color: rgba(16, 185, 129, 0.2);
+.rv2-audit-summary.rv2-tl-approved {
+  border-color: rgba(16, 185, 129, 0.22);
 }
-.rv2-audit-latest.rv2-tl-rejected {
-  border-color: rgba(239, 68, 68, 0.2);
+.rv2-audit-summary.rv2-tl-rejected {
+  border-color: rgba(239, 68, 68, 0.24);
 }
-.rv2-audit-latest.rv2-tl-needs-update {
-  border-color: rgba(245, 158, 11, 0.24);
+.rv2-audit-summary.rv2-tl-needs-update {
+  border-color: rgba(245, 158, 11, 0.26);
 }
-.rv2-audit-latest-top {
+.rv2-audit-summary-icon {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(149, 141, 161, 0.12);
+  color: var(--rv2-outline);
+  font-size: 17px;
+}
+.rv2-tl-approved .rv2-audit-summary-icon,
+.rv2-tl-approved .rv2-audit-node {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--rv2-success);
+}
+.rv2-tl-rejected .rv2-audit-summary-icon,
+.rv2-tl-rejected .rv2-audit-node {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--rv2-error);
+}
+.rv2-tl-needs-update .rv2-audit-summary-icon,
+.rv2-tl-needs-update .rv2-audit-node {
+  background: rgba(245, 158, 11, 0.13);
+  color: var(--rv2-warning);
+}
+.rv2-audit-summary-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.rv2-audit-kicker {
+  color: var(--rv2-muted-faint);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.rv2-audit-summary-main strong {
+  color: var(--rv2-fg);
+  font-size: 14px;
+  line-height: 1.25;
+}
+.rv2-audit-list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rv2-audit-list::before {
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 13px;
+  width: 1px;
+  content: '';
+  background: var(--rv2-border-muted);
+}
+.rv2-audit-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 10px;
+}
+.rv2-audit-node {
+  position: relative;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(149, 141, 161, 0.18);
+  border-radius: 999px;
+  background: var(--rv2-section);
+  color: var(--rv2-outline);
+}
+.rv2-audit-node .material-symbols-outlined {
+  font-size: 15px;
+}
+.rv2-audit-card {
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid var(--rv2-border-soft);
+  border-radius: var(--rv2-radius-sm);
+  background: rgba(17, 19, 30, 0.58);
+}
+.rv2-audit-card-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 8px;
+  gap: 7px;
+  margin-bottom: 7px;
 }
-.rv2-audit-latest-reviewer {
-  margin-bottom: 5px;
-  color: var(--rv2-fg);
-  font-size: 12px;
-  font-weight: 650;
-}
-.rv2-tl-time {
+.rv2-audit-time {
+  margin-left: auto;
+  color: var(--rv2-outline);
   font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
-  color: var(--rv2-outline);
-  opacity: 0.7;
+  opacity: 0.72;
+  white-space: nowrap;
+}
+.rv2-audit-reviewer-line {
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  margin-bottom: 4px;
+  color: var(--rv2-fg);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+.rv2-audit-summary-main .rv2-audit-reviewer-line {
+  color: var(--rv2-muted-soft);
+  font-size: 11px;
+}
+.rv2-audit-reviewer-line span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rv2-audit-avatar {
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
-  margin-left: 8px;
+  border: 1px solid rgba(204, 195, 216, 0.14);
+  border-radius: 999px;
+  background: var(--rv2-card-high);
+  object-fit: cover;
+}
+.rv2-drawer-reviewer {
+  margin-bottom: 8px;
+}
+.rv2-audit-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--rv2-border-soft);
+  border-radius: var(--rv2-radius-sm);
+  background: rgba(204, 195, 216, 0.05);
+  color: var(--rv2-muted-soft);
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    border-color 0.16s,
+    background 0.16s,
+    color 0.16s;
+}
+.rv2-audit-more:hover,
+.rv2-audit-more:focus-visible {
+  border-color: var(--rv2-border-muted);
+  background: var(--rv2-hover-tint);
+  color: var(--rv2-primary);
+  outline: none;
+}
+.rv2-audit-more .material-symbols-outlined {
+  font-size: 15px;
 }
 .rv2-tl-desc {
   margin: 0;
@@ -3624,41 +4124,211 @@ watch(
 .rv2-link-btn:hover {
   filter: brightness(1.08);
 }
+:deep(.rv2-record-drawer) {
+  background: var(--rv2-bg);
+}
+:deep(.rv2-record-drawer .el-drawer__body) {
+  padding: 0;
+  background: var(--rv2-bg);
+  color: var(--rv2-fg);
+}
+.rv2-record-drawer-shell {
+  min-height: 100%;
+  padding: 18px 18px 24px;
+}
+.rv2-record-drawer-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin: -18px -18px 18px;
+  padding: 18px;
+  background: rgba(17, 19, 30, 0.96);
+  border-bottom: 1px solid var(--rv2-border-hairline);
+}
+.rv2-record-drawer-title {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.rv2-record-drawer-title > .material-symbols-outlined {
+  margin-top: 1px;
+  color: var(--rv2-muted-soft);
+  font-size: 20px;
+}
+.rv2-record-drawer-title div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.rv2-record-drawer-title strong {
+  color: var(--rv2-fg);
+  font-size: 15px;
+  font-weight: 760;
+  line-height: 1.25;
+}
+.rv2-record-drawer-title span:not(.material-symbols-outlined) {
+  overflow: hidden;
+  max-width: 320px;
+  color: var(--rv2-muted-soft);
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rv2-record-drawer-close {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--rv2-border-soft);
+  border-radius: 999px;
+  background: rgba(204, 195, 216, 0.05);
+  color: var(--rv2-muted-soft);
+  cursor: pointer;
+  transition:
+    background 0.16s,
+    border-color 0.16s,
+    color 0.16s;
+}
+.rv2-record-drawer-close:hover,
+.rv2-record-drawer-close:focus-visible {
+  background: var(--rv2-hover-tint);
+  border-color: var(--rv2-border-muted);
+  color: var(--rv2-fg);
+  outline: none;
+}
+.rv2-record-drawer-close .material-symbols-outlined {
+  font-size: 18px;
+}
+.rv2-record-drawer-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 9px 11px;
+  border: 1px solid var(--rv2-border-hairline);
+  border-radius: var(--rv2-radius-sm);
+  background: rgba(204, 195, 216, 0.04);
+  color: var(--rv2-muted-faint);
+  font-size: 11px;
+  font-weight: 650;
+}
 .rv2-drawer-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 60px 0;
-  gap: 8px;
+  justify-content: center;
+  min-height: 260px;
+  padding: 48px 22px;
+  gap: 10px;
+  text-align: center;
   color: var(--rv2-fg-muted);
-  opacity: 0.5;
+  border: 1px dashed var(--rv2-border-muted);
+  border-radius: var(--rv2-radius-sm);
+  background: rgba(12, 14, 24, 0.28);
 }
 .rv2-drawer-empty .material-symbols-outlined {
-  font-size: 40px;
-  opacity: 0.4;
+  width: 46px;
+  height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(204, 195, 216, 0.08);
+  color: var(--rv2-muted-soft);
+  font-size: 24px;
+}
+.rv2-drawer-empty strong {
+  color: var(--rv2-fg);
+  font-size: 14px;
+  font-weight: 700;
+}
+.rv2-drawer-empty p {
+  max-width: 260px;
+  margin: 0;
+  color: var(--rv2-muted-faint);
+  font-size: 12px;
+  line-height: 1.6;
 }
 .rv2-drawer-list {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+}
+.rv2-drawer-list::before {
+  position: absolute;
+  top: 16px;
+  bottom: 16px;
+  left: 15px;
+  width: 1px;
+  content: '';
+  background: var(--rv2-border-muted);
 }
 .rv2-drawer-item {
-  padding: 12px 14px;
+  position: relative;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.rv2-drawer-node {
+  position: relative;
+  z-index: 1;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(149, 141, 161, 0.18);
+  border-radius: 999px;
+  background: var(--rv2-section);
+  color: var(--rv2-outline);
+}
+.rv2-drawer-node .material-symbols-outlined {
+  font-size: 16px;
+}
+.rv2-tl-approved .rv2-drawer-node {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--rv2-success);
+}
+.rv2-tl-rejected .rv2-drawer-node {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--rv2-error);
+}
+.rv2-tl-needs-update .rv2-drawer-node {
+  background: rgba(245, 158, 11, 0.13);
+  color: var(--rv2-warning);
+}
+.rv2-drawer-card {
+  min-width: 0;
+  padding: 13px 14px;
   border-radius: var(--rv2-radius-sm);
-  background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--rv2-border-soft);
+  background: rgba(17, 19, 30, 0.62);
 }
 .rv2-drawer-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
+  gap: 10px;
+  margin-bottom: 9px;
 }
 .rv2-drawer-result {
-  padding: 3px 10px;
+  padding: 4px 10px;
   border-radius: 10px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 750;
 }
 .rv2-drawer-result.approved {
   background: rgba(16, 185, 129, 0.12);
@@ -3676,25 +4346,29 @@ watch(
   background: rgba(149, 141, 161, 0.12);
   color: var(--rv2-outline);
 }
-.rv2-drawer-round {
-  font-size: 11px;
-  color: var(--rv2-fg-muted);
-  opacity: 0.6;
-  font-weight: 600;
-}
 .rv2-drawer-time {
   margin-left: auto;
   font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
   color: var(--rv2-outline);
-  opacity: 0.5;
+  opacity: 0.72;
+  white-space: nowrap;
 }
 .rv2-drawer-comment {
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--rv2-border-hairline);
+  border-radius: 7px;
+  background: rgba(12, 14, 24, 0.42);
   font-size: 12px;
   line-height: 1.5;
   color: var(--rv2-fg-muted);
   white-space: pre-wrap;
   word-break: break-word;
+}
+.rv2-drawer-comment-muted {
+  color: var(--rv2-muted-faint);
+  font-style: italic;
 }
 /* 设计稿 V2 样式结束。旧 .rd-* 类已全部迁移为 .rv2-*。 */
 </style>

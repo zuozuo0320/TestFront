@@ -87,6 +87,7 @@ export interface CaseReviewRecord {
   testcase_id: number
   reviewer_id: number
   reviewer_name?: string
+  reviewer_avatar?: string
   round_no: number
   result: string
   comment: string
@@ -240,19 +241,6 @@ export async function deleteReview(projectId: number, reviewId: number) {
 /** 关闭评审计划 */
 export async function closeReview(projectId: number, reviewId: number) {
   const { data } = await apiClient.post(`/projects/${projectId}/case-reviews/${reviewId}/close`)
-  return data
-}
-
-/** 复制评审计划 */
-export async function copyReview(
-  projectId: number,
-  reviewId: number,
-  payload: { name?: string; include_cases?: boolean; reset_reviewers?: boolean },
-) {
-  const { data } = await apiClient.post<CaseReview>(
-    `/projects/${projectId}/case-reviews/${reviewId}/copy`,
-    payload,
-  )
   return data
 }
 

@@ -189,6 +189,7 @@ function casesGoPage(p: number) {
 
 // ── Step 3: 指派评审人 ──
 const allUsers = ref<{ id: number; name: string; email: string; avatar?: string }[]>([])
+const failedAvatarUserIds = ref<Set<number>>(new Set())
 const assignedUserIds = ref<Set<number>>(new Set())
 /** v0.2：主评人（唯一），必选；其余被指派的人均为 Shadow */
 const primaryReviewerId = ref<number | null>(null)
@@ -339,7 +340,7 @@ async function handleActivate() {
         primary_reviewer_id: primaryId,
         shadow_reviewer_ids: shadowIds,
       }))
-      await linkItems(projectId.value!, activeReviewId.value!, entries)
+      await linkItems(projectId.value!, activeReviewId.value!, entries, true)
     }
     ElMessage.success('评审计划已创建并激活')
     clearDraft()
@@ -371,6 +372,12 @@ function resolveAvatarUrl(avatar?: string, _fallbackName?: string) {
     return `${avatarRaw.startsWith('/') ? '' : '/'}${avatarRaw}`
   }
   return ''
+}
+function hasUserAvatar(user: { id: number; avatar?: string }) {
+  return Boolean(resolveAvatarUrl(user.avatar) && !failedAvatarUserIds.value.has(user.id))
+}
+function markAvatarFailed(userId: number) {
+  failedAvatarUserIds.value = new Set([...failedAvatarUserIds.value, userId])
 }
 
 const casesTotalPages = computed(() =>
@@ -843,9 +850,11 @@ onBeforeUnmount(() => {
                 <div class="reviewer-card-top">
                   <div class="reviewer-avatar-lg">
                     <img
-                      v-if="resolveAvatarUrl(user.avatar)"
+                      v-if="hasUserAvatar(user)"
                       :src="resolveAvatarUrl(user.avatar)"
+                      :alt="user.name"
                       class="avatar-img"
+                      @error="markAvatarFailed(user.id)"
                     />
                     <span v-else>{{ getInitials(user.name) }}</span>
                   </div>
@@ -898,9 +907,11 @@ onBeforeUnmount(() => {
                   <div class="assigned-item-left">
                     <div class="reviewer-avatar-sm">
                       <img
-                        v-if="resolveAvatarUrl(user.avatar)"
+                        v-if="hasUserAvatar(user)"
                         :src="resolveAvatarUrl(user.avatar)"
+                        :alt="user.name"
                         class="avatar-img"
+                        @error="markAvatarFailed(user.id)"
                       />
                       <span v-else>{{ getInitials(user.name) }}</span>
                     </div>
@@ -982,8 +993,20 @@ onBeforeUnmount(() => {
                     <p class="summary-big-num">{{ assignedUserIds.size }}</p>
                   </div>
                   <div class="summary-avatars">
-                    <div v-for="u in assignedUsers.slice(0, 4)" :key="u.id" class="summary-avatar">
-                      {{ getInitials(u.name) }}
+                    <div
+                      v-for="u in assignedUsers.slice(0, 4)"
+                      :key="u.id"
+                      class="summary-avatar"
+                      :title="u.name"
+                    >
+                      <img
+                        v-if="hasUserAvatar(u)"
+                        :src="resolveAvatarUrl(u.avatar)"
+                        :alt="u.name"
+                        class="avatar-img"
+                        @error="markAvatarFailed(u.id)"
+                      />
+                      <span v-else>{{ getInitials(u.name) }}</span>
                     </div>
                     <span v-if="assignedUsers.length > 4" class="summary-avatar more">
                       +{{ assignedUsers.length - 4 }}

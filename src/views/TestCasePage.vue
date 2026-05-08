@@ -459,12 +459,18 @@ function formatTime(value?: string) {
   })
 }
 
+function normalizeReviewResult(tc: TestCase) {
+  const result = tc.review_result || '未评审'
+  if ((tc.in_review || tc.current_review_id) && result === '未评审') return '待评审'
+  return result
+}
+
 function toRow(tc: TestCase): TableRow {
   return {
     id: tc.id,
     title: tc.title,
     level: tc.level,
-    reviewResult: tc.review_result,
+    reviewResult: normalizeReviewResult(tc),
     inReview: tc.in_review || false,
     currentReviewId: tc.current_review_id || undefined,
     currentReviewName: tc.current_review_name || '',

@@ -11,7 +11,6 @@ import {
   createReview,
   deleteReview,
   closeReview,
-  copyReview,
   getReview,
   getReviewSummary,
   listReviewItems,
@@ -308,17 +307,6 @@ async function handleClose(review: CaseReview) {
   }
 }
 
-async function handleCopy(review: CaseReview) {
-  try {
-    await copyReview(selectedProjectId.value!, review.id, { include_cases: true })
-    ElMessage.success('已复制')
-    fetchReviews()
-    fetchSummary()
-  } catch (e) {
-    ElMessage.error(extractErrorMessage(e, '复制失败'))
-  }
-}
-
 // ── 计划级 AI 评审：对该任务下所有用例批量跑规则引擎 ──
 /** 每个 review 的 AI 评审 running 状态（按 id 追踪，互不影响，支持多行并行） */
 const aiRunningSet = ref<Set<number>>(new Set())
@@ -501,7 +489,7 @@ function reviewResultLabel(result: string) {
     pending: '待评审',
     approved: '通过',
     rejected: '驳回',
-    needs_update: '需修改',
+    needs_update: '打回修订',
   }
   return map[result] || result
 }
@@ -614,7 +602,7 @@ function progressResultClass(review: CaseReview) {
 function progressResultLabel(review: CaseReview) {
   if (review.case_total_count <= 0) return '暂无用例'
   if (review.rejected_count > 0) return `${review.rejected_count} 条未通过`
-  if (review.needs_update_count > 0) return `${review.needs_update_count} 条需修改`
+  if (review.needs_update_count > 0) return `${review.needs_update_count} 条打回修订`
   if (getProgressPercent(review) >= 100) return '全部通过'
   return `${getProgressPendingCount(review)} 条待评审`
 }
@@ -637,7 +625,7 @@ function reviewStatusBadgeClass(review: CaseReview) {
 
 function reviewStatusLabel(review: CaseReview) {
   if (review.status === 'completed' && review.rejected_count > 0) return '已完成·有驳回'
-  if (review.status === 'completed' && review.needs_update_count > 0) return '已完成·需修改'
+  if (review.status === 'completed' && review.needs_update_count > 0) return '已完成·打回修订'
   if (review.status === 'completed' && review.case_total_count > 0) return '已完成·通过'
   return statusLabel(review.status)
 }
@@ -894,13 +882,6 @@ function reviewStatusLabel(review: CaseReview) {
                     >
                       auto_awesome
                     </span>
-                  </button>
-                  <button
-                    class="action-btn action-clone icon-only"
-                    title="复制"
-                    @click="handleCopy(review)"
-                  >
-                    <span class="material-symbols-outlined">content_copy</span>
                   </button>
                   <button
                     v-if="review.status !== 'closed'"

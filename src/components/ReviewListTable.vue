@@ -26,7 +26,6 @@ const props = withDefaults(defineProps<Props>(), { loading: false })
 /** 行级操作事件：父组件决定跳路由 / 弹确认框 / 调 API */
 const emit = defineEmits<{
   (e: 'view', review: CaseReview): void
-  (e: 'copy', review: CaseReview): void
   (e: 'close', review: CaseReview): void
   (e: 'delete', review: CaseReview): void
 }>()
@@ -84,7 +83,7 @@ function progressResultClass(review: CaseReview): string {
 function progressResultLabel(review: CaseReview): string {
   if (review.case_total_count <= 0) return '暂无用例'
   if (review.rejected_count > 0) return `${review.rejected_count} 条未通过`
-  if (review.needs_update_count > 0) return `${review.needs_update_count} 条需修改`
+  if (review.needs_update_count > 0) return `${review.needs_update_count} 条打回修订`
   if (getProgressPercent(review) >= 100) return '全部通过'
   return `${getProgressPendingCount(review)} 条待评审`
 }
@@ -119,7 +118,7 @@ function reviewStatusBadgeClass(review: CaseReview): string {
 
 function reviewStatusLabel(review: CaseReview): string {
   if (review.status === 'completed' && review.rejected_count > 0) return '已完成·有驳回'
-  if (review.status === 'completed' && review.needs_update_count > 0) return '已完成·需修改'
+  if (review.status === 'completed' && review.needs_update_count > 0) return '已完成·打回修订'
   if (review.status === 'completed' && review.case_total_count > 0) return '已完成·通过'
   return statusLabel(review.status)
 }
@@ -221,13 +220,6 @@ function reviewerSummary(review: CaseReview): string {
                 @click="emit('view', review)"
               >
                 <span class="material-symbols-outlined">visibility</span>
-              </button>
-              <button
-                class="action-btn action-clone icon-only"
-                title="复制"
-                @click="emit('copy', review)"
-              >
-                <span class="material-symbols-outlined">content_copy</span>
               </button>
               <button
                 v-if="review.status !== 'closed'"

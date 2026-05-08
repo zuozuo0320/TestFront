@@ -6,7 +6,7 @@
  *   - 分页 / 视图切换（全部 · 我创建的 · 我评审的）/ 状态 · 模式筛选
  *   - 搜索关键词防抖 + AbortController 竞态控制
  *   - 筛选条件与 URL query 双向同步（刷新不丢状态）
- *   - 行级操作：删除 / 关闭 / 复制评审计划
+ *   - 行级操作：删除 / 关闭
  *
  * 使用约束：
  *   - 仅供 CaseReviewPage.vue 消费；详情抽屉与创建向导均为独立页面（router）
@@ -25,7 +25,6 @@ import {
   getReviewSummary,
   deleteReview,
   closeReview,
-  copyReview,
   type CaseReview,
   type ReviewListParams,
   type ReviewSummary,
@@ -123,7 +122,7 @@ export function useCaseReviewList() {
     }
   }
 
-  /** 并行刷新列表和汇总，用于创建 / 删除 / 关闭 / 复制后统一调用 */
+  /** 并行刷新列表和汇总，用于创建 / 删除 / 关闭后统一调用 */
   async function refreshAll() {
     await Promise.all([fetchList(), fetchSummary()])
   }
@@ -227,30 +226,6 @@ export function useCaseReviewList() {
     }
   }
 
-  /**
-   * 复制评审计划。默认连同用例一起复制，重置评审人列表由调用方控制。
-   *
-   * @param review - 源评审计划
-   * @param options - 复制选项（name 自定义 / reset_reviewers 是否清空评审人）
-   */
-  async function copy(
-    review: CaseReview,
-    options: { name?: string; include_cases?: boolean; reset_reviewers?: boolean } = {},
-  ) {
-    const projectId = selectedProjectId.value
-    if (!projectId) return
-    try {
-      await copyReview(projectId, review.id, {
-        include_cases: options.include_cases ?? true,
-        ...options,
-      })
-      ElMessage.success('已复制')
-      await refreshAll()
-    } catch (err) {
-      ElMessage.error(extractErrorMessage(err, '复制失败'))
-    }
-  }
-
   // ───────────────────────────── 初始挂载 ─────────────────────────────
 
   onMounted(() => {
@@ -278,7 +253,6 @@ export function useCaseReviewList() {
     clearFilters,
     removeReview,
     close,
-    copy,
   }
 }
 
