@@ -1,12 +1,12 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { loginByEmail } from '../api/auth'
-import type { LoginResp } from '../api/types'
+import type { AuthUser } from '../api/types'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem('tp-token'))
   const userId = ref<string | null>(localStorage.getItem('tp-user-id'))
-  const user = ref<LoginResp['user'] | null>(null)
+  const user = ref<AuthUser | null>(null)
 
   const isAuthenticated = computed(() => !!token.value)
 
@@ -37,6 +37,10 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     localStorage.removeItem('tp-token')
     localStorage.removeItem('tp-user-id')
+  }
+
+  function setUser(nextUser: AuthUser | null) {
+    user.value = nextUser
   }
 
   // 本地离线头像：基于姓名首字符生成 SVG data URI，不依赖外网
@@ -102,7 +106,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const avatarUrl = computed(() => {
-    return resolveAvatarUrl((user.value as any)?.avatar, user.value?.name)
+    return resolveAvatarUrl(user.value?.avatar, user.value?.name)
   })
 
   return {
@@ -114,6 +118,7 @@ export const useAuthStore = defineStore('auth', () => {
     loginLoading,
     login,
     logout,
+    setUser,
     resolveAvatarUrl,
     fallbackAvatarUrl,
     handleAvatarError,

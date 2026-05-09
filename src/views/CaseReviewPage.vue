@@ -42,6 +42,7 @@ const reviews = ref<CaseReview[]>([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
+const pageSizeOptions = [10, 20, 50]
 const viewMode = ref<'all' | 'assigned' | 'created'>('all')
 const searchKeyword = ref('')
 const filterStatus = ref('')
@@ -542,19 +543,14 @@ const completedRateLabel = computed(() => {
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
 const startItem = computed(() => (page.value - 1) * pageSize.value + 1)
 const endItem = computed(() => Math.min(page.value * pageSize.value, total.value))
-const displayPages = computed(() => {
-  const pages: number[] = []
-  const tp = totalPages.value
-  const cur = page.value
-  for (let i = Math.max(1, cur - 2); i <= Math.min(tp, cur + 2); i++) {
-    pages.push(i)
-  }
-  return pages
-})
-
 function goPage(p: number) {
   if (p < 1 || p > totalPages.value) return
   page.value = p
+}
+
+function onPageSizeChange(size: number) {
+  pageSize.value = size
+  page.value = 1
 }
 
 // ── 辅助工具 ──
@@ -921,23 +917,17 @@ function reviewStatusLabel(review: CaseReview) {
         <span class="pagination-info">
           显示 {{ startItem }}-{{ endItem }} 条，共 {{ total }} 条任务
         </span>
-        <div class="pagination-btns">
-          <button class="page-btn" :disabled="page <= 1" @click="goPage(page - 1)">
-            <span class="material-symbols-outlined">chevron_left</span>
-          </button>
-          <button
-            v-for="p in displayPages"
-            :key="p"
-            class="page-btn"
-            :class="{ active: p === page }"
-            @click="goPage(p)"
-          >
-            {{ p }}
-          </button>
-          <button class="page-btn" :disabled="page >= totalPages" @click="goPage(page + 1)">
-            <span class="material-symbols-outlined">chevron_right</span>
-          </button>
-        </div>
+        <el-pagination
+          background
+          size="small"
+          :current-page="page"
+          :page-size="pageSize"
+          :page-sizes="pageSizeOptions"
+          :total="total"
+          layout="sizes, prev, pager, next, jumper"
+          @size-change="onPageSizeChange"
+          @current-change="goPage"
+        />
       </div>
     </div>
 
@@ -2497,5 +2487,111 @@ function reviewStatusLabel(review: CaseReview) {
 
 .empty-state-pl {
   background: var(--tp-surface-muted);
+}
+
+.pipeline-title,
+.table-section-title {
+  font-weight: var(--tp-font-bold);
+}
+
+.pipeline-subtitle,
+.stat-sub-hint,
+.review-id-sub,
+.progress-count,
+.pagination-info {
+  line-height: var(--tp-line-body);
+}
+
+.stat-label-pl,
+.pipeline-table th {
+  font-size: var(--tp-text-xs) !important;
+  font-weight: var(--tp-font-bold) !important;
+  line-height: var(--tp-line-ui);
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  color: var(--tp-text-muted) !important;
+}
+
+.pipeline-table td {
+  font-size: var(--tp-text-sm) !important;
+  font-weight: var(--tp-font-medium);
+  line-height: var(--tp-line-ui);
+  color: var(--tp-text-secondary);
+}
+
+.status-badge-pl,
+.badge-secondary,
+.badge-primary,
+.badge-success,
+.badge-warning,
+.badge-danger,
+.badge-muted {
+  min-height: 24px;
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-tight);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.pagination-bar-pl {
+  min-height: 48px;
+  margin-top: 0;
+  padding: 10px 16px;
+  border-top: 1px solid var(--tp-border-subtle);
+  background: linear-gradient(180deg, var(--tp-surface-header), var(--tp-surface-card));
+}
+
+.pagination-info {
+  color: var(--tp-text-muted) !important;
+  font-size: var(--tp-text-xs) !important;
+  font-weight: var(--tp-font-medium);
+  line-height: var(--tp-line-ui);
+}
+
+.pagination-bar-pl :deep(.el-pagination) {
+  gap: 6px;
+}
+
+.pagination-bar-pl :deep(.el-pagination button),
+.pagination-bar-pl :deep(.el-pager li),
+.page-btn {
+  min-width: 32px;
+  height: 32px;
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 9px;
+  background: var(--tp-surface-card);
+  color: var(--tp-text-secondary);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.pagination-bar-pl :deep(.el-pagination button:hover),
+.pagination-bar-pl :deep(.el-pager li:hover),
+.page-btn:hover:not(:disabled):not(.active) {
+  border-color: var(--tp-accent-primary-border);
+  background: var(--tp-surface-hover);
+  color: var(--tp-primary);
+}
+
+.pagination-bar-pl :deep(.el-pagination.is-background .el-pager li.is-active),
+.page-btn.active {
+  background: var(--tp-btn-bg);
+  border-color: var(--tp-btn-border);
+  color: var(--tp-btn-text);
+  box-shadow: var(--tp-btn-shadow);
+}
+
+.pagination-bar-pl :deep(.el-pagination__jump),
+.pagination-bar-pl :deep(.el-pagination__total) {
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-medium);
+}
+
+.page-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 </style>

@@ -1799,6 +1799,42 @@ function goToTestCases() {
   font-size: 24px;
 }
 
+.status-badge,
+.cases-count-badge,
+.section-tag,
+.activity-count {
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-tight);
+  letter-spacing: 0;
+}
+
+.cases-table th {
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-ui);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.cases-table td {
+  font-size: var(--tp-text-sm);
+  font-weight: var(--tp-font-medium);
+  line-height: var(--tp-line-ui);
+}
+
+.cases-header h2,
+.section-title {
+  font-weight: var(--tp-font-bold);
+}
+
+.activity-sub,
+.chart-empty-overlay .empty-sub {
+  font-size: var(--tp-text-xs);
+  line-height: var(--tp-line-body);
+  color: var(--tp-text-muted);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .spinning,
   .pulse-dot.active::after {

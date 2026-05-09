@@ -63,20 +63,16 @@ function updateField(field: 'name' | 'color' | 'description', value: string) {
             :style="{ backgroundColor: c }"
             @click="updateField('color', c)"
           >
-            <span
-              v-if="localForm.color === c"
-              class="material-symbols-outlined"
-              style="color: #fff; font-size: 16px"
-            >
+            <span v-if="localForm.color === c" class="color-swatch-check material-symbols-outlined">
               check
             </span>
           </button>
         </div>
         <el-input
           :model-value="localForm.color"
+          class="color-input"
           maxlength="7"
           placeholder="#RRGGBB"
-          style="margin-top: 8px; width: 140px"
           @update:model-value="updateField('color', $event)"
         />
       </el-form-item>
@@ -119,24 +115,47 @@ function updateField(field: 'name' | 'color' | 'description', value: string) {
   transform: scale(1.15);
 }
 .color-swatch.active {
-  border-color: #fff;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+  border-color: var(--tp-surface-card);
+  box-shadow:
+    0 0 0 2px var(--tp-accent-primary-border),
+    0 10px 20px rgba(15, 23, 42, 0.12);
+}
+.color-swatch-check {
+  color: var(--tp-surface-card);
+  font-size: 16px;
+}
+.color-input {
+  width: 140px;
+  margin-top: 8px;
 }
 </style>
 <style>
 .tm-dialog .el-dialog {
-  background: var(--tp-surface-elevated, #1c1c22);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.88)),
+    radial-gradient(circle at 10% 0%, rgba(99, 102, 241, 0.12), transparent 38%);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 18px;
+  box-shadow:
+    0 28px 72px rgba(15, 23, 42, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
 }
 .tm-dialog .el-dialog__header {
-  color: #e8e8f0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
 }
 .tm-dialog .el-dialog__title {
-  color: #e8e8f0;
-  font-weight: 600;
+  color: var(--tp-gray-900);
+  font-size: var(--tp-text-lg);
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-tight);
 }
 .tm-dialog .el-form-item__label {
-  color: #9ca3af;
+  color: var(--tp-text-secondary);
+  font-size: var(--tp-text-sm);
+  font-weight: var(--tp-font-semibold);
+}
+.tm-dialog .el-dialog__body {
+  padding-top: 18px;
 }
 </style>

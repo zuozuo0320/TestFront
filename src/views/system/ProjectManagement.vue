@@ -33,7 +33,8 @@ const statusFilter = ref<'' | 'active' | 'archived'>('')
 
 // ── 分页 & 复选框 ──
 const currentPage = ref(1)
-const pageSize = 4
+const pageSize = ref(10)
+const pageSizeOptions = [10, 20, 50]
 const selectedIds = ref<Set<number>>(new Set())
 
 type QualityTone = 'emerald' | 'amber' | 'rose' | 'slate'
@@ -108,14 +109,13 @@ const filteredProjects = computed(() => {
 
 /** 分页 */
 const totalProjects = computed(() => filteredProjects.value.length)
-const totalPages = computed(() => Math.ceil(totalProjects.value / pageSize) || 1)
 const paginatedProjects = computed(() => {
-  const start = (currentPage.value - 1) * pageSize
-  return filteredProjects.value.slice(start, start + pageSize)
+  const start = (currentPage.value - 1) * pageSize.value
+  return filteredProjects.value.slice(start, start + pageSize.value)
 })
 const paginationLabel = computed(() => {
-  const start = (currentPage.value - 1) * pageSize + 1
-  const end = Math.min(currentPage.value * pageSize, totalProjects.value)
+  const start = totalProjects.value === 0 ? 0 : (currentPage.value - 1) * pageSize.value + 1
+  const end = Math.min(currentPage.value * pageSize.value, totalProjects.value)
   return `显示 ${start}-${end} / 共 ${totalProjects.value} 个项目`
 })
 
@@ -134,7 +134,11 @@ function toggleOne(id: number) {
   else selectedIds.value.add(id)
 }
 function goToPage(page: number) {
-  if (page >= 1 && page <= totalPages.value) currentPage.value = page
+  currentPage.value = page
+}
+function onProjectPaginationSizeChange(size: number) {
+  pageSize.value = size
+  currentPage.value = 1
 }
 
 const filteredMembers = computed(() => {
@@ -559,31 +563,17 @@ void Search // suppress unused import warning
       </table>
       <div class="pm-pagination">
         <span class="pm-pagination-info">{{ paginationLabel }}</span>
-        <div class="pm-pagination-btns">
-          <button
-            class="pm-page-btn"
-            :disabled="currentPage <= 1"
-            @click="goToPage(currentPage - 1)"
-          >
-            <span class="material-symbols-outlined pm-page-icon">chevron_left</span>
-          </button>
-          <button
-            v-for="pg in totalPages"
-            :key="pg"
-            class="pm-page-btn"
-            :class="{ 'pm-page-btn--active': pg === currentPage }"
-            @click="goToPage(pg)"
-          >
-            {{ pg }}
-          </button>
-          <button
-            class="pm-page-btn"
-            :disabled="currentPage >= totalPages"
-            @click="goToPage(currentPage + 1)"
-          >
-            <span class="material-symbols-outlined pm-page-icon">chevron_right</span>
-          </button>
-        </div>
+        <el-pagination
+          background
+          size="small"
+          :current-page="currentPage"
+          :page-size="pageSize"
+          :page-sizes="pageSizeOptions"
+          :total="totalProjects"
+          layout="sizes, prev, pager, next, jumper"
+          @size-change="onProjectPaginationSizeChange"
+          @current-change="goToPage"
+        />
       </div>
     </div>
 
@@ -1843,5 +1833,123 @@ void Search // suppress unused import warning
 
 .mb-card-remove--disabled:hover {
   color: var(--tp-gray-400);
+}
+
+.pm-title {
+  font-size: var(--tp-text-3xl);
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-tight);
+}
+
+.pm-subtitle,
+.pm-capacity-sub,
+.pm-vector-text,
+.pm-pagination-info {
+  font-size: var(--tp-text-md);
+  font-weight: var(--tp-font-regular);
+  line-height: var(--tp-line-body);
+  color: var(--tp-text-muted);
+}
+
+.pm-stat-label,
+.pm-th,
+.pm-progress-label,
+.pm-card-label,
+.pm-capacity-label,
+.pm-capacity-unit,
+.pm-urgent-badge,
+.pm-avatar-placeholder-text,
+.pm-avatar-hint,
+.mb-card-email,
+.mb-role-pill {
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+  line-height: var(--tp-line-ui);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.pm-td,
+.pm-owner-name,
+.pm-capacity-sub,
+.pm-vector-text,
+.mb-card-name {
+  font-size: var(--tp-text-sm);
+  font-weight: var(--tp-font-medium);
+  line-height: var(--tp-line-ui);
+}
+
+.pm-project-name,
+.pm-big-num,
+.pm-capacity-num {
+  font-weight: var(--tp-font-bold);
+}
+
+.pm-add-btn,
+.mb-add-btn,
+.mb-card-remove {
+  font-weight: var(--tp-font-semibold);
+}
+
+.pm-pagination {
+  min-height: 48px;
+  margin-top: 0;
+  padding: 10px 16px;
+  border-top: 1px solid var(--tp-border-subtle);
+  background: linear-gradient(180deg, var(--tp-surface-header), var(--tp-surface-card));
+}
+
+.pm-pagination-info {
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-medium);
+  line-height: var(--tp-line-ui);
+}
+
+.pm-pagination :deep(.el-pagination),
+.pm-pagination-btns {
+  gap: 6px;
+}
+
+.pm-pagination :deep(.el-pagination button),
+.pm-pagination :deep(.el-pager li),
+.pm-page-btn {
+  min-width: 32px;
+  height: 32px;
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 9px;
+  background: var(--tp-surface-card);
+  color: var(--tp-text-secondary);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.pm-pagination :deep(.el-pagination button:hover),
+.pm-pagination :deep(.el-pager li:hover),
+.pm-page-btn:hover:not(:disabled) {
+  border-color: var(--tp-accent-primary-border);
+  background: var(--tp-surface-hover);
+  color: var(--tp-primary);
+}
+
+.pm-pagination :deep(.el-pagination.is-background .el-pager li.is-active),
+.pm-page-btn--active {
+  background: var(--tp-btn-bg);
+  border-color: var(--tp-btn-border);
+  color: var(--tp-btn-text);
+  box-shadow: var(--tp-btn-shadow);
+}
+
+.pm-pagination :deep(.el-pagination__jump),
+.pm-pagination :deep(.el-pagination__total) {
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-medium);
+}
+
+.pm-page-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 </style>

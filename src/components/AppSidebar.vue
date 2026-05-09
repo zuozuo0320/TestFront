@@ -322,56 +322,27 @@ const systemNavItems = computed(() => {
           <span class="tree-root-title">目录树</span>
           <button
             class="nav-tree-add-btn"
+            type="button"
             title="新建根目录"
+            aria-label="新建根目录"
             @click="globalTreeActions.onAddRootModule"
           >
             <span class="material-symbols-outlined" style="font-size: 18px">create_new_folder</span>
           </button>
         </div>
 
-        <div class="nav-tree-search" style="padding: 0 8px 6px">
-          <div style="position: relative">
-            <span
-              class="material-symbols-outlined"
-              style="
-                position: absolute;
-                left: 8px;
-                top: 50%;
-                transform: translateY(-50%);
-                font-size: 16px;
-                color: rgba(255, 255, 255, 0.4);
-                pointer-events: none;
-              "
-            >
-              search
-            </span>
+        <div class="nav-tree-search">
+          <div class="nav-tree-search-box">
+            <span class="material-symbols-outlined nav-tree-search-icon">search</span>
             <input
               v-model="moduleSearchKey"
               type="text"
+              class="nav-tree-search-input"
               placeholder="搜索目录…"
-              style="
-                width: 100%;
-                padding: 5px 8px 5px 28px;
-                border-radius: 6px;
-                border: 1px solid rgba(255, 255, 255, 0.12);
-                background: rgba(255, 255, 255, 0.06);
-                color: rgba(255, 255, 255, 0.85);
-                font-size: 12px;
-                outline: none;
-                transition: border-color 0.2s;
-              "
-              @focus="
-                ($event.target as HTMLInputElement).style.borderColor = 'rgba(255,255,255,0.3)'
-              "
-              @blur="
-                ($event.target as HTMLInputElement).style.borderColor = 'rgba(255,255,255,0.12)'
-              "
+              aria-label="搜索目录"
             />
           </div>
-          <div
-            v-if="moduleSearchKey.trim() && combinedTree.length <= 2"
-            style="padding: 8px 4px; font-size: 12px; color: rgba(255, 255, 255, 0.4)"
-          >
+          <div v-if="moduleSearchKey.trim() && combinedTree.length <= 2" class="nav-tree-empty">
             未找到匹配目录
           </div>
         </div>
@@ -395,6 +366,7 @@ const systemNavItems = computed(() => {
                 :class="{
                   active: globalSelectedModuleId === data.id,
                   'is-virtual': data.isVirtual,
+                  'is-leaf': !data.children?.length,
                 }"
                 :style="{ paddingLeft: (node.level - 1) * 16 + 8 + 'px' }"
               >

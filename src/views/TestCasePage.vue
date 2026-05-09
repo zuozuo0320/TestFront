@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox, ElImageViewer } from 'element-plus'
 import { CopyDocument, Delete, Edit, Search, Grid, List } from '@element-plus/icons-vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -170,6 +170,13 @@ const kanbanColumns = computed(() => [
 
 // Flat module paths for filter dropdown
 type FlatModule = { id: number; name: string; path: string }
+type CaseModuleSelectNode = {
+  id: number
+  label: string
+  path: string
+  depth: number
+  caseCount: number
+}
 function collectModulePaths(
   nodes: APIModuleTreeNode[],
   paths: FlatModule[] = [],
@@ -243,6 +250,7 @@ const selectedModulePath = ref(
 ) // '' = 全部, '/未规划用例' = 未规划, '/xxx' = 特定目录
 
 const dialogVisible = ref(false)
+const caseDrawerHydrated = ref(false)
 const editingId = ref<number | null>(null)
 const editingCaseRow = ref<TableRow | null>(null)
 const saving = ref(false)
@@ -250,11 +258,19 @@ const stepRows = ref<StepRow[]>([{ action: '', expected: '' }])
 const draggingStepIndex = ref<number | null>(null)
 const directoryDialogVisible = ref(false)
 const pageSizeOptions = [10, 20, 50]
+const paginationStart = computed(() =>
+  total.value === 0 ? 0 : (page.value - 1) * pageSize.value + 1,
+)
+const paginationEnd = computed(() => Math.min(page.value * pageSize.value, total.value))
 
 // ── Priority Level Picker ──
 const levelPickerOpen = ref(false)
 const levelLabels: Record<string, string> = { P0: '核心', P1: '重点', P2: '一般', P3: '边界' }
 const levelKeys = ['P0', 'P1', 'P2', 'P3'] as const
+const modulePickerOpen = ref(false)
+const modulePickerKeyword = ref('')
+const modulePickerActiveIndex = ref(0)
+const modulePickerSearchInput = ref<HTMLInputElement | null>(null)
 
 const caseForm = reactive({
   title: '',
@@ -276,6 +292,8 @@ const reviewAttachments = ref<CaseReviewAttachment[]>([])
 const reviewAttachmentsLoading = ref(false)
 const caseHistory = ref<CaseHistory[]>([])
 const caseActivities = ref<CaseActivity[]>([])
+let caseDrawerHydrationTimer: ReturnType<typeof window.setTimeout> | null = null
+let caseDrawerLoadSeq = 0
 
 // ── AI Analyze ──
 const aiAnalyzing = ref(false)
@@ -300,6 +318,34 @@ function getScoreColor(score: number): string {
   if (score >= 80) return '#4caf50'
   if (score >= 60) return '#ff9800'
   return '#f44336'
+}
+
+function formatCaseLifecycleStatus(status?: string): string {
+  const statusMap: Record<string, string> = {
+    draft: '草稿',
+    pending: '待评审',
+    active: '已生效',
+    discarded: '已废弃',
+  }
+  return statusMap[status || 'draft'] || status || '草稿'
+}
+
+const currentUserDisplayName = computed(() => authStore.user?.name?.trim() || '当前用户')
+
+function getMetaUserName(name?: string): string {
+  const trimmed = (name || '').trim()
+  if (trimmed && trimmed !== '-' && trimmed !== '?') return trimmed
+  return currentUserDisplayName.value
+}
+
+function getMetaUserAvatarUrl(avatar?: string, name?: string): string {
+  const raw = (avatar || '').trim()
+  if (raw) return authStore.resolveAvatarUrl(raw, name)
+  if (authStore.user?.avatar)
+    return authStore.resolveAvatarUrl(authStore.user.avatar, currentUserDisplayName.value)
+  const trimmed = (name || '').trim()
+  if (trimmed && trimmed !== '-' && trimmed !== '?') return authStore.fallbackAvatarUrl(trimmed)
+  return authStore.avatarUrl
 }
 
 // ── Tags ──
@@ -350,6 +396,121 @@ function processApiTree(
 }
 
 const moduleTree = computed(() => processApiTree(moduleTreeRaw.value))
+
+function buildCaseModuleSelectOptions(
+  nodes: ModuleTreeNodeWithPath[],
+  options: CaseModuleSelectNode[] = [],
+  depth = 0,
+): CaseModuleSelectNode[] {
+  for (const node of nodes) {
+    options.push({
+      id: node.id,
+      label: node.name,
+      path: node.path,
+      depth,
+      caseCount: node.case_count || 0,
+    })
+    if (node.children?.length) buildCaseModuleSelectOptions(node.children, options, depth + 1)
+  }
+  return options
+}
+
+const caseModuleSelectOptions = computed<CaseModuleSelectNode[]>(() => [
+  {
+    id: 0,
+    label: '未规划用例',
+    path: '/未规划用例',
+    depth: 0,
+    caseCount: unplannedCount.value,
+  },
+  ...buildCaseModuleSelectOptions(moduleTree.value),
+])
+
+const selectedCaseModuleOption = computed<CaseModuleSelectNode>(() => {
+  const found = caseModuleSelectOptions.value.find((option) => option.id === caseForm.moduleId)
+  return (
+    found ?? {
+      id: 0,
+      label: '未规划用例',
+      path: '/未规划用例',
+      depth: 0,
+      caseCount: unplannedCount.value,
+    }
+  )
+})
+
+const filteredCaseModuleOptions = computed(() => {
+  const keyword = modulePickerKeyword.value.trim().toLowerCase()
+  if (!keyword) return caseModuleSelectOptions.value
+  return caseModuleSelectOptions.value.filter((option) => {
+    return `${option.label} ${option.path}`.toLowerCase().includes(keyword)
+  })
+})
+
+function formatModuleDisplayPath(path: string) {
+  const normalized = path.replace(/^\/+/, '').replace(/\//g, ' / ')
+  return normalized || '未规划用例'
+}
+
+function formatModuleParentPath(path: string) {
+  const segments = path.split('/').filter(Boolean)
+  if (segments.length <= 1) return '根目录'
+  return segments.slice(0, -1).join(' / ')
+}
+
+function formatModuleTriggerMeta(option: CaseModuleSelectNode) {
+  if (option.id === 0) return '系统默认目录'
+  return `路径：${formatModuleDisplayPath(option.path)}`
+}
+
+function formatModuleOptionMeta(option: CaseModuleSelectNode) {
+  if (option.id === 0) return '系统默认目录'
+  return `上级：${formatModuleParentPath(option.path)}`
+}
+
+watch(modulePickerKeyword, () => {
+  modulePickerActiveIndex.value = 0
+})
+
+function openModulePicker() {
+  levelPickerOpen.value = false
+  modulePickerOpen.value = true
+  modulePickerKeyword.value = ''
+  const selectedIndex = caseModuleSelectOptions.value.findIndex(
+    (option) => option.id === caseForm.moduleId,
+  )
+  modulePickerActiveIndex.value = Math.max(selectedIndex, 0)
+  nextTick(() => {
+    modulePickerSearchInput.value?.focus()
+    document.querySelector('.module-picker-option.is-active')?.scrollIntoView({ block: 'nearest' })
+  })
+}
+
+function closeModulePicker() {
+  modulePickerOpen.value = false
+  modulePickerKeyword.value = ''
+  modulePickerActiveIndex.value = 0
+}
+
+function selectCaseModuleOption(option: CaseModuleSelectNode) {
+  caseForm.moduleId = option.id
+  caseForm.modulePath = option.path
+  closeModulePicker()
+}
+
+function moveModulePickerActive(step: number) {
+  const optionCount = filteredCaseModuleOptions.value.length
+  if (optionCount === 0) return
+  modulePickerActiveIndex.value = (modulePickerActiveIndex.value + step + optionCount) % optionCount
+  nextTick(() => {
+    document.querySelector('.module-picker-option.is-active')?.scrollIntoView({ block: 'nearest' })
+  })
+}
+
+function selectActiveCaseModuleOption() {
+  const option = filteredCaseModuleOptions.value[modulePickerActiveIndex.value]
+  if (option) selectCaseModuleOption(option)
+}
 
 const moduleCaseCount = computed(() => {
   const counts: Record<string, number> = {}
@@ -675,7 +836,38 @@ function applyAdvancedFilters() {
 
 // ── CRUD ──
 
+function cancelCaseDrawerHydration() {
+  if (caseDrawerHydrationTimer !== null) {
+    window.clearTimeout(caseDrawerHydrationTimer)
+    caseDrawerHydrationTimer = null
+  }
+}
+
+function scheduleCaseDrawerHydration(options: { loadTags: boolean }) {
+  cancelCaseDrawerHydration()
+  caseDrawerHydrated.value = false
+  caseDrawerHydrationTimer = window.setTimeout(() => {
+    caseDrawerHydrated.value = true
+    if (options.loadTags) {
+      void loadTagOptions()
+    }
+    caseDrawerHydrationTimer = null
+  }, 160)
+}
+
+function onCaseDrawerClosed() {
+  cancelCaseDrawerHydration()
+  caseDrawerHydrated.value = false
+  levelPickerOpen.value = false
+  closeModulePicker()
+}
+
+function isCurrentCaseDrawerLoad(seq: number, caseId: number) {
+  return seq === caseDrawerLoadSeq && dialogVisible.value && editingId.value === caseId
+}
+
 function openCreate() {
+  caseDrawerLoadSeq += 1
   editingId.value = null
   editingCaseRow.value = null
   aiResult.value = null
@@ -686,6 +878,7 @@ function openCreate() {
     level: 'P1',
     execResult: '未执行',
     modulePath: '/未规划用例',
+    moduleId: 0,
     tags: '',
     precondition: '',
     postcondition: '',
@@ -698,11 +891,13 @@ function openCreate() {
   reviewAttachments.value = []
   caseActivities.value = []
   selectedTagIds.value = []
-  loadTagOptions()
   dialogVisible.value = true
+  scheduleCaseDrawerHydration({ loadTags: true })
 }
 
 async function openEdit(row: TableRow) {
+  const loadSeq = caseDrawerLoadSeq + 1
+  caseDrawerLoadSeq = loadSeq
   editingId.value = row.id
   editingCaseRow.value = row
   aiResult.value = null
@@ -723,13 +918,19 @@ async function openEdit(row: TableRow) {
   })
   stepRows.value = parseStepsToRows(row.steps)
   selectedTagIds.value = row.tagList.map((t) => t.id)
-  loadTagOptions()
-  // Load attachments
+  caseAttachments.value = []
+  reviewAttachments.value = []
+  caseHistory.value = []
+  caseActivities.value = []
+  dialogVisible.value = true
+  scheduleCaseDrawerHydration({ loadTags: true })
   if (selectedProject.value && row.id) {
     try {
       const resp = await listAttachments(selectedProject.value, row.id)
+      if (!isCurrentCaseDrawerLoad(loadSeq, row.id)) return
       caseAttachments.value = Array.isArray(resp) ? resp : []
     } catch {
+      if (!isCurrentCaseDrawerLoad(loadSeq, row.id)) return
       caseAttachments.value = []
     }
     // Load review attachments (read-only evidences)
@@ -737,42 +938,31 @@ async function openEdit(row: TableRow) {
     try {
       reviewAttachments.value = await listReviewAttachmentsByTestCase(selectedProject.value, row.id)
     } catch {
+      if (!isCurrentCaseDrawerLoad(loadSeq, row.id)) return
       reviewAttachments.value = []
     } finally {
-      reviewAttachmentsLoading.value = false
+      if (isCurrentCaseDrawerLoad(loadSeq, row.id)) {
+        reviewAttachmentsLoading.value = false
+      }
     }
     // Load history
     try {
       const resp = await listCaseHistory(selectedProject.value, row.id)
+      if (!isCurrentCaseDrawerLoad(loadSeq, row.id)) return
       const typedResp = resp as { items?: CaseHistory[] } | CaseHistory[] | undefined
       const items = Array.isArray(typedResp) ? typedResp : typedResp?.items || []
       caseHistory.value = items
     } catch {
+      if (!isCurrentCaseDrawerLoad(loadSeq, row.id)) return
       caseHistory.value = []
     }
     // Load activities
     try {
       caseActivities.value = await listCaseActivities(selectedProject.value, row.id)
     } catch {
+      if (!isCurrentCaseDrawerLoad(loadSeq, row.id)) return
       caseActivities.value = []
     }
-  } else {
-    caseAttachments.value = []
-    reviewAttachments.value = []
-    caseHistory.value = []
-    caseActivities.value = []
-  }
-  dialogVisible.value = true
-}
-
-function onModuleChangeInDrawer() {
-  if (caseForm.moduleId === 0) {
-    caseForm.modulePath = '/未规划用例'
-    return
-  }
-  const node = flatModules.value.find((n) => n.id === caseForm.moduleId)
-  if (node) {
-    caseForm.modulePath = node.path
   }
 }
 
@@ -951,6 +1141,7 @@ function handleToggleSelectAll() {
 function selectCaseLevel(level: string) {
   caseForm.level = level
   levelPickerOpen.value = false
+  closeModulePicker()
 }
 
 async function onCloneCase(row: TableRow) {
@@ -1024,14 +1215,6 @@ function formatAbsoluteTime(dateStr: string): string {
 
 const apiBaseUrl = apiClient.defaults.baseURL || '/api/v1'
 const serverUrl = apiBaseUrl.replace(/\/api\/v1\/?$/, '')
-
-function getUserAvatarUrl(avatar?: string) {
-  const raw = (avatar || '').trim()
-  if (!raw) return ''
-  if (/^https?:\/\//i.test(raw)) return raw
-  const normalized = raw.startsWith('/') ? raw : `/${raw}`
-  return `${serverUrl}${normalized}`
-}
 
 function onAvatarLoadError(event: Event, name?: string) {
   authStore.handleAvatarError(event, name)
@@ -1345,10 +1528,12 @@ onMounted(async () => {
 
 function closeLevelPicker() {
   levelPickerOpen.value = false
+  closeModulePicker()
 }
 
 onUnmounted(() => {
   document.removeEventListener('click', closeLevelPicker)
+  cancelCaseDrawerHydration()
 })
 
 watch(selectedProject, (newId) => {
@@ -1555,7 +1740,13 @@ watch(selectedProject, (newId) => {
           >
             <el-option v-for="n in flatModules" :key="n.id" :label="n.path" :value="n.id" />
           </el-select>
-          <button class="filter-icon-btn" title="高级筛选" @click="filterPanelVisible = true">
+          <button
+            type="button"
+            class="filter-icon-btn"
+            title="高级筛选"
+            aria-label="打开高级筛选"
+            @click="filterPanelVisible = true"
+          >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <line
                 x1="2"
@@ -1691,7 +1882,12 @@ watch(selectedProject, (newId) => {
           <thead>
             <tr>
               <th style="width: 40px">
-                <input type="checkbox" :checked="selectAll" @change="handleToggleSelectAll" />
+                <input
+                  type="checkbox"
+                  aria-label="选择当前页全部用例"
+                  :checked="selectAll"
+                  @change="handleToggleSelectAll"
+                />
               </th>
               <th style="width: 80px" class="sortable" @click="toggleSort('id')">
                 ID
@@ -1741,37 +1937,29 @@ watch(selectedProject, (newId) => {
               <td>
                 <input
                   type="checkbox"
+                  :aria-label="`选择用例 ${r.title}`"
                   :checked="selectedIds.includes(r.id)"
                   @change="toggleSelectRow(r.id)"
                 />
               </td>
               <td
-                class="id"
-                style="cursor: pointer"
+                class="id copy-id-cell"
                 title="点击复制 ID"
+                tabindex="0"
                 @click="copyIdToClipboard(r.id)"
+                @keydown.enter.prevent="copyIdToClipboard(r.id)"
+                @keydown.space.prevent="copyIdToClipboard(r.id)"
               >
                 {{ r.id }}
               </td>
-              <td class="name" :title="r.title" style="cursor: pointer" @click="openEdit(r)">
-                <div style="display: flex; align-items: center; gap: 6px">
+              <td class="name case-title-cell" :title="r.title" @click="openEdit(r)">
+                <div class="case-title-wrap">
                   <strong class="case-title-link">{{ r.title }}</strong>
-                  <span
-                    v-if="r.status === 'discarded'"
-                    style="
-                      font-size: 10px;
-                      background: #fee2e2;
-                      color: #ef4444;
-                      padding: 1px 4px;
-                      border-radius: 4px;
-                    "
-                  >
-                    已废弃
-                  </span>
+                  <span v-if="r.status === 'discarded'" class="case-discarded-badge">已废弃</span>
                 </div>
               </td>
               <td><LevelBadge :level="r.level" /></td>
-              <td>
+              <td class="case-module-cell" :title="r.modulePath || '未分类'">
                 {{ (r.modulePath || '').split('/').filter(Boolean).pop() || '未分类' }}
               </td>
               <td>
@@ -1803,14 +1991,14 @@ watch(selectedProject, (newId) => {
                 </el-tag>
               </td>
               <td>
-                <div v-if="r.tagList.length > 0" style="display: flex; gap: 4px; flex-wrap: wrap">
+                <div v-if="r.tagList.length > 0" class="table-tags">
                   <span
                     v-for="t in r.tagList.slice(0, 3)"
                     :key="t.id"
                     class="table-tag"
                     :style="{
                       backgroundColor: t.color + '20',
-                      color: t.color,
+                      color: 'var(--tp-gray-800)',
                       borderColor: t.color + '40',
                     }"
                   >
@@ -1818,8 +2006,7 @@ watch(selectedProject, (newId) => {
                   </span>
                   <span
                     v-if="r.tagList.length > 3"
-                    class="table-tag"
-                    style="background: var(--tp-surface-muted); color: var(--tp-gray-500)"
+                    class="table-tag table-tag-more"
                     :title="
                       r.tagList
                         .slice(3)
@@ -1830,7 +2017,7 @@ watch(selectedProject, (newId) => {
                     +{{ r.tagList.length - 3 }}
                   </span>
                 </div>
-                <span v-else style="color: var(--tp-gray-500)">-</span>
+                <span v-else class="table-empty-value">-</span>
               </td>
               <td>
                 <div
@@ -1857,8 +2044,10 @@ watch(selectedProject, (newId) => {
                 <div class="action-group">
                   <button
                     v-if="r.status === 'active' && isAdminOrManager"
-                    class="action-btn action-edit icon-only"
-                    style="color: #ef4444"
+                    type="button"
+                    class="action-btn action-discard icon-only"
+                    title="废弃用例"
+                    aria-label="废弃用例"
                     @click="onDiscard(r)"
                   >
                     <span class="material-symbols-outlined" style="font-size: 18px">block</span>
@@ -1866,8 +2055,10 @@ watch(selectedProject, (newId) => {
                   </button>
                   <button
                     v-if="r.status === 'discarded' && isAdminOrManager"
-                    class="action-btn action-edit icon-only"
-                    style="color: #10b981"
+                    type="button"
+                    class="action-btn action-recover icon-only"
+                    title="恢复用例"
+                    aria-label="恢复用例"
                     @click="onRecover(r)"
                   >
                     <span class="material-symbols-outlined" style="font-size: 18px">
@@ -1878,17 +2069,32 @@ watch(selectedProject, (newId) => {
 
                   <button
                     v-if="r.status !== 'discarded'"
+                    type="button"
                     class="action-btn action-edit icon-only"
+                    title="编辑用例"
+                    aria-label="编辑用例"
                     @click="openEdit(r)"
                   >
                     <el-icon class="btn-icon"><Edit /></el-icon>
                     <span>编辑</span>
                   </button>
-                  <button class="action-btn action-clone icon-only" @click="onCloneCase(r)">
+                  <button
+                    type="button"
+                    class="action-btn action-clone icon-only"
+                    title="复制用例"
+                    aria-label="复制用例"
+                    @click="onCloneCase(r)"
+                  >
                     <el-icon class="btn-icon"><CopyDocument /></el-icon>
                     <span>复制</span>
                   </button>
-                  <button class="action-btn action-delete icon-only" @click="onDelete(r)">
+                  <button
+                    type="button"
+                    class="action-btn action-delete icon-only"
+                    title="删除用例"
+                    aria-label="删除用例"
+                    @click="onDelete(r)"
+                  >
                     <el-icon class="btn-icon"><Delete /></el-icon>
                     <span>删除</span>
                   </button>
@@ -1900,6 +2106,9 @@ watch(selectedProject, (newId) => {
       </div>
 
       <div v-if="viewMode === 'table'" class="pager">
+        <span class="pagination-info">
+          显示 {{ paginationStart }}-{{ paginationEnd }} / 共 {{ total }} 条用例
+        </span>
         <el-pagination
           background
           size="small"
@@ -1907,7 +2116,7 @@ watch(selectedProject, (newId) => {
           :page-size="pageSize"
           :page-sizes="pageSizeOptions"
           :total="total"
-          layout="total, sizes, prev, pager, next, jumper"
+          layout="sizes, prev, pager, next, jumper"
           @size-change="onPaginationSizeChange"
           @current-change="onPaginationCurrentChange"
         />
@@ -2074,7 +2283,7 @@ watch(selectedProject, (newId) => {
       width="480px"
       :close-on-click-modal="false"
     >
-      <p style="margin-bottom: 12px; color: #94a3b8; font-size: 13px">
+      <p style="margin-bottom: 12px; color: var(--tp-gray-600); font-size: 13px">
         为已选的 {{ selectedIds.length }} 条用例设置标签（将替换原有标签）
       </p>
       <el-select
@@ -2112,36 +2321,15 @@ watch(selectedProject, (newId) => {
     <el-drawer
       v-model="dialogVisible"
       :with-header="false"
-      size="92%"
+      size="min(100vw, 1320px)"
       direction="rtl"
       class="stitch-case-drawer"
+      @closed="onCaseDrawerClosed"
     >
-      <div class="stitch-drawer-wrapper">
+      <div class="stitch-drawer-wrapper" :class="{ 'is-hydrated': caseDrawerHydrated }">
         <!-- Header / Breadcrumbs -->
         <div class="stitch-header">
           <div class="stitch-header-left">
-            <nav class="stitch-breadcrumb">
-              <a href="#">项目管理</a>
-              <span class="material-symbols-outlined breadcrumb-icon">chevron_right</span>
-              <a href="#">
-                {{
-                  projectStore.projects.find((p) => p.id === selectedProject)?.name || '未知项目'
-                }}
-              </a>
-              <span class="material-symbols-outlined breadcrumb-icon">chevron_right</span>
-              <template v-if="caseForm.modulePath && caseForm.modulePath !== '/未规划用例'">
-                <template
-                  v-for="(seg, idx) in caseForm.modulePath.split('/').filter(Boolean)"
-                  :key="idx"
-                >
-                  <a href="#">{{ seg }}</a>
-                  <span class="material-symbols-outlined breadcrumb-icon">chevron_right</span>
-                </template>
-              </template>
-              <span class="breadcrumb-active">
-                {{ editingId ? '编辑测试用例' : '新建测试用例' }}
-              </span>
-            </nav>
             <h1 class="stitch-title">
               <template v-if="editingId">
                 {{ caseForm.title || '' }}
@@ -2150,9 +2338,17 @@ watch(selectedProject, (newId) => {
             </h1>
           </div>
           <div class="stitch-header-right">
-            <button class="stitch-btn-cancel" @click="dialogVisible = false">取消</button>
-            <button class="stitch-btn-save" :class="{ 'is-loading': saving }" @click="submitCase">
-              保存用例
+            <button type="button" class="stitch-btn-cancel" @click="dialogVisible = false">
+              取消
+            </button>
+            <button
+              type="button"
+              class="stitch-btn-save"
+              :class="{ 'is-loading': saving }"
+              :disabled="saving"
+              @click="submitCase"
+            >
+              {{ saving ? '保存中...' : '保存用例' }}
             </button>
           </div>
         </div>
@@ -2162,7 +2358,7 @@ watch(selectedProject, (newId) => {
           <!-- Left Column: Core Editor -->
           <div class="stitch-col-left">
             <!-- Section 1: Basic Information -->
-            <section class="stitch-panel relative stitch-panel-accent overflow-hidden">
+            <section class="stitch-panel relative stitch-panel-accent case-basic-panel">
               <div class="stitch-panel-accent-bar"></div>
               <h3 class="stitch-panel-title">
                 <span class="material-symbols-outlined">info</span>
@@ -2172,19 +2368,31 @@ watch(selectedProject, (newId) => {
               <div class="stitch-form-grid">
                 <!-- Use Case Name -->
                 <div class="stitch-form-item col-span-full">
-                  <label>用例名称</label>
+                  <label for="case-title-input">用例名称</label>
                   <input
+                    id="case-title-input"
                     v-model="caseForm.title"
                     type="text"
                     class="stitch-input"
                     placeholder="请输入用例名称"
+                    aria-required="true"
                   />
                 </div>
 
                 <!-- Priority / Level -->
                 <div class="stitch-form-item">
-                  <label>优先级</label>
-                  <div class="stitch-level-picker" @click.stop="levelPickerOpen = !levelPickerOpen">
+                  <label id="case-level-label">优先级</label>
+                  <div
+                    class="stitch-level-picker"
+                    role="button"
+                    tabindex="0"
+                    aria-haspopup="listbox"
+                    :aria-expanded="levelPickerOpen"
+                    aria-labelledby="case-level-label"
+                    @click.stop="levelPickerOpen = !levelPickerOpen"
+                    @keydown.enter.prevent="levelPickerOpen = !levelPickerOpen"
+                    @keydown.space.prevent="levelPickerOpen = !levelPickerOpen"
+                  >
                     <span class="level-badge" :class="caseForm.level.toLowerCase()">
                       {{ caseForm.level }}
                     </span>
@@ -2196,12 +2404,14 @@ watch(selectedProject, (newId) => {
                       expand_more
                     </span>
                     <Transition name="level-fade">
-                      <div v-if="levelPickerOpen" class="level-dropdown-panel">
+                      <div v-if="levelPickerOpen" class="level-dropdown-panel" role="listbox">
                         <div
                           v-for="lv in levelKeys"
                           :key="lv"
                           class="level-dropdown-item"
                           :class="{ active: caseForm.level === lv }"
+                          role="option"
+                          :aria-selected="caseForm.level === lv"
                           @click.stop="selectCaseLevel(lv)"
                         >
                           <span class="level-badge" :class="lv.toLowerCase()">{{ lv }}</span>
@@ -2220,19 +2430,116 @@ watch(selectedProject, (newId) => {
 
                 <!-- Module Path -->
                 <div class="stitch-form-item">
-                  <label>所属模块</label>
-                  <div class="stitch-select-wrapper">
-                    <select
-                      v-model="caseForm.moduleId"
-                      class="stitch-select"
-                      @change="onModuleChangeInDrawer"
+                  <label for="case-module-select">所属模块</label>
+                  <div class="module-picker" :class="{ 'is-open': modulePickerOpen }" @click.stop>
+                    <button
+                      id="case-module-select"
+                      class="module-picker-trigger"
+                      type="button"
+                      role="combobox"
+                      aria-haspopup="listbox"
+                      :aria-expanded="modulePickerOpen"
+                      aria-controls="case-module-options"
+                      @click="modulePickerOpen ? closeModulePicker() : openModulePicker()"
+                      @keydown.enter.prevent="openModulePicker"
+                      @keydown.space.prevent="openModulePicker"
+                      @keydown.arrow-down.prevent="openModulePicker"
                     >
-                      <option :value="0">未规划用例</option>
-                      <option v-for="n in flatModules" :key="n.id" :value="n.id">
-                        {{ '\u3000'.repeat(n.path.split('/').length - 2) + n.name }}
-                      </option>
-                    </select>
-                    <span class="material-symbols-outlined select-icon">account_tree</span>
+                      <span class="module-picker-trigger-icon material-symbols-outlined">
+                        {{ selectedCaseModuleOption.id === 0 ? 'inventory_2' : 'folder' }}
+                      </span>
+                      <span class="module-picker-trigger-main">
+                        <span
+                          class="module-picker-trigger-label"
+                          :title="formatModuleDisplayPath(selectedCaseModuleOption.path)"
+                        >
+                          {{ selectedCaseModuleOption.label }}
+                        </span>
+                        <span class="module-picker-trigger-path">
+                          {{ formatModuleTriggerMeta(selectedCaseModuleOption) }}
+                        </span>
+                      </span>
+                      <span
+                        v-if="selectedCaseModuleOption.caseCount > 0"
+                        class="module-picker-trigger-count"
+                      >
+                        {{ selectedCaseModuleOption.caseCount }}
+                      </span>
+                      <span
+                        class="module-picker-trigger-arrow material-symbols-outlined"
+                        :class="{ 'is-open': modulePickerOpen }"
+                      >
+                        expand_more
+                      </span>
+                    </button>
+                    <Transition name="level-fade">
+                      <div v-if="modulePickerOpen" class="module-picker-panel">
+                        <div class="module-picker-search">
+                          <span class="material-symbols-outlined">search</span>
+                          <input
+                            ref="modulePickerSearchInput"
+                            v-model="modulePickerKeyword"
+                            type="text"
+                            placeholder="搜索目录名称或路径"
+                            @keydown.down.prevent="moveModulePickerActive(1)"
+                            @keydown.up.prevent="moveModulePickerActive(-1)"
+                            @keydown.enter.prevent="selectActiveCaseModuleOption"
+                            @keydown.esc.prevent="closeModulePicker"
+                          />
+                        </div>
+                        <div id="case-module-options" class="module-picker-list" role="listbox">
+                          <button
+                            v-for="(item, index) in filteredCaseModuleOptions"
+                            :key="item.id"
+                            class="module-picker-option"
+                            :class="{
+                              'is-selected': item.id === caseForm.moduleId,
+                              'is-active': index === modulePickerActiveIndex,
+                              'is-unplanned': item.id === 0,
+                            }"
+                            :style="{ '--module-indent': `${item.depth * 14}px` }"
+                            type="button"
+                            role="option"
+                            :aria-selected="item.id === caseForm.moduleId"
+                            :title="formatModuleDisplayPath(item.path)"
+                            @mouseenter="modulePickerActiveIndex = index"
+                            @click="selectCaseModuleOption(item)"
+                          >
+                            <span v-if="item.depth > 0" class="module-picker-option-branch"></span>
+                            <span class="module-picker-option-icon material-symbols-outlined">
+                              {{ item.id === 0 ? 'inventory_2' : 'folder' }}
+                            </span>
+                            <span class="module-picker-option-main">
+                              <span class="module-picker-option-label">
+                                {{ item.label }}
+                              </span>
+                              <span class="module-picker-option-path">
+                                {{ formatModuleOptionMeta(item) }}
+                              </span>
+                            </span>
+                            <span v-if="item.caseCount > 0" class="module-picker-option-count">
+                              {{ item.caseCount }}
+                            </span>
+                            <span
+                              v-if="item.id === caseForm.moduleId"
+                              class="module-picker-option-check material-symbols-outlined"
+                            >
+                              check
+                            </span>
+                          </button>
+                          <div
+                            v-if="filteredCaseModuleOptions.length === 0"
+                            class="module-picker-empty"
+                          >
+                            没有匹配的目录
+                          </div>
+                        </div>
+                        <div class="module-picker-footer">
+                          <span>{{ filteredCaseModuleOptions.length }} 个可选目录</span>
+                          <span v-if="filteredCaseModuleOptions.length > 6">滚动查看更多</span>
+                        </div>
+                      </div>
+                    </Transition>
                   </div>
                 </div>
 
@@ -2242,15 +2549,13 @@ watch(selectedProject, (newId) => {
                   <div class="review-readonly-card">
                     <div class="review-readonly-main">
                       <StatusBadge :value="editingCaseRow?.reviewResult || '未评审'" />
-                      <span class="review-readonly-text">
+                      <span v-if="editingCaseRow" class="review-readonly-text">
                         {{
-                          !editingCaseRow
-                            ? '新建后可从用例评审模块发起评审'
-                            : editingCaseRow.inReview
-                              ? `当前正在评审：${editingCaseRow.currentReviewName || '未命名评审计划'}`
-                              : editingCaseRow.relatedReviewCount > 0
-                                ? `历史已关联 ${editingCaseRow.relatedReviewCount} 个评审计划`
-                                : '当前暂无关联评审计划'
+                          editingCaseRow?.inReview
+                            ? `当前正在评审：${editingCaseRow.currentReviewName || '未命名评审计划'}`
+                            : editingCaseRow.relatedReviewCount > 0
+                              ? `历史已关联 ${editingCaseRow.relatedReviewCount} 个评审计划`
+                              : '当前暂无关联评审计划'
                         }}
                       </span>
                     </div>
@@ -2259,9 +2564,13 @@ watch(selectedProject, (newId) => {
 
                 <!-- Exec Status -->
                 <div class="stitch-form-item">
-                  <label>执行状态</label>
+                  <label for="case-exec-select">执行状态</label>
                   <div class="stitch-select-wrapper">
-                    <select v-model="caseForm.execResult" class="stitch-select">
+                    <select
+                      id="case-exec-select"
+                      v-model="caseForm.execResult"
+                      class="stitch-select"
+                    >
                       <option value="未执行">未执行</option>
                       <option value="成功">成功</option>
                       <option value="失败">失败</option>
@@ -2273,7 +2582,7 @@ watch(selectedProject, (newId) => {
 
                 <!-- Tags -->
                 <div class="stitch-form-item col-span-full">
-                  <label>标签</label>
+                  <label id="case-tags-label">标签</label>
                   <el-select
                     v-model="selectedTagIds"
                     multiple
@@ -2283,6 +2592,7 @@ watch(selectedProject, (newId) => {
                     :max-collapse-tags="99"
                     placeholder="搜索或选择标签..."
                     class="tag-selector"
+                    aria-labelledby="case-tags-label"
                     :reserve-keyword="true"
                     no-data-text="无匹配标签"
                   >
@@ -2308,6 +2618,7 @@ watch(selectedProject, (newId) => {
                         }}
                         <button
                           v-if="!selectDisabled && !item.isDisabled"
+                          type="button"
                           class="tag-remove-btn"
                           @click.stop="deleteTag($event, item)"
                         >
@@ -2344,6 +2655,7 @@ watch(selectedProject, (newId) => {
                   class="stitch-textarea"
                   rows="3"
                   placeholder="请输入前置条件..."
+                  aria-label="前置条件"
                 ></textarea>
               </section>
               <section class="stitch-panel">
@@ -2356,6 +2668,7 @@ watch(selectedProject, (newId) => {
                   class="stitch-textarea"
                   rows="3"
                   placeholder="请输入后置条件..."
+                  aria-label="后置条件"
                 ></textarea>
               </section>
             </div>
@@ -2367,7 +2680,7 @@ watch(selectedProject, (newId) => {
                   <span class="material-symbols-outlined">list_alt</span>
                   测试步骤
                 </h3>
-                <button class="stitch-btn-text" @click="addStepRow">
+                <button type="button" class="stitch-btn-text" @click="addStepRow">
                   <span class="material-symbols-outlined">add_circle</span>
                   添加步骤
                 </button>
@@ -2404,6 +2717,7 @@ watch(selectedProject, (newId) => {
                           class="stitch-table-input"
                           rows="1"
                           placeholder="输入操作描述..."
+                          :aria-label="`第 ${idx + 1} 步操作描述`"
                         ></textarea>
                       </td>
                       <td class="col-expect">
@@ -2412,6 +2726,7 @@ watch(selectedProject, (newId) => {
                           class="stitch-table-input"
                           rows="1"
                           placeholder="输入预期结果..."
+                          :aria-label="`第 ${idx + 1} 步预期结果`"
                         ></textarea>
                       </td>
                       <td class="col-op text-center">
@@ -2420,7 +2735,12 @@ watch(selectedProject, (newId) => {
                           placement="bottom-end"
                           @command="(cmd: string) => onStepMenuCommand(cmd, idx)"
                         >
-                          <button class="stitch-btn-step-menu" title="更多操作">
+                          <button
+                            type="button"
+                            class="stitch-btn-step-menu"
+                            title="更多操作"
+                            aria-label="更多步骤操作"
+                          >
                             <span class="material-symbols-outlined" style="font-size: 18px">
                               more_vert
                             </span>
@@ -2485,30 +2805,20 @@ watch(selectedProject, (newId) => {
                 备注
               </h3>
               <div class="stitch-textarea-wrap">
-                <div class="stitch-textarea-toolbar">
-                  <button class="format-btn">
-                    <span class="material-symbols-outlined">format_quote</span>
-                  </button>
-                  <button class="format-btn">
-                    <span class="material-symbols-outlined">code</span>
-                  </button>
-                  <button class="format-btn">
-                    <span class="material-symbols-outlined">attachment</span>
-                  </button>
-                </div>
                 <!-- Binding remark here -->
                 <textarea
                   v-model="caseForm.remark"
                   class="stitch-textarea no-border"
                   rows="4"
                   placeholder="添加补充备注信息，如测试账号、特定设备说明等..."
+                  aria-label="备注"
                 ></textarea>
               </div>
             </section>
           </div>
 
           <!-- Right Column: Sidebar Metadata -->
-          <div class="stitch-col-right">
+          <div v-if="caseDrawerHydrated" class="stitch-col-right">
             <!-- Version Metadata -->
             <section class="stitch-panel">
               <h3 class="stitch-subtitle">版本追踪</h3>
@@ -2519,22 +2829,25 @@ watch(selectedProject, (newId) => {
                 </div>
                 <div class="stitch-meta-row flex-between">
                   <span class="meta-label">状态</span>
-                  <StatusBadge :value="editingCaseRow?.status || 'draft'" />
+                  <StatusBadge :value="formatCaseLifecycleStatus(editingCaseRow?.status)" />
                 </div>
                 <div class="stitch-meta-row flex-between">
                   <span class="meta-label">维护者</span>
                   <div class="meta-user">
                     <img
-                      v-if="editingCaseRow?.updatedByAvatar"
                       class="meta-avatar-img"
-                      :src="getUserAvatarUrl(editingCaseRow.updatedByAvatar)"
-                      :alt="editingCaseRow.updatedByName"
-                      @error="onAvatarLoadError($event, editingCaseRow.updatedByName)"
+                      :src="
+                        getMetaUserAvatarUrl(
+                          editingCaseRow?.updatedByAvatar,
+                          editingCaseRow?.updatedByName,
+                        )
+                      "
+                      :alt="getMetaUserName(editingCaseRow?.updatedByName)"
+                      @error="
+                        onAvatarLoadError($event, getMetaUserName(editingCaseRow?.updatedByName))
+                      "
                     />
-                    <div v-else class="meta-avatar">
-                      {{ (editingCaseRow?.updatedByName || '?')[0] }}
-                    </div>
-                    <span>{{ editingCaseRow?.updatedByName || '-' }}</span>
+                    <span>{{ getMetaUserName(editingCaseRow?.updatedByName) }}</span>
                   </div>
                 </div>
                 <div class="stitch-meta-row flex-between">
@@ -2545,16 +2858,19 @@ watch(selectedProject, (newId) => {
                   <span class="meta-label">创建人</span>
                   <div class="meta-user">
                     <img
-                      v-if="editingCaseRow?.createdByAvatar"
                       class="meta-avatar-img"
-                      :src="getUserAvatarUrl(editingCaseRow.createdByAvatar)"
-                      :alt="editingCaseRow.createdByName"
-                      @error="onAvatarLoadError($event, editingCaseRow.createdByName)"
+                      :src="
+                        getMetaUserAvatarUrl(
+                          editingCaseRow?.createdByAvatar,
+                          editingCaseRow?.createdByName,
+                        )
+                      "
+                      :alt="getMetaUserName(editingCaseRow?.createdByName)"
+                      @error="
+                        onAvatarLoadError($event, getMetaUserName(editingCaseRow?.createdByName))
+                      "
                     />
-                    <div v-else class="meta-avatar">
-                      {{ (editingCaseRow?.createdByName || '?')[0] }}
-                    </div>
-                    <span>{{ editingCaseRow?.createdByName || '-' }}</span>
+                    <span>{{ getMetaUserName(editingCaseRow?.createdByName) }}</span>
                   </div>
                 </div>
                 <div class="stitch-meta-row flex-between">
@@ -2565,7 +2881,7 @@ watch(selectedProject, (newId) => {
                 <template v-if="caseHistory.length > 0">
                   <div class="stitch-meta-divider"></div>
                   <div class="stitch-meta-row">
-                    <div class="meta-label" style="font-size: 10px; text-transform: uppercase">
+                    <div class="meta-label" style="font-size: 12px">
                       版本历史 ({{ caseHistory.length }})
                     </div>
                     <div class="meta-tags-wrap mt-2">
@@ -2595,14 +2911,22 @@ watch(selectedProject, (newId) => {
                 >
                   <img :src="getAttachmentUrl(att)" :alt="att.file_name" />
                   <div class="asset-overlay">
-                    <button class="icon-only" title="预览图片" @click="openImagePreview(att)">
+                    <button
+                      type="button"
+                      class="icon-only"
+                      title="预览图片"
+                      aria-label="预览图片"
+                      @click="openImagePreview(att)"
+                    >
                       <span class="material-symbols-outlined" style="color: white; font-size: 20px">
                         visibility
                       </span>
                     </button>
                     <button
+                      type="button"
                       class="icon-only"
                       title="下载"
+                      aria-label="下载附件"
                       style="margin-left: 8px"
                       @click="downloadAttachment(att)"
                     >
@@ -2611,8 +2935,10 @@ watch(selectedProject, (newId) => {
                       </span>
                     </button>
                     <button
+                      type="button"
                       class="icon-only"
                       title="删除"
+                      aria-label="删除附件"
                       style="margin-left: 8px"
                       @click.stop="onRemoveAttachment(att.id)"
                     >
@@ -2646,14 +2972,22 @@ watch(selectedProject, (newId) => {
                     {{ att.file_name }}
                   </span>
                   <div class="asset-overlay">
-                    <button class="icon-only" title="下载" @click="downloadAttachment(att)">
+                    <button
+                      type="button"
+                      class="icon-only"
+                      title="下载"
+                      aria-label="下载附件"
+                      @click="downloadAttachment(att)"
+                    >
                       <span class="material-symbols-outlined" style="color: white; font-size: 20px">
                         download
                       </span>
                     </button>
                     <button
+                      type="button"
                       class="icon-only"
                       title="删除"
+                      aria-label="删除附件"
                       style="margin-left: 8px"
                       @click.stop="onRemoveAttachment(att.id)"
                     >
@@ -2667,24 +3001,33 @@ watch(selectedProject, (newId) => {
                   </div>
                 </div>
 
-                <div class="upload-area col-span-full mt-1">
+                <div v-if="caseAttachments.length === 0" class="asset-empty-card col-span-full">
+                  <span class="material-symbols-outlined">perm_media</span>
+                  <strong>暂无附件</strong>
+                  <small>
+                    {{
+                      editingId
+                        ? '可上传截图、日志或补充说明文件'
+                        : '保存用例后可上传截图、日志或补充说明文件'
+                    }}
+                  </small>
+                </div>
+                <div
+                  class="upload-area col-span-full mt-1"
+                  :class="{ 'is-upload-disabled': !editingId }"
+                >
                   <!-- FileUploader replaces the click area but keeps original functionality. We pass [] to hide its internal list -->
                   <FileUploader
+                    v-if="editingId"
                     :files="[]"
                     :project-id="selectedProject ?? undefined"
                     @upload="onUploadAttachment"
                   />
                   <!-- fallback text just in case -->
-                  <div
-                    v-if="!editingId"
-                    style="
-                      font-size: 10px;
-                      color: var(--tp-gray-500);
-                      text-align: center;
-                      padding: 10px;
-                    "
-                  >
-                    请先保存用例后再上传附件
+                  <div v-else class="upload-disabled-placeholder">
+                    <span class="material-symbols-outlined">lock</span>
+                    <strong>保存后可上传附件</strong>
+                    <small>先保存用例，再补充截图、日志或说明文件</small>
                   </div>
                 </div>
               </div>
@@ -2785,6 +3128,7 @@ watch(selectedProject, (newId) => {
               <div v-else-if="aiError" style="margin-bottom: 12px">
                 <p class="text-xs" style="color: #f44336; margin-bottom: 8px">{{ aiError }}</p>
                 <button
+                  type="button"
                   class="ai-btn w-full py-2 bg-white-10 hover:bg-white-20 text-xs font-bold text-primary-dim rounded-lg transition-all border border-white-10"
                   @click="runAIAnalyze"
                 >
@@ -2848,9 +3192,13 @@ watch(selectedProject, (newId) => {
                     class="text-xs"
                     style="padding: 3px 0; color: var(--tp-gray-600); line-height: 1.4"
                   >
-                    <span style="margin-right: 4px">
+                    <span class="material-symbols-outlined ai-issue-icon">
                       {{
-                        issue.type === 'coverage' ? '📋' : issue.type === 'boundary' ? '⚠️' : '💡'
+                        issue.type === 'coverage'
+                          ? 'checklist'
+                          : issue.type === 'boundary'
+                            ? 'warning'
+                            : 'tips_and_updates'
                       }}
                     </span>
                     {{ issue.text }}
@@ -2858,6 +3206,7 @@ watch(selectedProject, (newId) => {
                 </div>
 
                 <button
+                  type="button"
                   class="ai-btn w-full py-2 bg-white-10 hover:bg-white-20 text-xs font-bold text-primary-dim rounded-lg transition-all border border-white-10"
                   @click="runAIAnalyze"
                 >
@@ -2872,13 +3221,20 @@ watch(selectedProject, (newId) => {
                   将从覆盖率、边界值、综合质量三个维度进行分析，给出评分和改进建议。
                 </p>
                 <button
+                  type="button"
                   class="ai-btn w-full py-2 bg-white-10 hover:bg-white-20 text-xs font-bold text-primary-dim rounded-lg transition-all border border-white-10"
+                  :disabled="!editingId"
                   @click="runAIAnalyze"
                 >
-                  开始检测
+                  {{ editingId ? '开始检测' : '保存后可检测' }}
                 </button>
               </div>
             </section>
+          </div>
+          <div v-else class="stitch-col-right stitch-col-right-skeleton" aria-hidden="true">
+            <div class="stitch-panel skeleton-panel skeleton-panel-sm"></div>
+            <div class="stitch-panel skeleton-panel skeleton-panel-lg"></div>
+            <div class="stitch-panel skeleton-panel skeleton-panel-md"></div>
           </div>
         </div>
 
@@ -3048,17 +3404,18 @@ watch(selectedProject, (newId) => {
   line-height: 1.35;
 }
 .table-meta-name {
-  color: var(--tp-gray-200, #e2e8f0);
+  color: var(--tp-gray-800);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 140px;
 }
 .table-meta-time {
-  color: var(--tp-gray-500, #94a3b8);
-  font-size: 11px;
+  color: var(--tp-gray-600);
+  font-size: 12px;
+  font-weight: 500;
 }
 
 /* ── Review attachments (read-only evidences) ── */
@@ -3501,8 +3858,47 @@ watch(selectedProject, (newId) => {
 }
 
 .case-page .table-tag {
+  min-height: 24px;
   border-radius: 999px;
-  font-weight: 650;
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1;
+  color: var(--tp-gray-800) !important;
+  background-color: var(--tp-surface-muted) !important;
+  border-color: var(--tp-border-strong) !important;
+}
+
+.case-page .table-shell :deep(.el-tag) {
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1;
+}
+
+.case-page .table-shell :deep(.el-tag--warning) {
+  color: color-mix(in srgb, var(--tp-accent-warning) 62%, var(--tp-gray-900));
+  background: var(--tp-accent-warning-soft);
+  border-color: var(--tp-accent-warning-border);
+}
+
+.case-page .table-shell :deep(.el-tag--success) {
+  color: color-mix(in srgb, var(--tp-accent-success) 72%, var(--tp-gray-900));
+  background: var(--tp-accent-success-soft);
+  border-color: var(--tp-accent-success-border);
+}
+
+.case-page .table-shell :deep(.el-tag--danger) {
+  color: color-mix(in srgb, var(--tp-accent-danger) 82%, var(--tp-gray-900));
+  background: var(--tp-accent-danger-soft);
+  border-color: var(--tp-accent-danger-border);
+}
+
+.case-page .table-shell :deep(.el-tag--info) {
+  color: var(--tp-gray-700);
+  background: var(--tp-surface-muted);
+  border-color: var(--tp-border-strong);
 }
 
 .case-page .pager {
@@ -3730,6 +4126,47 @@ watch(selectedProject, (newId) => {
   font-size: 11px;
 }
 
+.case-page .insight-label,
+.case-page .insight-trend,
+.case-page .table-meta-time,
+.review-att-badge,
+.review-att-hint,
+.review-att-meta {
+  font-size: var(--tp-text-xs) !important;
+  line-height: var(--tp-line-ui);
+}
+
+.case-page .insight-label,
+.case-page .table-tag,
+.review-att-badge,
+.case-page .table-shell :deep(.el-tag) {
+  font-weight: var(--tp-font-bold);
+  letter-spacing: 0;
+}
+
+.case-page .insights-title,
+.case-page .insight-value {
+  font-weight: var(--tp-font-bold);
+}
+
+.case-page .table-shell th {
+  font-size: var(--tp-text-xs) !important;
+  line-height: var(--tp-line-ui);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.case-page .table-shell tbody td {
+  font-size: var(--tp-text-sm);
+  line-height: var(--tp-line-ui);
+}
+
+.case-page .table-meta-time,
+.review-att-hint,
+.review-att-meta {
+  color: var(--tp-text-muted) !important;
+}
+
 .case-page .action-group {
   gap: 2px;
 }
@@ -3742,8 +4179,338 @@ watch(selectedProject, (newId) => {
 
 .case-page .pager {
   display: flex;
-  justify-content: flex-end;
-  margin-top: -4px;
-  padding: 0;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 48px;
+  margin-top: 0;
+  padding: 10px 16px;
+  border-top: 1px solid var(--tp-border-subtle);
+  background: linear-gradient(180deg, var(--tp-surface-header), var(--tp-surface-card));
+}
+
+.case-page .pagination-info,
+.case-page .pager :deep(.el-pagination__total),
+.case-page .pager :deep(.el-pagination__jump) {
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-medium);
+  line-height: var(--tp-line-ui);
+}
+
+.case-page .pager :deep(.el-pagination) {
+  gap: 6px;
+}
+
+.case-page .pager :deep(.el-pagination button),
+.case-page .pager :deep(.el-pager li) {
+  min-width: 32px;
+  height: 32px;
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 9px;
+  background: var(--tp-surface-card);
+  color: var(--tp-text-secondary);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+}
+
+.case-page .pager :deep(.el-pagination button:hover),
+.case-page .pager :deep(.el-pager li:hover) {
+  border-color: var(--tp-accent-primary-border);
+  background: var(--tp-surface-hover);
+  color: var(--tp-primary);
+}
+
+.case-page .pager :deep(.el-pagination.is-background .el-pager li.is-active) {
+  background: var(--tp-btn-bg) !important;
+  border-color: var(--tp-btn-border) !important;
+  color: var(--tp-btn-text) !important;
+  box-shadow: var(--tp-btn-shadow);
+}
+
+.case-page .right-table {
+  gap: 12px;
+  background:
+    linear-gradient(180deg, rgba(99, 102, 241, 0.018), transparent 260px), var(--tp-surface-base) !important;
+}
+
+.case-page .insights-section {
+  padding: 12px !important;
+  border-radius: 16px !important;
+  box-shadow: var(--tp-shadow-sm) !important;
+}
+
+.case-page .insights-header {
+  margin-bottom: 10px !important;
+}
+
+.case-page .insights-title {
+  font-size: var(--tp-text-lg) !important;
+  line-height: var(--tp-line-tight);
+}
+
+.case-page .insights-desc {
+  font-size: var(--tp-text-xs);
+  line-height: var(--tp-line-body);
+}
+
+.case-page .insight-card {
+  min-height: 84px !important;
+  padding: 12px !important;
+  border-radius: 12px !important;
+}
+
+.case-page .insight-value {
+  font-size: 23px !important;
+}
+
+.case-page .filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 50px;
+  padding: 8px 10px !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+
+.case-page .filter-search-input :deep(.el-input__wrapper),
+.case-page .filter-dropdown :deep(.el-select__wrapper),
+.case-page .filter-icon-btn {
+  min-height: 36px;
+  border-radius: 9px !important;
+  box-shadow: 0 0 0 1px var(--tp-border-subtle) inset !important;
+}
+
+.case-page .filter-search-input :deep(.el-input__wrapper:hover),
+.case-page .filter-dropdown :deep(.el-select__wrapper:hover),
+.case-page .filter-icon-btn:hover {
+  box-shadow: 0 0 0 1px var(--tp-border-strong) inset !important;
+}
+
+.case-page .filter-search-input :deep(.el-input__wrapper.is-focus),
+.case-page .filter-dropdown :deep(.el-select__wrapper.is-focused) {
+  box-shadow:
+    0 0 0 1px var(--tp-accent-primary-border) inset,
+    0 0 0 3px var(--tp-accent-primary-soft) !important;
+}
+
+.case-page .filter-bar-selects {
+  align-items: center;
+}
+
+.case-page .table-shell {
+  min-height: 0 !important;
+  overflow: auto;
+  border-color: var(--tp-border-subtle) !important;
+  border-radius: 14px !important;
+  background: var(--tp-surface-card) !important;
+  box-shadow: none !important;
+}
+
+.case-page .table-shell table {
+  min-width: 1080px;
+}
+
+.case-page .table-shell thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.case-page .table-shell thead tr {
+  background: var(--tp-surface-header) !important;
+}
+
+.case-page .table-shell th {
+  height: 40px;
+  padding: 9px 12px !important;
+  border-bottom: 1px solid var(--tp-border-subtle) !important;
+  color: var(--tp-text-muted) !important;
+  font-weight: var(--tp-font-semibold) !important;
+}
+
+.case-page .table-shell tbody tr,
+.case-page .table-shell tbody tr:nth-child(even) {
+  background: var(--tp-surface-card) !important;
+}
+
+.case-page .table-shell tbody tr.row-selected {
+  background: var(--tp-accent-primary-soft) !important;
+}
+
+.case-page .table-shell tbody tr:hover {
+  background: var(--tp-surface-row-hover) !important;
+}
+
+.case-page .table-shell tbody td {
+  height: 52px;
+  padding: 10px 12px !important;
+  border-bottom: 1px solid var(--tp-border-subtle) !important;
+  color: var(--tp-text-secondary) !important;
+  vertical-align: middle;
+}
+
+.case-page .table-shell tbody tr:last-child td {
+  border-bottom: 0 !important;
+}
+
+.case-page .table-shell input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+.case-page .copy-id-cell {
+  cursor: copy;
+  color: var(--tp-text-subtle) !important;
+  font-family: var(--tp-font-family-mono);
+  font-size: var(--tp-text-xs) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.case-page .copy-id-cell:focus-visible {
+  outline: 2px solid var(--tp-accent-primary-border);
+  outline-offset: -2px;
+}
+
+.case-page .case-title-cell {
+  cursor: pointer;
+}
+
+.case-page .case-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.case-page .case-title-link {
+  overflow: hidden;
+  color: var(--tp-text-primary) !important;
+  font-size: var(--tp-text-sm);
+  font-weight: var(--tp-font-semibold);
+  line-height: var(--tp-line-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.case-page .case-title-link:hover {
+  text-decoration: none;
+}
+
+.case-page .case-discarded-badge {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border: 1px solid var(--tp-accent-danger-border);
+  border-radius: 999px;
+  background: var(--tp-accent-danger-soft);
+  color: var(--tp-accent-danger);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+  line-height: var(--tp-line-ui);
+}
+
+.case-page .case-module-cell {
+  overflow: hidden;
+  color: var(--tp-text-muted) !important;
+  max-width: 120px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.case-page .table-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-height: 50px;
+  overflow: hidden;
+}
+
+.case-page .table-tag {
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+  line-height: 20px;
+}
+
+.case-page .table-tag-more {
+  background: var(--tp-surface-muted) !important;
+  border-color: var(--tp-border-subtle) !important;
+  color: var(--tp-text-muted) !important;
+}
+
+.case-page .table-empty-value {
+  color: var(--tp-text-subtle);
+}
+
+.case-page .table-meta-cell {
+  min-width: 0;
+}
+
+.case-page .table-meta-name {
+  overflow: hidden;
+  max-width: 92px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.case-page .action-group {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.case-page .action-btn.icon-only {
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tp-text-muted);
+}
+
+.case-page .action-btn.icon-only:hover {
+  background: var(--tp-surface-hover);
+  border-color: var(--tp-border-subtle);
+  color: var(--tp-primary);
+}
+
+.case-page .action-delete:hover,
+.case-page .action-discard:hover {
+  background: var(--tp-accent-danger-soft);
+  border-color: var(--tp-accent-danger-border);
+  color: var(--tp-accent-danger);
+}
+
+.case-page .action-recover:hover {
+  background: var(--tp-accent-success-soft);
+  border-color: var(--tp-accent-success-border);
+  color: var(--tp-accent-success);
+}
+
+.case-page .pager {
+  min-height: 50px;
+  border: 1px solid var(--tp-border-subtle);
+  border-top: 0;
+  border-radius: 0 0 14px 14px;
+  background: var(--tp-surface-card);
+}
+
+@media (max-width: 1280px) {
+  .case-page .insights-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .case-page .filter-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .case-page .filter-bar-selects {
+    flex-wrap: wrap;
+  }
 }
 </style>

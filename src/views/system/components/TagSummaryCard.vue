@@ -177,4 +177,28 @@ defineProps<{
   background: var(--tp-surface-muted, var(--bg-dot-more));
   color: var(--tp-gray-600, var(--text-secondary));
 }
+
+.tm-summary-label,
+.tm-summary-metric-label {
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+  line-height: var(--tp-line-ui);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.tm-summary-number {
+  font-weight: var(--tp-font-bold);
+}
+
+.tm-summary-sub,
+.tm-summary-metric-value {
+  font-size: var(--tp-text-sm);
+  line-height: var(--tp-line-ui);
+}
+
+.tm-summary-dot {
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-bold);
+}
 </style>

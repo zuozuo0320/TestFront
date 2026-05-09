@@ -1807,3 +1807,114 @@
   box-shadow: var(--tp-shadow-md);
   color: var(--tp-gray-900);
 }
+
+.ai-page {
+  font-family: var(--tp-font-family-sans);
+  font-size: var(--tp-text-md);
+  line-height: var(--tp-line-body);
+}
+
+.ai-page-header-left h1 {
+  font-size: var(--tp-text-3xl);
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-tight);
+  letter-spacing: 0;
+}
+
+.ai-page-header-left .ai-subtitle,
+.ai-quickstart-card p,
+.ai-health-desc,
+.ai-insight-text,
+.ai-timeline-desc {
+  font-size: var(--tp-text-sm);
+  font-weight: var(--tp-font-regular);
+  line-height: var(--tp-line-body);
+}
+
+.ai-breadcrumb,
+.ai-table-title,
+.ai-table thead th,
+.ai-task-id,
+.ai-case-tag,
+.ai-status-badge,
+.ai-stat-label,
+.ai-section-title,
+.ai-info-label,
+.ai-code-filename,
+.ai-fail-label-time,
+.ai-assertion-pill,
+.ai-insight-label,
+.ai-insight-action,
+.ai-trace-sub,
+.ai-form-label,
+.ai-form-hint,
+.ai-mode-tag,
+.v1-file-type-badge {
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+  line-height: var(--tp-line-ui);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.ai-table tbody td,
+.ai-task-name,
+.ai-source-label,
+.ai-info-value,
+.ai-timeline-time,
+.ai-trace-title,
+.ai-toast-text,
+.v1-file-tab {
+  font-size: var(--tp-text-sm);
+  line-height: var(--tp-line-ui);
+}
+
+.ai-table tbody td {
+  font-weight: var(--tp-font-medium);
+}
+
+.ai-task-name,
+.ai-code-header-left h3,
+.ai-dialog-header h2,
+.ai-quickstart-card h4,
+.ai-trace-title {
+  font-weight: var(--tp-font-semibold);
+}
+
+.ai-btn,
+.ai-btn-primary,
+.ai-btn-success,
+.ai-btn-warning,
+.ai-pagination button.active,
+.ai-quickstart-link,
+.v1-file-tab.active {
+  font-weight: var(--tp-font-semibold);
+}
+
+.ai-case-tag,
+.ai-status-badge,
+.ai-assertion-pill,
+.ai-mode-tag,
+.v1-file-type-badge {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.ai-task-id,
+.ai-code-filename,
+.ai-code-body,
+.ai-log-stream,
+.v1-file-name {
+  font-family: var(--tp-font-family-mono);
+}
+
+.ai-code-body,
+.ai-log-stream {
+  font-size: var(--tp-text-xs);
+  line-height: var(--tp-line-prose);
+}
+
+.ai-health-value {
+  font-weight: var(--tp-font-bold);
+}

@@ -807,6 +807,49 @@ onMounted(() => loadRoles())
   outline: none;
   box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
 }
+
+.rm-title {
+  font-size: var(--tp-text-3xl);
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-tight);
+}
+
+.rm-subtitle,
+.rm-card-desc,
+.rm-empty-desc,
+.form-hint {
+  font-size: var(--tp-text-md);
+  font-weight: var(--tp-font-regular);
+  line-height: var(--tp-line-body);
+  color: var(--tp-text-muted);
+}
+
+.rm-stat-label,
+.rm-perm-tag,
+.rm-badge-text {
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+  line-height: var(--tp-line-ui);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.rm-card-name,
+.rm-empty-title {
+  font-weight: var(--tp-font-bold);
+}
+
+.rm-add-btn,
+.rm-btn-edit,
+.rm-btn-view {
+  font-weight: var(--tp-font-semibold);
+}
+
+.rm-stat-label,
+.rm-perm-tag {
+  text-transform: none;
+  letter-spacing: 0;
+}
 </style>
 
 <!-- Drawer 使用 teleport 到 body，必须单独放在 unscoped style 中 -->
@@ -1079,6 +1122,25 @@ onMounted(() => loadRoles())
 .drawer-footer-btn:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
+}
+
+.drawer-title {
+  font-weight: var(--tp-font-bold);
+}
+
+.drawer-subtitle,
+.drawer-user-email,
+.drawer-empty {
+  font-weight: var(--tp-font-regular);
+  color: var(--tp-text-muted);
+}
+
+.drawer-user-name {
+  font-weight: var(--tp-font-semibold);
+}
+
+.drawer-footer-btn {
+  font-weight: var(--tp-font-semibold);
 }
 
 /* Transitions */

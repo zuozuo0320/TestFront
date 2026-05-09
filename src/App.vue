@@ -32,6 +32,7 @@ function logout() {
   localStorage.removeItem('tp-token')
   localStorage.removeItem('tp-user-id')
   currentUser.value = null
+  authStore.setUser(null)
   router.push('/login')
 }
 
@@ -131,6 +132,7 @@ async function saveProfile() {
       avatar: profileForm.value.avatar.trim() || undefined,
     })
     currentUser.value = { ...currentUser.value!, ...data }
+    authStore.setUser(currentUser.value)
     ElMessage.success('个人中心更新成功')
     profileDialogVisible.value = false
   } catch (e: unknown) {
@@ -156,7 +158,10 @@ async function onAvatarFileChange(file: UploadFile) {
     savingProfile.value = true
     const data = await uploadMyAvatar(raw)
     profileForm.value.avatar = data.avatar
-    if (currentUser.value) currentUser.value = { ...currentUser.value, avatar: data.avatar }
+    if (currentUser.value) {
+      currentUser.value = { ...currentUser.value, avatar: data.avatar }
+      authStore.setUser(currentUser.value)
+    }
     ElMessage.success('头像上传成功')
   } catch (e: unknown) {
     ElMessage.error(extractErrorMessage(e, '上传失败'))
@@ -182,6 +187,7 @@ async function loadUserData() {
   projectStore.restoreProjectFromNav()
   try {
     currentUser.value = await getMyProfile()
+    authStore.setUser(currentUser.value)
   } catch {
     // silently fail — user stays as fallback
   }

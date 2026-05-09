@@ -44,12 +44,19 @@ function formatCount(n: number): string {
         </div>
       </div>
       <div class="tc-actions">
-        <button type="button" class="tc-act-btn" title="编辑" @click="emit('edit', tag)">
+        <button
+          type="button"
+          class="tc-act-btn"
+          :aria-label="`编辑标签 ${tag.name}`"
+          title="编辑"
+          @click="emit('edit', tag)"
+        >
           <span class="material-symbols-outlined" style="font-size: 20px">edit</span>
         </button>
         <button
           type="button"
           class="tc-act-btn tc-act-btn--del"
+          :aria-label="`删除标签 ${tag.name}`"
           title="删除"
           @click="emit('delete', tag)"
         >
@@ -265,5 +272,203 @@ function formatCount(n: number): string {
 
 .tc-divider {
   background: var(--tp-border-subtle, var(--border-subtle));
+}
+
+.tc-card {
+  overflow: hidden;
+  border-radius: 18px;
+  border-color: rgba(148, 163, 184, 0.24);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.74)),
+    radial-gradient(
+      circle at 8% 0%,
+      color-mix(in srgb, var(--accent) 14%, transparent),
+      transparent 42%
+    );
+  box-shadow:
+    0 16px 34px rgba(15, 23, 42, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  transition:
+    border-color var(--tp-transition),
+    box-shadow var(--tp-transition),
+    transform var(--tp-transition);
+}
+
+.tc-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 38%, transparent), transparent 34%)
+      top / 100% 1px no-repeat,
+    radial-gradient(
+      circle at 100% 0%,
+      color-mix(in srgb, var(--accent) 18%, transparent),
+      transparent 36%
+    );
+}
+
+.tc-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--tp-border-strong));
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.82)),
+    radial-gradient(
+      circle at 8% 0%,
+      color-mix(in srgb, var(--accent) 18%, transparent),
+      transparent 42%
+    );
+  box-shadow:
+    0 20px 44px rgba(15, 23, 42, 0.09),
+    0 0 0 4px color-mix(in srgb, var(--accent) 8%, transparent);
+  transform: translateY(-2px);
+}
+
+.tc-top,
+.tc-stats {
+  position: relative;
+  z-index: 1;
+}
+
+.tc-icon-box {
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, rgba(148, 163, 184, 0.24));
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 35% 20%, rgba(255, 255, 255, 0.82), transparent 42%),
+    color-mix(in srgb, var(--accent) 13%, #fff);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    0 8px 18px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.tc-name {
+  color: var(--tp-gray-900);
+  font-size: var(--tp-text-lg);
+  font-weight: var(--tp-font-bold);
+  text-transform: none;
+  letter-spacing: -0.01em;
+}
+
+.tc-desc {
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-medium);
+}
+
+.tc-actions {
+  opacity: 1;
+  gap: 6px;
+}
+
+.tc-act-btn {
+  width: 30px;
+  height: 30px;
+  justify-content: center;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.64);
+  color: var(--tp-text-subtle);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.tc-act-btn:hover {
+  border-color: color-mix(in srgb, var(--accent) 26%, rgba(148, 163, 184, 0.22));
+  background: color-mix(in srgb, var(--accent) 10%, #fff);
+  color: var(--accent);
+}
+
+.tc-act-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.tc-stats {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.tc-stat-label {
+  color: var(--tp-text-subtle);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.tc-stat-value {
+  font-size: var(--tp-text-lg);
+}
+
+.tc-stat-value--primary {
+  color: var(--accent);
+  text-shadow: 0 0 18px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+.tc-stat-value--creator {
+  color: var(--tp-gray-800);
+  font-size: var(--tp-text-sm);
+}
+
+.tc-divider {
+  background: rgba(148, 163, 184, 0.22);
+}
+
+.tc-card {
+  min-width: 0;
+  padding: 14px 15px;
+  border-radius: 15px;
+}
+
+.tc-top {
+  margin-bottom: 10px;
+}
+
+.tc-left {
+  gap: 10px;
+}
+
+.tc-icon-box {
+  width: 30px;
+  height: 30px;
+}
+
+.tc-icon-box .material-symbols-outlined {
+  font-size: 17px !important;
+}
+
+.tc-name {
+  font-size: var(--tp-text-md);
+}
+
+.tc-desc {
+  margin-top: 1px;
+}
+
+.tc-actions {
+  gap: 4px;
+}
+
+.tc-act-btn {
+  width: 28px;
+  height: 28px;
+}
+
+.tc-stats {
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+.tc-stat {
+  gap: 2px;
+}
+
+.tc-stat-value {
+  font-size: var(--tp-text-md);
+}
+
+.tc-divider {
+  height: 28px;
 }
 </style>

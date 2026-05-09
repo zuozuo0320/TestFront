@@ -8,6 +8,30 @@
     'Microsoft YaHei',
     sans-serif;
   color: #0f172a;
+  --tp-font-family-sans:
+    'Inter', 'Noto Sans SC', -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  --tp-font-family-mono:
+    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --tp-text-xs: 12px;
+  --tp-text-sm: 13px;
+  --tp-text-md: 14px;
+  --tp-text-lg: 16px;
+  --tp-text-xl: 20px;
+  --tp-text-2xl: 24px;
+  --tp-text-3xl: 28px;
+  --tp-line-tight: 1.2;
+  --tp-line-ui: 1.35;
+  --tp-line-body: 1.5;
+  --tp-line-prose: 1.65;
+  --tp-font-regular: 400;
+  --tp-font-medium: 500;
+  --tp-font-semibold: 600;
+  --tp-font-bold: 700;
+  --tp-text-primary: var(--tp-gray-900);
+  --tp-text-secondary: var(--tp-gray-700);
+  --tp-text-muted: var(--tp-gray-600);
+  --tp-text-subtle: var(--tp-gray-500);
+  --tp-text-disabled: var(--tp-gray-400);
 
   /* Brand Colors — Design B 深蓝灰 + 紫色点缀 */
   --tp-primary: #6366f1;

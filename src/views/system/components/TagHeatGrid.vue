@@ -138,4 +138,58 @@ function formatCount(n: number): string {
 .hm-bar-label {
   color: var(--tp-gray-900, #fff);
 }
+
+.hm-list {
+  gap: 10px;
+}
+
+.hm-row {
+  gap: 10px;
+}
+
+.hm-rank {
+  width: 20px;
+  color: var(--tp-text-subtle, var(--on-surface-variant));
+  font-family: var(--tp-font-family-mono);
+  font-weight: var(--tp-font-medium);
+}
+
+.hm-bar-track {
+  height: 30px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(248, 250, 252, 0.58)),
+    var(--tp-surface-muted);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.hm-bar-fill {
+  border-radius: inherit;
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--bar-color) 16%, #fff),
+      color-mix(in srgb, var(--bar-color) 44%, #fff)
+    ),
+    color-mix(in srgb, var(--bar-color) 18%, var(--tp-surface-card));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.68),
+    0 8px 20px color-mix(in srgb, var(--bar-color) 14%, transparent);
+}
+
+.hm-bar-label {
+  color: var(--tp-gray-900, #fff);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.hm-count {
+  color: var(--tp-gray-700) !important;
+  font-family: var(--tp-font-family-mono);
+  font-size: var(--tp-text-sm);
+  font-weight: var(--tp-font-bold);
+}
 </style>

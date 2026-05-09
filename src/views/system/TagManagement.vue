@@ -47,7 +47,13 @@ const {
   presetColors,
 } = useTagManagement()
 
-const rankBarColors = ['#ef4444', '#f59e0b', '#adc6ff', '#d2bbff', '#10b981']
+const rankBarColors = [
+  'var(--tp-primary)',
+  'var(--tp-accent-info)',
+  'var(--tp-accent-success)',
+  'var(--tp-primary-light)',
+  'var(--tp-gray-400)',
+]
 const batchExpanded = ref(false)
 
 /** 切换到"最近更新"标签：同时切换 tab 和将排序字段置为创建时间 */
@@ -96,7 +102,7 @@ const pulseData = computed(() => {
       <header class="tm-topnav">
         <div>
           <h2 class="tm-title">标签管理中心</h2>
-          <p class="tm-subtitle">标签管理 &amp; 智能分析</p>
+          <p class="tm-subtitle">智能标签治理中枢</p>
         </div>
         <div class="tm-topnav-right">
           <div class="tm-search-box">
@@ -105,6 +111,7 @@ const pulseData = computed(() => {
               v-model="keyword"
               class="tm-search-input"
               type="text"
+              aria-label="搜索标签"
               placeholder="搜索标签..."
               @keyup.enter="onSearch"
               @input="onSearchDebounce"
@@ -147,7 +154,7 @@ const pulseData = computed(() => {
         </div>
         <!-- Right: Top 5 Heatmap -->
         <div class="tm-panel tm-panel--heat">
-          <h3 class="tm-panel-title" style="margin-bottom: 24px">热度 Top 5</h3>
+          <h3 class="tm-panel-title tm-heat-title">热度 Top 5</h3>
           <TagHeatGrid
             v-if="tags.length > 0"
             :top-tags="topTags"
@@ -158,112 +165,123 @@ const pulseData = computed(() => {
         </div>
       </section>
 
-      <!-- ═══ Action Bar & Tabs ═══ -->
-      <div class="tm-actionbar">
-        <div class="tm-tabs">
-          <button
-            type="button"
-            :class="['tm-tab', { active: activeTab === 'all' }]"
-            @click="activeTab = 'all'"
-          >
-            所有标签
-          </button>
-          <button
-            type="button"
-            :class="['tm-tab', { active: activeTab === 'recent' }]"
-            @click="switchToRecent"
-          >
-            最近更新 (7天内)
-          </button>
-        </div>
-        <div class="tm-actionbar-right">
-          <div class="tm-sort">
-            <span class="tm-sort-label">排序:</span>
-            <select v-model="sortBy" class="tm-sort-select">
-              <option value="case_count">用例数</option>
-              <option value="name">名称</option>
-              <option value="created_at">创建时间</option>
-            </select>
+      <section class="tm-tag-workbench" aria-labelledby="tm-tag-workbench-title">
+        <div class="tm-tag-workbench-head">
+          <div>
+            <h3 id="tm-tag-workbench-title" class="tm-tag-workbench-title">标签列表</h3>
+            <p class="tm-tag-workbench-desc">
+              当前显示 {{ sortedTags.length }} / {{ total }} 个标签
+            </p>
           </div>
-          <button type="button" class="tm-btn-filter" @click="openCreate">
-            <span class="material-symbols-outlined" style="font-size: 18px">filter_list</span>
-            新建标签
-          </button>
-          <button type="button" class="tm-btn-wizard" @click="batchExpanded = !batchExpanded">
-            <span class="material-symbols-outlined" style="font-size: 18px">magic_button</span>
-            批量创建向导
-          </button>
         </div>
-      </div>
 
-      <!-- ═══ Batch Panel Modal ═══ -->
-      <teleport to="body">
-        <transition name="tm-modal">
-          <div v-if="batchExpanded" class="tm-modal-overlay" @click.self="batchExpanded = false">
-            <div class="tm-modal-content">
-              <div class="tm-modal-header">
-                <div>
-                  <h3 class="tm-modal-title">
-                    <span class="material-symbols-outlined" style="color: var(--primary)">
-                      auto_awesome
-                    </span>
-                    智能标签解析
-                  </h3>
-                  <p class="tm-modal-desc">粘贴文本、CSV 或 JSON，AI 将自动提取标签。</p>
+        <!-- ═══ Action Bar & Tabs ═══ -->
+        <div class="tm-actionbar">
+          <div class="tm-tabs">
+            <button
+              type="button"
+              :class="['tm-tab', { active: activeTab === 'all' }]"
+              @click="activeTab = 'all'"
+            >
+              所有标签
+            </button>
+            <button
+              type="button"
+              :class="['tm-tab', { active: activeTab === 'recent' }]"
+              @click="switchToRecent"
+            >
+              最近更新 (7天内)
+            </button>
+          </div>
+          <div class="tm-actionbar-right">
+            <div class="tm-sort">
+              <span class="tm-sort-label">排序:</span>
+              <select v-model="sortBy" class="tm-sort-select" aria-label="标签排序方式">
+                <option value="case_count">用例数</option>
+                <option value="name">名称</option>
+                <option value="created_at">创建时间</option>
+              </select>
+            </div>
+            <button type="button" class="tm-btn-filter" @click="openCreate">
+              <span class="material-symbols-outlined" style="font-size: 18px">add</span>
+              新建标签
+            </button>
+            <button type="button" class="tm-btn-wizard" @click="batchExpanded = !batchExpanded">
+              <span class="material-symbols-outlined" style="font-size: 18px">auto_awesome</span>
+              批量创建向导
+            </button>
+          </div>
+        </div>
+
+        <!-- ═══ Batch Panel Modal ═══ -->
+        <teleport to="body">
+          <transition name="tm-modal">
+            <div v-if="batchExpanded" class="tm-modal-overlay" @click.self="batchExpanded = false">
+              <div class="tm-modal-content">
+                <div class="tm-modal-header">
+                  <div>
+                    <h3 class="tm-modal-title">
+                      <span class="material-symbols-outlined" style="color: var(--primary)">
+                        auto_awesome
+                      </span>
+                      智能标签解析
+                    </h3>
+                    <p class="tm-modal-desc">粘贴文本、CSV 或 JSON，AI 将自动提取标签。</p>
+                  </div>
+                  <button type="button" class="tm-icon-btn" @click="batchExpanded = false">
+                    <span class="material-symbols-outlined">close</span>
+                  </button>
                 </div>
-                <button type="button" class="tm-icon-btn" @click="batchExpanded = false">
-                  <span class="material-symbols-outlined">close</span>
-                </button>
-              </div>
-              <div class="tm-modal-body">
-                <TagBatchPanel
-                  v-model:batch-input="batchInput"
-                  v-model:batch-auto-color="batchAutoColor"
-                  :batch-preview-names="batchPreviewNames"
-                  :saving="saving"
-                  @batch-create="batchCreate"
-                />
+                <div class="tm-modal-body">
+                  <TagBatchPanel
+                    v-model:batch-input="batchInput"
+                    v-model:batch-auto-color="batchAutoColor"
+                    :batch-preview-names="batchPreviewNames"
+                    :saving="saving"
+                    @batch-create="batchCreate"
+                  />
+                </div>
               </div>
             </div>
+          </transition>
+        </teleport>
+
+        <!-- ═══ Tag Cards Grid ═══ -->
+        <div class="tm-card-grid">
+          <div v-if="sortedTags.length === 0" class="tm-list-empty">
+            <el-empty description="暂无标签" :image-size="80">
+              <el-button type="primary" plain @click="openCreate">去新建</el-button>
+            </el-empty>
           </div>
-        </transition>
-      </teleport>
-
-      <!-- ═══ Tag Cards Grid ═══ -->
-      <div class="tm-card-grid">
-        <div v-if="sortedTags.length === 0" class="tm-list-empty">
-          <el-empty description="暂无标签" :image-size="80">
-            <el-button type="primary" plain @click="openCreate">去新建</el-button>
-          </el-empty>
+          <TagListRow
+            v-for="tag in sortedTags"
+            :key="tag.id"
+            :tag="tag"
+            :server-url="serverUrl"
+            :tag-icon="getTagIcon(tag)"
+            @edit="openEdit"
+            @delete="onDelete"
+          />
         </div>
-        <TagListRow
-          v-for="tag in sortedTags"
-          :key="tag.id"
-          :tag="tag"
-          :server-url="serverUrl"
-          :tag-icon="getTagIcon(tag)"
-          @edit="openEdit"
-          @delete="onDelete"
-        />
-      </div>
 
-      <!-- ═══ Pagination ═══ -->
-      <div v-if="total > pageSize" class="tm-pager">
-        <span class="tm-pager-total">共 {{ total }} 条</span>
-        <el-pagination
-          background
-          size="small"
-          :current-page="page"
-          :page-size="pageSize"
-          :total="total"
-          layout="prev, pager, next"
-          @current-change="
-            (v: number) => {
-              page = v
-            }
-          "
-        />
-      </div>
+        <!-- ═══ Pagination ═══ -->
+        <div v-if="total > pageSize" class="tm-pager">
+          <span class="tm-pager-total">共 {{ total }} 条</span>
+          <el-pagination
+            background
+            size="small"
+            :current-page="page"
+            :page-size="pageSize"
+            :total="total"
+            layout="prev, pager, next"
+            @current-change="
+              (v: number) => {
+                page = v
+              }
+            "
+          />
+        </div>
+      </section>
     </template>
 
     <TagFormDialog
@@ -912,6 +930,586 @@ const pulseData = computed(() => {
   outline: none;
   box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
 }
+
+.tm-root {
+  --tech-panel:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(248, 250, 252, 0.72)),
+    radial-gradient(circle at 12% 0%, rgba(99, 102, 241, 0.14), transparent 34%),
+    radial-gradient(circle at 92% 14%, rgba(2, 132, 199, 0.12), transparent 32%);
+  --tech-border: rgba(148, 163, 184, 0.28);
+  --tech-line: rgba(99, 102, 241, 0.16);
+  gap: 18px;
+  padding-bottom: 28px;
+  background:
+    radial-gradient(circle at 8% -8%, rgba(99, 102, 241, 0.18), transparent 34%),
+    radial-gradient(circle at 92% 2%, rgba(2, 132, 199, 0.16), transparent 30%),
+    linear-gradient(180deg, rgba(248, 250, 252, 0.92), var(--tp-surface-base) 38%);
+}
+
+.tm-root::before {
+  content: '';
+  position: sticky;
+  top: 0;
+  z-index: 0;
+  display: block;
+  height: 1px;
+  margin-bottom: -1px;
+  pointer-events: none;
+  box-shadow:
+    0 0 80px rgba(99, 102, 241, 0.14),
+    0 0 120px rgba(2, 132, 199, 0.1);
+}
+
+.tm-topnav {
+  margin: 16px 32px -4px;
+  padding: 18px 20px;
+  border: 1px solid var(--tech-border);
+  border-radius: 18px;
+  background: var(--tech-panel);
+  box-shadow:
+    0 18px 42px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.tm-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--tp-gray-900);
+  font-size: var(--tp-text-2xl);
+  font-weight: var(--tp-font-bold);
+  letter-spacing: -0.03em;
+}
+
+.tm-title::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--tp-primary);
+  box-shadow:
+    0 0 0 5px rgba(99, 102, 241, 0.12),
+    0 0 24px rgba(99, 102, 241, 0.46);
+}
+
+.tm-subtitle {
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-sm);
+  font-weight: var(--tp-font-medium);
+}
+
+.tm-search-box {
+  width: min(390px, 38vw);
+  min-height: 38px;
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.82)),
+    var(--tp-surface-input);
+  border-color: rgba(99, 102, 241, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 10px 26px rgba(15, 23, 42, 0.05);
+}
+
+.tm-search-box:focus-within {
+  border-color: rgba(99, 102, 241, 0.42);
+  box-shadow:
+    0 0 0 4px rgba(99, 102, 241, 0.1),
+    0 14px 32px rgba(99, 102, 241, 0.14);
+}
+
+.tm-search-input {
+  color: var(--tp-gray-900);
+  caret-color: var(--tp-primary);
+}
+
+.tm-search-input::placeholder {
+  color: var(--tp-gray-400);
+}
+
+.tm-insights {
+  gap: 18px;
+  padding: 0 32px;
+}
+
+.tm-panel,
+.tm-panel--pulse,
+.tm-panel--heat {
+  border-color: var(--tech-border);
+  border-radius: 18px;
+  background: var(--tech-panel);
+  box-shadow:
+    0 18px 42px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.76);
+}
+
+.tm-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.46), transparent) top / 100% 1px
+      no-repeat,
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent 31px,
+      rgba(99, 102, 241, 0.035) 32px
+    );
+}
+
+.tm-panel-glow {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.22), transparent 62%);
+  opacity: 0.55;
+  filter: blur(54px);
+}
+
+.tm-panel-title {
+  color: var(--tp-gray-900);
+  font-size: var(--tp-text-lg);
+  font-weight: var(--tp-font-bold);
+}
+
+.tm-panel-desc {
+  color: var(--tp-text-muted);
+  font-weight: var(--tp-font-medium);
+}
+
+.tm-heat-title {
+  margin-bottom: 20px;
+}
+
+.tm-panel-icon-right {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--tp-primary);
+  box-shadow: 0 0 22px rgba(99, 102, 241, 0.16);
+}
+
+.tm-pulse-bars {
+  height: 148px;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.tm-pulse-bar {
+  border-radius: 10px 10px 3px 3px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bar-color) 54%, #fff), transparent 122%),
+    color-mix(in srgb, var(--bar-color) 26%, #fff);
+  border: 1px solid color-mix(in srgb, var(--bar-color) 24%, var(--tp-border-subtle));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 10px 24px color-mix(in srgb, var(--bar-color) 16%, transparent);
+}
+
+.tm-pulse-bar--top {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bar-color) 72%, #fff), transparent 125%),
+    color-mix(in srgb, var(--bar-color) 34%, #fff);
+  border-color: color-mix(in srgb, var(--bar-color) 38%, var(--tp-border-subtle));
+}
+
+.tm-pulse-bar:hover,
+.tm-pulse-bar--top:hover {
+  filter: saturate(1.08) brightness(1.02);
+}
+
+.tm-pulse-tooltip {
+  padding: 4px 8px;
+  border: 1px solid rgba(99, 102, 241, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--tp-gray-800);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+}
+
+.tm-actionbar {
+  align-items: center;
+  margin: -2px 32px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--tech-border);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(248, 250, 252, 0.72)),
+    rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 12px 28px rgba(15, 23, 42, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.76);
+}
+
+.tm-tabs {
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid rgba(99, 102, 241, 0.13);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.tm-tab {
+  min-height: 30px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--tp-text-muted);
+  letter-spacing: 0;
+}
+
+.tm-tab.active {
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--tp-primary);
+  box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.16);
+}
+
+.tm-sort {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid rgba(99, 102, 241, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.tm-btn-filter,
+.tm-btn-wizard {
+  min-height: 34px;
+  border-radius: 999px;
+}
+
+.tm-btn-filter {
+  border-color: rgba(99, 102, 241, 0.2);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.82)),
+    var(--tp-surface-input);
+  color: var(--tp-primary);
+  box-shadow: 0 10px 22px rgba(99, 102, 241, 0.08);
+}
+
+.tm-btn-filter:hover {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.tm-btn-wizard {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.42), transparent 32%), var(--tp-btn-bg) !important;
+  box-shadow:
+    0 16px 30px rgba(99, 102, 241, 0.24),
+    0 8px 18px rgba(236, 72, 153, 0.16);
+}
+
+.tm-card-grid {
+  grid-template-columns: repeat(auto-fill, minmax(292px, 1fr));
+  gap: 16px;
+}
+
+.tm-pager {
+  margin: 0 32px;
+  padding: 12px 0 0;
+}
+
+@media (max-width: 768px) {
+  .tm-topnav,
+  .tm-actionbar,
+  .tm-pager {
+    margin-inline: 16px;
+  }
+
+  .tm-search-box {
+    width: 100%;
+  }
+
+  .tm-insights,
+  .tm-card-grid {
+    padding-inline: 16px;
+  }
+}
+
+.tm-root {
+  gap: 12px;
+  padding-bottom: 20px;
+}
+
+.tm-topnav {
+  margin: 10px 24px -2px;
+  padding: 12px 16px;
+  border-radius: 14px;
+}
+
+.tm-title {
+  font-size: var(--tp-text-xl);
+}
+
+.tm-title::before {
+  width: 8px;
+  height: 8px;
+  box-shadow:
+    0 0 0 4px rgba(99, 102, 241, 0.1),
+    0 0 18px rgba(99, 102, 241, 0.38);
+}
+
+.tm-subtitle {
+  margin-top: 2px;
+  font-size: var(--tp-text-xs);
+}
+
+.tm-search-box {
+  width: min(340px, 34vw);
+  min-height: 32px;
+  padding: 5px 11px;
+}
+
+.tm-insights {
+  gap: 12px;
+  padding: 0 24px;
+}
+
+.tm-panel {
+  padding: 16px;
+  border-radius: 14px;
+}
+
+.tm-panel-head {
+  margin-bottom: 12px;
+}
+
+.tm-panel-title {
+  font-size: var(--tp-text-md);
+}
+
+.tm-panel-desc {
+  margin-top: 2px;
+  font-size: var(--tp-text-xs);
+}
+
+.tm-panel-icon-right {
+  width: 28px;
+  height: 28px;
+  font-size: 18px;
+}
+
+.tm-heat-title {
+  margin-bottom: 14px;
+}
+
+.tm-pulse-chart {
+  margin-top: 8px;
+}
+
+.tm-pulse-bars {
+  height: 112px;
+  gap: 7px;
+  padding-top: 4px;
+}
+
+.tm-actionbar {
+  margin: -2px 24px 0;
+  padding: 8px 10px;
+  border-radius: 14px;
+}
+
+.tm-tabs {
+  padding: 2px;
+}
+
+.tm-tab {
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: var(--tp-text-xs);
+}
+
+.tm-sort,
+.tm-btn-filter,
+.tm-btn-wizard {
+  min-height: 30px;
+}
+
+.tm-btn-filter,
+.tm-btn-wizard {
+  padding: 6px 12px;
+  font-size: var(--tp-text-sm);
+}
+
+.tm-card-grid {
+  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+  gap: 12px;
+  padding: 0 24px;
+  margin-top: -2px;
+}
+
+.tm-pager {
+  margin: 0 24px;
+  padding-top: 8px;
+}
+
+@media (max-width: 768px) {
+  .tm-topnav,
+  .tm-actionbar,
+  .tm-pager {
+    margin-inline: 16px;
+  }
+
+  .tm-insights,
+  .tm-card-grid {
+    padding-inline: 16px;
+  }
+}
+
+.tm-tag-workbench {
+  margin: 0 24px;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 18px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.88), rgba(248, 250, 252, 0.72)),
+    radial-gradient(circle at 16% 0%, rgba(99, 102, 241, 0.1), transparent 32%),
+    radial-gradient(circle at 90% 16%, rgba(2, 132, 199, 0.08), transparent 28%);
+  box-shadow:
+    0 18px 42px rgba(15, 23, 42, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.tm-tag-workbench-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 4px 10px;
+}
+
+.tm-tag-workbench-title {
+  margin: 0;
+  color: var(--tp-gray-900);
+  font-size: var(--tp-text-md);
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-tight);
+}
+
+.tm-tag-workbench-desc {
+  margin: 3px 0 0;
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-medium);
+  line-height: var(--tp-line-ui);
+}
+
+.tm-tag-workbench .tm-actionbar {
+  margin: 0;
+  padding: 8px 0 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.tm-tag-workbench .tm-card-grid {
+  grid-template-columns: repeat(4, minmax(228px, 1fr));
+  gap: 10px;
+  padding: 0;
+  margin-top: 0;
+}
+
+.tm-tag-workbench .tm-pager {
+  margin: 0;
+  padding: 10px 0 0;
+}
+
+.tm-tag-workbench .tm-btn-filter {
+  border: 0;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.42), transparent 32%), var(--tp-btn-bg) !important;
+  color: var(--tp-btn-text);
+  box-shadow:
+    0 14px 28px rgba(99, 102, 241, 0.22),
+    0 8px 18px rgba(236, 72, 153, 0.12);
+}
+
+.tm-tag-workbench .tm-btn-filter:hover {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.48), transparent 34%),
+    var(--tp-btn-bg-hover) !important;
+}
+
+.tm-tag-workbench .tm-btn-wizard {
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(248, 250, 252, 0.78)),
+    rgba(99, 102, 241, 0.08) !important;
+  color: var(--tp-primary);
+  box-shadow: none;
+}
+
+.tm-tag-workbench .tm-btn-wizard:hover {
+  background: rgba(99, 102, 241, 0.11) !important;
+  box-shadow: 0 10px 22px rgba(99, 102, 241, 0.1);
+}
+
+.tm-pulse-bars {
+  height: 96px;
+}
+
+@media (max-width: 1180px) {
+  .tm-tag-workbench .tm-card-grid {
+    grid-template-columns: repeat(3, minmax(240px, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .tm-tag-workbench .tm-card-grid {
+    grid-template-columns: repeat(2, minmax(240px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .tm-tag-workbench {
+    margin-inline: 16px;
+  }
+
+  .tm-tag-workbench .tm-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tm-root {
+  gap: 10px;
+  padding: 8px 12px 20px;
+}
+
+.tm-topnav {
+  margin: 0;
+}
+
+.tm-insights {
+  padding: 0;
+}
+
+.tm-tag-workbench {
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .tm-root {
+    padding-inline: 10px;
+  }
+
+  .tm-topnav,
+  .tm-actionbar,
+  .tm-pager,
+  .tm-tag-workbench {
+    margin-inline: 0;
+  }
+
+  .tm-insights,
+  .tm-card-grid {
+    padding-inline: 0;
+  }
+}
 </style>
 
 <style>
@@ -1099,5 +1697,54 @@ const pulseData = computed(() => {
 .tm-modal-header .tm-icon-btn:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
+}
+
+.tm-modal-overlay {
+  background:
+    radial-gradient(circle at 50% 18%, rgba(99, 102, 241, 0.16), transparent 34%),
+    rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(6px);
+}
+
+.tm-modal-content {
+  max-width: 680px;
+  border-color: rgba(148, 163, 184, 0.26);
+  border-radius: 20px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.88)),
+    radial-gradient(circle at 8% 0%, rgba(99, 102, 241, 0.14), transparent 34%);
+  box-shadow:
+    0 32px 84px rgba(15, 23, 42, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.tm-modal-header {
+  background: transparent;
+  border-bottom-color: rgba(148, 163, 184, 0.18);
+}
+
+.tm-modal-title {
+  color: var(--tp-gray-900);
+  font-size: var(--tp-text-xl);
+  font-weight: var(--tp-font-bold);
+}
+
+.tm-modal-title .material-symbols-outlined {
+  color: var(--tp-primary);
+  text-shadow: 0 0 18px rgba(99, 102, 241, 0.32);
+}
+
+.tm-modal-desc {
+  color: var(--tp-text-muted);
+  font-weight: var(--tp-font-medium);
+}
+
+.tm-modal-body .tm-batch-textarea {
+  border-color: rgba(99, 102, 241, 0.18);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(248, 250, 252, 0.78)),
+    var(--tp-surface-input);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
 }
 </style>

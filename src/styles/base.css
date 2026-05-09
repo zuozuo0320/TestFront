@@ -4,6 +4,11 @@
 }
 body {
   margin: 0;
+  font-family: var(--tp-font-family-sans);
+  font-size: var(--tp-text-md);
+  font-weight: var(--tp-font-regular);
+  line-height: var(--tp-line-body);
+  color: var(--tp-text-primary);
   /* 默认黑色 → 防止登录页刷新时白闪 */
   background: #000;
 }
@@ -29,7 +34,7 @@ body {
 /* 全局 El Plus 暗色覆盖 */
 .el-button {
   border-radius: var(--tp-btn-radius) !important;
-  font-weight: 650;
+  font-weight: var(--tp-font-semibold);
   transition: all var(--tp-transition) !important;
 }
 .el-button:not(.is-link) {
@@ -150,7 +155,7 @@ body {
 }
 .el-select-dropdown__item.is-selected {
   color: var(--tp-primary-light) !important;
-  font-weight: 600;
+  font-weight: var(--tp-font-semibold);
 }
 .el-popper__arrow::before {
   background: var(--tp-surface-card) !important;
@@ -233,17 +238,20 @@ button:disabled,
   --el-table-border-color: var(--tp-border-subtle) !important;
   --el-table-header-text-color: var(--tp-gray-600) !important;
   --el-table-text-color: var(--tp-gray-800) !important;
-  font-size: 13px !important;
+  font-size: var(--tp-text-sm) !important;
+  line-height: var(--tp-line-ui);
 }
 .el-table th.el-table__cell {
-  font-size: 11px !important;
-  font-weight: 700 !important;
+  font-size: var(--tp-text-xs) !important;
+  font-weight: var(--tp-font-bold) !important;
   padding: 10px 0 !important;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  text-transform: none;
+  letter-spacing: 0;
 }
 .el-table td.el-table__cell {
   padding: 8px 0 !important;
+  font-weight: var(--tp-font-medium);
+  line-height: var(--tp-line-ui);
 }
 .el-table .el-table__header-wrapper th {
   border-bottom: 1px solid var(--tp-border-subtle) !important;
@@ -257,59 +265,230 @@ button:disabled,
 
 /* ========== Pagination ========== */
 
-.pager {
+.pager,
+.pagination-bar-pl,
+.pm-pagination,
+.tm-pager,
+.um-pagination {
+  min-height: 48px;
   margin-top: 12px;
+  padding: 10px 16px;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--tp-border-subtle);
+  background: linear-gradient(180deg, var(--tp-surface-header), var(--tp-surface-card));
 }
-.pager .el-pagination {
-  --el-pagination-bg-color: var(--tp-surface-input);
+.pager .el-pagination,
+.tm-pager .el-pagination,
+.um-pagination .el-pagination {
+  --el-pagination-bg-color: var(--tp-surface-card);
   --el-pagination-hover-color: var(--tp-primary);
-  --el-pagination-text-color: var(--tp-gray-700);
-  --el-pagination-button-color: var(--tp-gray-600);
-  --el-pagination-button-bg-color: var(--tp-surface-input);
-  --el-pagination-button-disabled-color: var(--tp-gray-400);
-  --el-pagination-button-disabled-bg-color: var(--tp-gray-100);
-  --el-pagination-border-radius: var(--tp-radius-sm);
+  --el-pagination-text-color: var(--tp-text-muted);
+  --el-pagination-button-color: var(--tp-text-secondary);
+  --el-pagination-button-bg-color: var(--tp-surface-card);
+  --el-pagination-button-disabled-color: var(--tp-text-disabled);
+  --el-pagination-button-disabled-bg-color: var(--tp-surface-muted);
+  --el-pagination-border-radius: 9px;
   --el-fill-color-blank: var(--tp-surface-card);
-  --el-border-color: var(--tp-gray-300);
+  --el-border-color: var(--tp-border-subtle);
   --el-color-primary: var(--tp-primary);
+  gap: 6px;
+  font-family: var(--tp-font-family-sans);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-medium);
+  color: var(--tp-text-muted);
 }
 .pager .el-pagination .el-select .el-input__wrapper,
-.pager .el-pagination__jump .el-input__wrapper {
-  border: 1px solid var(--tp-gray-300) !important;
+.pager .el-pagination__jump .el-input__wrapper,
+.tm-pager .el-pagination .el-select .el-input__wrapper,
+.tm-pager .el-pagination__jump .el-input__wrapper,
+.um-pagination .el-pagination .el-select .el-input__wrapper,
+.um-pagination .el-pagination__jump .el-input__wrapper {
+  min-height: 32px;
+  border: 1px solid var(--tp-border-subtle) !important;
+  border-radius: 9px !important;
   box-shadow: none !important;
-  background: var(--tp-surface-input) !important;
+  background: var(--tp-surface-card) !important;
 }
 .pager .el-pagination .el-select .el-input__wrapper:hover,
-.pager .el-pagination__jump .el-input__wrapper:hover {
-  border-color: var(--tp-gray-400) !important;
+.pager .el-pagination__jump .el-input__wrapper:hover,
+.tm-pager .el-pagination .el-select .el-input__wrapper:hover,
+.tm-pager .el-pagination__jump .el-input__wrapper:hover,
+.um-pagination .el-pagination .el-select .el-input__wrapper:hover,
+.um-pagination .el-pagination__jump .el-input__wrapper:hover {
+  border-color: var(--tp-border-strong) !important;
 }
 .pager .el-pagination .el-select .el-input__wrapper.is-focus,
 .pager .el-pagination__jump .el-input__wrapper.is-focus,
 .pager .el-pagination .el-select .el-input__wrapper.is-focused,
-.pager .el-pagination__jump .el-input__wrapper.is-focused {
+.pager .el-pagination__jump .el-input__wrapper.is-focused,
+.tm-pager .el-pagination .el-select .el-input__wrapper.is-focus,
+.tm-pager .el-pagination__jump .el-input__wrapper.is-focus,
+.tm-pager .el-pagination .el-select .el-input__wrapper.is-focused,
+.tm-pager .el-pagination__jump .el-input__wrapper.is-focused,
+.um-pagination .el-pagination .el-select .el-input__wrapper.is-focus,
+.um-pagination .el-pagination__jump .el-input__wrapper.is-focus,
+.um-pagination .el-pagination .el-select .el-input__wrapper.is-focused,
+.um-pagination .el-pagination__jump .el-input__wrapper.is-focused {
   border-color: var(--tp-primary) !important;
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft) !important;
 }
 .pager .el-pagination button,
-.pager .el-pagination .el-pager li {
-  border: 1px solid var(--tp-gray-200);
-  background: var(--tp-surface-input);
+.pager .el-pagination .el-pager li,
+.tm-pager .el-pagination button,
+.tm-pager .el-pagination .el-pager li,
+.um-pagination .el-pagination button,
+.um-pagination .el-pagination .el-pager li,
+.page-btn,
+.pm-page-btn {
+  min-width: 32px;
+  height: 32px;
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 9px;
+  background: var(--tp-surface-card);
+  color: var(--tp-text-secondary);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+  line-height: var(--tp-line-ui);
+  font-variant-numeric: tabular-nums;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 .pager .el-pagination button:hover,
-.pager .el-pagination .el-pager li:hover {
+.pager .el-pagination .el-pager li:hover,
+.tm-pager .el-pagination button:hover,
+.tm-pager .el-pagination .el-pager li:hover,
+.um-pagination .el-pagination button:hover,
+.um-pagination .el-pagination .el-pager li:hover,
+.page-btn:hover:not(:disabled):not(.active),
+.pm-page-btn:hover:not(:disabled):not(.pm-page-btn--active) {
   color: var(--tp-primary);
-  border-color: var(--tp-primary-light);
+  background: var(--tp-surface-hover);
+  border-color: var(--tp-accent-primary-border);
 }
-.pager .el-pagination.is-background .el-pager li.is-active {
-  background: var(--tp-primary) !important;
-  border-color: var(--tp-primary) !important;
-  color: #fff !important;
+.pager .el-pagination button:focus-visible,
+.pager .el-pagination .el-pager li:focus-visible,
+.tm-pager .el-pagination button:focus-visible,
+.tm-pager .el-pagination .el-pager li:focus-visible,
+.um-pagination .el-pagination button:focus-visible,
+.um-pagination .el-pagination .el-pager li:focus-visible,
+.page-btn:focus-visible,
+.pm-page-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
+}
+.pager .el-pagination.is-background .el-pager li.is-active,
+.tm-pager .el-pagination.is-background .el-pager li.is-active,
+.um-pagination .el-pagination.is-background .el-pager li.is-active,
+.page-btn.active,
+.pm-page-btn--active {
+  background: var(--tp-btn-bg) !important;
+  border-color: var(--tp-btn-border) !important;
+  color: var(--tp-btn-text) !important;
+  box-shadow: var(--tp-btn-shadow);
+}
+.pager .el-pagination button:disabled,
+.tm-pager .el-pagination button:disabled,
+.um-pagination .el-pagination button:disabled,
+.page-btn:disabled,
+.pm-page-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  box-shadow: none;
 }
 .pager .el-pagination__total,
-.pager .el-pagination__jump {
-  color: var(--tp-gray-600);
+.pager .el-pagination__jump,
+.tm-pager-total,
+.pagination-info,
+.pm-pagination-info,
+.um-pagination {
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-medium);
+  line-height: var(--tp-line-ui);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.pagination-btns,
+.pm-pagination-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.page-btn .material-symbols-outlined,
+.pm-page-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+:is(.pager, .pagination-bar-pl, .pm-pagination, .tm-pager, .um-pagination) .el-pagination {
+  --el-pagination-bg-color: var(--tp-surface-card);
+  --el-pagination-hover-color: var(--tp-primary);
+  --el-pagination-text-color: var(--tp-text-muted);
+  --el-pagination-button-color: var(--tp-text-secondary);
+  --el-pagination-button-bg-color: var(--tp-surface-card);
+  --el-pagination-button-disabled-color: var(--tp-text-disabled);
+  --el-pagination-button-disabled-bg-color: var(--tp-surface-muted);
+  --el-pagination-border-radius: 9px;
+  --el-fill-color-blank: var(--tp-surface-card);
+  --el-border-color: var(--tp-border-subtle);
+  --el-color-primary: var(--tp-primary);
+  gap: 6px;
+  font-family: var(--tp-font-family-sans);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-medium);
+  color: var(--tp-text-muted);
+}
+
+:is(.pager, .pagination-bar-pl, .pm-pagination, .tm-pager, .um-pagination) .el-pagination button,
+:is(.pager, .pagination-bar-pl, .pm-pagination, .tm-pager, .um-pagination)
+  .el-pagination
+  .el-pager
+  li {
+  min-width: 32px;
+  height: 32px;
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 9px;
+  background: var(--tp-surface-card);
+  color: var(--tp-text-secondary);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+:is(.pager, .pagination-bar-pl, .pm-pagination, .tm-pager, .um-pagination)
+  .el-pagination
+  button:hover,
+:is(.pager, .pagination-bar-pl, .pm-pagination, .tm-pager, .um-pagination)
+  .el-pagination
+  .el-pager
+  li:hover {
+  color: var(--tp-primary);
+  background: var(--tp-surface-hover);
+  border-color: var(--tp-accent-primary-border);
+}
+
+:is(.pager, .pagination-bar-pl, .pm-pagination, .tm-pager, .um-pagination)
+  .el-pagination.is-background
+  .el-pager
+  li.is-active {
+  background: var(--tp-btn-bg) !important;
+  border-color: var(--tp-btn-border) !important;
+  color: var(--tp-btn-text) !important;
+  box-shadow: var(--tp-btn-shadow);
+}
+
+:is(.pager, .pagination-bar-pl, .pm-pagination, .tm-pager, .um-pagination)
+  :is(.el-pagination__total, .el-pagination__jump) {
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-medium);
+  line-height: var(--tp-line-ui);
 }
 
 .btn-icon {
@@ -336,8 +515,8 @@ button:disabled,
 }
 .project-select-popper .el-select-dropdown__item {
   color: var(--tp-gray-600) !important;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--tp-text-sm);
+  font-weight: var(--tp-font-medium);
   border-radius: 8px;
   margin: 2px 0;
   padding: 10px 14px;
@@ -353,7 +532,7 @@ button:disabled,
 .project-select-popper .el-select-dropdown__item.is-selected {
   background: var(--tp-accent-primary-soft) !important;
   color: var(--tp-primary) !important;
-  font-weight: 600;
+  font-weight: var(--tp-font-semibold);
 }
 .project-select-popper .el-select-dropdown__item.is-selected::after {
   content: '✓';
@@ -388,16 +567,16 @@ button:disabled,
 
 /* ========== Mono font ========== */
 .mono {
-  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--tp-font-family-mono);
   color: var(--tp-gray-600);
-  font-size: 12px;
+  font-size: var(--tp-text-xs);
 }
 
 /* ========== Tech empty state ========== */
 .tech-empty {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--tp-font-family-mono);
   color: var(--tp-gray-400);
-  font-size: 13px;
+  font-size: var(--tp-text-sm);
   padding: 40px 20px;
   text-align: center;
 }

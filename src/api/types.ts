@@ -1,12 +1,16 @@
+export type AuthUser = {
+  id: number
+  name: string
+  email: string
+  role: string
+  phone?: string
+  avatar?: string
+}
+
 export type LoginResp = {
   access_token: string
   user_id: number
-  user: {
-    id: number
-    name: string
-    email: string
-    role: string
-  }
+  user: AuthUser
 }
 
 export type Project = {

@@ -2848,4 +2848,63 @@ onBeforeUnmount(() => {
 .footer-btn.activate.not-ready {
   background: var(--tp-gray-400);
 }
+
+.wizard-title,
+.card-title-primary,
+.step3-title,
+.assigned-title,
+.checklist-title {
+  font-weight: var(--tp-font-bold);
+}
+
+.wizard-subtitle,
+.card-desc,
+.step3-sub,
+.check-desc,
+.draft-status,
+.activate-hint p {
+  line-height: var(--tp-line-body);
+}
+
+.step-label,
+.form-label,
+.wz-table th,
+.load-bar-labels,
+.assigned-stat,
+.summary-label,
+.checklist-badge {
+  font-size: var(--tp-text-xs) !important;
+  font-weight: var(--tp-font-semibold);
+  line-height: var(--tp-line-ui);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.wz-table td,
+.reviewer-card-role,
+.assigned-role,
+.check-desc {
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-regular);
+}
+
+.td-title,
+.reviewer-card-name,
+.assigned-name,
+.check-label {
+  font-size: var(--tp-text-sm);
+  font-weight: var(--tp-font-semibold);
+  line-height: var(--tp-line-ui);
+}
+
+.module-tag,
+.priority-tag,
+.shadow-badge,
+.primary-badge {
+  min-height: 24px;
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-tight);
+  letter-spacing: 0;
+}
 </style>

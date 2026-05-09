@@ -4966,5 +4966,56 @@ watch(
   background: var(--tp-surface-muted);
   border: 1px solid var(--tp-accent-primary-border);
 }
+
+.rv2-summary-title,
+.rv2-panel-title,
+.rv2-sidebar-title,
+.rv2-record-drawer-title strong {
+  font-weight: var(--tp-font-bold);
+  letter-spacing: 0;
+}
+
+.rv2-summary-desc,
+.rv2-gate-card-desc,
+.rv2-decision-input,
+.rv2-drawer-comment {
+  font-weight: var(--tp-font-regular);
+  line-height: var(--tp-line-body);
+}
+
+.rv2-step-table th,
+.rv2-value-tag,
+.rv2-level-tag,
+.rv2-tc-badge,
+.rv2-case-status,
+.rv2-case-ai,
+.rv2-gate-status,
+.rv2-priority-tag,
+.rv2-drawer-result {
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-tight);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.rv2-step-table td,
+.rv2-case-name,
+.rv2-step-text,
+.rv2-finding-msg,
+.rv2-audit-reviewer-line {
+  font-size: var(--tp-text-sm);
+  line-height: var(--tp-line-ui);
+}
+
+.rv2-audit-time,
+.rv2-drawer-time,
+.rv2-case-idx,
+.rv2-sidebar-counter,
+.rv2-nav-pos {
+  font-size: var(--tp-text-xs);
+  color: var(--tp-text-muted);
+  opacity: 1;
+}
 /* 设计稿 V2 样式结束。旧 .rd-* 类已全部迁移为 .rv2-*。 */
 </style>

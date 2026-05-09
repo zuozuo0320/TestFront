@@ -42,6 +42,7 @@ const usersLoading = ref(false)
 // ── 分页 ──
 const userPage = ref(1)
 const userPageSize = ref(10)
+const userPageSizeOptions = [10, 20, 50]
 
 // ── 筛选 ──
 const searchKeyword = ref('')
@@ -129,6 +130,12 @@ const pagedUsers = computed(() => {
   const start = (userPage.value - 1) * userPageSize.value
   return filteredUsers.value.slice(start, start + userPageSize.value)
 })
+const userPaginationStart = computed(() =>
+  filteredUsers.value.length === 0 ? 0 : (userPage.value - 1) * userPageSize.value + 1,
+)
+const userPaginationEnd = computed(() =>
+  Math.min(userPage.value * userPageSize.value, filteredUsers.value.length),
+)
 
 /** 创建时排除 admin 角色（仅编辑时可授予 admin） */
 const creatableRoles = computed(() => roles.value.filter((r) => r.name !== 'admin'))
@@ -408,6 +415,10 @@ function isAdmin(u: UserRow) {
 function onUserPaginationCurrentChange(current: number) {
   userPage.value = current
 }
+function onUserPaginationSizeChange(size: number) {
+  userPageSize.value = size
+  userPage.value = 1
+}
 
 /* ── Design C: 统计数据计算 ── */
 
@@ -649,14 +660,20 @@ onMounted(async () => {
         <div v-if="!usersLoading && filteredUsers.length === 0" class="um-empty">暂无用户</div>
       </div>
 
-      <div v-if="filteredUsers.length > 0" class="um-pagination" style="justify-content: flex-end">
+      <div v-if="filteredUsers.length > 0" class="um-pagination">
+        <span class="um-pagination-info">
+          显示 {{ userPaginationStart }}-{{ userPaginationEnd }} / 共
+          {{ filteredUsers.length }} 个用户
+        </span>
         <el-pagination
           background
           small
           :current-page="userPage"
           :page-size="userPageSize"
+          :page-sizes="userPageSizeOptions"
           :total="filteredUsers.length"
-          layout="prev, pager, next"
+          layout="sizes, prev, pager, next, jumper"
+          @size-change="onUserPaginationSizeChange"
           @current-change="onUserPaginationCurrentChange"
         />
       </div>
@@ -1638,5 +1655,113 @@ onMounted(async () => {
 .um-avatar-upload:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
+}
+
+.um-title {
+  font-size: var(--tp-text-3xl);
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-tight);
+}
+
+.um-subtitle,
+.um-audit-desc {
+  font-size: var(--tp-text-md);
+  font-weight: var(--tp-font-regular);
+  line-height: var(--tp-line-body);
+  color: var(--tp-text-muted);
+}
+
+.um-stat-label,
+.um-bento-label,
+.um-table th,
+.um-list-header,
+.um-role-legends,
+.um-status-pill,
+.um-sec-title,
+.um-sec-link,
+.um-upload-overlay,
+.um-live-badge {
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+  line-height: var(--tp-line-ui);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.um-email,
+.um-ip,
+.um-log-time,
+.um-pagination,
+.um-avatar-hint,
+.um-avatar-placeholder-text {
+  font-size: var(--tp-text-xs);
+  color: var(--tp-text-muted);
+}
+
+.um-list-title,
+.um-name,
+.um-log-desc {
+  font-size: var(--tp-text-sm);
+  font-weight: var(--tp-font-semibold);
+  line-height: var(--tp-line-ui);
+}
+
+.um-add-btn {
+  font-weight: var(--tp-font-semibold);
+}
+
+.um-audit-btn,
+.um-avatar-placeholder-icon {
+  font-weight: var(--tp-font-regular);
+}
+
+.um-pagination {
+  min-height: 48px;
+  margin-top: 0;
+  padding: 10px 16px;
+  justify-content: space-between;
+  border-top: 1px solid var(--tp-border-subtle);
+  background: linear-gradient(180deg, var(--tp-surface-header), var(--tp-surface-card));
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.um-pagination-info,
+.um-pagination :deep(.el-pagination__total),
+.um-pagination :deep(.el-pagination__jump) {
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-medium);
+  line-height: var(--tp-line-ui);
+}
+
+.um-pagination :deep(.el-pagination) {
+  gap: 6px;
+}
+
+.um-pagination :deep(.el-pagination button),
+.um-pagination :deep(.el-pager li) {
+  min-width: 32px;
+  height: 32px;
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 9px;
+  background: var(--tp-surface-card);
+  color: var(--tp-text-secondary);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+}
+
+.um-pagination :deep(.el-pagination button:hover),
+.um-pagination :deep(.el-pager li:hover) {
+  border-color: var(--tp-accent-primary-border);
+  background: var(--tp-surface-hover);
+  color: var(--tp-primary);
+}
+
+.um-pagination :deep(.el-pagination.is-background .el-pager li.is-active) {
+  background: var(--tp-btn-bg) !important;
+  border-color: var(--tp-btn-border) !important;
+  color: var(--tp-btn-text) !important;
+  box-shadow: var(--tp-btn-shadow);
 }
 </style>
