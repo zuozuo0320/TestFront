@@ -873,10 +873,7 @@ async function handleExecute(task: AiScriptTask) {
         <button
           class="ai-quickstart-link"
           style="position: relative; z-index: 1"
-          @click="
-            openCreateDialog()
-            createForm.generationMode = GenerationMode.RECORDING_ENHANCED
-          "
+          @click="openCreateDialog"
         >
           立即体验
           <span class="material-symbols-outlined" style="font-size: 14px">arrow_forward</span>
