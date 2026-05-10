@@ -850,6 +850,35 @@ onMounted(() => loadRoles())
   text-transform: none;
   letter-spacing: 0;
 }
+
+.rm-root {
+  background: var(--tp-surface-base);
+}
+
+.rm-stats-panel,
+.rm-card,
+.rm-card-empty {
+  background: var(--tp-surface-card);
+  border-color: var(--tp-border-subtle);
+  box-shadow: var(--tp-shadow-sm);
+  backdrop-filter: none;
+}
+
+.rm-card:hover,
+.rm-card-empty:hover {
+  background: var(--tp-surface-row-hover);
+  border-color: var(--tp-border-strong);
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.rm-card-icon,
+.rm-empty-icon {
+  box-shadow: none;
+}
+
+.rm-card-accent {
+  opacity: 1;
+}
 </style>
 
 <!-- Drawer 使用 teleport 到 body，必须单独放在 unscoped style 中 -->
@@ -1141,6 +1170,25 @@ onMounted(() => loadRoles())
 
 .drawer-footer-btn {
   font-weight: var(--tp-font-semibold);
+}
+
+.drawer-overlay,
+.drawer-footer {
+  backdrop-filter: none;
+}
+
+.drawer-panel {
+  box-shadow: var(--tp-shadow-md);
+}
+
+.drawer-search-input,
+.drawer-user-item,
+.drawer-footer {
+  background: var(--tp-surface-card);
+}
+
+.drawer-user-item:hover {
+  border-color: var(--tp-border-strong);
 }
 
 /* Transitions */

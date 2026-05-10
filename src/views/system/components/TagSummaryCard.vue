@@ -201,4 +201,19 @@ defineProps<{
   font-size: var(--tp-text-xs);
   font-weight: var(--tp-font-bold);
 }
+
+.tm-summary-card {
+  background: var(--tp-surface-card);
+  border-color: var(--tp-border-subtle);
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.tm-summary-glow {
+  display: none;
+}
+
+.tm-summary-dot {
+  color: var(--tp-btn-text);
+  border-color: var(--tp-surface-card);
+}
 </style>

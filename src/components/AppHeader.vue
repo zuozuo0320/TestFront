@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Bell } from 'lucide-vue-next'
+import { Bell, LogOut as LogOutIcon, User as UserIcon } from 'lucide-vue-next'
 import { useAuthStore } from '../stores/auth'
 
 const props = defineProps<{
@@ -36,19 +36,19 @@ function onAvatarError(event: Event) {
       <!-- User Avatar & Dropdown via Popover -->
       <el-popover
         placement="bottom-end"
-        :width="240"
+        :width="236"
         trigger="click"
         popper-class="user-popover-popper"
       >
         <template #reference>
-          <div class="user-box" style="cursor: pointer">
-            <div class="header-user-info">
+          <button type="button" class="user-box" aria-label="打开用户菜单">
+            <span class="header-user-info">
               <span class="header-user-name">{{ userName || 'User' }}</span>
-            </div>
-            <div class="user-avatar-wrap">
+            </span>
+            <span class="user-avatar-wrap">
               <img class="user-avatar" :src="avatarUrl" alt="avatar" @error="onAvatarError" />
-            </div>
-          </div>
+            </span>
+          </button>
         </template>
 
         <div class="user-popover-card">
@@ -56,11 +56,21 @@ function onAvatarError(event: Event) {
             <img class="hover-avatar" :src="avatarUrl" alt="avatar" @error="onAvatarError" />
             <div class="hover-user-meta">
               <div class="hover-name">{{ userName || '示例用户' }}</div>
+              <div class="hover-subline">
+                <span class="hover-status-dot"></span>
+                <span>当前账号</span>
+              </div>
             </div>
           </div>
           <div class="hover-actions">
-            <button class="hover-action-btn" @click="$emit('open-profile')">个人中心</button>
-            <button class="hover-action-btn danger" @click="$emit('logout')">退出登录</button>
+            <button type="button" class="hover-action-btn" @click="$emit('open-profile')">
+              <UserIcon :size="15" />
+              <span>个人中心</span>
+            </button>
+            <button type="button" class="hover-action-btn danger" @click="$emit('logout')">
+              <LogOutIcon :size="15" />
+              <span>退出登录</span>
+            </button>
           </div>
         </div>
       </el-popover>

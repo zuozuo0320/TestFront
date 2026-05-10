@@ -227,7 +227,7 @@ export interface AiScriptTask {
   id: number
   projectId: number
   projectName: string
-  projectKey: string  // V1 项目标识
+  projectKey: string // V1 项目标识
   taskName: string
   generationMode: GenerationMode
   caseIds: number[]
@@ -392,7 +392,9 @@ function toSnake(obj: any): any {
 }
 
 /** 获取任务列表 */
-export async function fetchTaskList(params?: AiScriptTaskListQuery): Promise<{ list: AiScriptTask[]; total: number }> {
+export async function fetchTaskList(
+  params?: AiScriptTaskListQuery,
+): Promise<{ list: AiScriptTask[]; total: number }> {
   const query: Record<string, any> = {}
   if (params?.projectId) query.project_id = params.projectId
   if (params?.taskStatus) query.task_status = params.taskStatus
@@ -440,6 +442,10 @@ export async function createTask(payload: {
 /** 触发执行生成 */
 export async function executeTask(taskId: number): Promise<void> {
   await apiClient.post(`/ai-script/tasks/${taskId}/execute`)
+}
+
+export async function regenerateFromLatestRecording(taskId: number): Promise<void> {
+  await apiClient.post(`/ai-script/tasks/${taskId}/recording/regenerate`)
 }
 
 /** 获取脚本版本列表 */
@@ -673,16 +679,13 @@ export interface AuthStateInfo {
 
 /** 查询目标 URL 的认证状态 */
 export async function checkAuthStatus(startUrl: string): Promise<AuthStateInfo> {
-  const resp = await fetch(
-    `${EXECUTOR_BASE}/auth/status?start_url=${encodeURIComponent(startUrl)}`,
-  )
+  const resp = await fetch(`${EXECUTOR_BASE}/auth/status?start_url=${encodeURIComponent(startUrl)}`)
   return resp.json()
 }
 
 /** 手动清除认证状态（强制下次重新登录） */
 export async function invalidateAuth(startUrl: string): Promise<void> {
-  await fetch(
-    `${EXECUTOR_BASE}/auth/invalidate?start_url=${encodeURIComponent(startUrl)}`,
-    { method: 'POST' },
-  )
+  await fetch(`${EXECUTOR_BASE}/auth/invalidate?start_url=${encodeURIComponent(startUrl)}`, {
+    method: 'POST',
+  })
 }

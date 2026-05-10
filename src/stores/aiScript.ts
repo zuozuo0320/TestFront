@@ -22,6 +22,7 @@ import {
   fetchValidationHistory,
   createTask as apiCreateTask,
   executeTask as apiExecuteTask,
+  regenerateFromLatestRecording as apiRegenerateFromLatestRecording,
   editScript as apiEditScript,
   triggerValidation as apiTriggerValidation,
   discardTask as apiDiscardTask,
@@ -295,6 +296,16 @@ export const useAiScriptStore = defineStore('aiScript', () => {
     }
   }
 
+  async function regenerateFromLatestRecording(taskId: number): Promise<void> {
+    actionLoading.value = true
+    try {
+      await apiRegenerateFromLatestRecording(taskId)
+      await loadTaskDetail(taskId)
+    } finally {
+      actionLoading.value = false
+    }
+  }
+
   /** 编辑脚本并生成新版本。 */
   async function updateScript(
     taskId: number,
@@ -417,6 +428,7 @@ export const useAiScriptStore = defineStore('aiScript', () => {
     actionLoading,
     createTask,
     executeTask,
+    regenerateFromLatestRecording,
     updateScript,
     runValidation,
     discardTask,

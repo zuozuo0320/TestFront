@@ -68,7 +68,7 @@ const emit = defineEmits<{
 <style scoped>
 .tm-glass-panel {
   background: var(--glass-bg);
-  backdrop-filter: blur(12px);
+  backdrop-filter: none;
   padding: 24px;
   border-radius: 16px;
   border: 1px solid var(--border-subtle);

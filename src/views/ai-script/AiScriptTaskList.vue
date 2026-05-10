@@ -39,7 +39,9 @@ let toastTimer: ReturnType<typeof setTimeout> | null = null
 function showToast(msg: string) {
   toastMsg.value = msg
   if (toastTimer) clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => { toastMsg.value = '' }, 3000)
+  toastTimer = setTimeout(() => {
+    toastMsg.value = ''
+  }, 3000)
 }
 
 const totalPages = computed(() => Math.max(1, Math.ceil(store.taskTotal / pageSize.value)))
@@ -280,6 +282,14 @@ function toggleCase(caseItem: TestCase) {
   createForm.caseIds = selectedCaseIds.value.join(',')
 }
 
+function removeSelectedCase(caseId: number) {
+  const idx = selectedCaseIds.value.indexOf(caseId)
+  if (idx >= 0) {
+    selectedCaseIds.value.splice(idx, 1)
+    createForm.caseIds = selectedCaseIds.value.join(',')
+  }
+}
+
 function isCaseSelected(id: number) {
   return selectedCaseIds.value.includes(id)
 }
@@ -396,12 +406,15 @@ const batchDiscardReason = ref('')
 const showBatchDeleteDialog = ref(false)
 
 /** 汇总批量执行结果，用于 Toast 提示。 */
-function buildBatchResultMessage(actionName: string, result: {
-  matched: number
-  success: number
-  skipped: number
-  failed: number
-}): string {
+function buildBatchResultMessage(
+  actionName: string,
+  result: {
+    matched: number
+    success: number
+    skipped: number
+    failed: number
+  },
+): string {
   return `${actionName}完成：命中 ${result.matched} 条，成功 ${result.success} 条，跳过 ${result.skipped} 条，失败 ${result.failed} 条`
 }
 
@@ -502,11 +515,6 @@ async function handleExecute(task: AiScriptTask) {
     <!-- 页面头部 -->
     <div class="ai-page-header">
       <div class="ai-page-header-left">
-        <div class="ai-breadcrumb">
-          <span>测试智编</span>
-          <span class="material-symbols-outlined">chevron_right</span>
-          <span class="current">生成任务</span>
-        </div>
         <h1>智能脚本生成任务列表</h1>
       </div>
       <div class="ai-action-group">
@@ -515,7 +523,9 @@ async function handleExecute(task: AiScriptTask) {
           筛选条件
         </button>
         <button class="ai-btn ai-btn-ghost" @click="toggleSort">
-          <span class="material-symbols-outlined">{{ sortDesc ? 'arrow_downward' : 'arrow_upward' }}</span>
+          <span class="material-symbols-outlined">
+            {{ sortDesc ? 'arrow_downward' : 'arrow_upward' }}
+          </span>
           {{ sortDesc ? '最新优先' : '最早优先' }}
         </button>
         <button class="ai-btn ai-btn-primary" @click="openCreateDialog">
@@ -539,19 +549,37 @@ async function handleExecute(task: AiScriptTask) {
           <label>状态</label>
           <select v-model="filterStatus" class="ai-form-select" style="min-width: 140px">
             <option value="">全部状态</option>
-            <option v-for="(label, key) in TaskStatusLabel" :key="key" :value="key">{{ label }}</option>
+            <option v-for="(label, key) in TaskStatusLabel" :key="key" :value="key">
+              {{ label }}
+            </option>
           </select>
         </div>
         <div class="ai-filter-item">
           <label>关键字</label>
-          <input v-model="filterKeyword" class="ai-form-input" style="min-width: 180px" placeholder="任务名称 / 用例名称" @keyup.enter="applyFilter" />
+          <input
+            v-model="filterKeyword"
+            class="ai-form-input"
+            style="min-width: 180px"
+            placeholder="任务名称 / 用例名称"
+            @keyup.enter="applyFilter"
+          />
         </div>
         <div class="ai-filter-actions">
-          <button class="ai-btn ai-btn-primary" style="padding: 6px 16px; font-size: 0.8rem" @click="applyFilter">
+          <button
+            class="ai-btn ai-btn-primary"
+            style="padding: 6px 16px; font-size: 0.8rem"
+            @click="applyFilter"
+          >
             <span class="material-symbols-outlined" style="font-size: 16px">search</span>
             查询
           </button>
-          <button class="ai-btn ai-btn-ghost" style="padding: 6px 12px; font-size: 0.8rem" @click="resetFilter">重置</button>
+          <button
+            class="ai-btn ai-btn-ghost"
+            style="padding: 6px 12px; font-size: 0.8rem"
+            @click="resetFilter"
+          >
+            重置
+          </button>
         </div>
       </div>
     </div>
@@ -686,7 +714,12 @@ async function handleExecute(task: AiScriptTask) {
               </div>
             </td>
             <td>
-              <div v-if="task.latestValidationStatus" class="ai-status-badge" :class="ValidationStatusColor[task.latestValidationStatus]" style="font-size: 0.7rem">
+              <div
+                v-if="task.latestValidationStatus"
+                class="ai-status-badge"
+                :class="ValidationStatusColor[task.latestValidationStatus]"
+                style="font-size: 0.7rem"
+              >
                 {{ ValidationStatusLabel[task.latestValidationStatus] }}
               </div>
               <span v-else style="font-size: 0.75rem; color: var(--tp-gray-600)">—</span>
@@ -695,10 +728,14 @@ async function handleExecute(task: AiScriptTask) {
               <span style="font-size: 0.8rem; font-weight: 500">{{ task.createdName }}</span>
             </td>
             <td>
-              <span style="font-size: 0.75rem; color: var(--tp-gray-500)">{{ formatTime(task.createdAt) }}</span>
+              <span style="font-size: 0.75rem; color: var(--tp-gray-500)">
+                {{ formatTime(task.createdAt) }}
+              </span>
             </td>
             <td>
-              <span style="font-size: 0.75rem; color: var(--tp-gray-500)">{{ formatTime(task.updatedAt) }}</span>
+              <span style="font-size: 0.75rem; color: var(--tp-gray-500)">
+                {{ formatTime(task.updatedAt) }}
+              </span>
             </td>
             <td>
               <div class="ai-row-actions">
@@ -719,7 +756,11 @@ async function handleExecute(task: AiScriptTask) {
                 <button class="ai-row-action-btn" title="复制配置" @click.stop>
                   <span class="material-symbols-outlined">content_copy</span>
                 </button>
-                <button class="ai-row-action-btn danger" title="废弃" @click.stop="openDiscardDialog(task)">
+                <button
+                  class="ai-row-action-btn danger"
+                  title="废弃"
+                  @click.stop="openDiscardDialog(task)"
+                >
                   <span class="material-symbols-outlined">block</span>
                 </button>
                 <button
@@ -832,7 +873,10 @@ async function handleExecute(task: AiScriptTask) {
         <button
           class="ai-quickstart-link"
           style="position: relative; z-index: 1"
-          @click="openCreateDialog(); createForm.generationMode = GenerationMode.RECORDING_ENHANCED"
+          @click="
+            openCreateDialog()
+            createForm.generationMode = GenerationMode.RECORDING_ENHANCED
+          "
         >
           立即体验
           <span class="material-symbols-outlined" style="font-size: 14px">arrow_forward</span>
@@ -847,201 +891,145 @@ async function handleExecute(task: AiScriptTask) {
     </button>
 
     <!-- 新建任务 Dialog -->
-    <div v-if="showCreateDialog" class="ai-dialog-overlay" @click.self="showCreateDialog = false">
-      <div class="ai-dialog">
+    <div
+      v-if="showCreateDialog"
+      class="ai-dialog-overlay ai-create-dialog-overlay"
+      @click.self="showCreateDialog = false"
+    >
+      <div
+        class="ai-dialog ai-create-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-task-title"
+      >
         <div class="ai-dialog-header">
-          <h2>新建智能生成任务</h2>
-          <button class="ai-dialog-close" @click="showCreateDialog = false">
+          <div>
+            <h2 id="create-task-title">新建智能生成任务</h2>
+            <p class="ai-dialog-subtitle">配置场景、关联用例后生成可验证的自动化脚本</p>
+          </div>
+          <button class="ai-dialog-close" aria-label="关闭弹窗" @click="showCreateDialog = false">
             <span class="material-symbols-outlined">close</span>
           </button>
         </div>
-        <div class="ai-dialog-body">
-          <div class="ai-form-group">
-            <label class="ai-form-label">所属项目 *</label>
-            <select v-model="createForm.projectId" class="ai-form-select">
-              <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
-            </select>
-          </div>
-          <div class="ai-form-group">
-            <label class="ai-form-label">生成模式 *</label>
-            <select v-model="createForm.generationMode" class="ai-form-select">
-              <option v-for="(label, key) in GenerationModeLabel" :key="key" :value="key">
-                {{ label }}
-              </option>
-            </select>
-            <span class="ai-form-hint">
-              {{
-                createForm.generationMode === GenerationMode.RECORDING_ENHANCED
-                  ? '录制增强：先 Playwright 录制，再 AI 重构为标准脚本'
-                  : 'AI 直生：browser-use 自动探索并生成脚本'
-              }}
-            </span>
-          </div>
-          <div class="ai-form-group">
-            <label class="ai-form-label">任务名称 *</label>
-            <input
-              v-model="createForm.taskName"
-              class="ai-form-input"
-              placeholder="例如：登录流程回归测试"
-            />
-          </div>
-          <div class="ai-form-group">
-            <label class="ai-form-label">场景描述 *</label>
-            <textarea
-              v-model="createForm.scenarioDesc"
-              class="ai-form-textarea"
-              placeholder="描述 browser-use 需要探索的业务场景"
-            />
-          </div>
-          <div class="ai-form-group">
-            <label class="ai-form-label">起始 URL *</label>
-            <input
-              v-model="createForm.startUrl"
-              class="ai-form-input"
-              placeholder="https://your-app.com/login"
-            />
-          </div>
-          <div class="ai-form-group">
-            <label class="ai-form-label">关联用例 *</label>
-            <!-- 已选用例标签 -->
-            <div
-              v-if="selectedCaseIds.length"
-              style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px"
-            >
-              <span
-                v-for="cid in selectedCaseIds"
-                :key="cid"
-                style="
-                  display: inline-flex;
-                  align-items: center;
-                  gap: 4px;
-                  background: rgba(124, 77, 255, 0.15);
-                  color: #b388ff;
-                  padding: 2px 8px;
-                  border-radius: 12px;
-                  font-size: 0.75rem;
-                "
-              >
-                TC-{{ cid }}
-                <span
-                  class="material-symbols-outlined"
-                  style="font-size: 14px; cursor: pointer"
-                  @click="selectedCaseIds.splice(selectedCaseIds.indexOf(cid), 1); createForm.caseIds = selectedCaseIds.join(',')"
-                >
-                  ×
-                </span>
+        <div class="ai-dialog-body ai-create-dialog-body">
+          <div class="ai-form-grid">
+            <div class="ai-form-group ai-form-group-half">
+              <label class="ai-form-label">所属项目 *</label>
+              <select v-model="createForm.projectId" class="ai-form-select">
+                <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
+              </select>
+            </div>
+            <div class="ai-form-group ai-form-group-half">
+              <label class="ai-form-label">生成模式 *</label>
+              <select v-model="createForm.generationMode" class="ai-form-select">
+                <option v-for="(label, key) in GenerationModeLabel" :key="key" :value="key">
+                  {{ label }}
+                </option>
+              </select>
+              <span class="ai-form-hint">
+                {{
+                  createForm.generationMode === GenerationMode.RECORDING_ENHANCED
+                    ? '录制增强：先 Playwright 录制，再 AI 重构为标准脚本'
+                    : 'AI 直生：browser-use 自动探索并生成脚本'
+                }}
               </span>
             </div>
-            <!-- 搜索输入 -->
-            <div style="position: relative">
+            <div class="ai-form-group ai-form-group-half">
+              <label class="ai-form-label">任务名称 *</label>
               <input
+                v-model="createForm.taskName"
                 class="ai-form-input"
-                :value="caseSearchKeyword"
-                placeholder="搜索用例名称或 ID..."
-                @input="handleCaseSearch"
-                @focus="showCaseDropdown = true"
+                placeholder="例如：登录流程回归测试"
               />
-              <!-- 下拉列表 -->
-              <div
-                v-if="showCaseDropdown"
-                style="
-                  position: absolute;
-                  top: 100%;
-                  left: 0;
-                  right: 0;
-                  z-index: 100;
-                  max-height: 200px;
-                  overflow-y: auto;
-                  background: var(--tp-surface-elevated, #1e1e2e);
-                  border: 1px solid rgba(255, 255, 255, 0.1);
-                  border-radius: 8px;
-                  margin-top: 4px;
-                  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-                "
-              >
-                <div
-                  v-if="caseLoading"
-                  style="
-                    padding: 10px 12px;
-                    font-size: 0.8rem;
-                    color: var(--tp-gray-500);
-                  "
-                >
-                  正在加载用例...
-                </div>
-                <div
-                  v-else-if="caseCandidates.length === 0"
-                  style="
-                    padding: 10px 12px;
-                    font-size: 0.8rem;
-                    color: var(--tp-gray-500);
-                  "
-                >
-                  {{ caseLoadError || '当前没有可关联用例' }}
-                </div>
-                <template v-else>
-                  <div
-                    v-for="c in caseCandidates"
-                    :key="c.id"
-                    style="
-                      padding: 8px 12px;
-                      cursor: pointer;
-                      display: flex;
-                      align-items: center;
-                      gap: 8px;
-                      font-size: 0.8rem;
-                      transition: background 0.15s;
-                    "
-                    :style="{ background: isCaseSelected(c.id) ? 'rgba(124,77,255,0.12)' : '' }"
-                    @mousedown.prevent="toggleCase(c)"
-                  >
-                    <span
-                      class="material-symbols-outlined"
-                      style="font-size: 16px"
-                      :style="{ color: isCaseSelected(c.id) ? '#b388ff' : 'var(--tp-gray-500)' }"
-                    >
-                      {{ isCaseSelected(c.id) ? 'check_box' : 'check_box_outline_blank' }}
-                    </span>
-                    <span style="color: var(--tp-gray-500); min-width: 50px">TC-{{ c.id }}</span>
-                    <span
-                      style="
-                        color: var(--tp-gray-300);
-                        flex: 1;
-                        overflow: hidden;
-                        text-overflow: ellipsis;
-                        white-space: nowrap;
-                      "
-                    >
-                      {{ c.title }}
-                    </span>
-                    <span
-                      v-if="c.level"
-                      style="
-                        font-size: 0.65rem;
-                        padding: 1px 6px;
-                        border-radius: 8px;
-                        background: rgba(255, 255, 255, 0.06);
-                        color: var(--tp-gray-500);
-                      "
-                    >
-                      {{ c.level }}
-                    </span>
+            </div>
+            <div class="ai-form-group ai-form-group-half">
+              <label class="ai-form-label">起始 URL *</label>
+              <input
+                v-model="createForm.startUrl"
+                class="ai-form-input"
+                placeholder="https://your-app.com/login"
+              />
+            </div>
+            <div class="ai-form-group ai-form-group-full">
+              <label class="ai-form-label">场景描述 *</label>
+              <textarea
+                v-model="createForm.scenarioDesc"
+                class="ai-form-textarea"
+                placeholder="描述 browser-use 需要探索的业务场景，例如：登录系统后进入订单列表并筛选待处理订单"
+              />
+            </div>
+            <div class="ai-form-group ai-form-group-full ai-case-field">
+              <div class="ai-case-field-head">
+                <label class="ai-form-label">关联用例 *</label>
+                <span class="ai-case-selected-count">已选择 {{ selectedCaseIds.length }} 条</span>
+              </div>
+              <div class="ai-case-picker-panel">
+                <div class="ai-case-toolbar">
+                  <div class="ai-case-picker">
+                    <input
+                      class="ai-form-input"
+                      :value="caseSearchKeyword"
+                      placeholder="搜索用例名称或 ID..."
+                      @input="handleCaseSearch"
+                      @focus="showCaseDropdown = true"
+                    />
                   </div>
-                </template>
+                  <span v-if="caseLoadError && !caseLoading" class="ai-case-inline-error">
+                    {{ caseLoadError }}
+                  </span>
+                </div>
+                <div v-if="showCaseDropdown" class="ai-case-dropdown">
+                  <div v-if="caseLoading" class="ai-case-dropdown-state">正在加载用例...</div>
+                  <div v-else-if="caseCandidates.length === 0" class="ai-case-dropdown-state">
+                    {{ caseLoadError || '当前没有可关联用例' }}
+                  </div>
+                  <template v-else>
+                    <div
+                      v-for="c in caseCandidates"
+                      :key="c.id"
+                      class="ai-case-option"
+                      :class="{ selected: isCaseSelected(c.id) }"
+                      @mousedown.prevent="toggleCase(c)"
+                    >
+                      <span
+                        class="material-symbols-outlined ai-case-check"
+                        :class="{ selected: isCaseSelected(c.id) }"
+                      >
+                        {{ isCaseSelected(c.id) ? 'check_box' : 'check_box_outline_blank' }}
+                      </span>
+                      <span class="ai-case-id">TC-{{ c.id }}</span>
+                      <span class="ai-case-title">
+                        {{ c.title }}
+                      </span>
+                      <span v-if="c.level" class="ai-case-level">
+                        {{ c.level }}
+                      </span>
+                    </div>
+                  </template>
+                </div>
+                <div v-if="selectedCaseIds.length" class="ai-selected-case-list">
+                  <span v-for="cid in selectedCaseIds" :key="cid" class="ai-selected-case-tag">
+                    TC-{{ cid }}
+                    <button
+                      type="button"
+                      class="ai-selected-case-remove"
+                      aria-label="移除关联用例"
+                      @click="removeSelectedCase(cid)"
+                    >
+                      <span class="material-symbols-outlined">close</span>
+                    </button>
+                  </span>
+                </div>
               </div>
             </div>
-            <span class="ai-form-hint">
-              已选择 {{ selectedCaseIds.length }} 条用例
-              <template v-if="caseLoadError && !caseLoading">，{{ caseLoadError }}</template>
-            </span>
-          </div>
-          <div class="ai-form-group">
-            <label class="ai-form-label">测试账号 (可选)</label>
-            <input
-              v-model="createForm.accountRef"
-              class="ai-form-input"
-              placeholder="引用的测试账号标识"
-            />
+            <div class="ai-form-group ai-form-group-half">
+              <label class="ai-form-label">测试账号 (可选)</label>
+              <input
+                v-model="createForm.accountRef"
+                class="ai-form-input"
+                placeholder="引用的测试账号标识"
+              />
+            </div>
           </div>
         </div>
         <div class="ai-dialog-footer">
@@ -1077,7 +1065,9 @@ async function handleExecute(task: AiScriptTask) {
         </div>
         <div class="ai-dialog-body">
           <p class="discard-warning">
-            确定要废弃任务 <strong>{{ discardTaskName }}</strong>（ID: {{ discardTaskId }}）吗？废弃后任务将不可恢复。
+            确定要废弃任务
+            <strong>{{ discardTaskName }}</strong>
+            （ID: {{ discardTaskId }}）吗？废弃后任务将不可恢复。
           </p>
           <div class="ai-form-group">
             <label class="ai-form-label">废弃原因 *</label>
@@ -1114,10 +1104,14 @@ async function handleExecute(task: AiScriptTask) {
         </div>
         <div class="ai-dialog-body">
           <p class="discard-warning" style="color: #ff8a80">
-            确定要彻底删除任务 <strong>{{ deleteTaskName }}</strong>（ID: {{ deleteTaskId }}）吗？
+            确定要彻底删除任务
+            <strong>{{ deleteTaskName }}</strong>
+            （ID: {{ deleteTaskId }}）吗？
           </p>
           <p style="font-size: 0.8rem; color: var(--tp-gray-500); margin-top: 8px">
-            此操作将级联删除任务关联的所有脚本版本、验证记录、轨迹、证据和录制会话，<strong style="color: #ff8a80">不可恢复</strong>。
+            此操作将级联删除任务关联的所有脚本版本、验证记录、轨迹、证据和录制会话，
+            <strong style="color: #ff8a80">不可恢复</strong>
+            。
           </p>
         </div>
         <div class="ai-dialog-footer">
@@ -1135,7 +1129,11 @@ async function handleExecute(task: AiScriptTask) {
     </div>
 
     <!-- 批量废弃确认 Dialog -->
-    <div v-if="showBatchDiscardDialog" class="ai-dialog-overlay" @click.self="showBatchDiscardDialog = false">
+    <div
+      v-if="showBatchDiscardDialog"
+      class="ai-dialog-overlay"
+      @click.self="showBatchDiscardDialog = false"
+    >
       <div class="ai-dialog" style="max-width: 460px">
         <div class="ai-dialog-header">
           <h2>批量废弃任务</h2>
@@ -1145,7 +1143,9 @@ async function handleExecute(task: AiScriptTask) {
         </div>
         <div class="ai-dialog-body">
           <p class="discard-warning">
-            确定要批量废弃已选中的 <strong>{{ store.selectedTaskCount }}</strong> 条任务吗？
+            确定要批量废弃已选中的
+            <strong>{{ store.selectedTaskCount }}</strong>
+            条任务吗？
           </p>
           <div class="ai-form-group">
             <label class="ai-form-label">废弃原因 *</label>
@@ -1172,7 +1172,11 @@ async function handleExecute(task: AiScriptTask) {
     </div>
 
     <!-- 批量删除确认 Dialog -->
-    <div v-if="showBatchDeleteDialog" class="ai-dialog-overlay" @click.self="showBatchDeleteDialog = false">
+    <div
+      v-if="showBatchDeleteDialog"
+      class="ai-dialog-overlay"
+      @click.self="showBatchDeleteDialog = false"
+    >
       <div class="ai-dialog" style="max-width: 460px">
         <div class="ai-dialog-header">
           <h2>批量删除任务</h2>
@@ -1182,7 +1186,9 @@ async function handleExecute(task: AiScriptTask) {
         </div>
         <div class="ai-dialog-body">
           <p class="discard-warning" style="color: #ff8a80">
-            确定要批量删除已选中的 <strong>{{ store.selectedTaskCount }}</strong> 条任务吗？
+            确定要批量删除已选中的
+            <strong>{{ store.selectedTaskCount }}</strong>
+            条任务吗？
           </p>
           <p style="font-size: 0.8rem; color: var(--tp-gray-500); margin-top: 8px">
             只有已废弃任务会被真正删除，不满足条件的任务会在结果中按“跳过/失败”统计返回。
@@ -1272,15 +1278,31 @@ async function handleExecute(task: AiScriptTask) {
   width: auto;
   white-space: nowrap;
 }
-.toast-enter-active { animation: task-toast-in 0.3s ease; }
-.toast-leave-active { animation: task-toast-in 0.2s ease reverse; }
+.toast-enter-active {
+  animation: task-toast-in 0.3s ease;
+}
+.toast-leave-active {
+  animation: task-toast-in 0.2s ease reverse;
+}
 @keyframes task-toast-in {
-  from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* 废弃确认弹窗 */

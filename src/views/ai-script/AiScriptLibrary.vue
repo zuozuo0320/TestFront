@@ -34,7 +34,7 @@ function highlightLine(line: string): string {
     /\b(import|from|export|const|let|var|async|await|function|return|test|expect)\b/g,
     '<span class="ai-code-keyword">$1</span>',
   )
-  s = s.replace(/'([^']*)'/g, "'<span class=\"ai-code-string\">$1</span>'")
+  s = s.replace(/'([^']*)'/g, '\'<span class="ai-code-string">$1</span>\'')
   return s
 }
 </script>
@@ -44,11 +44,6 @@ function highlightLine(line: string): string {
     <!-- 页面头部 -->
     <div class="ai-page-header">
       <div class="ai-page-header-left">
-        <div class="ai-breadcrumb">
-          <span>用例管理</span>
-          <span class="material-symbols-outlined">chevron_right</span>
-          <span class="current">TC-4029 鉴权流程</span>
-        </div>
         <h1>脚本管理区</h1>
         <p class="ai-subtitle">管理、回放及验证该用例的所有自动化脚本版本</p>
       </div>
@@ -95,13 +90,22 @@ function highlightLine(line: string): string {
                   <div style="display: flex; align-items: center; gap: 10px">
                     <div
                       style="
-                        width: 36px; height: 36px; border-radius: 8px;
+                        width: 36px;
+                        height: 36px;
+                        border-radius: 8px;
                         background: var(--tp-surface-elevated);
-                        display: flex; align-items: center; justify-content: center;
-                        border: 1px solid rgba(255,255,255,0.06);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        border: 1px solid rgba(255, 255, 255, 0.06);
                       "
                     >
-                      <span class="material-symbols-outlined" style="font-size: 18px; color: var(--tp-primary-light)">code</span>
+                      <span
+                        class="material-symbols-outlined"
+                        style="font-size: 18px; color: var(--tp-primary-light)"
+                      >
+                        code
+                      </span>
                     </div>
                     <div>
                       <div style="font-size: 0.85rem; font-weight: 600">{{ s.scriptName }}</div>
@@ -159,14 +163,34 @@ function highlightLine(line: string): string {
         </div>
 
         <!-- 代码预览 -->
-        <div class="ai-glass-panel" style="padding: 20px" v-if="current">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px">
+        <div v-if="current" class="ai-glass-panel" style="padding: 20px">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 14px;
+            "
+          >
             <div style="display: flex; align-items: center; gap: 8px">
-              <span class="material-symbols-outlined" style="color: var(--tp-primary-light)">terminal</span>
-              <span style="font-size: 0.85rem; font-weight: 600">预览: {{ current.scriptName }}</span>
+              <span class="material-symbols-outlined" style="color: var(--tp-primary-light)">
+                terminal
+              </span>
+              <span style="font-size: 0.85rem; font-weight: 600">
+                预览: {{ current.scriptName }}
+              </span>
             </div>
             <div style="display: flex; align-items: center; gap: 8px">
-              <span style="font-size: 0.6rem; text-transform: uppercase; color: var(--tp-gray-600); background: var(--tp-surface-elevated); padding: 2px 8px; border-radius: 3px">
+              <span
+                style="
+                  font-size: 0.6rem;
+                  text-transform: uppercase;
+                  color: var(--tp-gray-600);
+                  background: var(--tp-surface-elevated);
+                  padding: 2px 8px;
+                  border-radius: 3px;
+                "
+              >
                 TypeScript
               </span>
               <button class="ai-code-copy-btn" title="全屏">
@@ -186,7 +210,14 @@ function highlightLine(line: string): string {
             "
           >
             <div style="display: flex; gap: 14px">
-              <div style="color: var(--tp-gray-400); text-align: right; user-select: none; flex-shrink: 0">
+              <div
+                style="
+                  color: var(--tp-gray-400);
+                  text-align: right;
+                  user-select: none;
+                  flex-shrink: 0;
+                "
+              >
                 <div v-for="line in highlightLines(current.scriptContent)" :key="line.no">
                   {{ line.no }}
                 </div>
@@ -195,8 +226,8 @@ function highlightLine(line: string): string {
                 <div
                   v-for="line in highlightLines(current.scriptContent)"
                   :key="line.no"
-                  v-html="line.html"
                   style="color: var(--tp-gray-700)"
+                  v-html="line.html"
                 ></div>
               </div>
             </div>
@@ -205,7 +236,14 @@ function highlightLine(line: string): string {
             <button class="ai-btn ai-btn-ghost" style="font-size: 0.7rem; padding: 6px 14px">
               导出 (.zip)
             </button>
-            <button class="ai-btn ai-btn-secondary" style="font-size: 0.7rem; padding: 6px 14px; border: 1px solid rgba(124, 58, 237, 0.2)">
+            <button
+              class="ai-btn ai-btn-secondary"
+              style="
+                font-size: 0.7rem;
+                padding: 6px 14px;
+                border: 1px solid rgba(124, 58, 237, 0.2);
+              "
+            >
               一键部署
             </button>
           </div>
@@ -217,7 +255,9 @@ function highlightLine(line: string): string {
         <!-- 自动化健康度 -->
         <div class="ai-health-card">
           <div style="position: relative; z-index: 1">
-            <span class="ai-section-title" style="margin-bottom: 14px; display: block">自动化健康度</span>
+            <span class="ai-section-title" style="margin-bottom: 14px; display: block">
+              自动化健康度
+            </span>
             <div style="display: flex; align-items: flex-end; gap: 8px">
               <span class="ai-health-value">94%</span>
               <span class="ai-health-trend" style="margin-bottom: 6px">
@@ -238,7 +278,12 @@ function highlightLine(line: string): string {
         <div class="ai-info-card">
           <div class="ai-info-card-header">
             <span class="ai-section-title">最近回放分析</span>
-            <span class="material-symbols-outlined" style="font-size: 16px; color: var(--tp-gray-500); cursor: pointer">more_horiz</span>
+            <span
+              class="material-symbols-outlined"
+              style="font-size: 16px; color: var(--tp-gray-500); cursor: pointer"
+            >
+              more_horiz
+            </span>
           </div>
           <div class="ai-trace-timeline">
             <div class="ai-trace-item">
@@ -272,11 +317,10 @@ function highlightLine(line: string): string {
             <span class="ai-insight-label">AI 建议</span>
           </div>
           <p class="ai-insight-text">
-            "当前脚本 version 2 使用了硬编码的等待时间。建议将其替换为 Playwright 的 auto-waiting 机制以提高 15% 的执行效率。"
+            "当前脚本 version 2 使用了硬编码的等待时间。建议将其替换为 Playwright 的 auto-waiting
+            机制以提高 15% 的执行效率。"
           </p>
-          <button class="ai-insight-action">
-            应用优化方案 →
-          </button>
+          <button class="ai-insight-action">应用优化方案 →</button>
         </div>
       </div>
     </div>

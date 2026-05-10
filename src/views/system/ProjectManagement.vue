@@ -1952,4 +1952,37 @@ void Search // suppress unused import warning
   cursor: not-allowed;
   opacity: 0.55;
 }
+
+.pm-page {
+  background: var(--tp-surface-base);
+}
+
+.pm-stats-panel,
+.pm-table-wrap,
+.pm-glass-card,
+.pm-capacity-card {
+  background: var(--tp-surface-card);
+  border-color: var(--tp-border-subtle);
+  box-shadow: var(--tp-shadow-sm);
+  backdrop-filter: none;
+}
+
+.pm-row:hover {
+  background: var(--tp-surface-row-hover);
+  box-shadow: inset 2px 0 0 var(--tp-primary);
+}
+
+.pm-pagination {
+  background: var(--tp-surface-card);
+}
+
+.pm-bar-hi {
+  box-shadow: none;
+}
+
+.pm-card-top,
+.pm-owner-cell,
+.pm-actions {
+  min-width: 0;
+}
 </style>

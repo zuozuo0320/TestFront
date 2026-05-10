@@ -471,4 +471,70 @@ function formatCount(n: number): string {
 .tc-divider {
   height: 28px;
 }
+
+.tc-card {
+  background: var(--tp-surface-card);
+  border-color: var(--tp-border-subtle);
+  box-shadow: var(--tp-shadow-sm);
+  transform: none;
+}
+
+.tc-card::before {
+  display: none;
+}
+
+.tc-card:hover {
+  background: var(--tp-surface-row-hover);
+  border-color: var(--tp-border-strong);
+  box-shadow: var(--tp-shadow-sm);
+  transform: none;
+}
+
+.tc-icon-box {
+  background: color-mix(in srgb, var(--accent) 10%, var(--tp-surface-card));
+  box-shadow: none;
+}
+
+.tc-name,
+.tc-stat-value--creator {
+  color: var(--tp-text-primary);
+}
+
+.tc-desc,
+.tc-stat-label {
+  color: var(--tp-text-muted);
+}
+
+.tc-act-btn {
+  background: var(--tp-surface-input);
+  border-color: var(--tp-border-subtle);
+  box-shadow: none;
+  color: var(--tp-text-muted);
+}
+
+.tc-act-btn:hover {
+  background: var(--tp-surface-hover);
+  border-color: var(--tp-border-strong);
+  color: var(--tp-primary);
+}
+
+.tc-act-btn--del:hover {
+  background: var(--tp-accent-danger-soft);
+  color: var(--tp-accent-danger);
+}
+
+.tc-stat-value--primary {
+  color: var(--accent);
+  text-shadow: none;
+}
+
+.tc-stats,
+.tc-divider,
+.tc-avatar {
+  border-color: var(--tp-border-subtle);
+}
+
+.tc-divider {
+  background: var(--tp-border-subtle);
+}
 </style>

@@ -9,6 +9,7 @@ import { listUsersLookup } from '../api/user'
 import {
   listReviews,
   createReview,
+  updateReview,
   deleteReview,
   closeReview,
   getReview,
@@ -278,6 +279,26 @@ async function handleCreate() {
 }
 
 // ── 操作 ──
+async function handleRename(review: CaseReview) {
+  try {
+    const { value: newName } = await ElMessageBox.prompt('请输入新的评审任务名称', '重命名', {
+      inputValue: review.name,
+      inputPattern: /\S+/,
+      inputErrorMessage: '名称不能为空',
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+    })
+    const trimmed = newName.trim()
+    if (trimmed === review.name) return
+    await updateReview(selectedProjectId.value!, review.id, { name: trimmed })
+    ElMessage.success('重命名成功')
+    fetchReviews()
+  } catch (e) {
+    if (isElMessageBoxCancel(e)) return
+    ElMessage.error(extractErrorMessage(e, '重命名失败'))
+  }
+}
+
 async function handleDelete(review: CaseReview) {
   try {
     await ElMessageBox.confirm(`确定删除评审计划「${review.name}」？`, '删除确认', {
@@ -649,12 +670,17 @@ function reviewStatusLabel(review: CaseReview) {
             <input
               v-model="searchKeyword"
               type="text"
+              aria-label="搜索评审计划"
               placeholder="搜索计划名称 / ID"
               class="pipeline-search-input"
               @keyup.enter="handleSearch"
             />
           </div>
-          <button class="pipeline-btn-create" @click="router.push('/case-reviews/create')">
+          <button
+            type="button"
+            class="pipeline-btn-create"
+            @click="router.push('/case-reviews/create')"
+          >
             <span class="material-symbols-outlined" style="font-size: 18px">add_circle</span>
             新建评审
           </button>
@@ -748,6 +774,7 @@ function reviewStatusLabel(review: CaseReview) {
                 { key: 'assigned', label: '我评审的', icon: 'how_to_reg' },
               ]"
               :key="tab.key"
+              type="button"
               class="view-tab-pl"
               :class="{ active: viewMode === tab.key }"
               @click="viewMode = tab.key as any"
@@ -802,8 +829,17 @@ function reviewStatusLabel(review: CaseReview) {
               <td>
                 <div class="review-name-cell">
                   <span class="review-name">{{ review.name }}</span>
+                  <button
+                    type="button"
+                    class="rename-btn"
+                    title="重命名"
+                    aria-label="重命名评审任务"
+                    @click.stop="handleRename(review)"
+                  >
+                    <span class="material-symbols-outlined">edit</span>
+                  </button>
                   <span class="review-id-sub">
-                    ID: #{{ review.id }} · {{ modeLabel(review.review_mode) }}
+                    {{ modeLabel(review.review_mode) }}
                   </span>
                 </div>
               </td>
@@ -850,13 +886,18 @@ function reviewStatusLabel(review: CaseReview) {
               <td class="td-right">
                 <div class="row-actions" @click.stop>
                   <button
+                    type="button"
                     class="action-btn action-edit icon-only"
                     :title="isCreationDraftReview(review) ? '继续创建' : '查看详情'"
+                    :aria-label="
+                      isCreationDraftReview(review) ? '继续创建评审计划' : '查看评审详情'
+                    "
                     @click="openReviewEntry(review)"
                   >
                     <span class="material-symbols-outlined">visibility</span>
                   </button>
                   <button
+                    type="button"
                     class="action-btn action-ai icon-only"
                     :disabled="
                       aiRunningSet.has(review.id) ||
@@ -870,6 +911,13 @@ function reviewStatusLabel(review: CaseReview) {
                           ? '计划已关闭/完成，无法再运行 AI 评审'
                           : '对该任务下所有用例运行 AI 评审'
                     "
+                    :aria-label="
+                      aiRunningSet.has(review.id)
+                        ? 'AI 评审中'
+                        : review.status === 'closed' || review.status === 'completed'
+                          ? '当前计划无法运行 AI 评审'
+                          : '运行 AI 评审'
+                    "
                     @click="handleRunAI(review)"
                   >
                     <span
@@ -881,15 +929,19 @@ function reviewStatusLabel(review: CaseReview) {
                   </button>
                   <button
                     v-if="review.status !== 'closed'"
+                    type="button"
                     class="action-btn icon-only"
                     title="关闭"
+                    aria-label="关闭评审计划"
                     @click="handleClose(review)"
                   >
                     <span class="material-symbols-outlined">block</span>
                   </button>
                   <button
+                    type="button"
                     class="action-btn action-delete icon-only"
                     title="删除"
+                    aria-label="删除评审计划"
                     @click="handleDelete(review)"
                   >
                     <span class="material-symbols-outlined">delete</span>
@@ -906,7 +958,11 @@ function reviewStatusLabel(review: CaseReview) {
         <span class="material-symbols-outlined empty-icon-pl">rate_review</span>
         <h3 class="empty-title-pl">还没有评审计划</h3>
         <p class="empty-desc-pl">创建评审计划，关联测试用例，邀请团队成员进行用例评审</p>
-        <button class="pipeline-btn-create" @click="router.push('/case-reviews/create')">
+        <button
+          type="button"
+          class="pipeline-btn-create"
+          @click="router.push('/case-reviews/create')"
+        >
           <span class="material-symbols-outlined" style="font-size: 18px">add_circle</span>
           创建第一个评审计划
         </button>
@@ -2593,5 +2649,698 @@ function reviewStatusLabel(review: CaseReview) {
 .page-btn:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.case-review-page {
+  min-height: calc(100vh - 56px - 16px);
+  gap: 8px;
+  padding: 8px !important;
+}
+
+.case-review-page .pipeline-header {
+  padding-top: 0;
+}
+
+.case-review-page .pipeline-header-top {
+  align-items: center;
+  gap: 8px;
+}
+
+.case-review-page .pipeline-title {
+  margin-bottom: 2px;
+  font-size: 18px;
+  line-height: var(--tp-line-tight);
+}
+
+.case-review-page .pipeline-subtitle {
+  font-size: 12px;
+  line-height: var(--tp-line-ui);
+}
+
+.case-review-page .pipeline-actions {
+  gap: 6px;
+}
+
+.case-review-page .pipeline-search-box {
+  min-height: 30px;
+  min-width: min(320px, 100%);
+  padding: 4px 9px;
+  border-radius: 9px;
+}
+
+.case-review-page .pipeline-search-input {
+  width: min(320px, 34vw);
+  font-size: 12px;
+}
+
+.case-review-page .pipeline-btn-create {
+  min-height: 30px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.case-review-page .pipeline-btn-create .material-symbols-outlined {
+  font-size: 16px !important;
+}
+
+.case-review-page .stats-grid {
+  gap: 8px;
+}
+
+.case-review-page .stat-card-pl {
+  min-height: 72px;
+  padding: 10px 11px;
+  border-radius: 11px;
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.case-review-page .stat-bg-icon {
+  top: 8px;
+  right: 8px;
+}
+
+.case-review-page .stat-bg-icon .material-symbols-outlined {
+  font-size: 34px;
+}
+
+.case-review-page .stat-label-pl {
+  margin-bottom: 3px;
+  font-size: 11px !important;
+}
+
+.case-review-page .stat-num {
+  font-size: 21px;
+  line-height: 1;
+}
+
+.case-review-page .stat-sub,
+.case-review-page .stat-sub-hint {
+  font-size: 11px;
+}
+
+.case-review-page .stat-bar-track {
+  height: 3px;
+  margin-top: 8px;
+}
+
+.case-review-page .table-container-pl {
+  border-radius: 12px;
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.case-review-page .table-header-bar {
+  min-height: 42px;
+  gap: 8px;
+  padding: 6px 10px;
+}
+
+.case-review-page .table-section-title {
+  font-size: 14px;
+  line-height: var(--tp-line-ui);
+}
+
+.case-review-page .table-header-actions {
+  gap: 8px;
+}
+
+.case-review-page .view-tabs-pl {
+  min-height: 30px;
+  padding: 2px;
+  border-radius: 8px;
+}
+
+.case-review-page .view-tab-pl {
+  min-height: 26px;
+  padding: 4px 9px;
+  border-radius: 7px;
+  font-size: 12px;
+}
+
+.case-review-page .view-tab-pl .material-symbols-outlined {
+  font-size: 15px !important;
+}
+
+.case-review-page .filter-select-pl {
+  width: 86px;
+  --el-component-size: 30px;
+}
+
+.case-review-page :deep(.filter-select-pl .el-select__wrapper) {
+  min-height: 30px !important;
+  padding: 0 8px !important;
+  border-radius: 8px !important;
+}
+
+.case-review-page .pipeline-table {
+  min-width: 900px;
+}
+
+.case-review-page .pipeline-table th {
+  height: 34px;
+  padding: 7px 10px !important;
+}
+
+.case-review-page .pipeline-table td {
+  height: 42px;
+  padding: 7px 10px !important;
+}
+
+.case-review-page .review-name-cell {
+  gap: 2px;
+}
+
+.case-review-page .review-name {
+  max-width: 320px;
+  font-size: 12px;
+  line-height: var(--tp-line-ui);
+}
+
+.case-review-page .review-id-sub {
+  font-size: 11px;
+  line-height: var(--tp-line-ui);
+}
+
+.case-review-page .person-cell {
+  gap: 7px;
+}
+
+.case-review-page .avatar-circle,
+.case-review-page .avatar-circle-img {
+  width: 22px;
+  height: 22px;
+}
+
+.case-review-page .person-name {
+  font-size: 12px;
+}
+
+.case-review-page .progress-cell-pl {
+  width: 176px;
+}
+
+.case-review-page .progress-top-row {
+  margin-bottom: 4px;
+}
+
+.case-review-page .progress-pct,
+.case-review-page .progress-count,
+.case-review-page .progress-result {
+  font-size: 11px;
+  line-height: var(--tp-line-ui);
+}
+
+.case-review-page .progress-bar-track {
+  height: 4px;
+}
+
+.case-review-page .progress-result {
+  margin-top: 3px;
+}
+
+.case-review-page .status-badge-pl {
+  min-height: 22px;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.case-review-page .row-actions {
+  gap: 2px;
+}
+
+.case-review-page .action-btn.icon-only {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+}
+
+.case-review-page .action-btn.icon-only .material-symbols-outlined {
+  font-size: 15px !important;
+}
+
+.case-review-page .pagination-bar-pl {
+  min-height: 42px;
+  padding: 6px 12px;
+}
+
+.case-review-page .pagination-bar-pl :deep(.el-pagination button),
+.case-review-page .pagination-bar-pl :deep(.el-pager li),
+.case-review-page .page-btn {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.case-review-page {
+  background-image: none;
+}
+
+.case-review-page .pipeline-header-top {
+  min-height: 34px;
+}
+
+.case-review-page .pipeline-title {
+  font-family: var(--tp-font-family-sans) !important;
+  font-size: 18px !important;
+  font-weight: var(--tp-font-bold) !important;
+  line-height: var(--tp-line-tight) !important;
+  letter-spacing: -0.01em !important;
+  color: var(--tp-text-primary) !important;
+}
+
+.case-review-page .pipeline-subtitle {
+  max-width: 520px;
+  font-family: var(--tp-font-family-sans) !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  color: var(--tp-text-muted) !important;
+}
+
+.case-review-page .pipeline-search-box {
+  min-height: 32px;
+  border-color: var(--tp-border-subtle);
+  background: var(--tp-surface-card);
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.case-review-page .pipeline-search-box:hover {
+  border-color: var(--tp-border-strong);
+}
+
+.case-review-page .pipeline-search-box:focus-within {
+  border-color: var(--tp-accent-primary-border);
+  background: var(--tp-surface-card);
+  box-shadow:
+    inset 0 0 0 1px var(--tp-accent-primary-border),
+    var(--review-focus-ring);
+}
+
+.case-review-page .stats-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px !important;
+}
+
+.case-review-page .stat-card-pl {
+  min-height: 76px;
+  padding: 11px 12px 10px;
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 12px;
+  background: var(--tp-surface-card);
+  box-shadow: none;
+}
+
+.case-review-page .stat-card-pl::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: var(--tp-border-subtle);
+}
+
+.case-review-page .stat-card-pl:nth-child(1)::after {
+  background: var(--tp-accent-info);
+}
+
+.case-review-page .stat-card-pl:nth-child(2)::after {
+  background: var(--tp-primary);
+}
+
+.case-review-page .stat-card-pl:nth-child(3)::after {
+  background: var(--tp-accent-success);
+}
+
+.case-review-page .stat-card-pl:nth-child(4)::after {
+  background: var(--tp-accent-danger);
+}
+
+.case-review-page .stat-card-pl:hover {
+  border-color: var(--tp-border-strong);
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.case-review-page .stat-bg-icon {
+  display: none;
+}
+
+.case-review-page .stat-value-row {
+  align-items: flex-end;
+  min-height: 26px;
+}
+
+.case-review-page .stat-label-pl {
+  margin-bottom: 4px;
+  color: var(--tp-text-muted) !important;
+  font-size: 11px !important;
+  font-weight: var(--tp-font-semibold) !important;
+}
+
+.case-review-page .stat-num {
+  color: var(--tp-text-primary);
+  font-size: 22px !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.case-review-page .stat-sub,
+.case-review-page .stat-sub-hint {
+  font-size: 11px;
+  line-height: var(--tp-line-ui);
+}
+
+.case-review-page .stat-sub-hint {
+  color: var(--tp-text-subtle);
+}
+
+.case-review-page .stat-bar-track {
+  height: 3px;
+  margin-top: 9px;
+  background: var(--tp-gray-100);
+}
+
+.case-review-page .table-container-pl {
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 12px;
+  background: var(--tp-surface-card);
+  box-shadow: none;
+}
+
+.case-review-page .table-header-bar {
+  min-height: 44px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--tp-border-subtle);
+  background: var(--tp-surface-card);
+}
+
+.case-review-page .table-section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--tp-text-primary);
+  font-size: 14px !important;
+}
+
+.case-review-page .table-section-title::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--tp-primary);
+}
+
+.case-review-page .table-header-actions {
+  gap: 6px;
+}
+
+.case-review-page .view-tabs-pl {
+  min-height: 30px;
+  border: 1px solid var(--tp-border-subtle);
+  background: var(--tp-surface-input);
+}
+
+.case-review-page .view-tab-pl {
+  min-height: 26px;
+  border: 1px solid transparent;
+  color: var(--tp-text-muted);
+}
+
+.case-review-page .view-tab-pl:hover:not(.active) {
+  border-color: var(--tp-border-subtle);
+  background: var(--tp-surface-hover);
+  color: var(--tp-text-primary);
+}
+
+.case-review-page .view-tab-pl.active {
+  border-color: var(--tp-accent-primary-border);
+  background: var(--tp-surface-card);
+  color: var(--tp-primary);
+  box-shadow: inset 0 -2px 0 var(--tp-primary);
+}
+
+.case-review-page :deep(.filter-select-pl .el-select__wrapper) {
+  border-color: var(--tp-border-subtle) !important;
+  background: var(--tp-surface-card) !important;
+  box-shadow: none !important;
+}
+
+.case-review-page :deep(.filter-select-pl .el-select__wrapper:hover) {
+  border-color: var(--tp-border-strong) !important;
+}
+
+.case-review-page :deep(.filter-select-pl .el-select__wrapper.is-focused),
+.case-review-page :deep(.filter-select-pl .el-select__wrapper.is-focus) {
+  border-color: var(--tp-accent-primary-border) !important;
+  box-shadow: var(--review-focus-ring) !important;
+}
+
+.case-review-page .table-scroll-area {
+  background: var(--tp-surface-card);
+}
+
+.case-review-page .pipeline-table {
+  min-width: 940px;
+  table-layout: fixed;
+}
+
+.case-review-page .pipeline-table th:nth-child(1) {
+  width: 30%;
+}
+
+.case-review-page .pipeline-table th:nth-child(2) {
+  width: 18%;
+}
+
+.case-review-page .pipeline-table th:nth-child(3) {
+  width: 30%;
+}
+
+.case-review-page .pipeline-table th:nth-child(4) {
+  width: 11%;
+}
+
+.case-review-page .pipeline-table th:nth-child(5) {
+  width: 11%;
+}
+
+.case-review-page .pipeline-table th {
+  height: 33px;
+  padding: 6px 10px !important;
+  border-bottom: 1px solid var(--tp-border-subtle);
+  background: var(--tp-surface-header);
+  color: var(--tp-text-subtle) !important;
+}
+
+.case-review-page .pipeline-table td {
+  height: 44px;
+  padding: 7px 10px !important;
+  border-bottom: 1px solid var(--tp-border-subtle);
+  color: var(--tp-text-secondary) !important;
+}
+
+.case-review-page .pipeline-table tbody tr:hover {
+  background: var(--tp-surface-row-hover);
+}
+
+.case-review-page .pipeline-table tbody tr:hover td:first-child {
+  box-shadow: inset 2px 0 0 var(--tp-primary);
+}
+
+.case-review-page .review-name {
+  max-width: 100%;
+  color: var(--tp-text-primary);
+  font-size: 13px;
+  font-weight: var(--tp-font-semibold);
+}
+
+.case-review-page .review-name-cell {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.case-review-page .rename-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--tp-text-subtle);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--tp-transition),
+    background var(--tp-transition),
+    color var(--tp-transition);
+}
+
+.case-review-page .rename-btn .material-symbols-outlined {
+  font-size: 14px;
+}
+
+.case-review-page .pipeline-row:hover .rename-btn {
+  opacity: 1;
+}
+
+.case-review-page .rename-btn:hover {
+  background: var(--tp-surface-hover);
+  color: var(--tp-primary);
+}
+
+.case-review-page .review-id-sub {
+  color: var(--tp-text-subtle) !important;
+  font-size: 11px;
+  width: 100%;
+}
+
+.case-review-page .person-cell {
+  min-width: 0;
+}
+
+.case-review-page .person-name {
+  color: var(--tp-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.case-review-page .avatar-circle,
+.case-review-page .avatar-circle-img {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--tp-border-subtle);
+  box-shadow: none;
+}
+
+.case-review-page .progress-cell-pl {
+  width: 100%;
+  max-width: 230px;
+}
+
+.case-review-page .progress-top-row {
+  margin-bottom: 3px;
+}
+
+.case-review-page .progress-pct {
+  color: var(--tp-primary);
+  font-weight: var(--tp-font-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.case-review-page .progress-count {
+  color: var(--tp-text-subtle) !important;
+}
+
+.case-review-page .progress-bar-track {
+  height: 5px;
+  background: var(--tp-gray-100);
+}
+
+.case-review-page .progress-result {
+  margin-top: 3px;
+  font-weight: var(--tp-font-semibold);
+}
+
+.case-review-page .status-badge-pl {
+  justify-content: center;
+  min-width: 72px;
+  min-height: 22px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-weight: var(--tp-font-semibold);
+}
+
+.case-review-page .row-actions {
+  gap: 3px;
+  opacity: 0.72;
+  transition: opacity var(--tp-transition);
+}
+
+.case-review-page .pipeline-row:hover .row-actions {
+  opacity: 1;
+}
+
+.case-review-page .action-btn.icon-only {
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--tp-text-subtle);
+  box-shadow: none;
+}
+
+.case-review-page .action-btn.icon-only:hover:not(:disabled) {
+  border-color: var(--tp-border-subtle);
+  background: var(--tp-surface-hover);
+  color: var(--tp-primary);
+}
+
+.case-review-page .action-btn.action-ai:hover:not(:disabled) {
+  border-color: var(--tp-accent-info-border);
+  background: var(--tp-accent-info-soft);
+  color: var(--tp-accent-info);
+}
+
+.case-review-page .action-btn.action-delete:hover:not(:disabled) {
+  border-color: var(--tp-accent-danger-border);
+  background: var(--tp-accent-danger-soft);
+  color: var(--tp-danger);
+}
+
+.case-review-page .action-btn.icon-only:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.case-review-page .pagination-bar-pl {
+  min-height: 40px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--tp-border-subtle);
+  background: var(--tp-surface-card);
+}
+
+.case-review-page .empty-state-pl {
+  margin: 12px;
+  border: 1px dashed var(--tp-border-strong);
+  border-radius: 12px;
+  background: var(--tp-surface-muted);
+}
+
+.case-review-page .empty-icon-pl {
+  opacity: 0.6;
+}
+
+.case-review-page .loading-overlay {
+  background: rgba(248, 250, 252, 0.78);
+}
+
+.case-review-page .spin-icon {
+  color: var(--tp-primary);
+}
+
+.case-review-page .empty-title-pl {
+  color: var(--tp-text-primary);
+}
+
+.case-review-page .empty-desc-pl {
+  color: var(--tp-text-muted);
+}
+
+@media (max-width: 1200px) {
+  .case-review-page .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .case-review-page .stats-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

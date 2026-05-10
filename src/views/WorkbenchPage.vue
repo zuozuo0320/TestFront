@@ -1841,4 +1841,52 @@ function goToTestCases() {
     animation: none;
   }
 }
+
+.workbench-container {
+  background: var(--tp-surface-base);
+}
+
+.stats-grid,
+.cases-section,
+.trend-section,
+.activity-section {
+  background: var(--tp-surface-card);
+  border-color: var(--tp-border-subtle);
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.stat-card {
+  background: transparent;
+  box-shadow: none;
+}
+
+.stat-card:hover {
+  transform: none;
+  border-color: var(--tp-border-subtle);
+  background: var(--tp-surface-row-hover);
+  box-shadow: none;
+}
+
+.stat-card-glow {
+  display: none;
+  filter: none;
+}
+
+.stat-card::before {
+  opacity: 0.8;
+  background: var(--card-accent, var(--tp-primary));
+}
+
+.cases-header,
+.cases-footer {
+  background: var(--tp-surface-card);
+}
+
+.chart-empty {
+  background: var(--tp-surface-muted);
+}
+
+.pulse-dot.active::after {
+  display: none;
+}
 </style>

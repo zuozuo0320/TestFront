@@ -36,9 +36,9 @@
   /* Brand Colors — Design B 深蓝灰 + 紫色点缀 */
   --tp-primary: #6366f1;
   --tp-primary-light: #818cf8;
-  --tp-primary-lighter: rgba(99, 102, 241, 0.1);
+  --tp-primary-lighter: rgba(99, 102, 241, 0.09);
   --tp-primary-dark: #4f46e5;
-  --tp-primary-shadow: rgba(99, 102, 241, 0.22);
+  --tp-primary-shadow: rgba(99, 102, 241, 0.16);
 
   /* Semantic Colors */
   --tp-success: #10b981;
@@ -80,26 +80,26 @@
   --tp-nav-text-bright: #0f172a;
 
   /* 内容区表面色 — 深空极致暗黑底色 (Design B) */
-  --tp-surface-base: #fafbfc;
+  --tp-surface-base: #f6f8fc;
   --tp-surface-card: #ffffff;
-  --tp-surface-elevated: #f8fafc;
+  --tp-surface-elevated: #f9fbff;
   --tp-surface-input: #ffffff;
-  --tp-surface-hover: #f4f6ff;
-  --tp-surface-sheen: rgba(99, 102, 241, 0.025);
-  --tp-surface-sheen-strong: rgba(236, 72, 153, 0.04);
+  --tp-surface-hover: #f2f5ff;
+  --tp-surface-sheen: rgba(99, 102, 241, 0.035);
+  --tp-surface-sheen-strong: rgba(99, 102, 241, 0.045);
   --tp-surface-muted: #f8fafc;
-  --tp-surface-row-hover: rgba(99, 102, 241, 0.055);
+  --tp-surface-row-hover: rgba(99, 102, 241, 0.045);
   --tp-surface-header: #f8fafc;
   --tp-overlay-scrim: rgba(15, 23, 42, 0.45);
-  --tp-ambient-primary: rgba(99, 102, 241, 0.1);
-  --tp-ambient-info: rgba(236, 72, 153, 0.06);
+  --tp-ambient-primary: rgba(99, 102, 241, 0.055);
+  --tp-ambient-info: rgba(99, 102, 241, 0.026);
 
   /* Shadows */
-  --tp-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.08);
-  --tp-shadow-md: 0 18px 48px rgba(15, 23, 42, 0.12);
-  --tp-shadow-glow: 0 0 0 3px rgba(99, 102, 241, 0.14);
-  --tp-btn-bg: linear-gradient(135deg, #6366f1 0%, #ec4899 100%);
-  --tp-btn-bg-hover: linear-gradient(135deg, #4f46e5 0%, #db2777 100%);
+  --tp-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.045), 0 1px 3px rgba(15, 23, 42, 0.055);
+  --tp-shadow-md: 0 10px 26px rgba(15, 23, 42, 0.075);
+  --tp-shadow-glow: 0 0 0 3px rgba(99, 102, 241, 0.1), 0 6px 16px rgba(99, 102, 241, 0.09);
+  --tp-btn-bg: linear-gradient(180deg, #6366f1 0%, #5558e8 100%);
+  --tp-btn-bg-hover: linear-gradient(180deg, #5855eb 0%, #4f46e5 100%);
   --tp-btn-text: #ffffff;
   --tp-btn-border: transparent;
   --tp-btn-plain-bg: #ffffff;
@@ -108,8 +108,8 @@
   --tp-btn-radius: 999px;
   --tp-btn-height-sm: 32px;
   --tp-btn-height-md: 36px;
-  --tp-btn-shadow: 0 10px 22px rgba(99, 102, 241, 0.2), 0 6px 16px rgba(236, 72, 153, 0.14);
-  --tp-btn-shadow-hover: 0 12px 26px rgba(99, 102, 241, 0.24), 0 8px 18px rgba(236, 72, 153, 0.18);
+  --tp-btn-shadow: 0 2px 5px rgba(99, 102, 241, 0.16);
+  --tp-btn-shadow-hover: 0 3px 8px rgba(99, 102, 241, 0.2);
 
   /* Radius */
   --tp-radius-sm: 6px;
@@ -149,12 +149,12 @@
   --tp-accent-warning-border: rgba(249, 115, 22, 0.24);
 
   /* ── Layered Borders（玻璃态微光） ── */
-  --tp-border-subtle: #e2e8f0;
-  --tp-border-strong: #cbd5e1;
+  --tp-border-subtle: #dfe7f2;
+  --tp-border-strong: #c6d1df;
 
   /* ── Layered Shadows ── */
-  --tp-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 28px rgba(99, 102, 241, 0.08);
-  --tp-shadow-card-hover: 0 1px 2px rgba(15, 23, 42, 0.05), 0 18px 40px rgba(99, 102, 241, 0.14);
+  --tp-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 32px rgba(99, 102, 241, 0.07);
+  --tp-shadow-card-hover: 0 1px 2px rgba(15, 23, 42, 0.05), 0 18px 42px rgba(99, 102, 241, 0.11);
 }
 
 /* ========== Element Plus Dark Theme Overrides for Style B ========== */

@@ -1510,6 +1510,83 @@ const pulseData = computed(() => {
     padding-inline: 0;
   }
 }
+
+.tm-root {
+  --tech-panel: var(--tp-surface-card);
+  --tech-border: var(--tp-border-subtle);
+  --tech-line: var(--tp-border-subtle);
+  gap: 8px;
+  padding: 8px 12px 16px;
+  background: var(--tp-surface-base);
+}
+
+.tm-root::before,
+.tm-panel::before,
+.tm-panel-glow {
+  display: none;
+}
+
+.tm-topnav,
+.tm-panel,
+.tm-panel--pulse,
+.tm-panel--heat,
+.tm-actionbar,
+.tm-tag-workbench {
+  background: var(--tp-surface-card);
+  border-color: var(--tp-border-subtle);
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.tm-title::before {
+  width: 3px;
+  height: 16px;
+  border-radius: 999px;
+  box-shadow: none;
+}
+
+.tm-search-box,
+.tm-tabs,
+.tm-sort {
+  background: var(--tp-surface-input);
+  border-color: var(--tp-border-subtle);
+  box-shadow: none;
+}
+
+.tm-search-box:focus-within {
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
+}
+
+.tm-panel-icon-right {
+  background: var(--tp-accent-primary-soft);
+  border: 1px solid var(--tp-accent-primary-border);
+  box-shadow: none;
+}
+
+.tm-pulse-bar,
+.tm-pulse-bar--top {
+  box-shadow: none;
+}
+
+.tm-tag-workbench .tm-btn-filter {
+  background: var(--tp-btn-bg) !important;
+  box-shadow: var(--tp-btn-shadow);
+}
+
+.tm-tag-workbench .tm-btn-filter:hover {
+  background: var(--tp-btn-bg-hover) !important;
+  box-shadow: var(--tp-btn-shadow-hover);
+}
+
+.tm-tag-workbench .tm-btn-wizard {
+  background: var(--tp-surface-input) !important;
+  border-color: var(--tp-border-subtle);
+  box-shadow: none;
+}
+
+.tm-tag-workbench .tm-btn-wizard:hover {
+  background: var(--tp-surface-hover) !important;
+  box-shadow: none;
+}
 </style>
 
 <style>
@@ -1746,5 +1823,31 @@ const pulseData = computed(() => {
     linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(248, 250, 252, 0.78)),
     var(--tp-surface-input);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.tm-modal-overlay {
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: none;
+}
+
+.tm-modal-content,
+.tm-modal-header {
+  background: var(--tp-surface-card);
+  border-color: var(--tp-border-subtle);
+}
+
+.tm-modal-content {
+  border-radius: 16px;
+  box-shadow: var(--tp-shadow-md);
+}
+
+.tm-modal-title .material-symbols-outlined {
+  text-shadow: none;
+}
+
+.tm-modal-body .tm-batch-textarea {
+  background: var(--tp-surface-input);
+  border-color: var(--tp-border-subtle);
+  box-shadow: none;
 }
 </style>

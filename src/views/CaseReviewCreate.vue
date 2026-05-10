@@ -412,13 +412,16 @@ function isReviewMode(value: unknown): value is ReviewMode {
   return value === 'single' || value === 'parallel'
 }
 
-async function loadExistingReviewBase(reviewId: number) {
+async function loadExistingReviewBase(reviewId: number, overrideAll = true) {
   if (!projectId.value) return
   try {
     const review = await getReview(projectId.value, reviewId)
+    // 名称和描述始终以后端为准（可能被列表页重命名）
     form.name = review.name
     form.description = review.description || ''
-    form.review_mode = isReviewMode(review.review_mode) ? review.review_mode : 'single'
+    if (overrideAll) {
+      form.review_mode = isReviewMode(review.review_mode) ? review.review_mode : 'single'
+    }
   } catch (e) {
     activeReviewId.value = null
     ElMessage.warning(extractErrorMessage(e, '加载评审任务失败，请重新创建'))
@@ -585,8 +588,9 @@ onMounted(async () => {
   activeReviewId.value = parseRouteDraftReviewId()
   if (!activeReviewId.value) clearLegacyProjectDraft()
   const restored = activeReviewId.value ? restoreDraft() : false
-  if (activeReviewId.value && !restored) {
-    await loadExistingReviewBase(activeReviewId.value)
+  if (activeReviewId.value) {
+    // 无论是否恢复了本地草稿，都从后端拉取最新名称/描述（可能被列表页重命名）
+    await loadExistingReviewBase(activeReviewId.value, !restored)
   }
   draftSavingEnabled.value = true
   window.addEventListener('beforeunload', saveDraftNow)
@@ -706,16 +710,18 @@ onBeforeUnmount(() => {
               <span class="material-symbols-outlined search-icon-wz">search</span>
               <input
                 v-model="casesSearch"
+                type="text"
+                aria-label="搜索用例 ID 或标题"
                 class="search-input-wz"
                 placeholder="搜索用例 ID 或标题..."
                 @keyup.enter="fetchCases"
               />
             </div>
             <div class="filter-btns">
-              <button class="filter-btn">所有模块</button>
-              <button class="filter-btn">所有优先级</button>
-              <button class="filter-btn">所有状态</button>
-              <button class="filter-btn icon-btn" @click="fetchCases">
+              <button type="button" class="filter-btn">所有模块</button>
+              <button type="button" class="filter-btn">所有优先级</button>
+              <button type="button" class="filter-btn">所有状态</button>
+              <button type="button" class="filter-btn icon-btn" @click="fetchCases">
                 <span class="material-symbols-outlined" style="font-size: 14px">filter_alt</span>
                 筛选
               </button>
@@ -726,8 +732,12 @@ onBeforeUnmount(() => {
         <div class="selection-bar">
           <div class="selection-left">
             <span class="selection-count">已选择 {{ selectedCaseIds.size }} 个测试用例</span>
-            <button class="selection-action" @click="selectAllPage">全选当前页</button>
-            <button class="selection-action danger" @click="clearSelection">清除选择</button>
+            <button type="button" class="selection-action" @click="selectAllPage">
+              全选当前页
+            </button>
+            <button type="button" class="selection-action danger" @click="clearSelection">
+              清除选择
+            </button>
           </div>
           <span class="selection-range">
             显示范围: {{ (casesPage - 1) * casesPageSize + 1 }}-{{
@@ -806,7 +816,9 @@ onBeforeUnmount(() => {
         <!-- 分页 -->
         <div v-if="casesTotal > 0" class="wz-pagination">
           <button
+            type="button"
             class="page-btn-wz"
+            aria-label="上一页"
             :disabled="casesPage <= 1"
             @click="casesGoPage(casesPage - 1)"
           >
@@ -815,14 +827,18 @@ onBeforeUnmount(() => {
           <button
             v-for="p in Math.min(casesTotalPages, 5)"
             :key="p"
+            type="button"
             class="page-btn-wz"
             :class="{ active: p === casesPage }"
+            :aria-current="p === casesPage ? 'page' : undefined"
             @click="casesGoPage(p)"
           >
             {{ p }}
           </button>
           <button
+            type="button"
             class="page-btn-wz"
+            aria-label="下一页"
             :disabled="casesPage >= casesTotalPages"
             @click="casesGoPage(casesPage + 1)"
           >
@@ -863,15 +879,6 @@ onBeforeUnmount(() => {
                   <div class="reviewer-card-info">
                     <h3 class="reviewer-card-name">{{ user.name }}</h3>
                     <p class="reviewer-card-role">{{ user.email }}</p>
-                  </div>
-                </div>
-                <div class="load-bar-wrap">
-                  <div class="load-bar-labels">
-                    <span>当前工作负载</span>
-                    <span class="load-pct low">空闲</span>
-                  </div>
-                  <div class="load-bar-track">
-                    <div class="load-bar-fill low" style="width: 20%"></div>
                   </div>
                 </div>
               </div>
@@ -965,57 +972,68 @@ onBeforeUnmount(() => {
           <!-- 左：摘要 -->
           <div class="step-main">
             <div class="summary-card">
-              <div class="summary-card-bg">
-                <span class="material-symbols-outlined">dashboard_customize</span>
+              <!-- 顶部指标行 -->
+              <div class="summary-metrics">
+                <div class="summary-metric-item">
+                  <span class="material-symbols-outlined metric-icon">description</span>
+                  <div>
+                    <p class="metric-num">{{ selectedCaseIds.size }}</p>
+                    <p class="metric-label">用例总数</p>
+                  </div>
+                </div>
+                <div class="summary-metric-item">
+                  <span class="material-symbols-outlined metric-icon">group</span>
+                  <div>
+                    <p class="metric-num">{{ assignedUserIds.size }}</p>
+                    <p class="metric-label">评审人数</p>
+                  </div>
+                </div>
+                <div class="summary-metric-item">
+                  <span class="material-symbols-outlined metric-icon">
+                    {{ form.review_mode === 'single' ? 'person' : 'groups' }}
+                  </span>
+                  <div>
+                    <p class="metric-num-text">
+                      {{ form.review_mode === 'single' ? '独审' : '会签' }}
+                    </p>
+                    <p class="metric-label">评审模式</p>
+                  </div>
+                </div>
               </div>
-              <div class="summary-grid">
-                <div>
+              <!-- 信息区 -->
+              <div class="summary-info">
+                <div class="summary-info-row">
                   <label class="summary-label">计划名称</label>
                   <p class="summary-value-primary">{{ form.name || '—' }}</p>
-                  <div class="summary-meta">
-                    <div>
-                      <label class="summary-label">评审模式</label>
-                      <p class="summary-value">
-                        {{ form.review_mode === 'single' ? '独审模式' : '会签模式' }}
-                      </p>
-                    </div>
-                    <div>
-                      <label class="summary-label">描述</label>
-                      <p class="summary-value">{{ form.description || '—' }}</p>
-                    </div>
-                  </div>
                 </div>
-                <div class="summary-stats">
-                  <div class="summary-stat-item">
-                    <label class="summary-label">用例总数</label>
-                    <p class="summary-big-num">{{ selectedCaseIds.size }}</p>
-                  </div>
-                  <div class="summary-stat-item">
-                    <label class="summary-label">评审人数</label>
-                    <p class="summary-big-num">{{ assignedUserIds.size }}</p>
-                  </div>
-                  <div class="summary-avatars">
-                    <div
-                      v-for="u in assignedUsers.slice(0, 4)"
-                      :key="u.id"
-                      class="summary-avatar"
-                      :title="u.name"
-                    >
-                      <img
-                        v-if="hasUserAvatar(u)"
-                        :src="resolveAvatarUrl(u.avatar)"
-                        :alt="u.name"
-                        class="avatar-img"
-                        @error="markAvatarFailed(u.id)"
-                      />
-                      <span v-else>{{ getInitials(u.name) }}</span>
-                    </div>
-                    <span v-if="assignedUsers.length > 4" class="summary-avatar more">
-                      +{{ assignedUsers.length - 4 }}
-                    </span>
-                    <span class="summary-avatar-label">已指派评审人员</span>
-                  </div>
+                <div v-if="form.description" class="summary-info-row">
+                  <label class="summary-label">描述</label>
+                  <p class="summary-value">{{ form.description }}</p>
                 </div>
+              </div>
+              <!-- 底部评审人 -->
+              <div class="summary-footer">
+                <div class="summary-avatars">
+                  <div
+                    v-for="u in assignedUsers.slice(0, 5)"
+                    :key="u.id"
+                    class="summary-avatar"
+                    :title="u.name"
+                  >
+                    <img
+                      v-if="hasUserAvatar(u)"
+                      :src="resolveAvatarUrl(u.avatar)"
+                      :alt="u.name"
+                      class="avatar-img"
+                      @error="markAvatarFailed(u.id)"
+                    />
+                    <span v-else>{{ getInitials(u.name) }}</span>
+                  </div>
+                  <span v-if="assignedUsers.length > 5" class="summary-avatar more">
+                    +{{ assignedUsers.length - 5 }}
+                  </span>
+                </div>
+                <span class="summary-avatar-label">已指派评审人员</span>
               </div>
             </div>
           </div>
@@ -1103,7 +1121,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   padding: 0 28px;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 /* ── 标题 + 步骤条 ── */
@@ -1207,7 +1225,8 @@ onBeforeUnmount(() => {
 /* ── 内容区 ── */
 .wizard-content {
   flex: 1;
-  padding-bottom: 100px;
+  overflow-y: auto;
+  padding-bottom: 16px;
 }
 .step-body {
   animation: fadeIn 0.3s ease;
@@ -2101,16 +2120,13 @@ onBeforeUnmount(() => {
 
 /* ── 底部操作栏 ── */
 .wizard-footer {
-  position: sticky;
-  bottom: 0;
+  flex-shrink: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 0;
   background: var(--tp-surface-base, #11131e);
   border-top: 1px solid rgba(255, 255, 255, 0.06);
-  margin: 0 -28px;
-  padding: 16px 28px;
+  padding: 12px 0;
   z-index: 10;
 }
 .footer-left,
@@ -2497,8 +2513,8 @@ onBeforeUnmount(() => {
 }
 
 .wizard-footer {
-  backdrop-filter: blur(14px);
-  background: rgba(5, 5, 5, 0.86);
+  backdrop-filter: none;
+  background: var(--tp-surface-card);
 }
 
 .footer-btn {
@@ -2822,7 +2838,7 @@ onBeforeUnmount(() => {
 }
 
 .wizard-footer {
-  backdrop-filter: blur(14px);
+  backdrop-filter: none;
   box-shadow: 0 -1px 2px rgba(15, 23, 42, 0.04);
 }
 
@@ -2906,5 +2922,1508 @@ onBeforeUnmount(() => {
   font-weight: var(--tp-font-bold);
   line-height: var(--tp-line-tight);
   letter-spacing: 0;
+}
+
+.wizard-page {
+  min-height: calc(100vh - 56px - 16px);
+  gap: 8px;
+  padding: 0 8px !important;
+}
+
+.wizard-header {
+  margin-bottom: 6px;
+  padding-top: 0;
+}
+
+.wizard-title-area {
+  margin-bottom: 6px;
+}
+
+.wizard-title {
+  margin-bottom: 2px;
+  font-size: 18px;
+  line-height: var(--tp-line-tight);
+}
+
+.wizard-subtitle,
+.card-desc,
+.step3-sub {
+  font-size: 12px;
+  line-height: var(--tp-line-ui);
+}
+
+.stepper {
+  padding: 8px 28px;
+  border-radius: 12px;
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.stepper-line,
+.stepper-line-active {
+  top: 24px;
+  left: 48px;
+  right: 48px;
+  height: 1px;
+}
+
+.step-item {
+  min-width: 82px;
+  gap: 5px;
+}
+
+.step-circle {
+  width: 30px;
+  height: 30px;
+  font-size: 12px;
+}
+
+.step-circle .material-symbols-outlined,
+.step-check {
+  font-size: 16px;
+}
+
+.step-label {
+  font-size: 11px !important;
+}
+
+.wizard-content {
+  padding-bottom: 12px;
+}
+
+.step-grid {
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 12px;
+}
+
+.step-grid.step-grid-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.card-glass,
+.card-surface,
+.summary-card,
+.checklist-panel,
+.assigned-panel {
+  padding: 14px;
+  border-radius: 12px;
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.card-title-primary {
+  margin-bottom: 12px;
+  font-size: 15px;
+  line-height: var(--tp-line-tight);
+}
+
+.card-title,
+.step3-title,
+.assigned-title,
+.checklist-title {
+  font-size: 14px;
+  line-height: var(--tp-line-ui);
+}
+
+.form-group {
+  margin-bottom: 12px;
+}
+
+.form-label {
+  margin-bottom: 5px;
+}
+
+.form-input,
+.form-textarea {
+  min-height: 32px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.form-textarea {
+  min-height: 78px;
+}
+
+.mode-radio-group {
+  gap: 8px;
+}
+
+.mode-radio {
+  min-height: 32px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.filter-bar {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+}
+
+.filter-bar-inner {
+  gap: 8px;
+}
+
+.filter-btn {
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.search-box-wz {
+  min-height: 30px;
+  width: min(320px, 100%);
+  padding: 4px 9px;
+  border-radius: 8px;
+}
+
+.search-icon-wz {
+  font-size: 16px;
+}
+
+.search-input-wz {
+  font-size: 12px;
+}
+
+.selection-bar {
+  margin-bottom: 10px;
+  padding: 7px 10px;
+  border-radius: 10px;
+}
+
+.table-wrap {
+  border-radius: 12px;
+}
+
+.wz-table {
+  min-width: 840px;
+}
+
+.wz-table th {
+  height: 34px;
+  padding: 7px 10px;
+}
+
+.wz-table td {
+  height: 42px;
+  padding: 7px 10px;
+}
+
+.th-check,
+.td-check {
+  width: 38px;
+}
+
+.custom-check {
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+}
+
+.td-title {
+  font-size: 12px;
+}
+
+.wz-pagination {
+  padding: 8px;
+}
+
+.page-btn-wz {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.step3-header {
+  margin-bottom: 12px;
+}
+
+.reviewer-grid {
+  gap: 10px;
+}
+
+.reviewer-card {
+  min-height: 96px;
+  padding: 10px;
+  border-radius: 11px;
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.reviewer-card-top {
+  gap: 9px;
+  margin-bottom: 9px;
+}
+
+.reviewer-avatar-lg {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  font-size: 12px;
+}
+
+.load-bar-track {
+  height: 3px;
+}
+
+.assigned-panel {
+  top: 12px;
+}
+
+.assigned-header,
+.assigned-footer {
+  padding: 9px 10px;
+}
+
+.assigned-list {
+  min-height: 200px;
+}
+
+.assigned-item {
+  padding: 8px;
+  border-radius: 10px;
+}
+
+.reviewer-avatar-sm {
+  width: 24px;
+  height: 24px;
+}
+
+.remove-btn {
+  min-width: 24px;
+  min-height: 24px;
+}
+
+.drop-placeholder {
+  min-height: 82px;
+  padding: 12px;
+}
+
+.summary-card {
+  padding: 14px;
+}
+
+.summary-grid {
+  gap: 18px;
+}
+
+.summary-value-primary {
+  margin-bottom: 12px;
+  font-size: 15px;
+}
+
+.summary-meta,
+.summary-stats {
+  gap: 10px;
+}
+
+.summary-big-num {
+  font-size: 24px;
+}
+
+.summary-avatar {
+  width: 24px;
+  height: 24px;
+}
+
+.checklist-item {
+  padding: 7px 8px;
+}
+
+.activate-hint {
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.wizard-footer {
+  min-height: 48px;
+  padding: 8px 0;
+}
+
+.footer-btn {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+@media (max-width: 1280px) {
+  .step-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .assigned-panel {
+    position: static;
+  }
+}
+
+/* ══════════════════════════════════════════════════
+   Step 2 选择用例 — 最终视觉优化覆盖
+   ══════════════════════════════════════════════════ */
+
+/* 筛选栏 */
+.filter-bar {
+  background: var(--tp-surface-card);
+  border: 1px solid var(--tp-border-subtle);
+  box-shadow: none;
+}
+
+.filter-btn {
+  color: var(--tp-text-secondary);
+  background: var(--tp-surface-input);
+  border: 1px solid var(--tp-border-subtle);
+  font-weight: var(--tp-font-medium);
+  transition:
+    border-color var(--tp-transition),
+    background var(--tp-transition),
+    color var(--tp-transition);
+}
+
+.filter-btn:hover {
+  border-color: var(--tp-border-strong);
+  background: var(--tp-surface-hover);
+  color: var(--tp-text-primary);
+}
+
+.filter-btn.icon-btn {
+  background: var(--tp-primary);
+  border-color: var(--tp-primary);
+  color: #fff;
+  box-shadow: none;
+}
+
+.filter-btn.icon-btn:hover {
+  background: var(--tp-primary-dark);
+  border-color: var(--tp-primary-dark);
+  color: #fff;
+}
+
+/* 搜索框 */
+.search-box-wz {
+  background: var(--tp-surface-input);
+  border: 1px solid var(--tp-border-subtle);
+  box-shadow: none;
+}
+
+.search-box-wz:focus-within {
+  border-color: var(--tp-accent-primary-border);
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
+}
+
+/* 选中状态条 */
+.selection-bar {
+  background: var(--tp-accent-info-soft);
+  border: 1px solid var(--tp-accent-info-border);
+}
+
+.selection-count {
+  color: var(--tp-accent-info);
+  font-weight: var(--tp-font-semibold);
+}
+
+.selection-action {
+  color: var(--tp-accent-info);
+  font-weight: var(--tp-font-medium);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 2px;
+  transition:
+    color var(--tp-transition),
+    text-decoration-color var(--tp-transition);
+}
+
+.selection-action:hover {
+  text-decoration-color: currentColor;
+}
+
+.selection-action.danger {
+  color: var(--tp-danger);
+}
+
+.selection-range {
+  color: var(--tp-text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 表格容器 */
+.table-wrap {
+  background: var(--tp-surface-card);
+  border: 1px solid var(--tp-border-subtle);
+  box-shadow: none;
+  overflow-x: auto;
+}
+
+/* 表格 */
+.wz-table {
+  table-layout: fixed;
+}
+
+.wz-table colgroup,
+.wz-table col {
+  visibility: visible;
+}
+
+.th-check,
+.td-check {
+  width: 36px;
+}
+
+.wz-table th:nth-child(2) {
+  width: 72px;
+}
+
+.wz-table th:nth-child(3) {
+  width: auto;
+}
+
+.wz-table th:nth-child(4) {
+  width: 100px;
+}
+
+.wz-table th:nth-child(5) {
+  width: 64px;
+}
+
+.wz-table th:nth-child(6) {
+  width: 80px;
+}
+
+.wz-table th:nth-child(7) {
+  width: 100px;
+}
+
+/* 表头 */
+.wz-table thead tr {
+  background: var(--tp-surface-header);
+}
+
+.wz-table th {
+  background: var(--tp-surface-header);
+  color: var(--tp-text-subtle);
+  border-bottom: 1px solid var(--tp-border-subtle);
+  font-weight: var(--tp-font-semibold);
+  font-size: var(--tp-text-xs);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* 表格行 */
+.wz-row {
+  border-bottom: 1px solid var(--tp-border-subtle);
+  transition:
+    background var(--tp-transition),
+    box-shadow var(--tp-transition);
+}
+
+.wz-row:hover {
+  background: var(--tp-surface-row-hover);
+  box-shadow: inset 2px 0 0 var(--tp-primary);
+}
+
+.wz-row.selected {
+  background: var(--tp-accent-primary-soft);
+  box-shadow: inset 3px 0 0 var(--tp-primary);
+}
+
+.wz-row.selected:hover {
+  background: rgba(99, 102, 241, 0.12);
+}
+
+/* Checkbox */
+.custom-check {
+  border: 1.5px solid var(--tp-gray-400);
+  border-radius: 4px;
+  transition:
+    background var(--tp-transition),
+    border-color var(--tp-transition);
+}
+
+.custom-check.checked {
+  background: var(--tp-primary);
+  border-color: var(--tp-primary);
+  color: #fff;
+}
+
+/* ID 列 */
+.td-id {
+  font-family: var(--tp-font-family-mono);
+  font-size: var(--tp-text-xs);
+  color: var(--tp-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 标题列 */
+.td-title {
+  color: var(--tp-text-primary);
+  font-weight: var(--tp-font-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 模块标签 */
+.module-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--tp-accent-primary-soft);
+  border: 1px solid var(--tp-accent-primary-border);
+  color: var(--tp-primary);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+  line-height: var(--tp-line-tight);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 优先级标签 */
+.priority-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 22px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-tight);
+}
+
+.priority-tag.p0 {
+  background: var(--tp-p0-bg);
+  color: var(--tp-p0);
+  border: 1px solid rgba(220, 38, 38, 0.18);
+}
+
+.priority-tag.p1 {
+  background: var(--tp-p1-bg);
+  color: var(--tp-p1);
+  border: 1px solid rgba(249, 115, 22, 0.18);
+}
+
+.priority-tag.p2 {
+  background: var(--tp-p2-bg);
+  color: var(--tp-p2);
+  border: 1px solid rgba(99, 102, 241, 0.18);
+}
+
+.priority-tag.p3 {
+  background: var(--tp-p3-bg);
+  color: var(--tp-p3);
+  border: 1px solid rgba(100, 116, 139, 0.18);
+}
+
+/* 状态指示 */
+.status-dot {
+  width: 7px;
+  height: 7px;
+}
+
+.status-dot.active {
+  background: var(--tp-success);
+}
+
+.status-dot.pending {
+  background: var(--tp-warning);
+}
+
+.status-dot.draft {
+  background: var(--tp-gray-400);
+}
+
+.status-dot.discarded {
+  background: var(--tp-danger);
+}
+
+.status-text {
+  color: var(--tp-text-secondary);
+  font-size: var(--tp-text-xs);
+}
+
+/* 日期列 */
+.td-date {
+  color: var(--tp-text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 空状态 */
+.td-empty {
+  color: var(--tp-text-subtle);
+  text-align: center;
+  padding: 36px 10px;
+}
+
+/* 分页 */
+.wz-pagination {
+  background: var(--tp-surface-card);
+  border-top: 1px solid var(--tp-border-subtle);
+  border-radius: 0 0 12px 12px;
+}
+
+.page-btn-wz {
+  background: var(--tp-surface-input);
+  border: 1px solid var(--tp-border-subtle);
+  color: var(--tp-text-secondary);
+  font-variant-numeric: tabular-nums;
+  transition:
+    background var(--tp-transition),
+    border-color var(--tp-transition),
+    color var(--tp-transition);
+}
+
+.page-btn-wz:hover:not(:disabled) {
+  background: var(--tp-surface-hover);
+  border-color: var(--tp-border-strong);
+  color: var(--tp-text-primary);
+}
+
+.page-btn-wz.active {
+  background: var(--tp-primary);
+  border-color: var(--tp-primary);
+  color: #fff;
+  box-shadow: none;
+}
+
+.page-btn-wz:disabled {
+  opacity: 0.36;
+  cursor: not-allowed;
+}
+
+/* ══════════════════════════════════════════════════
+   Step 3 指派评审人 — 全面精调覆盖
+   ══════════════════════════════════════════════════ */
+
+/* 标题区 */
+.step3-header {
+  margin-bottom: 16px;
+}
+
+.step3-title {
+  font-size: 16px;
+  font-weight: var(--tp-font-bold);
+  color: var(--tp-text-primary);
+  margin: 0 0 4px;
+}
+
+.step3-sub {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--tp-text-secondary);
+  margin: 0;
+  line-height: var(--tp-line-ui);
+}
+
+/* 评审人卡片网格 */
+.reviewer-grid {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+/* 评审人卡片 */
+.reviewer-card {
+  background: var(--tp-surface-card);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 10px;
+  box-shadow: none;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition:
+    border-color var(--tp-transition),
+    background var(--tp-transition),
+    box-shadow var(--tp-transition);
+}
+
+.reviewer-card:hover {
+  transform: none;
+  border-color: var(--tp-primary);
+  background: var(--tp-accent-primary-soft);
+  box-shadow: inset 3px 0 0 var(--tp-primary);
+}
+
+.reviewer-card:active {
+  background: rgba(99, 102, 241, 0.12);
+}
+
+/* 卡片顶部 */
+.reviewer-card-top {
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.reviewer-card-name {
+  font-size: 13px;
+  font-weight: var(--tp-font-semibold);
+  color: var(--tp-text-primary);
+  margin: 0;
+}
+
+.reviewer-card-role {
+  font-size: 11px;
+  color: var(--tp-text-subtle);
+  margin: 2px 0 0;
+}
+
+/* 头像大 */
+.reviewer-avatar-lg {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--tp-accent-primary-soft);
+  border: 1px solid var(--tp-accent-primary-border);
+  color: var(--tp-primary);
+  font-size: 12px;
+  font-weight: var(--tp-font-bold);
+  flex-shrink: 0;
+}
+
+.reviewer-avatar-lg .avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+/* 负载条 */
+.load-bar-wrap {
+  margin-top: 10px;
+}
+
+.load-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--tp-text-secondary);
+  margin-bottom: 4px;
+}
+
+.load-pct.low {
+  color: var(--tp-success);
+  font-weight: var(--tp-font-semibold);
+}
+
+.load-pct.medium {
+  color: var(--tp-warning);
+  font-weight: var(--tp-font-semibold);
+}
+
+.load-pct.high {
+  color: var(--tp-danger);
+  font-weight: var(--tp-font-semibold);
+}
+
+.load-bar-track {
+  height: 3px;
+  background: var(--tp-gray-200);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.load-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.load-bar-fill.low {
+  background: var(--tp-success);
+}
+
+.load-bar-fill.medium {
+  background: var(--tp-warning);
+}
+
+.load-bar-fill.high {
+  background: var(--tp-danger);
+}
+
+/* 空提示 */
+.empty-hint {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--tp-text-subtle);
+  font-size: 13px;
+}
+
+/* ── 已指派面板 ── */
+.assigned-panel {
+  background: var(--tp-surface-card);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 10px;
+  box-shadow: none;
+  backdrop-filter: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.assigned-header {
+  background: var(--tp-surface-header);
+  border-bottom: 1px solid var(--tp-border-subtle);
+  border-radius: 10px 10px 0 0;
+  padding: 12px 14px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.assigned-title {
+  font-size: 13px;
+  font-weight: var(--tp-font-bold);
+  color: var(--tp-text-primary);
+  margin: 0;
+}
+
+.assigned-sub {
+  font-size: 11px;
+  color: var(--tp-text-subtle);
+  margin: 3px 0 0;
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: var(--tp-line-ui);
+}
+
+.self-review-toggle {
+  font-size: 11px;
+  color: var(--tp-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+.self-review-toggle input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--tp-primary);
+  cursor: pointer;
+}
+
+/* 已指派列表 */
+.assigned-list {
+  padding: 10px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 180px;
+}
+
+.assigned-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--tp-surface-input);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 8px;
+  padding: 9px 10px;
+  box-shadow: none;
+  transition:
+    border-color var(--tp-transition),
+    background var(--tp-transition);
+}
+
+.assigned-item:hover {
+  border-color: var(--tp-border-strong);
+}
+
+.assigned-item:hover .remove-btn {
+  opacity: 1;
+}
+
+.assigned-item.is-primary {
+  background: var(--tp-accent-primary-soft);
+  border-color: var(--tp-accent-primary-border);
+  box-shadow: none;
+}
+
+.assigned-item-left {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.assigned-name {
+  font-size: 12px;
+  font-weight: var(--tp-font-semibold);
+  color: var(--tp-text-primary);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assigned-role {
+  font-size: 10px;
+  color: var(--tp-text-subtle);
+  margin: 1px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 头像小 */
+.reviewer-avatar-sm {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: var(--tp-accent-primary-soft);
+  border: 1px solid var(--tp-accent-primary-border);
+  color: var(--tp-primary);
+  font-size: 10px;
+  font-weight: var(--tp-font-bold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.reviewer-avatar-sm .avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+/* 徽章 */
+.primary-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--tp-primary);
+  color: #fff;
+  font-size: 10px;
+  font-weight: var(--tp-font-bold);
+  border: none;
+  line-height: 1.5;
+}
+
+.shadow-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--tp-surface-muted);
+  color: var(--tp-text-secondary);
+  font-size: 10px;
+  font-weight: var(--tp-font-semibold);
+  line-height: 1.5;
+}
+
+/* 操作按钮 */
+.assigned-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.set-primary-btn {
+  padding: 3px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--tp-accent-primary-border);
+  background: transparent;
+  color: var(--tp-primary);
+  font-size: 10px;
+  font-weight: var(--tp-font-medium);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--tp-transition),
+    border-color var(--tp-transition);
+}
+
+.set-primary-btn:hover {
+  background: var(--tp-accent-primary-soft);
+  border-color: var(--tp-primary);
+}
+
+.remove-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  color: var(--tp-text-subtle);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition:
+    opacity var(--tp-transition),
+    background var(--tp-transition),
+    color var(--tp-transition);
+}
+
+.remove-btn:hover {
+  background: var(--tp-accent-danger-soft);
+  color: var(--tp-danger);
+}
+
+/* 占位区 */
+.drop-placeholder {
+  background: var(--tp-surface-input);
+  border: 1px dashed var(--tp-border-subtle);
+  border-radius: 8px;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--tp-text-subtle);
+  font-size: 12px;
+  cursor: default;
+  transition:
+    border-color var(--tp-transition),
+    color var(--tp-transition),
+    background var(--tp-transition);
+}
+
+.drop-placeholder .material-symbols-outlined {
+  font-size: 24px;
+  opacity: 0.5;
+}
+
+.drop-placeholder:hover {
+  border-color: var(--tp-primary);
+  color: var(--tp-primary);
+  background: var(--tp-accent-primary-soft);
+}
+
+.drop-placeholder:hover .material-symbols-outlined {
+  opacity: 1;
+}
+
+/* 底部统计 */
+.assigned-footer {
+  background: var(--tp-surface-header);
+  border-top: 1px solid var(--tp-border-subtle);
+  border-radius: 0 0 10px 10px;
+  padding: 10px 14px;
+  font-size: 12px;
+}
+
+.assigned-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--tp-text-secondary);
+}
+
+.stat-bold {
+  color: var(--tp-primary);
+  font-weight: var(--tp-font-bold);
+  font-size: 14px;
+}
+
+/* ══════════════════════════════════════════════════
+   Step 4 确认激活 — 视觉精调
+   ══════════════════════════════════════════════════ */
+
+/* 摘要卡片 */
+.summary-card {
+  background: var(--tp-surface-card);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 10px;
+  box-shadow: none;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* 顶部指标行 */
+.summary-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid var(--tp-border-subtle);
+}
+
+.summary-metric-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px;
+  border-right: 1px solid var(--tp-border-subtle);
+}
+
+.summary-metric-item:last-child {
+  border-right: none;
+}
+
+.metric-icon {
+  font-size: 20px;
+  color: var(--tp-primary);
+  background: var(--tp-accent-primary-soft);
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.metric-num {
+  font-size: 22px;
+  font-weight: var(--tp-font-bold);
+  color: var(--tp-text-primary);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.metric-num-text {
+  font-size: 16px;
+  font-weight: var(--tp-font-bold);
+  color: var(--tp-text-primary);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.metric-label {
+  font-size: 11px;
+  color: var(--tp-text-subtle);
+  margin: 2px 0 0;
+}
+
+/* 信息区 */
+.summary-info {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-bottom: 1px solid var(--tp-border-subtle);
+}
+
+.summary-info-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.summary-label {
+  font-size: 11px;
+  color: var(--tp-text-subtle);
+  font-weight: var(--tp-font-medium);
+}
+
+.summary-value-primary {
+  font-size: 15px;
+  font-weight: var(--tp-font-bold);
+  color: var(--tp-text-primary);
+  margin: 0;
+}
+
+.summary-value {
+  font-size: 13px;
+  color: var(--tp-text-secondary);
+  margin: 0;
+}
+
+/* 底部评审人 */
+.summary-footer {
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.summary-avatars {
+  display: flex;
+  align-items: center;
+  gap: -4px;
+}
+
+.summary-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--tp-accent-primary-soft);
+  border: 2px solid var(--tp-surface-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: var(--tp-font-bold);
+  color: var(--tp-primary);
+  overflow: hidden;
+  margin-left: -6px;
+}
+
+.summary-avatar:first-child {
+  margin-left: 0;
+}
+
+.summary-avatar .avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.summary-avatar.more {
+  background: var(--tp-surface-muted);
+  color: var(--tp-text-secondary);
+  font-size: 9px;
+  border-color: var(--tp-surface-card);
+}
+
+.summary-avatar-label {
+  font-size: 12px;
+  color: var(--tp-text-subtle);
+  margin-left: 8px;
+}
+
+/* 质量自检面板 */
+.checklist-panel {
+  background: var(--tp-surface-card);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 10px;
+  box-shadow: none;
+  padding: 14px;
+}
+
+.checklist-title {
+  font-size: 13px;
+  font-weight: var(--tp-font-bold);
+  color: var(--tp-text-primary);
+  margin: 0 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.checklist-badge {
+  font-size: 10px;
+  font-weight: var(--tp-font-medium);
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--tp-accent-primary-soft);
+  color: var(--tp-primary);
+  border: 1px solid var(--tp-accent-primary-border);
+}
+
+.checklist-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checklist-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px 10px;
+  background: var(--tp-surface-input);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 8px;
+  transition: border-color var(--tp-transition);
+}
+
+.checklist-item.ok {
+  border-color: var(--tp-accent-success-border, var(--tp-border-subtle));
+}
+
+.checklist-item:not(.ok) {
+  opacity: 0.5;
+}
+
+.check-icon {
+  font-size: 18px;
+  color: var(--tp-text-subtle);
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.check-icon.filled {
+  color: var(--tp-success);
+}
+
+.check-label {
+  font-size: 12px;
+  font-weight: var(--tp-font-semibold);
+  color: var(--tp-text-primary);
+  margin: 0;
+}
+
+.check-desc {
+  font-size: 11px;
+  color: var(--tp-text-subtle);
+  margin: 2px 0 0;
+}
+
+/* 激活提示 */
+.activate-hint {
+  margin-top: 12px;
+  background: var(--tp-accent-primary-soft);
+  border: 1px solid var(--tp-accent-primary-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.activate-hint p {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--tp-primary);
+  margin: 0;
+  line-height: var(--tp-line-body);
+}
+
+.wizard-page {
+  background: var(--tp-surface-base) !important;
+}
+
+.wizard-page .stepper,
+.wizard-page .card-glass,
+.wizard-page .card-surface,
+.wizard-page .table-wrap,
+.wizard-page .reviewer-card,
+.wizard-page .assigned-panel,
+.wizard-page .summary-card,
+.wizard-page .checklist-panel {
+  background: var(--tp-surface-card) !important;
+  border-color: var(--tp-border-subtle) !important;
+  box-shadow: var(--tp-shadow-sm) !important;
+  backdrop-filter: none !important;
+}
+
+.wizard-page .step-item:hover,
+.wizard-page .reviewer-card:hover {
+  transform: none !important;
+}
+
+.wizard-page .step-item.active .step-circle,
+.wizard-page .step-item.done .step-circle,
+.wizard-page .filter-btn.icon-btn,
+.wizard-page .page-btn-wz.active,
+.wizard-page .footer-btn.primary,
+.wizard-page .footer-btn.activate {
+  box-shadow: var(--tp-btn-shadow) !important;
+}
+
+.wizard-page .form-input,
+.wizard-page .form-textarea,
+.wizard-page .search-box-wz,
+.wizard-page .mode-radio,
+.wizard-page .filter-btn,
+.wizard-page .page-btn-wz,
+.wizard-page .assigned-item,
+.wizard-page .drop-placeholder,
+.wizard-page .checklist-item {
+  background: var(--tp-surface-input) !important;
+  border-color: var(--tp-border-subtle) !important;
+  box-shadow: none !important;
+}
+
+.wizard-page .wz-table thead tr,
+.wizard-page .wz-table th,
+.wizard-page .assigned-header,
+.wizard-page .assigned-footer,
+.wizard-page .wizard-footer {
+  background: var(--tp-surface-header) !important;
+  border-color: var(--tp-border-subtle) !important;
+}
+
+.wizard-page .wz-row:hover,
+.wizard-page .reviewer-card:hover,
+.wizard-page .mode-radio:hover,
+.wizard-page .page-btn-wz:hover:not(:disabled),
+.wizard-page .filter-btn:hover {
+  background: var(--tp-surface-row-hover) !important;
+}
+
+.wizard-page .wz-row.selected,
+.wizard-page .assigned-item.is-primary,
+.wizard-page .mode-radio.selected {
+  background: var(--tp-accent-primary-soft) !important;
+  border-color: var(--tp-accent-primary-border) !important;
+}
+
+.wizard-page .reviewer-avatar-lg,
+.wizard-page .reviewer-avatar-sm,
+.wizard-page .summary-avatar {
+  background: var(--tp-accent-primary-soft) !important;
+  border: 1px solid var(--tp-accent-primary-border) !important;
+  color: var(--tp-primary) !important;
+  box-shadow: none !important;
+}
+
+.wizard-page .primary-badge,
+.wizard-page .module-tag,
+.wizard-page .checklist-badge {
+  background: var(--tp-accent-primary-soft) !important;
+  border: 1px solid var(--tp-accent-primary-border) !important;
+  color: var(--tp-primary) !important;
+}
+
+.wizard-page .footer-btn.primary:hover {
+  box-shadow: var(--tp-btn-shadow-hover) !important;
+}
+
+.wizard-page .wizard-title,
+.wizard-page .card-title,
+.wizard-page .card-title-primary,
+.wizard-page .step3-title,
+.wizard-page .assigned-title,
+.wizard-page .checklist-title,
+.wizard-page .td-title,
+.wizard-page .reviewer-card-name,
+.wizard-page .assigned-name,
+.wizard-page .check-label,
+.wizard-page .stat-bold {
+  color: var(--tp-text-primary) !important;
+}
+
+.wizard-page .wizard-subtitle,
+.wizard-page .card-desc,
+.wizard-page .step3-sub,
+.wizard-page .reviewer-card-role,
+.wizard-page .assigned-role,
+.wizard-page .check-desc,
+.wizard-page .td-date,
+.wizard-page .status-text,
+.wizard-page .selection-range {
+  color: var(--tp-text-muted) !important;
+}
+
+.wizard-page .form-input,
+.wizard-page .form-textarea,
+.wizard-page .search-input-wz {
+  color: var(--tp-text-primary) !important;
+}
+
+.wizard-page .form-input::placeholder,
+.wizard-page .form-textarea::placeholder,
+.wizard-page .search-input-wz::placeholder {
+  color: var(--tp-text-subtle) !important;
+}
+
+.wizard-page .wz-table td {
+  color: var(--tp-text-secondary) !important;
+}
+
+.wizard-page .footer-btn.outline {
+  background: var(--tp-surface-input) !important;
+  border-color: var(--tp-border-subtle) !important;
+  color: var(--tp-text-secondary) !important;
+}
+
+.wizard-page .footer-btn.outline:hover {
+  border-color: var(--tp-border-strong) !important;
+  color: var(--tp-text-primary) !important;
 }
 </style>

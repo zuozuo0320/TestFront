@@ -1764,4 +1764,42 @@ onMounted(async () => {
   color: var(--tp-btn-text) !important;
   box-shadow: var(--tp-btn-shadow);
 }
+
+.um-root {
+  background: var(--tp-surface-base);
+}
+
+.um-stats-panel,
+.um-bento-card,
+.um-list-panel,
+.um-sec-panel,
+.audit-status {
+  background: var(--tp-surface-card);
+  border-color: var(--tp-border-subtle);
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.um-bento-card:hover,
+.um-list-panel:hover,
+.um-sec-panel:hover {
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.um-bento-bg-icon {
+  display: none;
+}
+
+.um-avatar-glass {
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+.um-pagination {
+  background: var(--tp-surface-card);
+}
+
+.um-tr:hover,
+.um-log-row:hover {
+  box-shadow: inset 2px 0 0 var(--tp-primary);
+}
 </style>

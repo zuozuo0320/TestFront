@@ -192,4 +192,23 @@ function formatCount(n: number): string {
   font-size: var(--tp-text-sm);
   font-weight: var(--tp-font-bold);
 }
+
+.hm-bar-track {
+  background: var(--tp-surface-input);
+  border-color: var(--tp-border-subtle);
+  box-shadow: none;
+}
+
+.hm-bar-fill {
+  background: color-mix(in srgb, var(--bar-color) 20%, var(--tp-surface-card));
+  box-shadow: inset 2px 0 0 var(--bar-color);
+}
+
+.hm-bar-fill--empty {
+  background: var(--tp-surface-muted);
+}
+
+.hm-bar-label {
+  color: var(--tp-text-primary);
+}
 </style>

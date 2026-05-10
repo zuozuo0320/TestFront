@@ -47,7 +47,9 @@ function showToast(msg: string, type: 'success' | 'error' = 'success') {
   toastMsg.value = msg
   toastType.value = type
   if (toastTimer) clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => { toastMsg.value = '' }, 3000)
+  toastTimer = setTimeout(() => {
+    toastMsg.value = ''
+  }, 3000)
 }
 
 onMounted(async () => {
@@ -141,7 +143,9 @@ const validationHistory = computed(() => store.validationHistory)
 
 /** 从 Playwright locator 字符串中提取人类可读的元素名 */
 function readableFromLocator(locator: string): string {
-  const m = locator.match(/getBy(?:Role|Text|Label|Placeholder|TestId|AltText|Title)\(['"]([^'"]{1,40})/)
+  const m = locator.match(
+    /getBy(?:Role|Text|Label|Placeholder|TestId|AltText|Title)\(['"]([^'"]{1,40})/,
+  )
   if (m?.[1]) return m[1]
   return locator.length > 40 ? locator.slice(0, 40) + '\u2026' : locator
 }
@@ -156,7 +160,11 @@ function stepSummary(s: any): string {
   }
   if (type === 'INPUT') {
     const field = s.locator ? readableFromLocator(s.locator) : '输入框'
-    const val = s.inputValue ? (s.inputValue.length > 20 ? s.inputValue.slice(0, 20) + '\u2026' : s.inputValue) : ''
+    const val = s.inputValue
+      ? s.inputValue.length > 20
+        ? s.inputValue.slice(0, 20) + '\u2026'
+        : s.inputValue
+      : ''
     return val ? `在「${field}」输入 ${val}` : `在「${field}」输入`
   }
   if (type === 'KEY_PRESS') return `按键 ${s.inputValue || ''}`
@@ -387,6 +395,19 @@ async function handleExecute() {
   }
 }
 
+async function handleRegenerateFromRecording() {
+  if (!task.value) return
+  try {
+    await store.regenerateFromLatestRecording(taskId.value)
+    await store.loadTaskDetailFull(taskId.value)
+    showToast('已复用录制稿重新生成，请等待完成')
+    startTaskPolling()
+  } catch (e) {
+    console.error('重新生成失败:', e)
+    showToast('重新生成失败，请确认录制稿可用后重试', 'error')
+  }
+}
+
 async function handleValidate() {
   if (!script.value) return
   try {
@@ -580,6 +601,16 @@ const canExecute = computed(() => {
   const s = task.value?.taskStatus
   return s === TaskStatus.PENDING_EXECUTE || s === TaskStatus.GENERATE_FAILED
 })
+const canRegenerateFromRecording = computed(() => {
+  const rawScript = recording.value?.rawScriptContent?.trim()
+  return (
+    isRecordingMode.value &&
+    task.value?.taskStatus === TaskStatus.GENERATE_FAILED &&
+    recording.value?.recordingStatus === 'FINISHED' &&
+    !!rawScript &&
+    canExecute.value
+  )
+})
 const canEdit = computed(() => {
   if (task.value?.permissions) return task.value.permissions.canEdit
   const s = task.value?.taskStatus
@@ -617,39 +648,53 @@ const isTaskActive = computed(() => {
 </script>
 
 <template>
-  <div class="ai-page">
+  <div class="ai-page ai-task-detail-page">
     <!-- 顶部操作栏 -->
-    <div class="ai-page-header" style="margin-bottom: 20px">
+    <div class="ai-page-header ai-task-detail-header">
       <div class="ai-page-header-left">
-        <div class="ai-breadcrumb">
-          <span style="cursor: pointer" @click="goBack">测试智编</span>
-          <span class="material-symbols-outlined">chevron_right</span>
-          <span style="cursor: pointer" @click="goBack">生成任务</span>
-          <span class="material-symbols-outlined">chevron_right</span>
-          <span class="current">验证详情</span>
+        <button
+          class="ai-detail-back-icon"
+          type="button"
+          aria-label="返回智能任务列表"
+          @click="goBack"
+        >
+          <span class="material-symbols-outlined">arrow_back</span>
+        </button>
+        <div class="ai-detail-title-block">
+          <div class="ai-detail-title-row">
+            <h1>{{ task?.taskName || '加载中...' }}</h1>
+            <span
+              v-if="task"
+              class="ai-mode-tag"
+              :class="isRecordingMode ? 'recording' : 'ai-direct'"
+            >
+              {{ GenerationModeLabel[task.generationMode] || task.generationMode }}
+            </span>
+          </div>
+          <div class="ai-detail-subtitle">智能任务详情</div>
         </div>
-        <h1>
-          {{ task?.taskName || '加载中...' }}
-          <span
-            v-if="task"
-            class="ai-mode-tag"
-            :class="isRecordingMode ? 'recording' : 'ai-direct'"
-          >
-            {{ GenerationModeLabel[task.generationMode] || task.generationMode }}
-          </span>
-        </h1>
       </div>
-      <div class="ai-action-group">
+      <div class="ai-action-group ai-task-detail-actions">
         <!-- 录制增强模式：录制按钮 -->
         <template v-if="isRecordingMode && isTaskActive">
           <button
+            v-if="canRegenerateFromRecording"
+            class="ai-btn ai-btn-primary"
+            :disabled="store.actionLoading"
+            @click="handleRegenerateFromRecording"
+          >
+            <span v-if="store.actionLoading" class="ai-spinner"></span>
+            <span v-else class="material-symbols-outlined">refresh</span>
+            重新生成
+          </button>
+          <button
             v-if="!recording || recording.recordingStatus !== 'RECORDING'"
             class="ai-btn ai-btn-secondary"
-            :disabled="recordingLoading"
+            :disabled="recordingLoading || store.actionLoading"
             @click="handleStartRecording"
           >
             <span class="material-symbols-outlined">fiber_manual_record</span>
-            开始录制
+            {{ recording?.recordingStatus === 'FINISHED' ? '重新录制' : '开始录制' }}
           </button>
           <button v-else class="ai-btn ai-btn-warning" @click="openRecordingSubmitDialog">
             <span class="material-symbols-outlined">stop_circle</span>
@@ -725,22 +770,15 @@ const isTaskActive = computed(() => {
         <section class="ai-info-card">
           <div class="ai-info-card-header">
             <span class="ai-section-title">任务基础信息</span>
-            <div
-              v-if="task"
-              class="ai-status-badge"
-              :class="TaskStatusColor[task.taskStatus]"
-              style="font-size: 0.55rem"
-            >
+            <div v-if="task" class="ai-status-badge" :class="TaskStatusColor[task.taskStatus]">
               {{ TaskStatusLabel[task.taskStatus] }}
             </div>
           </div>
-          <div style="display: flex; flex-direction: column; gap: 14px">
+          <div class="ai-task-meta-list">
             <div>
               <div class="ai-info-label">关联用例</div>
               <div class="ai-info-value">
-                <span class="material-symbols-outlined" style="font-size: 16px; color: #adc6ff">
-                  terminal
-                </span>
+                <span class="material-symbols-outlined ai-task-meta-icon">terminal</span>
                 <span v-if="task">
                   {{ task.caseTags?.join(', ') || `${task.caseCount} 条用例` }}
                 </span>
@@ -753,12 +791,12 @@ const isTaskActive = computed(() => {
             <!-- 场景描述 -->
             <div v-if="task?.scenarioDesc">
               <div class="ai-info-label">场景描述</div>
-              <div style="font-size: 0.8rem; color: var(--tp-gray-300); line-height: 1.6; background: rgba(255,255,255,0.02); padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); white-space: pre-wrap">
+              <div class="ai-task-scenario">
                 {{ task.scenarioDesc }}
               </div>
             </div>
             <!-- 创建人/时间 -->
-            <div style="display: flex; gap: 24px">
+            <div class="ai-task-time-grid">
               <div>
                 <div class="ai-info-label">创建人</div>
                 <div class="ai-info-value">{{ task?.createdName || '-' }}</div>
@@ -775,22 +813,10 @@ const isTaskActive = computed(() => {
             <!-- 失败原因 -->
             <div
               v-if="task?.taskStatus === TaskStatus.GENERATE_FAILED && task?.errorMessage"
-              style="margin-top: 4px"
+              class="ai-task-error-block"
             >
-              <div class="ai-info-label" style="color: #ff5252">失败原因</div>
-              <div
-                style="
-                  font-size: 0.8rem;
-                  color: #ff8a80;
-                  background: rgba(255, 82, 82, 0.08);
-                  padding: 8px 12px;
-                  border-radius: 6px;
-                  border: 1px solid rgba(255, 82, 82, 0.15);
-                  margin-top: 4px;
-                  line-height: 1.5;
-                  word-break: break-all;
-                "
-              >
+              <div class="ai-info-label ai-task-error-label">失败原因</div>
+              <div class="ai-task-error-message">
                 {{ task.errorMessage }}
               </div>
             </div>
@@ -799,67 +825,39 @@ const isTaskActive = computed(() => {
 
         <!-- 录制状态卡片（仅录制增强模式） -->
         <section v-if="isRecordingMode" class="ai-info-card">
-          <span class="ai-section-title" style="margin-bottom: 12px; display: block">录制状态</span>
+          <span class="ai-section-title ai-card-section-title">录制状态</span>
           <!-- 状态消息 -->
-          <div
-            v-if="recordingStatusText"
-            class="ai-recording-status-msg"
-            style="
-              margin-bottom: 12px;
-              padding: 10px 14px;
-              border-radius: 8px;
-              background: rgba(124, 77, 255, 0.08);
-              border: 1px solid rgba(124, 77, 255, 0.2);
-              font-size: 0.8rem;
-              color: #b388ff;
-              line-height: 1.5;
-            "
-          >
+          <div v-if="recordingStatusText" class="ai-recording-status-msg">
             {{ recordingStatusText }}
           </div>
-          <div
-            v-if="!recording && !recordingStatusText"
-            style="text-align: center; padding: 20px; color: var(--tp-gray-500); font-size: 0.8rem"
-          >
-            <span class="material-symbols-outlined" style="font-size: 36px; opacity: 0.3">
-              videocam
-            </span>
-            <p style="margin-top: 8px">点击上方"开始录制"按钮，系统将自动打开浏览器</p>
-            <p style="font-size: 0.7rem; color: var(--tp-gray-600); margin-top: 4px">
-              在弹出的浏览器中操作被测系统，关闭浏览器后脚本自动回收
-            </p>
+          <div v-if="!recording && !recordingStatusText" class="ai-recording-empty">
+            <span class="material-symbols-outlined">videocam</span>
+            <p>点击上方"开始录制"按钮，系统将自动打开浏览器</p>
+            <p>在弹出的浏览器中操作被测系统，关闭浏览器后脚本自动回收</p>
           </div>
-          <div v-else-if="recording" style="display: flex; flex-direction: column; gap: 10px">
-            <div style="display: flex; align-items: center; gap: 8px">
+          <div v-else-if="recording" class="ai-recording-summary">
+            <div class="ai-recording-state-line">
               <span
                 class="ai-rec-dot"
                 :class="recording.recordingStatus === 'RECORDING' ? 'active' : 'done'"
               ></span>
-              <span style="font-size: 0.8rem; color: var(--tp-gray-300)">
+              <span>
                 {{ recording.recordingStatus === 'RECORDING' ? '录制中...' : '录制已完成' }}
               </span>
             </div>
-            <div style="font-size: 0.75rem; color: var(--tp-gray-500)">
-              录制 ID: {{ recording.id }}
-            </div>
-            <div
-              v-if="recording.rawScriptContent"
-              style="font-size: 0.75rem; color: var(--tp-gray-500)"
-            >
+            <div class="ai-recording-meta">录制 ID: {{ recording.id }}</div>
+            <div v-if="recording.rawScriptContent" class="ai-recording-meta">
               脚本长度: {{ recording.rawScriptContent.length }} 字符
             </div>
           </div>
         </section>
 
         <!-- 操作轨迹时间线 -->
-        <section class="ai-info-card" style="flex: 1; overflow-y: auto; max-height: 600px">
-          <span class="ai-section-title" style="margin-bottom: 18px; display: block">
+        <section class="ai-info-card ai-trace-card">
+          <span class="ai-section-title ai-card-section-title">
             {{ isRecordingMode ? '操作步骤 (录制解析)' : '操作轨迹 (browser-use)' }}
           </span>
-          <div
-            v-if="displayTraces.length === 0"
-            style="text-align: center; padding: 24px; color: var(--tp-gray-500); font-size: 0.8rem"
-          >
+          <div v-if="displayTraces.length === 0" class="ai-trace-empty">
             暂无轨迹数据，请先触发执行
           </div>
           <div v-else class="ai-timeline">
@@ -875,46 +873,18 @@ const isTaskActive = computed(() => {
                   <span class="ai-timeline-time">
                     {{ trace.occurredAt || `#${trace.traceNo}` }}
                   </span>
-                  <span
-                    class="material-symbols-outlined"
-                    style="font-size: 16px; color: var(--tp-gray-500)"
-                  >
+                  <span class="material-symbols-outlined">
                     {{ traceIcon(trace.actionType) }}
                   </span>
                 </div>
                 <p class="ai-timeline-desc">{{ trace.targetSummary }}</p>
                 <!-- #11: 定位器展示 -->
-                <div
-                  v-if="trace.locatorUsed"
-                  style="
-                    margin-top: 6px;
-                    padding: 4px 8px;
-                    background: rgba(0, 0, 0, 0.2);
-                    border-radius: 4px;
-                    font-family: monospace;
-                    font-size: 0.7rem;
-                    color: #80cbc4;
-                    word-break: break-all;
-                  "
-                >
-                  <span
-                    class="material-symbols-outlined"
-                    style="
-                      font-size: 12px;
-                      vertical-align: middle;
-                      margin-right: 4px;
-                      color: var(--tp-gray-500);
-                    "
-                  >
-                    code
-                  </span>
+                <div v-if="trace.locatorUsed" class="ai-trace-code">
+                  <span class="material-symbols-outlined">code</span>
                   {{ trace.locatorUsed }}
                 </div>
                 <!-- 输入值 -->
-                <div
-                  v-if="trace.inputValueMasked"
-                  style="margin-top: 4px; font-size: 0.7rem; color: #ffb74d"
-                >
+                <div v-if="trace.inputValueMasked" class="ai-trace-input">
                   输入: "{{ trace.inputValueMasked }}"
                 </div>
               </div>
@@ -955,8 +925,8 @@ const isTaskActive = computed(() => {
             <CodeEditor
               :model-value="script.scriptContent"
               :readonly="true"
-              min-height="200px"
-              max-height="600px"
+              min-height="320px"
+              max-height="320px"
             />
           </div>
         </section>
@@ -1039,10 +1009,7 @@ const isTaskActive = computed(() => {
               :class="{ active: activeFileIdx === idx }"
               @click="activeFileIdx = idx"
             >
-              <span
-                class="v1-file-type-badge"
-                :class="file.fileType"
-              >
+              <span class="v1-file-type-badge" :class="file.fileType">
                 {{ file.fileType }}
               </span>
               <span class="v1-file-name">{{ fileBasename(file.relativePath) }}</span>
@@ -1126,16 +1093,10 @@ const isTaskActive = computed(() => {
             </div>
           </div>
         </section>
-        <section
-          v-else
-          class="ai-info-card"
-          style="flex: 1; display: flex; align-items: center; justify-content: center"
-        >
-          <div style="text-align: center; color: var(--tp-gray-500)">
-            <span class="material-symbols-outlined" style="font-size: 48px; opacity: 0.3">
-              code
-            </span>
-            <p style="margin-top: 12px; font-size: 0.85rem">暂无脚本，请先触发执行生成</p>
+        <section v-else class="ai-info-card ai-script-empty-card">
+          <div class="ai-script-empty">
+            <span class="material-symbols-outlined">code</span>
+            <p>暂无脚本，请先触发执行生成</p>
           </div>
         </section>
 
@@ -1184,7 +1145,13 @@ const isTaskActive = computed(() => {
                   v-if="validation.screenshots?.length"
                   :src="validation.screenshots?.[0]?.fileUrl"
                   :alt="validation.screenshots?.[0]?.caption || '错误状态截图'"
-                  style="width: 100%; border-radius: 8px; object-fit: contain; max-height: 300px; background: rgba(0,0,0,0.3)"
+                  style="
+                    width: 100%;
+                    border-radius: 8px;
+                    object-fit: contain;
+                    max-height: 300px;
+                    background: rgba(0, 0, 0, 0.3);
+                  "
                 />
                 <div v-else class="ai-fail-screenshot-placeholder">
                   <span class="material-symbols-outlined">broken_image</span>
@@ -1256,7 +1223,11 @@ const isTaskActive = computed(() => {
         </section>
 
         <!-- 脚本版本记录 -->
-        <section v-if="store.scriptVersions.length > 0" class="ai-info-card" style="margin-top: 16px">
+        <section
+          v-if="store.scriptVersions.length > 0"
+          class="ai-info-card"
+          style="margin-top: 16px"
+        >
           <span class="ai-section-title" style="margin-bottom: 12px; display: block">
             <span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle">
               layers
@@ -1278,7 +1249,14 @@ const isTaskActive = computed(() => {
               "
               :style="{ borderColor: ver.isCurrentFlag ? 'rgba(124,77,255,0.3)' : '' }"
             >
-              <div style="font-size: 0.8rem; font-weight: 600; color: var(--tp-gray-300); min-width: 36px">
+              <div
+                style="
+                  font-size: 0.8rem;
+                  font-weight: 600;
+                  color: var(--tp-gray-300);
+                  min-width: 36px;
+                "
+              >
                 v{{ ver.versionNo }}
               </div>
               <div
@@ -1296,7 +1274,13 @@ const isTaskActive = computed(() => {
               </div>
               <span
                 v-if="ver.isCurrentFlag"
-                style="font-size: 0.6rem; padding: 1px 6px; border-radius: 8px; background: rgba(124,77,255,0.15); color: #b388ff"
+                style="
+                  font-size: 0.6rem;
+                  padding: 1px 6px;
+                  border-radius: 8px;
+                  background: rgba(124, 77, 255, 0.15);
+                  color: #b388ff;
+                "
               >
                 当前
               </span>
@@ -1391,7 +1375,11 @@ const isTaskActive = computed(() => {
     </div>
 
     <!-- 废弃任务 Dialog -->
-    <div v-if="showDetailDiscardDialog" class="ai-dialog-overlay" @click.self="showDetailDiscardDialog = false">
+    <div
+      v-if="showDetailDiscardDialog"
+      class="ai-dialog-overlay"
+      @click.self="showDetailDiscardDialog = false"
+    >
       <div class="ai-dialog" style="max-width: 440px">
         <div class="ai-dialog-header">
           <h2>ℹ️ 废弃任务</h2>
@@ -1401,7 +1389,9 @@ const isTaskActive = computed(() => {
         </div>
         <div class="ai-dialog-body">
           <p style="font-size: 0.85rem; color: var(--tp-gray-300); margin-bottom: 12px">
-            确定要废弃任务 <strong>{{ task?.taskName }}</strong> 吗？废弃后任务将不可恢复。
+            确定要废弃任务
+            <strong>{{ task?.taskName }}</strong>
+            吗？废弃后任务将不可恢复。
           </p>
           <div class="ai-form-group">
             <label class="ai-form-label">废弃原因 *</label>
@@ -1427,7 +1417,11 @@ const isTaskActive = computed(() => {
     </div>
 
     <!-- 删除任务 Dialog -->
-    <div v-if="showDetailDeleteDialog" class="ai-dialog-overlay" @click.self="showDetailDeleteDialog = false">
+    <div
+      v-if="showDetailDeleteDialog"
+      class="ai-dialog-overlay"
+      @click.self="showDetailDeleteDialog = false"
+    >
       <div class="ai-dialog" style="max-width: 440px">
         <div class="ai-dialog-header">
           <h2>⚠️ 删除任务</h2>
@@ -1437,17 +1431,19 @@ const isTaskActive = computed(() => {
         </div>
         <div class="ai-dialog-body">
           <p style="font-size: 0.85rem; color: #ff8a80">
-            确定要彻底删除任务 <strong>{{ task?.taskName }}</strong> 吗？
+            确定要彻底删除任务
+            <strong>{{ task?.taskName }}</strong>
+            吗？
           </p>
           <p style="font-size: 0.8rem; color: var(--tp-gray-500); margin-top: 8px">
-            此操作将级联删除任务关联的所有脚本版本、验证记录、轨迹、证据和录制会话，<strong style="color: #ff8a80">不可恢复</strong>。
+            此操作将级联删除任务关联的所有脚本版本、验证记录、轨迹、证据和录制会话，
+            <strong style="color: #ff8a80">不可恢复</strong>
+            。
           </p>
         </div>
         <div class="ai-dialog-footer">
           <button class="ai-btn ai-btn-ghost" @click="showDetailDeleteDialog = false">取消</button>
-          <button class="ai-btn ai-btn-danger" @click="confirmDetailDelete">
-            确认删除
-          </button>
+          <button class="ai-btn ai-btn-danger" @click="confirmDetailDelete">确认删除</button>
         </div>
       </div>
     </div>
@@ -1493,10 +1489,20 @@ const isTaskActive = computed(() => {
   border: 1px solid rgba(255, 138, 128, 0.3);
   color: #ff8a80;
 }
-.detail-toast-enter-active { animation: detail-toast-in 0.3s ease; }
-.detail-toast-leave-active { animation: detail-toast-in 0.2s ease reverse; }
+.detail-toast-enter-active {
+  animation: detail-toast-in 0.3s ease;
+}
+.detail-toast-leave-active {
+  animation: detail-toast-in 0.2s ease reverse;
+}
 @keyframes detail-toast-in {
-  from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 </style>

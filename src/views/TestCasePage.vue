@@ -288,6 +288,7 @@ const caseForm = reactive({
 
 // Attachments
 const caseAttachments = ref<CaseAttachment[]>([])
+const pendingAttachmentFiles = ref<File[]>([])
 const reviewAttachments = ref<CaseReviewAttachment[]>([])
 const reviewAttachmentsLoading = ref(false)
 const caseHistory = ref<CaseHistory[]>([])
@@ -858,6 +859,7 @@ function scheduleCaseDrawerHydration(options: { loadTags: boolean }) {
 function onCaseDrawerClosed() {
   cancelCaseDrawerHydration()
   caseDrawerHydrated.value = false
+  pendingAttachmentFiles.value = []
   levelPickerOpen.value = false
   closeModulePicker()
 }
@@ -888,6 +890,7 @@ function openCreate() {
   })
   stepRows.value = [{ action: '', expected: '' }]
   caseAttachments.value = []
+  pendingAttachmentFiles.value = []
   reviewAttachments.value = []
   caseActivities.value = []
   selectedTagIds.value = []
@@ -919,6 +922,7 @@ async function openEdit(row: TableRow) {
   stepRows.value = parseStepsToRows(row.steps)
   selectedTagIds.value = row.tagList.map((t) => t.id)
   caseAttachments.value = []
+  pendingAttachmentFiles.value = []
   reviewAttachments.value = []
   caseHistory.value = []
   caseActivities.value = []
@@ -974,6 +978,9 @@ async function submitCase() {
   }
   saving.value = true
   try {
+    const projectId = selectedProject.value
+    const wasEditing = Boolean(editingId.value)
+    let savedCaseId = editingId.value
     const stepsText = rowsToStepsText(stepRows.value)
     const payload = {
       title: caseForm.title.trim(),
@@ -989,13 +996,23 @@ async function submitCase() {
       remark: caseForm.remark,
       priority: caseForm.priority,
     }
-    if (editingId.value) {
-      await updateTestCase(selectedProject.value, editingId.value, payload)
-      ElMessage.success('修改成功')
+    if (savedCaseId) {
+      await updateTestCase(projectId, savedCaseId, payload)
     } else {
-      await createTestCase(selectedProject.value, payload)
-      ElMessage.success('新增成功')
+      const created = await createTestCase(projectId, payload)
+      savedCaseId = created.id
+      editingId.value = created.id
       page.value = 1
+    }
+    if (savedCaseId) {
+      const uploadResult = await uploadPendingAttachments(projectId, savedCaseId)
+      if (uploadResult.failed > 0) {
+        ElMessage.warning(`用例已保存，${uploadResult.failed} 个附件上传失败，可在当前页面重试`)
+        await loadCases()
+        return
+      }
+      const uploadText = uploadResult.uploaded > 0 ? `，已上传 ${uploadResult.uploaded} 个附件` : ''
+      ElMessage.success(`${wasEditing ? '修改成功' : '新增成功'}${uploadText}`)
     }
     dialogVisible.value = false
     await loadCases()
@@ -1255,9 +1272,17 @@ function getFileIconName(filename: string) {
   return map[ext] || 'draft'
 }
 
+function getPendingFilePreviewUrl(file: File) {
+  return URL.createObjectURL(file)
+}
+
 async function onUploadAttachment(file: File) {
-  if (!selectedProject.value || !editingId.value) {
-    ElMessage.warning('请先保存用例后再上传附件')
+  if (!selectedProject.value) {
+    return
+  }
+  if (!editingId.value) {
+    pendingAttachmentFiles.value.push(file)
+    ElMessage.success('已添加到待上传列表，保存用例后自动上传')
     return
   }
   try {
@@ -1267,6 +1292,31 @@ async function onUploadAttachment(file: File) {
   } catch (e: unknown) {
     ElMessage.error(extractErrorMessage(e, '上传失败'))
   }
+}
+
+function onRemovePendingAttachment(file: File) {
+  const index = pendingAttachmentFiles.value.indexOf(file)
+  if (index < 0) return
+  pendingAttachmentFiles.value.splice(index, 1)
+}
+
+async function uploadPendingAttachments(projectId: number, testcaseId: number) {
+  const files = [...pendingAttachmentFiles.value]
+  let uploaded = 0
+  let failed = 0
+  for (const file of files) {
+    try {
+      const att = await uploadAttachment(projectId, testcaseId, file)
+      if (att) {
+        caseAttachments.value.push(att)
+        uploaded += 1
+        onRemovePendingAttachment(file)
+      }
+    } catch {
+      failed += 1
+    }
+  }
+  return { uploaded, failed }
 }
 
 async function onRemoveAttachment(id: number) {
@@ -2565,19 +2615,18 @@ watch(selectedProject, (newId) => {
                 <!-- Exec Status -->
                 <div class="stitch-form-item">
                   <label for="case-exec-select">执行状态</label>
-                  <div class="stitch-select-wrapper">
-                    <select
-                      id="case-exec-select"
-                      v-model="caseForm.execResult"
-                      class="stitch-select"
-                    >
-                      <option value="未执行">未执行</option>
-                      <option value="成功">成功</option>
-                      <option value="失败">失败</option>
-                      <option value="阻塞">阻塞</option>
-                    </select>
-                    <span class="material-symbols-outlined select-icon">expand_more</span>
-                  </div>
+                  <el-select
+                    id="case-exec-select"
+                    v-model="caseForm.execResult"
+                    class="exec-status-select"
+                    popper-class="case-exec-dropdown"
+                    teleported
+                  >
+                    <el-option label="未执行" value="未执行" />
+                    <el-option label="成功" value="成功" />
+                    <el-option label="失败" value="失败" />
+                    <el-option label="阻塞" value="阻塞" />
+                  </el-select>
                 </div>
 
                 <!-- Tags -->
@@ -2952,6 +3001,36 @@ watch(selectedProject, (newId) => {
                   </div>
                 </div>
 
+                <!-- Pending Image Previews -->
+                <div
+                  v-for="file in pendingAttachmentFiles.filter((item) =>
+                    item.type.startsWith('image/'),
+                  )"
+                  :key="`pending-image-${file.name}-${file.size}-${file.lastModified}`"
+                  class="asset-item image-preview pending-asset pending-image-asset group"
+                >
+                  <div class="pending-image-thumb">
+                    <img :src="getPendingFilePreviewUrl(file)" :alt="file.name" />
+                  </div>
+                  <div class="pending-asset-footer">待保存后上传</div>
+                  <div class="asset-overlay">
+                    <button
+                      type="button"
+                      class="icon-only"
+                      title="移除待上传文件"
+                      aria-label="移除待上传文件"
+                      @click.stop="onRemovePendingAttachment(file)"
+                    >
+                      <span
+                        class="material-symbols-outlined"
+                        style="color: #ff5252; font-size: 20px"
+                      >
+                        delete
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
                 <!-- Dynamic File Previews -->
                 <div
                   v-for="att in caseAttachments.filter((a) => !isImageAttachment(a))"
@@ -3001,7 +3080,52 @@ watch(selectedProject, (newId) => {
                   </div>
                 </div>
 
-                <div v-if="caseAttachments.length === 0" class="asset-empty-card col-span-full">
+                <!-- Pending File Previews -->
+                <div
+                  v-for="file in pendingAttachmentFiles.filter(
+                    (item) => !item.type.startsWith('image/'),
+                  )"
+                  :key="`pending-file-${file.name}-${file.size}-${file.lastModified}`"
+                  class="asset-item file-preview pending-asset group"
+                >
+                  <span
+                    class="material-symbols-outlined text-outline"
+                    style="font-size: 28px; margin-bottom: 6px"
+                  >
+                    {{ getFileIconName(file.name) }}
+                  </span>
+                  <span
+                    class="file-name text-center w-full truncate"
+                    :title="file.name"
+                    style="font-size: 12px"
+                  >
+                    {{ file.name }}
+                  </span>
+                  <small class="pending-asset-meta">待保存后上传</small>
+                  <div class="asset-overlay">
+                    <button
+                      type="button"
+                      class="icon-only"
+                      title="移除待上传文件"
+                      aria-label="移除待上传文件"
+                      @click.stop="onRemovePendingAttachment(file)"
+                    >
+                      <span
+                        class="material-symbols-outlined"
+                        style="color: #ff5252; font-size: 20px"
+                      >
+                        delete
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  v-if="
+                    caseAttachments.length === 0 && pendingAttachmentFiles.length === 0 && editingId
+                  "
+                  class="asset-empty-card col-span-full"
+                >
                   <span class="material-symbols-outlined">perm_media</span>
                   <strong>暂无附件</strong>
                   <small>
@@ -3012,23 +3136,12 @@ watch(selectedProject, (newId) => {
                     }}
                   </small>
                 </div>
-                <div
-                  class="upload-area col-span-full mt-1"
-                  :class="{ 'is-upload-disabled': !editingId }"
-                >
-                  <!-- FileUploader replaces the click area but keeps original functionality. We pass [] to hide its internal list -->
+                <div class="upload-area col-span-full mt-1">
                   <FileUploader
-                    v-if="editingId"
                     :files="[]"
                     :project-id="selectedProject ?? undefined"
                     @upload="onUploadAttachment"
                   />
-                  <!-- fallback text just in case -->
-                  <div v-else class="upload-disabled-placeholder">
-                    <span class="material-symbols-outlined">lock</span>
-                    <strong>保存后可上传附件</strong>
-                    <small>先保存用例，再补充截图、日志或说明文件</small>
-                  </div>
                 </div>
               </div>
             </section>
@@ -3101,7 +3214,10 @@ watch(selectedProject, (newId) => {
             </section>
 
             <!-- AI Bot -->
-            <section class="stitch-ai-panel rounded-xl p-6 relative">
+            <section
+              class="stitch-ai-panel rounded-xl p-6 relative"
+              :class="{ 'is-ai-locked': !editingId && !aiAnalyzing && !aiError && !aiResult }"
+            >
               <div class="ai-header flex items-center gap-3 mb-4">
                 <div
                   class="ai-icon w-8 h-8 rounded-full bg-primary flex items-center justify-center"
@@ -4495,6 +4611,247 @@ watch(selectedProject, (newId) => {
   border-top: 0;
   border-radius: 0 0 14px 14px;
   background: var(--tp-surface-card);
+}
+
+.case-page {
+  min-height: calc(100vh - 56px - 16px);
+}
+
+.case-page .right-table {
+  gap: 8px !important;
+  min-width: 0;
+  min-height: calc(100vh - 56px - 16px);
+  padding: 8px !important;
+  border: none;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none;
+}
+
+.case-page .insights-section {
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.case-page .insights-header {
+  margin-bottom: 6px !important;
+  padding: 0;
+}
+
+.case-page .insights-title {
+  font-family: var(--tp-font-family-sans) !important;
+  font-size: 18px !important;
+  font-weight: var(--tp-font-bold) !important;
+  line-height: var(--tp-line-tight) !important;
+  letter-spacing: -0.01em !important;
+  color: var(--tp-text-primary) !important;
+}
+
+.case-page .insights-desc {
+  margin-top: 2px;
+  font-family: var(--tp-font-family-sans) !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: var(--tp-line-ui) !important;
+  color: var(--tp-text-muted) !important;
+}
+
+.case-page .insights-actions {
+  gap: 6px;
+}
+
+.case-page .insights-btn-primary {
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: var(--tp-font-semibold);
+}
+
+.case-page .insights-btn-primary .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.case-page .insights-cards {
+  gap: 6px !important;
+}
+
+.case-page .insight-card {
+  min-height: 68px !important;
+  padding: 8px 10px !important;
+  border-radius: 11px !important;
+}
+
+.case-page .insight-icon-wrap {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 8px;
+}
+
+.case-page .insight-icon-wrap .material-symbols-outlined {
+  font-size: 17px;
+}
+
+.case-page .insight-label {
+  font-size: 11px;
+  line-height: var(--tp-line-ui);
+}
+
+.case-page .insight-value {
+  margin: 3px 0 !important;
+  font-size: 21px !important;
+  line-height: 1;
+}
+
+.case-page .insight-value span {
+  font-size: 12px !important;
+}
+
+.case-page .insight-trend {
+  margin-top: 8px !important;
+  padding: 1px 6px;
+  font-size: 10px !important;
+}
+
+.case-page .insight-chart {
+  height: 14px;
+  gap: 2px;
+}
+
+.case-page .bar {
+  width: 3px;
+}
+
+.case-page .filter-bar {
+  min-height: 42px;
+  gap: 8px;
+  padding: 6px 8px !important;
+  border-radius: 12px !important;
+}
+
+.case-page .filter-search-input :deep(.el-input__wrapper),
+.case-page .filter-dropdown :deep(.el-select__wrapper),
+.case-page .filter-icon-btn {
+  min-height: 30px;
+  border-radius: 8px !important;
+}
+
+.case-page .filter-search-input :deep(.el-input__inner),
+.case-page .filter-dropdown :deep(.el-select__placeholder),
+.case-page .filter-dropdown :deep(.el-select__selected-item) {
+  font-size: 12px;
+}
+
+.case-page .filter-dropdown {
+  width: 112px;
+}
+
+.case-page .filter-dropdown:nth-child(3) {
+  width: 136px;
+}
+
+.case-page .filter-icon-btn {
+  width: 30px;
+  height: 30px;
+}
+
+.case-page .filter-chips {
+  gap: 6px;
+  margin-top: -2px;
+}
+
+.case-page .chip,
+.case-page .chip-clear-all {
+  min-height: 24px;
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+.case-page .table-shell {
+  flex: 1 1 auto;
+  border-radius: 12px 12px 0 0 !important;
+}
+
+.case-page .table-shell table {
+  min-width: 1040px;
+}
+
+.case-page .table-shell th {
+  height: 34px;
+  padding: 7px 10px !important;
+  font-size: 11px !important;
+}
+
+.case-page .table-shell tbody td {
+  height: 42px;
+  padding: 7px 10px !important;
+  font-size: 12px;
+}
+
+.case-page .case-title-link {
+  font-size: 12px;
+  line-height: var(--tp-line-ui);
+}
+
+.case-page .table-shell :deep(.el-tag),
+.case-page .table-tag {
+  min-height: 20px;
+  padding: 0 7px;
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.case-page .table-tags {
+  gap: 4px;
+  max-height: 42px;
+}
+
+.case-page .table-meta-cell {
+  gap: 7px;
+}
+
+.case-page .table-user-avatar,
+.case-page .table-user-avatar-img {
+  width: 22px;
+  height: 22px;
+}
+
+.case-page .table-meta-name {
+  max-width: 84px;
+  font-size: 11px;
+}
+
+.case-page .table-meta-time {
+  font-size: 10px;
+}
+
+.case-page .action-group {
+  gap: 2px;
+}
+
+.case-page .action-btn.icon-only {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+}
+
+.case-page .action-btn.icon-only .material-symbols-outlined,
+.case-page .action-btn.icon-only .btn-icon {
+  font-size: 15px !important;
+}
+
+.case-page .pager {
+  min-height: 42px;
+  padding: 6px 12px;
+}
+
+.case-page .pager :deep(.el-pagination button),
+.case-page .pager :deep(.el-pager li) {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 8px;
 }
 
 @media (max-width: 1280px) {

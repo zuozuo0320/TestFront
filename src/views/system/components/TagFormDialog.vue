@@ -158,4 +158,22 @@ function updateField(field: 'name' | 'color' | 'description', value: string) {
 .tm-dialog .el-dialog__body {
   padding-top: 18px;
 }
+
+.tm-dialog .el-dialog {
+  background: var(--tp-surface-card);
+  border-color: var(--tp-border-subtle);
+  box-shadow: var(--tp-shadow-md);
+}
+
+.tm-dialog .el-dialog__header {
+  border-bottom-color: var(--tp-border-subtle);
+}
+
+.color-swatch:hover {
+  transform: none;
+}
+
+.color-swatch.active {
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
+}
 </style>

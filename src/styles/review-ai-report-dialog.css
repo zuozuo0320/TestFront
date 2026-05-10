@@ -1,0 +1,208 @@
+.ai-report-dialog.el-dialog,
+.ai-report-dialog .el-dialog {
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 14px;
+  box-shadow: var(--tp-shadow-md);
+}
+
+.ai-report-dialog .el-dialog__header,
+.ai-report-dialog .el-dialog__footer {
+  margin-right: 0;
+  border-color: var(--tp-border-subtle);
+}
+
+.ai-report-dialog .el-dialog__header {
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--tp-border-subtle);
+}
+
+.ai-report-dialog .el-dialog__body {
+  padding: 14px 18px 12px;
+}
+
+.ai-report-dialog .el-dialog__footer {
+  padding: 10px 18px 14px;
+  border-top: 1px solid var(--tp-border-subtle);
+}
+
+.ai-report-header,
+.count-pill {
+  display: flex;
+  align-items: center;
+}
+
+.ai-report-header {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ai-report-header h3 {
+  margin: 0;
+  color: var(--tp-text-primary);
+  font-size: 16px;
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-tight);
+}
+
+.ai-report-header p,
+.ai-report-meta {
+  color: var(--tp-text-muted);
+  font-size: 11px;
+  line-height: var(--tp-line-ui);
+}
+
+.ai-report-header p {
+  margin: 5px 0 0;
+  font-size: 12px;
+}
+
+.ai-report-status {
+  min-height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--tp-accent-success-border);
+  border-radius: 999px;
+  background: var(--tp-accent-success-soft);
+  color: var(--tp-success);
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: var(--tp-font-semibold);
+  white-space: nowrap;
+}
+
+.ai-report-status.is-warning {
+  border-color: var(--tp-accent-warning-border);
+  background: var(--tp-accent-warning-soft);
+  color: var(--tp-warning);
+}
+
+.ai-report {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ai-report-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.stat-card {
+  min-height: 70px;
+  padding: 10px 12px;
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 10px;
+  background: var(--tp-surface-elevated);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.stat-total {
+  background: var(--tp-surface-muted);
+}
+
+.stat-pass {
+  background: var(--tp-accent-success-soft);
+  border-color: var(--tp-accent-success-border);
+}
+
+.stat-fail,
+.count-critical {
+  background: var(--tp-accent-danger-soft);
+}
+
+.stat-fail {
+  border-color: var(--tp-accent-danger-border);
+}
+
+.stat-error,
+.count-major {
+  background: var(--tp-accent-warning-soft);
+}
+
+.stat-error {
+  border-color: var(--tp-accent-warning-border);
+}
+
+.stat-label {
+  margin-bottom: 4px;
+  color: var(--tp-text-muted);
+  font-size: 11px;
+  font-weight: var(--tp-font-medium);
+  line-height: var(--tp-line-ui);
+}
+
+.stat-value,
+.stat-rate-value {
+  color: var(--tp-text-primary);
+  font-weight: var(--tp-font-bold);
+  line-height: 1;
+}
+
+.stat-value {
+  font-size: 22px;
+}
+
+.stat-rate-value {
+  margin-bottom: 7px;
+  font-size: 16px;
+}
+
+.count-pill {
+  min-width: 22px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  color: var(--tp-text-secondary);
+  justify-content: center;
+  font-size: 12px;
+  font-weight: var(--tp-font-semibold);
+}
+
+.count-critical {
+  color: var(--tp-danger);
+}
+
+.count-major {
+  color: var(--tp-warning);
+}
+
+.count-action {
+  background: var(--tp-accent-primary-soft);
+  color: var(--tp-primary);
+}
+
+.ai-report-table {
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.ai-report-table .el-table__header th {
+  height: 34px;
+  background: var(--tp-surface-header);
+  color: var(--tp-text-muted);
+  font-size: 11px;
+  font-weight: var(--tp-font-bold);
+}
+
+.ai-report-table .el-table__row td {
+  height: 38px;
+  color: var(--tp-text-secondary);
+  font-size: 12px;
+}
+
+.ai-report-table .el-table__row:hover > td {
+  background: var(--tp-surface-row-hover);
+}
+
+.ai-report-table .row-failed {
+  --el-table-tr-bg-color: var(--tp-accent-danger-soft);
+}
+
+.ai-report-meta {
+  margin: -2px 0 0;
+  justify-content: flex-end;
+}

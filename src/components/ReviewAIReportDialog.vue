@@ -13,6 +13,8 @@ import { computed } from 'vue'
 
 import { ElDialog, ElTable, ElTableColumn, ElTag, ElButton, ElProgress } from 'element-plus'
 
+import '@/styles/review-ai-report-dialog.css'
+
 import type { PlanRunReport, PlanItemSummary, AIGateStatus } from '@/api/caseReviewV02'
 
 interface Props {
@@ -37,6 +39,16 @@ const passRate = computed(() => {
   const r = props.report
   if (!r || r.total_count === 0) return 0
   return Math.round((r.passed_count / r.total_count) * 100)
+})
+const passRateLabel = computed(() => {
+  if (passRate.value >= 80) return '质量稳定'
+  if (passRate.value >= 50) return '存在风险'
+  return '需重点关注'
+})
+const passRateColor = computed(() => {
+  if (passRate.value >= 80) return 'var(--tp-success)'
+  if (passRate.value >= 50) return 'var(--tp-warning)'
+  return 'var(--tp-danger)'
 })
 
 const gateLabel: Record<AIGateStatus, string> = {
@@ -64,15 +76,30 @@ function rowClass({ row }: { row: PlanItemSummary }) {
 <template>
   <ElDialog
     :model-value="modelValue"
-    title="AI 评审报告"
     width="960px"
     append-to-body
+    class="ai-report-dialog"
     :before-close="close"
   >
+    <template #header>
+      <div class="ai-report-header">
+        <div>
+          <h3>AI 评审报告</h3>
+          <p v-if="report">
+            {{ report.total_count }} 个用例 ·
+            {{ report.failed_count + report.error_count }} 项需关注
+          </p>
+        </div>
+        <span class="ai-report-status" :class="{ 'is-warning': passRate < 80 }">
+          {{ passRateLabel }}
+        </span>
+      </div>
+    </template>
+
     <div v-if="report" class="ai-report">
       <!-- 顶部统计 -->
       <div class="ai-report-stats">
-        <div class="stat-card">
+        <div class="stat-card stat-total">
           <div class="stat-label">用例总数</div>
           <div class="stat-value">{{ report.total_count }}</div>
         </div>
@@ -90,16 +117,24 @@ function rowClass({ row }: { row: PlanItemSummary }) {
         </div>
         <div class="stat-card stat-rate">
           <div class="stat-label">通过率</div>
+          <div class="stat-rate-value">{{ passRate }}%</div>
           <ElProgress
             :percentage="passRate"
-            :color="passRate >= 80 ? '#10b981' : passRate >= 50 ? '#f59e0b' : '#ef4444'"
-            :stroke-width="10"
+            :color="passRateColor"
+            :stroke-width="8"
+            :show-text="false"
           />
         </div>
       </div>
 
       <!-- 明细表格 -->
-      <ElTable :data="report.items" :row-class-name="rowClass" max-height="480" size="small">
+      <ElTable
+        class="ai-report-table"
+        :data="report.items"
+        :row-class-name="rowClass"
+        max-height="420"
+        size="small"
+      >
         <ElTableColumn prop="item_id" label="评审项" width="90" />
         <ElTableColumn prop="title_snapshot" label="用例" min-width="260" show-overflow-tooltip />
         <ElTableColumn label="门禁状态" width="110">
@@ -111,18 +146,30 @@ function rowClass({ row }: { row: PlanItemSummary }) {
         </ElTableColumn>
         <ElTableColumn label="严重" width="72" align="center">
           <template #default="{ row }">
-            <span :class="{ 'count-critical': row.critical_count > 0 }">
+            <span class="count-pill" :class="{ 'count-critical': row.critical_count > 0 }">
               {{ row.critical_count }}
             </span>
           </template>
         </ElTableColumn>
         <ElTableColumn label="主要" width="72" align="center">
           <template #default="{ row }">
-            <span :class="{ 'count-major': row.major_count > 0 }">{{ row.major_count }}</span>
+            <span class="count-pill" :class="{ 'count-major': row.major_count > 0 }">
+              {{ row.major_count }}
+            </span>
           </template>
         </ElTableColumn>
-        <ElTableColumn label="提示" width="72" align="center" prop="minor_count" />
-        <ElTableColumn label="Action Items" width="110" align="center" prop="defect_count" />
+        <ElTableColumn label="提示" width="72" align="center">
+          <template #default="{ row }">
+            <span class="count-pill">{{ row.minor_count }}</span>
+          </template>
+        </ElTableColumn>
+        <ElTableColumn label="Action Items" width="110" align="center">
+          <template #default="{ row }">
+            <span class="count-pill" :class="{ 'count-action': row.defect_count > 0 }">
+              {{ row.defect_count }}
+            </span>
+          </template>
+        </ElTableColumn>
         <ElTableColumn label="操作" width="110">
           <template #default="{ row }">
             <ElButton link type="primary" size="small" @click="jump(row.item_id)">
@@ -132,7 +179,9 @@ function rowClass({ row }: { row: PlanItemSummary }) {
         </ElTableColumn>
       </ElTable>
 
-      <p class="ai-report-meta">生成时间：{{ report.run_at }}</p>
+      <div class="ai-report-meta">
+        <span>生成时间：{{ report.run_at }}</span>
+      </div>
     </div>
 
     <template #footer>
@@ -140,64 +189,3 @@ function rowClass({ row }: { row: PlanItemSummary }) {
     </template>
   </ElDialog>
 </template>
-
-<style scoped>
-.ai-report {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.ai-report-stats {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
-}
-.stat-card {
-  padding: 12px 16px;
-  border-radius: 8px;
-  background: #f5f5f7;
-  border: 1px solid #e5e5ea;
-}
-.stat-card.stat-pass {
-  background: #ecfdf5;
-  border-color: #a7f3d0;
-}
-.stat-card.stat-fail {
-  background: #fef2f2;
-  border-color: #fecaca;
-}
-.stat-card.stat-error {
-  background: #fff7ed;
-  border-color: #fed7aa;
-}
-.stat-card.stat-rate {
-  grid-column: span 1;
-}
-.stat-label {
-  font-size: 12px;
-  color: #6b7280;
-  margin-bottom: 4px;
-}
-.stat-value {
-  font-size: 22px;
-  font-weight: 700;
-  color: #111827;
-}
-.count-critical {
-  color: #ef4444;
-  font-weight: 600;
-}
-.count-major {
-  color: #f59e0b;
-  font-weight: 600;
-}
-:deep(.row-failed) {
-  background: rgba(248, 113, 113, 0.04);
-}
-.ai-report-meta {
-  margin: 0;
-  text-align: right;
-  color: #9ca3af;
-  font-size: 12px;
-}
-</style>

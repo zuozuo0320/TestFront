@@ -5017,5 +5017,435 @@ watch(
   color: var(--tp-text-muted);
   opacity: 1;
 }
+
+.rv2 {
+  min-height: calc(100vh - 56px - 16px);
+}
+
+.rv2-main {
+  gap: 8px;
+  padding: 8px;
+}
+
+.rv2-summary {
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.rv2-summary-title-row {
+  gap: 7px;
+  margin-bottom: 5px;
+}
+
+.rv2-summary-title {
+  font-size: 16px;
+  line-height: var(--tp-line-tight);
+}
+
+.rv2-summary-desc {
+  max-width: 560px;
+  font-size: 12px;
+  line-height: var(--tp-line-ui);
+}
+
+.rv2-tc-badge {
+  min-height: 20px;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.rv2-summary-r {
+  gap: 9px;
+}
+
+.rv2-progress-compact {
+  min-width: 190px;
+  gap: 5px;
+}
+
+.rv2-progress-copy {
+  gap: 10px;
+}
+
+.rv2-progress-track {
+  height: 4px;
+}
+
+.rv2-nav-btns {
+  gap: 6px;
+}
+
+.rv2-nav-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+.rv2-body {
+  gap: 10px;
+}
+
+@media (min-width: 1100px) {
+  .rv2-body {
+    grid-template-columns: clamp(220px, 14vw, 280px) minmax(0, 1fr);
+  }
+
+  .rv2-sidebar {
+    height: calc(100vh - 56px - 48px);
+    max-height: calc(100vh - 56px - 48px);
+    top: 12px;
+  }
+}
+
+@media (min-width: 1600px) {
+  .rv2-body {
+    grid-template-columns: clamp(240px, 14vw, 300px) minmax(0, 1fr);
+  }
+}
+
+.rv2-sidebar,
+.rv2-panel,
+.rv2-gate-card,
+.rv2-basic-card,
+.rv2-condition-box,
+.rv2-step-table,
+.rv2-decision-panel,
+.rv2-audit-latest,
+.rv2-attachments {
+  border-radius: 12px;
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.rv2-sidebar-header {
+  gap: 7px;
+  padding: 8px 10px;
+}
+
+.rv2-sidebar-stats {
+  gap: 5px;
+}
+
+.rv2-sidebar-filter {
+  min-height: 24px;
+  padding: 4px 6px;
+  border-radius: 7px;
+  font-size: 10px;
+}
+
+.rv2-case-row {
+  min-height: 48px;
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.rv2-case-idx {
+  width: 20px;
+  padding-top: 1px;
+}
+
+.rv2-case-main {
+  gap: 5px;
+}
+
+.rv2-case-name {
+  font-size: 12px;
+  line-height: var(--tp-line-ui);
+}
+
+.rv2-case-meta {
+  gap: 4px;
+}
+
+.rv2-case-status,
+.rv2-case-ai,
+.rv2-gate-status,
+.rv2-value-tag,
+.rv2-level-tag,
+.rv2-priority-tag,
+.rv2-finding-sev,
+.rv2-finding-field,
+.rv2-finding-status,
+.rv2-drawer-result {
+  min-height: 20px;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.rv2-panel {
+  padding: 12px;
+}
+
+.rv2-panel-title {
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  line-height: var(--tp-line-ui);
+}
+
+.rv2-panel-title .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.rv2-panel-actions {
+  gap: 6px;
+}
+
+.rv2-panel-btn,
+.rv2-attach-inline-btn {
+  min-height: 30px;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.rv2-panel-btn .material-symbols-outlined,
+.rv2-attach-inline-btn .material-symbols-outlined {
+  font-size: 15px;
+}
+
+.rv2-gate-grid {
+  gap: 8px;
+}
+
+.rv2-gate-card {
+  padding: 10px;
+}
+
+.rv2-gate-head {
+  margin-bottom: 6px;
+}
+
+.rv2-gate-icon {
+  font-size: 18px;
+}
+
+.rv2-gate-card-title {
+  font-size: 13px;
+  line-height: var(--tp-line-ui);
+}
+
+.rv2-gate-card-desc {
+  font-size: 11px;
+  line-height: var(--tp-line-ui);
+}
+
+.rv2-findings {
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.rv2-finding {
+  gap: 5px;
+  padding: 8px 9px;
+  border-radius: 8px;
+}
+
+.rv2-finding-msg {
+  font-size: 12px;
+  line-height: var(--tp-line-ui);
+}
+
+.rv2-finding-note {
+  padding: 5px 7px;
+  font-size: 10px;
+}
+
+.rv2-finding-actions {
+  gap: 5px;
+}
+
+.rv2-finding-btn {
+  padding: 3px 7px;
+  border-radius: 7px;
+}
+
+.rv2-case-fields {
+  gap: 10px;
+  padding: 12px;
+}
+
+.rv2-case-fields-head {
+  gap: 10px;
+}
+
+.rv2-basic-fields {
+  gap: 8px;
+}
+
+.rv2-basic-field {
+  padding: 9px;
+  border-radius: 10px;
+}
+
+.rv2-field-head {
+  margin-bottom: 5px;
+}
+
+.rv2-basic-field p {
+  font-size: 12px;
+  line-height: var(--tp-line-body);
+}
+
+.rv2-panel-compact {
+  padding: 10px 12px;
+}
+
+.rv2-attach-grid {
+  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.rv2-attach-drop {
+  height: 88px;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 10px;
+}
+
+.rv2-attach-card {
+  min-height: 86px;
+  gap: 9px;
+  padding: 9px 36px 9px 9px;
+  border-radius: 10px;
+}
+
+.rv2-attach-card.has-preview {
+  min-height: 96px;
+}
+
+.rv2-attach-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.rv2-attach-preview {
+  width: 88px;
+  min-height: 78px;
+  border-radius: 8px;
+}
+
+.rv2-attach-name {
+  font-size: 12px;
+}
+
+.rv2-attach-action {
+  width: 24px;
+  height: 24px;
+}
+
+.rv2-decision {
+  gap: 10px;
+}
+
+.rv2-decision-options {
+  gap: 6px;
+}
+
+.rv2-decision-option {
+  min-height: 48px;
+  gap: 9px;
+  padding: 9px;
+  border-radius: 10px;
+}
+
+.rv2-decision-option .material-symbols-outlined {
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
+}
+
+.rv2-decision-option strong {
+  font-size: 12px;
+}
+
+.rv2-decision-option small {
+  font-size: 10px;
+  line-height: var(--tp-line-ui);
+}
+
+.rv2-decision-input {
+  min-height: 78px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: var(--tp-line-body);
+}
+
+.rv2-btn {
+  min-height: 32px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.rv2-btn .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.rv2 {
+  background: var(--tp-surface-base);
+  background-image: none;
+}
+
+.rv2-summary,
+.rv2-record-drawer-shell {
+  background-image: none;
+}
+
+.rv2-record-drawer-header {
+  background: var(--tp-surface-card);
+  backdrop-filter: none;
+}
+
+.rv2-gate-blob {
+  display: none;
+  filter: none;
+}
+
+.rv2-gate-card:hover .rv2-gate-blob {
+  background: transparent;
+}
+
+.rv2-attach-actions,
+.rv2-attach-card:hover .rv2-attach-actions,
+.rv2-attach-card:focus-within .rv2-attach-actions,
+.rv2-attach-action:hover,
+.rv2-attach-action:focus-visible,
+.rv2-decision-option:hover,
+.rv2-btn-submit:hover:not(:disabled) {
+  transform: none;
+}
+
+.rv2-decision-option {
+  background: var(--tp-surface-input);
+  border-color: var(--tp-border-subtle);
+}
+
+.rv2-decision-option:hover {
+  background: var(--tp-surface-hover);
+  border-color: var(--tp-border-strong);
+}
+
+.rv2-btn-submit,
+.rv2-btn-submit:hover:not(:disabled) {
+  box-shadow: var(--tp-btn-shadow);
+}
+
+.rv2-panel,
+.rv2-sidebar,
+.rv2-summary,
+.rv2-gate-card,
+.rv2-basic-card,
+.rv2-condition-box,
+.rv2-step-table,
+.rv2-audit-latest,
+.rv2-attachments,
+.rv2-record-drawer-shell {
+  box-shadow: var(--tp-shadow-sm);
+}
 /* 设计稿 V2 样式结束。旧 .rd-* 类已全部迁移为 .rv2-*。 */
 </style>
