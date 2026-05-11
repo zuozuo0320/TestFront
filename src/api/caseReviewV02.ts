@@ -9,6 +9,11 @@
 import type { AxiosRequestConfig } from 'axios'
 
 import { apiClient } from './client'
+import {
+  getProjectSettings as getGenericProjectSettings,
+  updateProjectSettings as updateGenericProjectSettings,
+} from './projectSettings'
+export type { ProjectSettings, TestEnvironment } from './projectSettings'
 
 /** 轻量请求选项：仅透出 signal */
 interface RequestOptions {
@@ -129,11 +134,6 @@ export interface CaseReviewDefect {
   updated_at: string
 }
 
-/** 项目级 settings */
-export interface ProjectSettings {
-  allow_self_review: boolean
-}
-
 // ─── Action Items ───
 
 export interface ListDefectsParams {
@@ -235,15 +235,13 @@ export async function reopenDefect(projectId: number, defectId: number) {
 
 /** 读取项目级 settings（默认 allow_self_review=false） */
 export async function getProjectSettings(projectId: number) {
-  const { data } = await apiClient.get<ProjectSettings>(`/projects/${projectId}/settings`)
-  return data
+  return getGenericProjectSettings(projectId)
 }
 
 /** 局部更新项目级 settings；字段使用指针语义（undefined 不修改） */
 export async function updateProjectSettings(
   projectId: number,
-  payload: { allow_self_review?: boolean },
+  payload: Parameters<typeof updateGenericProjectSettings>[1],
 ) {
-  const { data } = await apiClient.put<ProjectSettings>(`/projects/${projectId}/settings`, payload)
-  return data
+  return updateGenericProjectSettings(projectId, payload)
 }

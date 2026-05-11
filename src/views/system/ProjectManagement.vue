@@ -12,9 +12,15 @@ import {
   uploadProjectAvatar,
 } from '../../api/project'
 import { listMembers, addMember, removeMember } from '../../api/projectMember'
+import {
+  getProjectSettings,
+  updateProjectSettings,
+  type TestEnvironment,
+} from '../../api/projectSettings'
 import { listUsers } from '../../api/user'
 import type { Project, ProjectMember, User } from '../../api/types'
 import { useAuthStore } from '../../stores/auth'
+import { extractErrorMessage, isElMessageBoxCancel } from '../../utils/error'
 
 const authStore = useAuthStore()
 
@@ -92,6 +98,15 @@ const allUsers = ref<User[]>([])
 const addMemberUserId = ref<number | ''>('')
 const addingMember = ref(false)
 const projectMembers = ref<Record<number, ProjectMember[]>>({})
+
+// ── 测试环境配置弹窗 ──
+const environmentDialogVisible = ref(false)
+const environmentProject = ref<Project | null>(null)
+const environmentRows = ref<TestEnvironment[]>([])
+const environmentLoading = ref(false)
+const environmentSaving = ref(false)
+const projectEnvironmentMap = ref<Record<number, TestEnvironment[]>>({})
+const switchingEnvironmentProjectId = ref<number | null>(null)
 
 /** 过滤并排序项目列表 */
 const filteredProjects = computed(() => {
@@ -178,6 +193,7 @@ async function loadProjects() {
   try {
     projects.value = await listProjects()
     await loadAllProjectMembers()
+    await loadAllProjectEnvironmentSummaries()
   } finally {
     appLoading.value = false
   }
@@ -199,6 +215,20 @@ async function loadAllProjectMembers() {
   )
   projectMembers.value = map
 }
+async function loadAllProjectEnvironmentSummaries() {
+  const map: Record<number, TestEnvironment[]> = {}
+  await Promise.all(
+    projects.value.map(async (project) => {
+      try {
+        const settings = await getProjectSettings(project.id)
+        map[project.id] = normalizeEnvironmentRows(settings.test_environments)
+      } catch {
+        map[project.id] = []
+      }
+    }),
+  )
+  projectEnvironmentMap.value = map
+}
 
 function getProjectOwnerName(project: Project) {
   return project.owner_name?.trim() || '未设置'
@@ -215,6 +245,147 @@ function isMemberRemovalBlocked(member: ProjectMember) {
 function memberRemovalTip(member: ProjectMember) {
   if (isProjectOwnerMember(member)) return '当前负责人不可移除，请先转交负责人'
   return '管理员角色不可移除'
+}
+function getProjectEnvironments(projectId: number) {
+  return projectEnvironmentMap.value[projectId] ?? []
+}
+function getDefaultProjectEnvironment(projectId: number) {
+  const envs = getProjectEnvironments(projectId)
+  return envs.find((env) => env.is_default) ?? envs[0] ?? null
+}
+function createEnvironmentRow(): TestEnvironment {
+  return {
+    id: `env_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    name: environmentRows.value.length === 0 ? '测试环境' : '',
+    base_url: '',
+    description: '',
+    is_default: environmentRows.value.length === 0,
+  }
+}
+function normalizeEnvironmentRows(rows: TestEnvironment[]) {
+  const normalized = rows.map((row) => ({
+    id: row.id,
+    name: row.name.trim(),
+    base_url: row.base_url.trim(),
+    description: row.description?.trim() || '',
+    is_default: row.is_default,
+  }))
+  if (normalized.length > 0 && !normalized.some((row) => row.is_default)) {
+    const first = normalized[0]
+    if (first) first.is_default = true
+  }
+  return normalized
+}
+function isValidHttpUrl(raw: string) {
+  try {
+    const parsed = new URL(raw)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+async function openEnvironmentDialog(project: Project) {
+  environmentProject.value = project
+  environmentRows.value = []
+  environmentDialogVisible.value = true
+  environmentLoading.value = true
+  try {
+    const settings = await getProjectSettings(project.id)
+    environmentRows.value =
+      settings.test_environments.length > 0
+        ? normalizeEnvironmentRows(settings.test_environments)
+        : [createEnvironmentRow()]
+  } catch {
+    ElMessage.error('测试环境配置加载失败，请稍后重试')
+  } finally {
+    environmentLoading.value = false
+  }
+}
+function addEnvironmentRow() {
+  environmentRows.value.push(createEnvironmentRow())
+}
+function removeEnvironmentRow(id: string) {
+  environmentRows.value = normalizeEnvironmentRows(
+    environmentRows.value.filter((row) => row.id !== id),
+  )
+}
+function setDefaultEnvironment(id: string) {
+  environmentRows.value = environmentRows.value.map((row) => ({
+    ...row,
+    is_default: row.id === id,
+  }))
+}
+function handleProjectEnvironmentCommand(project: Project, command: string | number | object) {
+  if (command === 'manage') {
+    void openEnvironmentDialog(project)
+    return
+  }
+  if (typeof command !== 'string') return
+  void switchDefaultProjectEnvironment(project, command)
+}
+async function switchDefaultProjectEnvironment(project: Project, environmentId: string) {
+  const envs = getProjectEnvironments(project.id)
+  const target = envs.find((env) => env.id === environmentId)
+  if (!target) {
+    ElMessage.warning('测试环境不存在，请刷新后重试')
+    return
+  }
+  if (target.is_default) return
+
+  const rows = normalizeEnvironmentRows(
+    envs.map((env) => ({
+      ...env,
+      is_default: env.id === environmentId,
+    })),
+  )
+  switchingEnvironmentProjectId.value = project.id
+  try {
+    const settings = await updateProjectSettings(project.id, {
+      test_environments: rows,
+    })
+    const normalized = normalizeEnvironmentRows(settings.test_environments)
+    projectEnvironmentMap.value = {
+      ...projectEnvironmentMap.value,
+      [project.id]: normalized,
+    }
+    if (environmentProject.value?.id === project.id) environmentRows.value = normalized
+    ElMessage.success(`已切换到 ${target.name}`)
+  } catch (err: unknown) {
+    ElMessage.error(extractErrorMessage(err, '测试环境切换失败'))
+  } finally {
+    switchingEnvironmentProjectId.value = null
+  }
+}
+async function submitEnvironmentSettings() {
+  if (!environmentProject.value) return
+  const rows = normalizeEnvironmentRows(environmentRows.value)
+  for (const row of rows) {
+    if (!row.name) {
+      ElMessage.warning('测试环境名称不能为空')
+      return
+    }
+    if (!isValidHttpUrl(row.base_url)) {
+      ElMessage.warning('测试环境访问地址必须是有效的 http 或 https URL')
+      return
+    }
+  }
+  environmentSaving.value = true
+  try {
+    const settings = await updateProjectSettings(environmentProject.value.id, {
+      test_environments: rows,
+    })
+    environmentRows.value = normalizeEnvironmentRows(settings.test_environments)
+    projectEnvironmentMap.value = {
+      ...projectEnvironmentMap.value,
+      [environmentProject.value.id]: environmentRows.value,
+    }
+    environmentDialogVisible.value = false
+    ElMessage.success('测试环境配置已保存')
+  } catch (err: unknown) {
+    ElMessage.error(extractErrorMessage(err, '测试环境配置保存失败'))
+  } finally {
+    environmentSaving.value = false
+  }
 }
 
 async function openCreateProject() {
@@ -300,8 +471,8 @@ async function submitProject() {
     }
     dialogVisible.value = false
     await loadProjects()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || e?.response?.data?.message || '操作失败')
+  } catch (err: unknown) {
+    ElMessage.error(extractErrorMessage(err, '操作失败'))
   } finally {
     savingProject.value = false
   }
@@ -316,8 +487,8 @@ async function onArchive(p: Project) {
     await archiveProject(p.id)
     ElMessage.success('项目已归档')
     await loadProjects()
-  } catch (e: any) {
-    if (e !== 'cancel') ElMessage.error(e?.response?.data?.error || '归档失败')
+  } catch (err: unknown) {
+    if (!isElMessageBoxCancel(err)) ElMessage.error(extractErrorMessage(err, '归档失败'))
   }
 }
 async function onRestore(p: Project) {
@@ -325,8 +496,8 @@ async function onRestore(p: Project) {
     await unarchiveProject(p.id)
     ElMessage.success('项目已恢复')
     await loadProjects()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '恢复失败')
+  } catch (err: unknown) {
+    ElMessage.error(extractErrorMessage(err, '恢复失败'))
   }
 }
 async function onDelete(p: Project) {
@@ -339,8 +510,8 @@ async function onDelete(p: Project) {
     await deleteProject(p.id)
     ElMessage.success('项目已删除')
     await loadProjects()
-  } catch (e: any) {
-    if (e !== 'cancel') ElMessage.error(e?.response?.data?.error || '删除失败')
+  } catch (err: unknown) {
+    if (!isElMessageBoxCancel(err)) ElMessage.error(extractErrorMessage(err, '删除失败'))
   }
 }
 async function openMemberDialog(p: Project) {
@@ -372,8 +543,8 @@ async function onAddMember() {
     addMemberUserId.value = ''
     await loadMembers(memberProject.value.id)
     await loadProjects()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '添加成员失败')
+  } catch (err: unknown) {
+    ElMessage.error(extractErrorMessage(err, '添加成员失败'))
   } finally {
     addingMember.value = false
   }
@@ -390,8 +561,8 @@ async function onRemoveMember(m: ProjectMember) {
     ElMessage.success('成员已移除')
     await loadMembers(memberProject.value.id)
     await loadProjects()
-  } catch (e: any) {
-    if (e !== 'cancel') ElMessage.error(e?.response?.data?.error || '移除失败')
+  } catch (err: unknown) {
+    if (!isElMessageBoxCancel(err)) ElMessage.error(extractErrorMessage(err, '移除失败'))
   }
 }
 function onCardAction(cmd: string, p: Project) {
@@ -401,6 +572,9 @@ function onCardAction(cmd: string, p: Project) {
       break
     case 'members':
       openMemberDialog(p)
+      break
+    case 'environments':
+      openEnvironmentDialog(p)
       break
     case 'archive':
       onArchive(p)
@@ -422,8 +596,8 @@ void Search // suppress unused import warning
     <!-- 头部 -->
     <div class="pm-header">
       <div class="pm-header-left">
-        <h2 class="pm-title">活跃项目库</h2>
-        <p class="pm-subtitle">管理并监控所有正在进行的自动化测试流</p>
+        <h2 class="pm-title">项目管理</h2>
+        <p class="pm-subtitle">统一维护项目、成员、测试环境和质量状态</p>
       </div>
       <div class="pm-header-right">
         <div class="pm-stats-panel">
@@ -461,6 +635,7 @@ void Search // suppress unused import warning
             </th>
             <th class="pm-th">项目名称</th>
             <th class="pm-th">负责人</th>
+            <th class="pm-th">测试环境</th>
             <th class="pm-th">质量状态</th>
             <th class="pm-th">测试进度</th>
             <th class="pm-th pm-th-action">操作</th>
@@ -507,6 +682,74 @@ void Search // suppress unused import warning
               </div>
             </td>
             <td class="pm-td">
+              <el-dropdown
+                v-if="getProjectEnvironments(p.id).length > 0"
+                trigger="click"
+                popper-class="pm-env-dropdown-popper"
+                :disabled="switchingEnvironmentProjectId === p.id"
+                @command="
+                  (cmd: string | number | object) => handleProjectEnvironmentCommand(p, cmd)
+                "
+              >
+                <button class="pm-env-trigger" type="button" :aria-label="`${p.name} 切换测试环境`">
+                  <span
+                    v-if="switchingEnvironmentProjectId === p.id"
+                    class="material-symbols-outlined pm-env-spin"
+                  >
+                    progress_activity
+                  </span>
+                  <span v-else class="pm-env-trigger-dot"></span>
+                  <span class="pm-env-trigger-label">
+                    {{ getDefaultProjectEnvironment(p.id)?.name || '选择环境' }}
+                  </span>
+                  <span v-if="getProjectEnvironments(p.id).length > 1" class="pm-env-trigger-count">
+                    {{ getProjectEnvironments(p.id).length }}
+                  </span>
+                  <span class="material-symbols-outlined pm-env-chevron">expand_more</span>
+                </button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item
+                      v-for="env in getProjectEnvironments(p.id)"
+                      :key="env.id"
+                      :command="env.id"
+                      :disabled="env.is_default"
+                    >
+                      <span class="pm-env-menu-item" :class="{ 'is-active': env.is_default }">
+                        <span class="pm-env-menu-dot"></span>
+                        <span class="pm-env-menu-copy">
+                          <span class="pm-env-menu-name">{{ env.name }}</span>
+                          <span class="pm-env-menu-url">{{ env.base_url }}</span>
+                        </span>
+                        <span
+                          v-if="env.is_default"
+                          class="pm-env-menu-check material-symbols-outlined"
+                        >
+                          check
+                        </span>
+                      </span>
+                    </el-dropdown-item>
+                    <el-dropdown-item command="manage" divided>
+                      <span class="pm-env-menu-manage">
+                        <span class="material-symbols-outlined">settings</span>
+                        管理测试环境
+                      </span>
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+              <button
+                v-else
+                class="pm-env-trigger pm-env-trigger--empty"
+                type="button"
+                @click="openEnvironmentDialog(p)"
+              >
+                <span class="pm-env-trigger-dot"></span>
+                <span class="pm-env-trigger-label">未配置</span>
+                <span class="material-symbols-outlined pm-env-chevron">add</span>
+              </button>
+            </td>
+            <td class="pm-td">
               <span class="pm-health-badge" :class="`pm-health-${getProjectQuality(p).color}`">
                 <span class="pm-health-dot"></span>
                 {{ getProjectQuality(p).label }}
@@ -536,6 +779,7 @@ void Search // suppress unused import warning
                   <el-dropdown-menu>
                     <el-dropdown-item command="edit">编辑</el-dropdown-item>
                     <el-dropdown-item command="members">成员管理</el-dropdown-item>
+                    <el-dropdown-item command="environments">测试环境</el-dropdown-item>
                     <el-dropdown-item
                       v-if="p.status === 'active'"
                       command="archive"
@@ -557,7 +801,7 @@ void Search // suppress unused import warning
             </td>
           </tr>
           <tr v-if="paginatedProjects.length === 0">
-            <td colspan="6" class="pm-empty-row">暂无匹配的项目</td>
+            <td colspan="7" class="pm-empty-row">暂无匹配的项目</td>
           </tr>
         </tbody>
       </table>
@@ -581,7 +825,7 @@ void Search // suppress unused import warning
     <div class="pm-bento-grid">
       <div class="pm-glass-card">
         <div class="pm-card-top">
-          <h4 class="pm-card-label">COVERAGE PULSE</h4>
+          <h4 class="pm-card-label">覆盖率趋势</h4>
           <span class="pm-trend-up">
             <span class="material-symbols-outlined pm-trend-icon">trending_up</span>
             +4.2%
@@ -602,8 +846,8 @@ void Search // suppress unused import warning
       </div>
       <div class="pm-glass-card">
         <div class="pm-card-top">
-          <h4 class="pm-card-label">CRITICAL VECTORS</h4>
-          <span class="pm-urgent-badge">URGENT</span>
+          <h4 class="pm-card-label">风险提醒</h4>
+          <span class="pm-urgent-badge">需关注</span>
         </div>
         <div class="pm-vectors-list">
           <div class="pm-vector-row">
@@ -611,7 +855,7 @@ void Search // suppress unused import warning
               <span class="material-symbols-outlined pm-vector-icon pm-vector-rose">
                 bug_report
               </span>
-              <span class="pm-vector-text">API Latency Issues</span>
+              <span class="pm-vector-text">接口响应异常</span>
             </div>
             <span class="pm-vector-count">12 处</span>
           </div>
@@ -620,7 +864,7 @@ void Search // suppress unused import warning
               <span class="material-symbols-outlined pm-vector-icon pm-vector-amber">
                 sync_problem
               </span>
-              <span class="pm-vector-text">Memory Leaks</span>
+              <span class="pm-vector-text">运行资源泄露</span>
             </div>
             <span class="pm-vector-count">5 处</span>
           </div>
@@ -629,7 +873,7 @@ void Search // suppress unused import warning
               <span class="material-symbols-outlined pm-vector-icon pm-vector-primary">
                 history
               </span>
-              <span class="pm-vector-text">Regression Risk</span>
+              <span class="pm-vector-text">回归风险</span>
             </div>
             <span class="pm-vector-count pm-vector-primary">低</span>
           </div>
@@ -637,12 +881,12 @@ void Search // suppress unused import warning
       </div>
       <div class="pm-capacity-card">
         <div class="pm-capacity-content">
-          <h4 class="pm-card-label pm-card-label--purple">COMPUTE CAPACITY</h4>
-          <p class="pm-capacity-sub">测试集群当前负载情况</p>
+          <h4 class="pm-card-label pm-card-label--purple">执行资源</h4>
+          <p class="pm-capacity-sub">测试执行节点当前负载</p>
           <div class="pm-capacity-stats">
             <div>
               <p class="pm-capacity-num">64%</p>
-              <p class="pm-capacity-label">LOAD</p>
+              <p class="pm-capacity-label">负载</p>
             </div>
             <div class="pm-capacity-divider"></div>
             <div>
@@ -650,7 +894,7 @@ void Search // suppress unused import warning
                 2.4
                 <span class="pm-capacity-unit">ms</span>
               </p>
-              <p class="pm-capacity-label">PING</p>
+              <p class="pm-capacity-label">响应</p>
             </div>
           </div>
         </div>
@@ -810,6 +1054,68 @@ void Search // suppress unused import warning
         </div>
         <div v-if="filteredMembers.length === 0 && !membersLoading" class="mb-empty">暂无成员</div>
       </div>
+    </el-dialog>
+
+    <el-dialog
+      v-model="environmentDialogVisible"
+      :title="`${environmentProject?.name || ''} - 测试环境配置`"
+      width="860px"
+    >
+      <div v-loading="environmentLoading" class="pm-env-panel">
+        <div class="pm-env-toolbar">
+          <div>
+            <h3 class="pm-env-title">项目通用测试环境</h3>
+            <p class="pm-env-desc">
+              维护当前项目可复用的访问地址，AI 生成、脚本录制和后续执行均可引用。
+            </p>
+          </div>
+          <button type="button" class="pm-env-add" @click="addEnvironmentRow">
+            <span class="material-symbols-outlined">add</span>
+            添加环境
+          </button>
+        </div>
+        <div class="pm-env-list">
+          <div v-for="row in environmentRows" :key="row.id" class="pm-env-row">
+            <label class="pm-env-default">
+              <input
+                type="radio"
+                name="default-test-environment"
+                :checked="row.is_default"
+                @change="setDefaultEnvironment(row.id)"
+              />
+              默认
+            </label>
+            <el-input v-model="row.name" class="pm-env-name" placeholder="环境名称，如测试环境" />
+            <el-input
+              v-model="row.base_url"
+              class="pm-env-url"
+              placeholder="https://test.example.com"
+            />
+            <el-input
+              v-model="row.description"
+              class="pm-env-desc-input"
+              placeholder="说明（可选）"
+            />
+            <button
+              type="button"
+              class="pm-env-remove"
+              aria-label="删除测试环境"
+              @click="removeEnvironmentRow(row.id)"
+            >
+              <span class="material-symbols-outlined">delete</span>
+            </button>
+          </div>
+          <div v-if="environmentRows.length === 0" class="pm-env-empty">
+            暂无测试环境，点击“添加环境”创建一条配置
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="environmentDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="environmentSaving" @click="submitEnvironmentSettings">
+          保存配置
+        </el-button>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -1060,6 +1366,51 @@ void Search // suppress unused import warning
   font-size: 13px;
   font-weight: 300;
   color: #e1e1f2;
+}
+.pm-env-cell {
+  display: inline-flex;
+  align-items: center;
+  max-width: 260px;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 12px;
+  background: var(--tp-surface-input);
+  color: var(--tp-text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+.pm-env-cell:hover {
+  border-color: var(--tp-accent-primary-border);
+  background: var(--tp-surface-hover);
+}
+.pm-env-cell-icon {
+  color: var(--tp-primary);
+  font-size: 18px;
+}
+.pm-env-cell-main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.pm-env-cell-name,
+.pm-env-cell-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pm-env-cell-name {
+  color: var(--tp-text-primary);
+  font-size: var(--tp-text-sm);
+  font-weight: var(--tp-font-semibold);
+  line-height: var(--tp-line-ui);
+}
+.pm-env-cell-url {
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-medium);
+  line-height: var(--tp-line-ui);
 }
 .pm-health-badge {
   display: inline-flex;
@@ -1984,5 +2335,600 @@ void Search // suppress unused import warning
 .pm-owner-cell,
 .pm-actions {
   min-width: 0;
+}
+
+.pm-env-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pm-env-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pm-env-title {
+  margin: 0 0 6px;
+  color: var(--tp-text-primary);
+  font-size: 16px;
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-tight);
+  letter-spacing: -0.01em;
+}
+
+.pm-env-desc {
+  margin: 0;
+  color: var(--tp-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.pm-env-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid rgba(139, 92, 246, 0.18);
+  border-radius: var(--tp-btn-radius);
+  background: var(--tp-accent-primary-soft);
+  color: var(--tp-primary);
+  font-size: 13px;
+  font-weight: var(--tp-font-semibold);
+  cursor: pointer;
+  transition: background var(--tp-transition);
+}
+
+.pm-env-add:hover {
+  background: rgba(139, 92, 246, 0.16);
+}
+
+.pm-env-add .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.pm-env-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pm-env-row {
+  display: grid;
+  grid-template-columns: 72px minmax(120px, 0.7fr) minmax(220px, 1.1fr) minmax(160px, 0.9fr) 40px;
+  gap: 8px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid rgba(229, 231, 235, 0.7);
+  border-radius: var(--tp-radius-lg);
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(17, 24, 39, 0.02);
+  transition:
+    border-color var(--tp-transition),
+    box-shadow var(--tp-transition);
+}
+
+.pm-env-row:focus-within,
+.pm-env-row:hover {
+  border-color: rgba(139, 92, 246, 0.28);
+  box-shadow:
+    0 6px 14px rgba(17, 24, 39, 0.035),
+    0 0 0 3px rgba(139, 92, 246, 0.06);
+}
+
+.pm-env-row :deep(.el-input__wrapper) {
+  box-shadow: none !important;
+  background: var(--tp-surface-input);
+  border-radius: 8px;
+}
+
+.pm-env-row :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px var(--tp-primary) inset !important;
+  background: #ffffff;
+}
+
+.pm-env-row :deep(.el-input__inner) {
+  font-size: 13px;
+}
+
+.pm-env-default {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--tp-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.pm-env-default input[type='radio'] {
+  accent-color: var(--tp-primary);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+.pm-env-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--tp-text-muted);
+  cursor: pointer;
+}
+
+.pm-env-remove:hover {
+  background: var(--tp-accent-danger-soft);
+  color: var(--tp-accent-danger);
+}
+
+.pm-env-remove .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.pm-env-empty {
+  padding: 28px;
+  border: 1px dashed var(--tp-border-strong);
+  border-radius: var(--tp-radius-lg);
+  color: var(--tp-text-muted);
+  text-align: center;
+}
+
+.pm-page {
+  min-height: auto;
+  padding: var(--tp-space-2) var(--tp-space-3) var(--tp-space-4);
+  background:
+    radial-gradient(circle at 8% 88%, var(--tp-ambient-info), transparent 32%),
+    radial-gradient(circle at 88% 0%, var(--tp-ambient-primary), transparent 28%),
+    var(--tp-surface-base);
+}
+
+.pm-header {
+  align-items: center;
+  gap: var(--tp-space-3);
+  margin-bottom: var(--tp-space-2);
+}
+
+.pm-title {
+  margin-bottom: var(--tp-space-1);
+  color: var(--tp-text-primary);
+  font-size: var(--tp-text-2xl);
+  letter-spacing: -0.03em;
+}
+
+.pm-subtitle {
+  color: var(--tp-text-muted);
+}
+
+.pm-stats-panel {
+  gap: var(--tp-space-3);
+  padding: var(--tp-space-1) var(--tp-space-2) var(--tp-space-1) var(--tp-space-3);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: var(--tp-radius-xl);
+  background: var(--tp-glass-bg-strong);
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.pm-stat-item {
+  min-width: var(--tp-space-12);
+  text-align: left;
+}
+
+.pm-stat-number {
+  color: var(--tp-text-primary);
+  font-size: var(--tp-text-xl);
+  line-height: var(--tp-line-tight);
+}
+
+.pm-add-btn {
+  height: var(--tp-btn-height-md);
+  padding: 0 var(--tp-space-5);
+  margin-left: var(--tp-space-1);
+}
+
+.pm-table-wrap {
+  overflow: hidden;
+  margin-bottom: var(--tp-space-3);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: var(--tp-radius-xl);
+  background: var(--tp-glass-bg-strong);
+  box-shadow: var(--tp-shadow-card);
+}
+
+.pm-table {
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.pm-th {
+  padding: var(--tp-space-2) var(--tp-space-3);
+  border-bottom: 1px solid var(--tp-border-subtle);
+  color: var(--tp-text-subtle);
+  font-size: 11px;
+}
+
+.pm-th-check {
+  width: 46px;
+}
+
+.pm-th:nth-child(2) {
+  width: 22%;
+}
+
+.pm-th:nth-child(3) {
+  width: 16%;
+}
+
+.pm-th:nth-child(4) {
+  width: 26%;
+}
+
+.pm-th:nth-child(5) {
+  width: 14%;
+}
+
+.pm-th:nth-child(6) {
+  width: 15%;
+}
+
+.pm-row {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.pm-row:hover {
+  background: var(--tp-surface-row-hover);
+  box-shadow: none;
+}
+
+.pm-td {
+  padding: var(--tp-space-2) var(--tp-space-3);
+  border-bottom: 1px solid rgba(229, 231, 235, 0.62);
+}
+
+.pm-row:last-child .pm-td {
+  border-bottom: 0;
+}
+
+.pm-project-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 11px;
+}
+
+.pm-project-name,
+.pm-owner-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pm-env-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--tp-space-2);
+  width: 156px;
+  height: 32px;
+  padding: 0 var(--tp-space-2);
+  border: 1px solid rgba(196, 181, 253, 0.56);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--tp-surface-card), var(--tp-surface-header));
+  color: var(--tp-text-primary);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-medium);
+  line-height: var(--tp-line-ui);
+  box-shadow:
+    0 1px 2px rgba(17, 24, 39, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+  transition:
+    border-color var(--tp-transition),
+    background var(--tp-transition),
+    box-shadow var(--tp-transition);
+}
+
+.pm-env-trigger:hover {
+  border-color: var(--tp-accent-primary-border);
+  background: var(--tp-surface-hover);
+  box-shadow:
+    0 4px 10px rgba(139, 92, 246, 0.08),
+    0 0 0 3px rgba(139, 92, 246, 0.06);
+}
+
+.pm-env-trigger:focus-visible {
+  outline: none;
+  border-color: var(--tp-primary);
+  box-shadow:
+    0 0 0 3px var(--tp-accent-primary-soft),
+    0 4px 10px rgba(139, 92, 246, 0.1);
+}
+
+.pm-env-trigger--empty {
+  border-color: var(--tp-border-subtle);
+  background: var(--tp-surface-card);
+  color: var(--tp-text-muted);
+}
+
+.pm-env-trigger--empty:hover {
+  border-color: var(--tp-accent-primary-border);
+  background: var(--tp-surface-hover);
+  color: var(--tp-primary);
+}
+
+.pm-env-trigger-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: var(--tp-btn-radius);
+  background: var(--tp-primary);
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
+}
+
+.pm-env-trigger--empty .pm-env-trigger-dot {
+  background: var(--tp-text-disabled);
+  box-shadow: none;
+}
+
+.pm-env-trigger-label {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.pm-env-trigger-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: var(--tp-btn-radius);
+  background: var(--tp-surface-muted);
+  color: var(--tp-text-muted);
+  font-size: 10px;
+  font-weight: var(--tp-font-semibold);
+  line-height: 1;
+}
+
+.pm-env-chevron {
+  flex: 0 0 auto;
+  color: var(--tp-text-disabled);
+  font-size: 16px;
+  transition: color var(--tp-transition);
+}
+
+.pm-env-trigger:hover .pm-env-chevron {
+  color: var(--tp-text-muted);
+}
+
+.pm-env-spin {
+  flex: 0 0 auto;
+  color: var(--tp-primary);
+  font-size: 16px;
+  animation: pm-spin 0.9s linear infinite;
+}
+
+.pm-env-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.pm-env-menu-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--tp-gray-400);
+}
+
+.pm-env-menu-item.is-active .pm-env-menu-dot {
+  background: var(--tp-primary);
+  box-shadow: 0 0 0 2px var(--tp-accent-primary-soft);
+}
+
+.pm-env-menu-copy {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.pm-env-menu-name {
+  overflow: hidden;
+  color: var(--tp-text-primary);
+  font-size: 13px;
+  font-weight: var(--tp-font-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pm-env-menu-url {
+  overflow: hidden;
+  max-width: 200px;
+  color: var(--tp-text-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pm-env-menu-check {
+  flex: 0 0 auto;
+  color: var(--tp-primary);
+  font-size: 16px;
+}
+
+.pm-env-menu-manage {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--tp-text-secondary);
+  font-size: 12px;
+  font-weight: var(--tp-font-medium);
+}
+
+.pm-env-menu-manage .material-symbols-outlined {
+  font-size: 15px;
+}
+
+:global(.pm-env-dropdown-popper) {
+  border: 1px solid var(--tp-border-subtle) !important;
+  border-radius: 10px !important;
+  background: var(--tp-surface-card) !important;
+  box-shadow: var(--tp-shadow-card) !important;
+}
+
+:global(.pm-env-dropdown-popper .el-dropdown-menu) {
+  padding: 4px !important;
+  background: transparent !important;
+}
+
+:global(.pm-env-dropdown-popper .el-dropdown-menu__item) {
+  min-height: 40px;
+  padding: 6px 10px !important;
+  border-radius: 6px;
+  color: var(--tp-text-primary);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+:global(.pm-env-dropdown-popper .el-dropdown-menu__item:not(.is-disabled):hover) {
+  background: var(--tp-surface-hover) !important;
+  color: var(--tp-text-primary) !important;
+}
+
+:global(.pm-env-dropdown-popper .el-dropdown-menu__item.is-disabled) {
+  background: var(--tp-accent-primary-soft) !important;
+  opacity: 1;
+  cursor: default;
+}
+
+:global(.pm-env-dropdown-popper .el-dropdown-menu__item--divided) {
+  min-height: 32px;
+  margin-top: 4px !important;
+  border-top: 1px solid var(--tp-border-subtle) !important;
+}
+
+@keyframes pm-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pm-health-badge {
+  padding: var(--tp-space-1) var(--tp-space-2);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+}
+
+.pm-progress-cell {
+  width: 100%;
+  max-width: 132px;
+}
+
+.pm-progress-label {
+  margin-bottom: 6px;
+  color: var(--tp-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.pm-progress-track {
+  height: 6px;
+  background: rgba(139, 92, 246, 0.12);
+}
+
+.pm-progress-bar {
+  height: 6px;
+}
+
+.pm-more-btn {
+  width: 34px;
+  height: 34px;
+  margin-left: auto;
+  border: 1px solid transparent;
+  border-radius: 11px;
+}
+
+.pm-more-btn:hover {
+  border-color: var(--tp-accent-primary-border);
+}
+
+.pm-pagination {
+  padding: var(--tp-space-2) var(--tp-space-3);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.pm-bento-grid {
+  grid-template-columns: 1fr 1.1fr 0.9fr;
+  gap: var(--tp-space-3);
+}
+
+.pm-glass-card,
+.pm-capacity-card {
+  min-height: 118px;
+  padding: var(--tp-space-3);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: var(--tp-radius-xl);
+  background: var(--tp-glass-bg-strong);
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.pm-card-top {
+  align-items: center;
+  margin-bottom: var(--tp-space-2);
+}
+
+.pm-card-label {
+  color: var(--tp-text-secondary);
+  font-size: var(--tp-text-sm);
+  font-weight: var(--tp-font-bold);
+}
+
+.pm-big-num,
+.pm-capacity-num {
+  color: var(--tp-text-primary);
+  font-size: var(--tp-text-2xl);
+  letter-spacing: -0.04em;
+}
+
+.pm-mini-bars {
+  height: 28px;
+  align-items: end;
+}
+
+.pm-bar {
+  border-radius: 8px 8px 0 0;
+}
+
+.pm-vectors-list {
+  gap: 9px;
+}
+
+.pm-vector-row {
+  padding: var(--tp-space-2);
+  border: 1px solid rgba(229, 231, 235, 0.72);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.pm-capacity-card {
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(139, 92, 246, 0.14), transparent 34%),
+    var(--tp-glass-bg-strong);
 }
 </style>

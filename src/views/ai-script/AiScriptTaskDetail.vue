@@ -2,7 +2,7 @@
 import { onMounted, onUnmounted, computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAiScriptStore } from '../../stores/aiScript'
-import type { TraceActionType } from '../../api/aiScript'
+import type { AiScriptTrace } from '../../api/aiScript'
 import {
   TaskStatusLabel,
   TaskStatusColor,
@@ -140,6 +140,18 @@ const validation = computed(() => store.latestValidation)
 const validationHistory = computed(() => store.validationHistory)
 
 // ── 操作轨迹（录制模式下用步骤模型填充）──
+type RecordingStep = {
+  stepNo?: number
+  actionType?: string
+  pageUrl?: string
+  locator?: string
+  inputValue?: string
+  description?: string
+}
+type RecordingStepModel = {
+  steps?: RecordingStep[]
+}
+type DisplayTrace = Omit<AiScriptTrace, 'actionType'> & { actionType: string }
 
 /** 从 Playwright locator 字符串中提取人类可读的元素名 */
 function readableFromLocator(locator: string): string {
@@ -151,7 +163,7 @@ function readableFromLocator(locator: string): string {
 }
 
 /** 将 step_model step 转为可读的 targetSummary */
-function stepSummary(s: any): string {
+function stepSummary(s: RecordingStep): string {
   const type = (s.actionType || 'CUSTOM').toUpperCase()
   if (type === 'NAVIGATE') return `导航到 ${s.pageUrl || ''}`
   if (type === 'CLICK') {
@@ -174,24 +186,27 @@ function stepSummary(s: any): string {
   return s.description || `步骤 ${s.stepNo}`
 }
 
-const displayTraces = computed(() => {
+const displayTraces = computed<DisplayTrace[]>(() => {
   // 优先用 DB 持久化的 traces（AI 直生 & 录制增强 AI 重构完成后均有数据）
   if (traces.value.length > 0) return traces.value
   // 兜底：录制增强但 AI 还未重构完成，用 step_model_json 实时渲染
   if (isRecordingMode.value && recording.value?.stepModelJson) {
-    const model = recording.value.stepModelJson as any
-    const steps = model?.steps || []
-    return steps.map((s: any) => ({
-      id: s.stepNo,
-      taskId: taskId.value,
-      traceNo: s.stepNo,
-      actionType: (s.actionType || 'CUSTOM').toUpperCase(),
-      pageUrl: s.pageUrl || '',
-      targetSummary: stepSummary(s),
-      locatorUsed: s.locator || '',
-      inputValueMasked: s.inputValue || '',
-      occurredAt: '',
-    }))
+    const model = recording.value.stepModelJson as RecordingStepModel
+    const steps = Array.isArray(model.steps) ? model.steps : []
+    return steps.map((s, idx) => {
+      const stepNo = s.stepNo ?? idx + 1
+      return {
+        id: stepNo,
+        taskId: taskId.value,
+        traceNo: stepNo,
+        actionType: (s.actionType || 'CUSTOM').toUpperCase(),
+        pageUrl: s.pageUrl || '',
+        targetSummary: stepSummary(s),
+        locatorUsed: s.locator || '',
+        inputValueMasked: s.inputValue || '',
+        occurredAt: '',
+      }
+    })
   }
   return []
 })
@@ -348,7 +363,7 @@ async function handleFinishRecording() {
 }
 
 /** 轨迹动作图标 */
-function traceIcon(type: TraceActionType): string {
+function traceIcon(type: string): string {
   const map: Record<string, string> = {
     NAVIGATE: 'open_in_browser',
     CLICK: 'mouse',
@@ -651,7 +666,7 @@ const isTaskActive = computed(() => {
   <div class="ai-page ai-task-detail-page">
     <!-- 顶部操作栏 -->
     <div class="ai-page-header ai-task-detail-header">
-      <div class="ai-page-header-left">
+      <div class="ai-detail-header-left">
         <button
           class="ai-detail-back-icon"
           type="button"
@@ -674,91 +689,106 @@ const isTaskActive = computed(() => {
           <div class="ai-detail-subtitle">智能任务详情</div>
         </div>
       </div>
-      <div class="ai-action-group ai-task-detail-actions">
-        <!-- 录制增强模式：录制按钮 -->
-        <template v-if="isRecordingMode && isTaskActive">
+      <div class="ai-task-detail-actions">
+        <div class="ai-detail-action-group ai-detail-action-group--primary">
+          <template v-if="isRecordingMode && isTaskActive">
+            <button
+              v-if="canRegenerateFromRecording"
+              class="ai-btn ai-btn-primary"
+              :disabled="store.actionLoading"
+              @click="handleRegenerateFromRecording"
+            >
+              <span v-if="store.actionLoading" class="ai-spinner"></span>
+              <span v-else class="material-symbols-outlined">refresh</span>
+              重新生成
+            </button>
+            <button
+              v-if="!recording || recording.recordingStatus !== 'RECORDING'"
+              class="ai-btn ai-btn-secondary"
+              :disabled="recordingLoading || store.actionLoading"
+              @click="handleStartRecording"
+            >
+              <span class="material-symbols-outlined">fiber_manual_record</span>
+              {{ recording?.recordingStatus === 'FINISHED' ? '重新录制' : '开始录制' }}
+            </button>
+            <button v-else class="ai-btn ai-btn-warning" @click="openRecordingSubmitDialog">
+              <span class="material-symbols-outlined">stop_circle</span>
+              提交录制
+            </button>
+          </template>
           <button
-            v-if="canRegenerateFromRecording"
-            class="ai-btn ai-btn-primary"
-            :disabled="store.actionLoading"
-            @click="handleRegenerateFromRecording"
+            v-if="isAIDirectMode"
+            class="ai-btn ai-btn-ghost"
+            :disabled="store.actionLoading || !canExecute"
+            @click="handleExecute"
           >
             <span v-if="store.actionLoading" class="ai-spinner"></span>
             <span v-else class="material-symbols-outlined">refresh</span>
-            重新生成
+            {{ canExecute ? '触发执行' : '重新生成' }}
           </button>
           <button
-            v-if="!recording || recording.recordingStatus !== 'RECORDING'"
-            class="ai-btn ai-btn-secondary"
-            :disabled="recordingLoading || store.actionLoading"
-            @click="handleStartRecording"
+            class="ai-btn ai-btn-primary"
+            :disabled="store.actionLoading || !canValidate"
+            @click="handleValidate"
           >
-            <span class="material-symbols-outlined">fiber_manual_record</span>
-            {{ recording?.recordingStatus === 'FINISHED' ? '重新录制' : '开始录制' }}
+            <span v-if="store.actionLoading" class="ai-spinner"></span>
+            <span
+              v-else
+              class="material-symbols-outlined"
+              style="font-variation-settings: 'FILL' 1"
+            >
+              play_arrow
+            </span>
+            执行验证
           </button>
-          <button v-else class="ai-btn ai-btn-warning" @click="openRecordingSubmitDialog">
-            <span class="material-symbols-outlined">stop_circle</span>
-            提交录制
+          <button v-if="canConfirm" class="ai-btn ai-btn-success" @click="handleConfirm">
+            <span class="material-symbols-outlined">check_circle</span>
+            确认脚本
           </button>
-        </template>
-        <!-- AI 直生模式：执行按钮 -->
-        <button
-          v-if="isAIDirectMode"
-          class="ai-btn ai-btn-ghost"
-          :disabled="store.actionLoading || !canExecute"
-          @click="handleExecute"
+        </div>
+        <div class="ai-detail-action-group ai-detail-action-group--secondary">
+          <button class="ai-btn ai-btn-secondary" :disabled="!canEdit" @click="openEditDialog">
+            <span class="material-symbols-outlined">edit</span>
+            编辑脚本
+          </button>
+          <button
+            v-if="canExport"
+            class="ai-btn ai-btn-ghost"
+            title="导出脚本"
+            @click="handleExport"
+          >
+            <span class="material-symbols-outlined">download</span>
+          </button>
+          <button
+            v-if="canDiscard && script"
+            class="ai-btn ai-btn-ghost"
+            title="废弃当前脚本"
+            @click="handleDiscardScript"
+          >
+            <span class="material-symbols-outlined">cancel</span>
+          </button>
+        </div>
+        <div
+          v-if="canDiscard || canDelete"
+          class="ai-detail-action-group ai-detail-action-group--danger"
         >
-          <span v-if="store.actionLoading" class="ai-spinner"></span>
-          <span v-else class="material-symbols-outlined">refresh</span>
-          {{ canExecute ? '触发执行' : '重新生成' }}
-        </button>
-        <!-- 通用操作 -->
-        <button class="ai-btn ai-btn-secondary" :disabled="!canEdit" @click="openEditDialog">
-          <span class="material-symbols-outlined">edit</span>
-          编辑脚本
-        </button>
-        <button
-          class="ai-btn ai-btn-primary"
-          :disabled="store.actionLoading || !canValidate"
-          @click="handleValidate"
-        >
-          <span v-if="store.actionLoading" class="ai-spinner"></span>
-          <span v-else class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1">
-            play_arrow
-          </span>
-          执行验证
-        </button>
-        <button v-if="canConfirm" class="ai-btn ai-btn-success" @click="handleConfirm">
-          <span class="material-symbols-outlined">check_circle</span>
-          确认脚本
-        </button>
-        <button
-          v-if="canDiscard && script"
-          class="ai-btn ai-btn-ghost"
-          title="废弃当前脚本"
-          @click="handleDiscardScript"
-        >
-          <span class="material-symbols-outlined">cancel</span>
-        </button>
-        <button v-if="canExport" class="ai-btn ai-btn-ghost" title="导出脚本" @click="handleExport">
-          <span class="material-symbols-outlined">download</span>
-        </button>
-        <button
-          v-if="canDiscard"
-          class="ai-btn ai-btn-danger-ghost"
-          title="废弃任务"
-          @click="handleDiscardTask"
-        >
-          <span class="material-symbols-outlined">block</span>
-        </button>
-        <button
-          v-if="canDelete"
-          class="ai-btn ai-btn-danger-ghost"
-          title="删除任务"
-          @click="handleDeleteTask"
-        >
-          <span class="material-symbols-outlined">delete_forever</span>
-        </button>
+          <button
+            v-if="canDiscard"
+            class="ai-btn ai-btn-danger-ghost"
+            title="废弃任务"
+            @click="handleDiscardTask"
+          >
+            <span class="material-symbols-outlined">block</span>
+          </button>
+          <button
+            v-if="canDelete"
+            class="ai-btn ai-btn-danger-ghost"
+            title="删除任务"
+            @click="handleDeleteTask"
+          >
+            <span class="material-symbols-outlined">delete_forever</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -775,13 +805,29 @@ const isTaskActive = computed(() => {
             </div>
           </div>
           <div class="ai-task-meta-list">
-            <div>
-              <div class="ai-info-label">关联用例</div>
-              <div class="ai-info-value">
-                <span class="material-symbols-outlined ai-task-meta-icon">terminal</span>
-                <span v-if="task">
-                  {{ task.caseTags?.join(', ') || `${task.caseCount} 条用例` }}
-                </span>
+            <div class="ai-task-summary-card">
+              <div class="ai-task-summary-main">
+                <span class="material-symbols-outlined ai-task-summary-icon">automation</span>
+                <div>
+                  <div class="ai-task-summary-title">{{ task?.taskName || '加载中...' }}</div>
+                  <div class="ai-task-summary-desc">
+                    {{
+                      task ? GenerationModeLabel[task.generationMode] || task.generationMode : '-'
+                    }}
+                  </div>
+                </div>
+              </div>
+              <div class="ai-task-summary-metrics">
+                <div>
+                  <span>关联用例</span>
+                  <strong v-if="task">
+                    {{ task.caseTags?.join(', ') || `${task.caseCount} 条` }}
+                  </strong>
+                </div>
+                <div>
+                  <span>脚本状态</span>
+                  <strong>{{ script ? ScriptStatusLabel[script.scriptStatus] : '未生成' }}</strong>
+                </div>
               </div>
             </div>
             <div>
@@ -1096,7 +1142,14 @@ const isTaskActive = computed(() => {
         <section v-else class="ai-info-card ai-script-empty-card">
           <div class="ai-script-empty">
             <span class="material-symbols-outlined">code</span>
-            <p>暂无脚本，请先触发执行生成</p>
+            <h3>暂无可预览脚本</h3>
+            <p>
+              {{
+                isRecordingMode
+                  ? '请先开始录制并提交录制稿，系统会自动重构生成脚本'
+                  : '请先触发执行，系统会自动探索页面并生成 Playwright 脚本'
+              }}
+            </p>
           </div>
         </section>
 

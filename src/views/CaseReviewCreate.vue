@@ -11,7 +11,7 @@ import {
   updateReview,
   type LinkItemEntry,
 } from '../api/caseReview'
-import { getProjectSettings, updateProjectSettings } from '../api/caseReviewV02'
+import { getProjectSettings, updateProjectSettings } from '../api/projectSettings'
 import { listTestCases } from '../api/testcase'
 import type { TestCase } from '../api/types'
 import { extractErrorMessage } from '../utils/error'

@@ -15,6 +15,7 @@ import {
 } from '../../api/aiScript'
 import { TaskStatus } from '../../api/aiScript'
 import { listProjects } from '../../api/project'
+import { getProjectSettings, type TestEnvironment } from '../../api/projectSettings'
 import { listTestCases } from '../../api/testcase'
 import type { Project, TestCase } from '../../api/types'
 
@@ -170,6 +171,18 @@ const createForm = reactive({
   caseIds: '',
   frameworkType: 'Playwright',
 })
+const generationModeOptions: Array<{ value: GenerationMode; label: string; desc: string }> = [
+  {
+    value: GenerationMode.RECORDING_ENHANCED,
+    label: GenerationModeLabel[GenerationMode.RECORDING_ENHANCED],
+    desc: '先录制真实路径，再由 AI 重构为稳定脚本',
+  },
+  {
+    value: GenerationMode.AI_DIRECT,
+    label: GenerationModeLabel[GenerationMode.AI_DIRECT],
+    desc: '由 AI 自动探索目标页面并生成测试脚本',
+  },
+]
 
 // ── 用例搜索选择 ──
 const caseCandidates = ref<TestCase[]>([])
@@ -179,6 +192,13 @@ const showCaseDropdown = ref(false)
 const caseLoading = ref(false)
 const caseLoadError = ref('')
 let caseSearchTimer: ReturnType<typeof setTimeout> | null = null
+const environmentOptions = ref<TestEnvironment[]>([])
+const selectedEnvironmentId = ref('')
+const environmentLoading = ref(false)
+const showEnvironmentDropdown = ref(false)
+const selectedEnvironment = computed(() =>
+  environmentOptions.value.find((env) => env.id === selectedEnvironmentId.value),
+)
 
 /**
  * 为新建任务弹窗选择默认项目。
@@ -186,18 +206,15 @@ let caseSearchTimer: ReturnType<typeof setTimeout> | null = null
  */
 function resolveDefaultCreateProjectId(): number {
   const selectedProjectId = projectStore.selectedProjectId
-  if (
-    typeof selectedProjectId === 'number' &&
-    projects.value.some((project) => project.id === selectedProjectId)
-  ) {
+  if (typeof selectedProjectId === 'number') {
     return selectedProjectId
   }
-  return projects.value[0]?.id ?? 0
+  return 0
 }
 
 /**
  * 重置关联用例选择器状态。
- * 打开弹窗或切换所属项目时，需要清掉旧项目残留的已选项、搜索词和错误提示。
+ * 打开弹窗或当前项目变化时，需要清掉旧项目残留的已选项、搜索词和错误提示。
  */
 function resetCasePickerState() {
   caseCandidates.value = []
@@ -206,32 +223,62 @@ function resetCasePickerState() {
   createForm.caseIds = ''
   caseLoadError.value = ''
 }
+function getDefaultEnvironment(envs: TestEnvironment[]) {
+  return envs.find((env) => env.is_default) ?? envs[0]
+}
+async function loadProjectEnvironments(projectId: number) {
+  environmentLoading.value = true
+  try {
+    const settings = await getProjectSettings(projectId)
+    environmentOptions.value = settings.test_environments
+    const defaultEnv = getDefaultEnvironment(environmentOptions.value)
+    selectedEnvironmentId.value = defaultEnv?.id ?? ''
+    createForm.startUrl = defaultEnv?.base_url ?? ''
+    return !!defaultEnv
+  } catch {
+    environmentOptions.value = []
+    selectedEnvironmentId.value = ''
+    createForm.startUrl = ''
+    showToast('测试环境配置加载失败，请稍后重试')
+    return false
+  } finally {
+    environmentLoading.value = false
+  }
+}
+function selectEnvironment(environmentId: string) {
+  selectedEnvironmentId.value = environmentId
+  createForm.startUrl =
+    environmentOptions.value.find((env) => env.id === environmentId)?.base_url ?? ''
+  showEnvironmentDropdown.value = false
+}
 
 /**
  * 打开新建任务弹窗并预加载关联用例。
- * 这里会在打开前确保项目列表可用，避免项目尚未加载完成时 projectId 被初始化为 0。
+ * 新建任务固定归属左侧当前项目，避免在弹窗内重复选择造成误操作。
  */
 async function openCreateDialog() {
-  if (projects.value.length === 0) {
-    projects.value = await listProjects()
+  createForm.projectId = resolveDefaultCreateProjectId()
+  if (!createForm.projectId) {
+    showToast('请先在左侧选择当前项目')
+    return
   }
 
-  createForm.projectId = resolveDefaultCreateProjectId()
   createForm.taskName = ''
   createForm.scenarioDesc = ''
-  createForm.startUrl = ''
   createForm.accountRef = ''
   createForm.caseIds = ''
   createForm.frameworkType = 'Playwright'
   createForm.generationMode = GenerationMode.RECORDING_ENHANCED
   resetCasePickerState()
   showCaseDropdown.value = false
-  showCreateDialog.value = true
-
-  if (!createForm.projectId) {
-    showToast('当前没有可用项目，请先创建项目')
+  showEnvironmentDropdown.value = false
+  const hasEnvironment = await loadProjectEnvironments(createForm.projectId)
+  if (!hasEnvironment) {
+    showToast('请先在项目管理中配置当前项目的测试环境')
     return
   }
+
+  showCreateDialog.value = true
 
   await loadCases(createForm.projectId)
 }
@@ -243,7 +290,7 @@ async function openCreateDialog() {
 async function loadCases(projectId: number, keyword = '') {
   if (!projectId) {
     caseCandidates.value = []
-    caseLoadError.value = '请先选择所属项目'
+    caseLoadError.value = '请先在左侧选择当前项目'
     return
   }
 
@@ -306,6 +353,11 @@ watch(
 )
 
 async function submitCreateTask() {
+  createForm.projectId = resolveDefaultCreateProjectId()
+  if (!createForm.projectId) {
+    showToast('请先在左侧选择当前项目')
+    return
+  }
   if (!createForm.taskName.trim()) {
     showToast('请输入任务名称')
     return
@@ -314,8 +366,12 @@ async function submitCreateTask() {
     showToast('请输入场景描述')
     return
   }
+  if (!selectedEnvironmentId.value) {
+    showToast('请选择测试环境')
+    return
+  }
   if (!createForm.startUrl.trim()) {
-    showToast('请输入起始 URL')
+    showToast('测试环境访问地址不能为空')
     return
   }
   // 解析用例 ID：支持逗号分隔
@@ -898,6 +954,7 @@ async function handleExecute(task: AiScriptTask) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="create-task-title"
+        @click="showEnvironmentDropdown = false"
       >
         <div class="ai-dialog-header">
           <div>
@@ -909,136 +966,219 @@ async function handleExecute(task: AiScriptTask) {
           </button>
         </div>
         <div class="ai-dialog-body ai-create-dialog-body">
-          <div class="ai-form-grid">
-            <div class="ai-form-group ai-form-group-half">
-              <label class="ai-form-label">所属项目 *</label>
-              <select v-model="createForm.projectId" class="ai-form-select">
-                <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
-              </select>
-            </div>
-            <div class="ai-form-group ai-form-group-half">
-              <label class="ai-form-label">生成模式 *</label>
-              <select v-model="createForm.generationMode" class="ai-form-select">
-                <option v-for="(label, key) in GenerationModeLabel" :key="key" :value="key">
-                  {{ label }}
-                </option>
-              </select>
-              <span class="ai-form-hint">
-                {{
-                  createForm.generationMode === GenerationMode.RECORDING_ENHANCED
-                    ? '录制增强：先 Playwright 录制，再 AI 重构为标准脚本'
-                    : 'AI 直生：browser-use 自动探索并生成脚本'
-                }}
-              </span>
-            </div>
-            <div class="ai-form-group ai-form-group-half">
-              <label class="ai-form-label">任务名称 *</label>
-              <input
-                v-model="createForm.taskName"
-                class="ai-form-input"
-                placeholder="例如：登录流程回归测试"
-              />
-            </div>
-            <div class="ai-form-group ai-form-group-half">
-              <label class="ai-form-label">起始 URL *</label>
-              <input
-                v-model="createForm.startUrl"
-                class="ai-form-input"
-                placeholder="https://your-app.com/login"
-              />
-            </div>
-            <div class="ai-form-group ai-form-group-full">
-              <label class="ai-form-label">场景描述 *</label>
-              <textarea
-                v-model="createForm.scenarioDesc"
-                class="ai-form-textarea"
-                placeholder="描述 browser-use 需要探索的业务场景，例如：登录系统后进入订单列表并筛选待处理订单"
-              />
-            </div>
-            <div class="ai-form-group ai-form-group-full ai-case-field">
-              <div class="ai-case-field-head">
-                <label class="ai-form-label">关联用例 *</label>
-                <span class="ai-case-selected-count">已选择 {{ selectedCaseIds.length }} 条</span>
+          <div class="ai-create-form">
+            <section class="ai-create-section">
+              <div class="ai-create-section-head">
+                <span class="ai-create-section-index">01</span>
+                <div>
+                  <h3>生成配置</h3>
+                  <p>选择脚本生成路径和本次任务使用的项目环境</p>
+                </div>
               </div>
-              <div class="ai-case-picker-panel">
-                <div class="ai-case-toolbar">
-                  <div class="ai-case-picker">
-                    <input
-                      class="ai-form-input"
-                      :value="caseSearchKeyword"
-                      placeholder="搜索用例名称或 ID..."
-                      @input="handleCaseSearch"
-                      @focus="showCaseDropdown = true"
-                    />
-                  </div>
-                  <span v-if="caseLoadError && !caseLoading" class="ai-case-inline-error">
-                    {{ caseLoadError }}
-                  </span>
-                </div>
-                <div v-if="showCaseDropdown" class="ai-case-dropdown">
-                  <div v-if="caseLoading" class="ai-case-dropdown-state">正在加载用例...</div>
-                  <div v-else-if="caseCandidates.length === 0" class="ai-case-dropdown-state">
-                    {{ caseLoadError || '当前没有可关联用例' }}
-                  </div>
-                  <template v-else>
-                    <div
-                      v-for="c in caseCandidates"
-                      :key="c.id"
-                      class="ai-case-option"
-                      :class="{ selected: isCaseSelected(c.id) }"
-                      @mousedown.prevent="toggleCase(c)"
+              <div class="ai-form-grid">
+                <div class="ai-form-group ai-form-group-half">
+                  <label class="ai-form-label">生成模式 *</label>
+                  <div class="ai-choice-grid">
+                    <button
+                      v-for="mode in generationModeOptions"
+                      :key="mode.value"
+                      type="button"
+                      class="ai-choice-card"
+                      :class="{ active: createForm.generationMode === mode.value }"
+                      :aria-pressed="createForm.generationMode === mode.value"
+                      @click="createForm.generationMode = mode.value"
                     >
-                      <span
-                        class="material-symbols-outlined ai-case-check"
-                        :class="{ selected: isCaseSelected(c.id) }"
-                      >
-                        {{ isCaseSelected(c.id) ? 'check_box' : 'check_box_outline_blank' }}
-                      </span>
-                      <span class="ai-case-id">TC-{{ c.id }}</span>
-                      <span class="ai-case-title">
-                        {{ c.title }}
-                      </span>
-                      <span v-if="c.level" class="ai-case-level">
-                        {{ c.level }}
-                      </span>
-                    </div>
-                  </template>
+                      <span class="ai-choice-title">{{ mode.label }}</span>
+                      <span class="ai-choice-desc">{{ mode.desc }}</span>
+                    </button>
+                  </div>
                 </div>
-                <div v-if="selectedCaseIds.length" class="ai-selected-case-list">
-                  <span v-for="cid in selectedCaseIds" :key="cid" class="ai-selected-case-tag">
-                    TC-{{ cid }}
+                <div class="ai-form-group ai-form-group-half">
+                  <label class="ai-form-label">测试环境 *</label>
+                  <div
+                    class="ai-env-select"
+                    :class="{ open: showEnvironmentDropdown, loading: environmentLoading }"
+                    @click.stop
+                  >
                     <button
                       type="button"
-                      class="ai-selected-case-remove"
-                      aria-label="移除关联用例"
-                      @click="removeSelectedCase(cid)"
+                      class="ai-env-select-trigger"
+                      :disabled="environmentLoading"
+                      :aria-expanded="showEnvironmentDropdown"
+                      @click="showEnvironmentDropdown = !showEnvironmentDropdown"
                     >
-                      <span class="material-symbols-outlined">close</span>
+                      <span class="ai-env-choice-dot active"></span>
+                      <span class="ai-env-select-copy">
+                        <span class="ai-env-choice-name">
+                          {{ selectedEnvironment?.name || '请选择测试环境' }}
+                        </span>
+                        <span class="ai-env-choice-url">
+                          {{ selectedEnvironment?.base_url || '请先在项目管理中配置测试环境' }}
+                        </span>
+                      </span>
+                      <span v-if="selectedEnvironment?.is_default" class="ai-env-choice-badge">
+                        默认
+                      </span>
+                      <span class="material-symbols-outlined ai-env-select-arrow">expand_more</span>
                     </button>
-                  </span>
+                    <div v-if="showEnvironmentDropdown" class="ai-env-dropdown">
+                      <button
+                        v-for="env in environmentOptions"
+                        :key="env.id"
+                        type="button"
+                        class="ai-env-option"
+                        :class="{ active: selectedEnvironmentId === env.id }"
+                        @click="selectEnvironment(env.id)"
+                      >
+                        <span class="ai-env-choice-dot"></span>
+                        <span class="ai-env-select-copy">
+                          <span class="ai-env-choice-name">{{ env.name }}</span>
+                          <span class="ai-env-choice-url">{{ env.base_url }}</span>
+                        </span>
+                        <span v-if="selectedEnvironmentId === env.id" class="ai-env-choice-badge">
+                          当前
+                        </span>
+                        <span v-else-if="env.is_default" class="ai-env-choice-badge">默认</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="ai-form-group ai-form-group-half">
-              <label class="ai-form-label">测试账号 (可选)</label>
-              <input
-                v-model="createForm.accountRef"
-                class="ai-form-input"
-                placeholder="引用的测试账号标识"
-              />
-            </div>
+            </section>
+            <section class="ai-create-section">
+              <div class="ai-create-section-head">
+                <span class="ai-create-section-index">02</span>
+                <div>
+                  <h3>任务详情</h3>
+                  <p>描述本次自动化任务的目标、路径和验证结果</p>
+                </div>
+              </div>
+              <div class="ai-form-grid">
+                <div class="ai-form-group ai-form-group-full">
+                  <label class="ai-form-label">任务名称 *</label>
+                  <input
+                    v-model="createForm.taskName"
+                    class="ai-form-input"
+                    placeholder="例如：登录流程回归测试"
+                  />
+                </div>
+                <div class="ai-form-group ai-form-group-full">
+                  <div class="ai-case-field-head">
+                    <label class="ai-form-label">场景描述 *</label>
+                    <span class="ai-prompt-count">{{ createForm.scenarioDesc.length }} 字</span>
+                  </div>
+                  <div class="ai-prompt-helper">
+                    <span class="material-symbols-outlined">tips_and_updates</span>
+                    建议写清入口页面、操作路径、关键数据和断言目标
+                  </div>
+                  <textarea
+                    v-model="createForm.scenarioDesc"
+                    class="ai-form-textarea ai-prompt-textarea"
+                    placeholder="例如：登录系统 → 进入订单列表 → 筛选待处理订单 → 验证订单状态为待处理"
+                  />
+                </div>
+              </div>
+            </section>
+            <section class="ai-create-section">
+              <div class="ai-create-section-head">
+                <span class="ai-create-section-index">03</span>
+                <div>
+                  <h3>执行上下文</h3>
+                  <p>关联用例和测试账号会作为生成脚本的上下文</p>
+                </div>
+              </div>
+              <div class="ai-form-grid">
+                <div class="ai-form-group ai-form-group-full ai-case-field">
+                  <div class="ai-case-field-head">
+                    <label class="ai-form-label">关联用例 *</label>
+                    <span class="ai-case-selected-count">
+                      已选择 {{ selectedCaseIds.length }} 条
+                    </span>
+                  </div>
+                  <div class="ai-case-picker-panel">
+                    <div class="ai-case-toolbar">
+                      <div class="ai-case-picker">
+                        <input
+                          class="ai-form-input"
+                          :value="caseSearchKeyword"
+                          placeholder="搜索用例名称或 ID..."
+                          @input="handleCaseSearch"
+                          @focus="showCaseDropdown = true"
+                        />
+                      </div>
+                      <span v-if="caseLoadError && !caseLoading" class="ai-case-inline-error">
+                        {{ caseLoadError }}
+                      </span>
+                    </div>
+                    <div v-if="showCaseDropdown" class="ai-case-dropdown">
+                      <div v-if="caseLoading" class="ai-case-dropdown-state">正在加载用例...</div>
+                      <div v-else-if="caseCandidates.length === 0" class="ai-case-dropdown-state">
+                        {{ caseLoadError || '当前没有可关联用例' }}
+                      </div>
+                      <template v-else>
+                        <div
+                          v-for="c in caseCandidates"
+                          :key="c.id"
+                          class="ai-case-option"
+                          :class="{ selected: isCaseSelected(c.id) }"
+                          @mousedown.prevent="toggleCase(c)"
+                        >
+                          <span
+                            class="material-symbols-outlined ai-case-check"
+                            :class="{ selected: isCaseSelected(c.id) }"
+                          >
+                            {{ isCaseSelected(c.id) ? 'check_box' : 'check_box_outline_blank' }}
+                          </span>
+                          <span class="ai-case-id">TC-{{ c.id }}</span>
+                          <span class="ai-case-title">
+                            {{ c.title }}
+                          </span>
+                          <span v-if="c.level" class="ai-case-level">
+                            {{ c.level }}
+                          </span>
+                        </div>
+                      </template>
+                    </div>
+                    <div v-if="selectedCaseIds.length" class="ai-selected-case-list">
+                      <span v-for="cid in selectedCaseIds" :key="cid" class="ai-selected-case-tag">
+                        TC-{{ cid }}
+                        <button
+                          type="button"
+                          class="ai-selected-case-remove"
+                          aria-label="移除关联用例"
+                          @click="removeSelectedCase(cid)"
+                        >
+                          <span class="material-symbols-outlined">close</span>
+                        </button>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div class="ai-form-group ai-form-group-full">
+                  <label class="ai-form-label">测试账号 (可选)</label>
+                  <input
+                    v-model="createForm.accountRef"
+                    class="ai-form-input"
+                    placeholder="引用的测试账号标识"
+                  />
+                </div>
+              </div>
+            </section>
           </div>
         </div>
-        <div class="ai-dialog-footer">
-          <button class="ai-btn ai-btn-ghost" @click="showCreateDialog = false">取消</button>
-          <button
-            class="ai-btn ai-btn-primary"
-            :disabled="store.actionLoading"
-            @click="submitCreateTask"
-          >
-            <span v-if="store.actionLoading" class="ai-spinner"></span>
-            {{ store.actionLoading ? '创建中...' : '创建任务' }}
-          </button>
+        <div class="ai-dialog-footer ai-create-footer">
+          <span class="ai-create-footer-note">创建后将进入任务详情，可继续录制或执行验证</span>
+          <div class="ai-create-footer-actions">
+            <button class="ai-btn ai-btn-ghost" @click="showCreateDialog = false">取消</button>
+            <button
+              class="ai-btn ai-btn-primary"
+              :disabled="store.actionLoading"
+              @click="submitCreateTask"
+            >
+              <span v-if="store.actionLoading" class="ai-spinner"></span>
+              {{ store.actionLoading ? '创建中...' : '创建任务' }}
+            </button>
+          </div>
         </div>
       </div>
     </div>

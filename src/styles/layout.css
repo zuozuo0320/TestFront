@@ -4634,3 +4634,41 @@ tr.row-selected td {
   background: var(--tp-accent-danger-soft);
   color: var(--tp-accent-danger);
 }
+
+.insights-actions .insights-btn-primary,
+.pm-header-right .pm-add-btn,
+.rm-header-right .rm-add-btn,
+.um-header-right .um-add-btn,
+.tm-actionbar-right .tm-btn-filter,
+.tm-actionbar-right .tm-btn-wizard,
+.ai-action-group .ai-btn,
+.pipeline-btn-create,
+.cases-actions .btn-primary {
+  box-sizing: border-box !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 30px !important;
+  height: 30px !important;
+  padding: 0 12px !important;
+  gap: 6px !important;
+  font-size: 12px !important;
+  font-weight: var(--tp-font-semibold) !important;
+  line-height: var(--tp-line-ui) !important;
+  white-space: nowrap !important;
+}
+
+.insights-actions .insights-btn-primary .material-symbols-outlined,
+.pm-header-right .pm-add-icon,
+.rm-header-right .rm-add-icon,
+.um-header-right .um-add-icon,
+.tm-actionbar-right .tm-btn-filter .material-symbols-outlined,
+.tm-actionbar-right .tm-btn-wizard .material-symbols-outlined,
+.ai-action-group .ai-btn .material-symbols-outlined,
+.pipeline-btn-create .material-symbols-outlined,
+.cases-actions .btn-primary .material-symbols-outlined {
+  width: 16px !important;
+  height: 16px !important;
+  font-size: 16px !important;
+  line-height: 16px !important;
+}

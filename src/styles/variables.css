@@ -7,7 +7,7 @@
     'Segoe UI',
     'Microsoft YaHei',
     sans-serif;
-  color: #0f172a;
+  color: #1f2937;
   --tp-font-family-sans:
     'Inter', 'Noto Sans SC', -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
   --tp-font-family-mono:
@@ -34,88 +34,99 @@
   --tp-text-disabled: var(--tp-gray-400);
 
   /* Brand Colors — Design B 深蓝灰 + 紫色点缀 */
-  --tp-primary: #6366f1;
-  --tp-primary-light: #818cf8;
-  --tp-primary-lighter: rgba(99, 102, 241, 0.09);
-  --tp-primary-dark: #4f46e5;
-  --tp-primary-shadow: rgba(99, 102, 241, 0.16);
+  --tp-primary: #8b5cf6;
+  --tp-primary-light: #a78bfa;
+  --tp-primary-lighter: rgba(139, 92, 246, 0.1);
+  --tp-primary-dark: #7c3aed;
+  --tp-primary-shadow: rgba(139, 92, 246, 0.2);
+  --tp-secondary: #ec4899;
+  --tp-secondary-dark: #db2777;
+  --tp-secondary-soft: rgba(236, 72, 153, 0.1);
+  --tp-secondary-border: rgba(236, 72, 153, 0.2);
 
   /* Semantic Colors */
-  --tp-success: #10b981;
-  --tp-success-light: rgba(16, 185, 129, 0.15);
-  --tp-warning: #f97316;
-  --tp-warning-light: rgba(249, 115, 22, 0.15);
+  --tp-success: #22c55e;
+  --tp-success-light: rgba(34, 197, 94, 0.14);
+  --tp-warning: #f59e0b;
+  --tp-warning-light: rgba(245, 158, 11, 0.14);
   --tp-danger: #ef4444;
-  --tp-danger-light: rgba(239, 68, 68, 0.15);
-  --tp-info: #64748b;
-  --tp-info-light: rgba(100, 116, 139, 0.12);
+  --tp-danger-light: rgba(239, 68, 68, 0.14);
+  --tp-info: #6366f1;
+  --tp-info-light: rgba(99, 102, 241, 0.1);
 
   /* Level Colors */
   --tp-p0: #dc2626;
   --tp-p0-bg: rgba(220, 38, 38, 0.1);
   --tp-p1: #f97316;
   --tp-p1-bg: rgba(249, 115, 22, 0.1);
-  --tp-p2: #6366f1;
-  --tp-p2-bg: rgba(99, 102, 241, 0.1);
+  --tp-p2: #8b5cf6;
+  --tp-p2-bg: rgba(139, 92, 246, 0.1);
   --tp-p3: #64748b;
   --tp-p3-bg: rgba(100, 116, 139, 0.1);
 
   /* Neutral — 冷蓝灰色调 (Design B 深海军蓝风格) */
-  --tp-gray-50: #f8fafc;
-  --tp-gray-100: #f1f5f9;
-  --tp-gray-200: #e2e8f0;
-  --tp-gray-300: #cbd5e1;
-  --tp-gray-400: #94a3b8;
-  --tp-gray-500: #64748b;
-  --tp-gray-600: #475569;
-  --tp-gray-700: #334155;
-  --tp-gray-800: #1e293b;
-  --tp-gray-900: #0f172a;
+  --tp-gray-50: #fafafa;
+  --tp-gray-100: #f5f3ff;
+  --tp-gray-200: #ede9fe;
+  --tp-gray-300: #ddd6fe;
+  --tp-gray-400: #a3a0b8;
+  --tp-gray-500: #6b7280;
+  --tp-gray-600: #4b5563;
+  --tp-gray-700: #374151;
+  --tp-gray-800: #1f2937;
+  --tp-gray-900: #111827;
 
   /* 导航专用色 — 深海军蓝 (Design B) */
-  --tp-nav-bg: #ffffff;
-  --tp-nav-bg-light: #f8fafc;
-  --tp-nav-border: #e2e8f0;
-  --tp-nav-text: #64748b;
-  --tp-nav-text-bright: #0f172a;
+  --tp-nav-bg: rgba(255, 255, 255, 0.82);
+  --tp-nav-bg-light: rgba(255, 255, 255, 0.72);
+  --tp-nav-border: rgba(229, 231, 235, 0.82);
+  --tp-nav-text: #6b7280;
+  --tp-nav-text-bright: #111827;
 
   /* 内容区表面色 — 深空极致暗黑底色 (Design B) */
-  --tp-surface-base: #f6f8fc;
-  --tp-surface-card: #ffffff;
-  --tp-surface-elevated: #f9fbff;
-  --tp-surface-input: #ffffff;
-  --tp-surface-hover: #f2f5ff;
-  --tp-surface-sheen: rgba(99, 102, 241, 0.035);
-  --tp-surface-sheen-strong: rgba(99, 102, 241, 0.045);
-  --tp-surface-muted: #f8fafc;
-  --tp-surface-row-hover: rgba(99, 102, 241, 0.045);
-  --tp-surface-header: #f8fafc;
+  --tp-surface-base: #fbfaf8;
+  --tp-surface-card: rgba(255, 255, 255, 0.88);
+  --tp-surface-elevated: rgba(255, 255, 255, 0.78);
+  --tp-surface-input: rgba(255, 255, 255, 0.82);
+  --tp-surface-hover: #f7f2ff;
+  --tp-surface-sheen: rgba(236, 72, 153, 0.04);
+  --tp-surface-sheen-strong: rgba(139, 92, 246, 0.055);
+  --tp-surface-muted: rgba(250, 245, 255, 0.72);
+  --tp-surface-row-hover: rgba(139, 92, 246, 0.055);
+  --tp-surface-header: rgba(250, 245, 255, 0.72);
   --tp-overlay-scrim: rgba(15, 23, 42, 0.45);
-  --tp-ambient-primary: rgba(99, 102, 241, 0.055);
-  --tp-ambient-info: rgba(99, 102, 241, 0.026);
+  --tp-ambient-primary: rgba(139, 92, 246, 0.12);
+  --tp-ambient-info: rgba(236, 72, 153, 0.1);
+  --tp-glass-bg: rgba(255, 255, 255, 0.74);
+  --tp-glass-bg-strong: rgba(255, 255, 255, 0.9);
+  --tp-glass-border: rgba(229, 231, 235, 0.76);
+  --tp-workhub-card-bg:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.72)),
+    radial-gradient(circle at 18% 0%, rgba(139, 92, 246, 0.08), transparent 36%),
+    radial-gradient(circle at 92% 12%, rgba(236, 72, 153, 0.06), transparent 32%);
 
   /* Shadows */
-  --tp-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.045), 0 1px 3px rgba(15, 23, 42, 0.055);
-  --tp-shadow-md: 0 10px 26px rgba(15, 23, 42, 0.075);
-  --tp-shadow-glow: 0 0 0 3px rgba(99, 102, 241, 0.1), 0 6px 16px rgba(99, 102, 241, 0.09);
-  --tp-btn-bg: linear-gradient(180deg, #6366f1 0%, #5558e8 100%);
-  --tp-btn-bg-hover: linear-gradient(180deg, #5855eb 0%, #4f46e5 100%);
+  --tp-shadow-sm: 0 4px 6px -1px rgba(17, 24, 39, 0.08), 0 2px 4px -2px rgba(17, 24, 39, 0.08);
+  --tp-shadow-md: 0 20px 25px -5px rgba(139, 92, 246, 0.14), 0 8px 10px -6px rgba(17, 24, 39, 0.08);
+  --tp-shadow-glow: 0 0 0 3px rgba(139, 92, 246, 0.12), 0 14px 30px rgba(236, 72, 153, 0.12);
+  --tp-btn-bg: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+  --tp-btn-bg-hover: linear-gradient(135deg, #7c3aed 0%, #db2777 100%);
   --tp-btn-text: #ffffff;
   --tp-btn-border: transparent;
   --tp-btn-plain-bg: #ffffff;
   --tp-btn-plain-text: var(--tp-primary);
-  --tp-btn-plain-border: rgba(99, 102, 241, 0.24);
+  --tp-btn-plain-border: rgba(139, 92, 246, 0.22);
   --tp-btn-radius: 999px;
   --tp-btn-height-sm: 32px;
   --tp-btn-height-md: 36px;
-  --tp-btn-shadow: 0 2px 5px rgba(99, 102, 241, 0.16);
-  --tp-btn-shadow-hover: 0 3px 8px rgba(99, 102, 241, 0.2);
+  --tp-btn-shadow: 0 10px 22px rgba(139, 92, 246, 0.18);
+  --tp-btn-shadow-hover: 0 14px 28px rgba(236, 72, 153, 0.22);
 
   /* Radius */
-  --tp-radius-sm: 6px;
-  --tp-radius-md: 10px;
-  --tp-radius-lg: 14px;
-  --tp-radius-xl: 20px;
+  --tp-radius-sm: 8px;
+  --tp-radius-md: 12px;
+  --tp-radius-lg: 16px;
+  --tp-radius-xl: 24px;
 
   /* Transitions */
   --tp-transition: 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -132,29 +143,30 @@
   --tp-space-12: 48px;
 
   /* ── Expressive Accent Palette (Tailwind 400 tone, 深色友好) ── */
-  --tp-accent-primary: #6366f1;
-  --tp-accent-primary-soft: rgba(99, 102, 241, 0.1);
-  --tp-accent-primary-border: rgba(99, 102, 241, 0.22);
-  --tp-accent-success: #10b981;
-  --tp-accent-success-soft: rgba(16, 185, 129, 0.1);
-  --tp-accent-success-border: rgba(16, 185, 129, 0.22);
+  --tp-accent-primary: #8b5cf6;
+  --tp-accent-primary-soft: rgba(139, 92, 246, 0.11);
+  --tp-accent-primary-border: rgba(139, 92, 246, 0.24);
+  --tp-accent-success: #22c55e;
+  --tp-accent-success-soft: rgba(34, 197, 94, 0.11);
+  --tp-accent-success-border: rgba(34, 197, 94, 0.22);
   --tp-accent-danger: #dc2626;
   --tp-accent-danger-soft: rgba(220, 38, 38, 0.1);
   --tp-accent-danger-border: rgba(220, 38, 38, 0.2);
-  --tp-accent-info: #0284c7;
-  --tp-accent-info-soft: rgba(2, 132, 199, 0.1);
-  --tp-accent-info-border: rgba(2, 132, 199, 0.18);
-  --tp-accent-warning: #f97316;
-  --tp-accent-warning-soft: rgba(249, 115, 22, 0.1);
-  --tp-accent-warning-border: rgba(249, 115, 22, 0.24);
+  --tp-accent-info: #6366f1;
+  --tp-accent-info-soft: rgba(99, 102, 241, 0.1);
+  --tp-accent-info-border: rgba(99, 102, 241, 0.2);
+  --tp-accent-warning: #f59e0b;
+  --tp-accent-warning-soft: rgba(245, 158, 11, 0.11);
+  --tp-accent-warning-border: rgba(245, 158, 11, 0.24);
 
   /* ── Layered Borders（玻璃态微光） ── */
-  --tp-border-subtle: #dfe7f2;
-  --tp-border-strong: #c6d1df;
+  --tp-border-subtle: rgba(229, 231, 235, 0.82);
+  --tp-border-strong: rgba(196, 181, 253, 0.64);
 
   /* ── Layered Shadows ── */
-  --tp-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 32px rgba(99, 102, 241, 0.07);
-  --tp-shadow-card-hover: 0 1px 2px rgba(15, 23, 42, 0.05), 0 18px 42px rgba(99, 102, 241, 0.11);
+  --tp-shadow-card: 0 4px 6px -1px rgba(17, 24, 39, 0.08), 0 18px 40px rgba(139, 92, 246, 0.08);
+  --tp-shadow-card-hover:
+    0 20px 25px -5px rgba(139, 92, 246, 0.16), 0 10px 16px -8px rgba(236, 72, 153, 0.14);
 }
 
 /* ========== Element Plus Dark Theme Overrides for Style B ========== */
@@ -181,8 +193,8 @@ html.dark {
 
   --el-color-primary: var(--tp-primary);
   --el-color-primary-light-3: var(--tp-primary-light);
-  --el-color-primary-light-5: rgba(99, 102, 241, 0.5);
-  --el-color-primary-light-7: rgba(99, 102, 241, 0.3);
-  --el-color-primary-light-8: rgba(99, 102, 241, 0.2);
+  --el-color-primary-light-5: rgba(139, 92, 246, 0.5);
+  --el-color-primary-light-7: rgba(139, 92, 246, 0.3);
+  --el-color-primary-light-8: rgba(139, 92, 246, 0.2);
   --el-color-primary-light-9: var(--tp-primary-lighter);
 }

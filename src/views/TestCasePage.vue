@@ -4614,14 +4614,14 @@ watch(selectedProject, (newId) => {
 }
 
 .case-page {
-  min-height: calc(100vh - 56px - 16px);
+  min-height: calc(100vh - 56px - 8px);
 }
 
 .case-page .right-table {
-  gap: 8px !important;
+  gap: 4px !important;
   min-width: 0;
-  min-height: calc(100vh - 56px - 16px);
-  padding: 8px !important;
+  min-height: calc(100vh - 56px - 8px);
+  padding: 4px !important;
   border: none;
   border-radius: 0;
   background: transparent !important;
