@@ -86,6 +86,15 @@ const roleForm = reactive({
   description: '',
 })
 
+type ApiError = {
+  response?: {
+    data?: {
+      error?: string
+      message?: string
+    }
+  }
+}
+
 /** 判断是否为预置角色 */
 function isPresetRole(name: string) {
   return PRESET_ROLES.has(name.toLowerCase())
@@ -156,7 +165,11 @@ async function submitRole() {
   savingRole.value = true
   try {
     if (editingRoleId.value) {
-      const payload: any = {
+      const payload: {
+        name?: string
+        display_name: string
+        description: string
+      } = {
         display_name: roleForm.display_name.trim(),
         description: roleForm.description.trim(),
       }
@@ -175,8 +188,9 @@ async function submitRole() {
     }
     roleDialogVisible.value = false
     await loadRoles()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '保存角色失败')
+  } catch (e: unknown) {
+    const error = e as ApiError
+    ElMessage.error(error.response?.data?.error || '保存角色失败')
   } finally {
     savingRole.value = false
   }
@@ -204,7 +218,7 @@ onMounted(() => loadRoles())
             <span class="rm-stat-label">活跃用户</span>
             <span class="rm-stat-number rm-stat-secondary">{{ totalAssignedUsers }}</span>
           </div>
-          <button class="rm-add-btn" @click="openCreateRole">
+          <button class="rm-add-btn" type="button" @click="openCreateRole">
             <span class="rm-add-icon">+</span>
             新增角色
           </button>
@@ -226,7 +240,7 @@ onMounted(() => loadRoles())
             </span>
           </div>
           <div class="rm-badge">
-            <span class="rm-badge-icon">👥</span>
+            <span class="material-symbols-outlined rm-badge-icon" aria-hidden="true">group</span>
             <span class="rm-badge-text">{{ getRoleUserCount(role) }} 用户</span>
           </div>
         </div>
@@ -244,19 +258,24 @@ onMounted(() => loadRoles())
 
         <!-- Action buttons -->
         <div class="rm-card-actions">
-          <button class="rm-btn-edit" @click="openEditRole(role)">编辑权限</button>
-          <button class="rm-btn-view" @click="openUserDrawer(role)">展示用户</button>
+          <button class="rm-btn-edit" type="button" @click="openEditRole(role)">编辑权限</button>
+          <button class="rm-btn-view" type="button" @click="openUserDrawer(role)">展示用户</button>
         </div>
       </div>
 
       <!-- Create Custom Role Card -->
-      <div class="rm-card rm-card-empty" @click="openCreateRole">
+      <button
+        class="rm-card rm-card-empty"
+        type="button"
+        aria-label="创建自定义角色"
+        @click="openCreateRole"
+      >
         <div class="rm-empty-icon">
           <span class="rm-empty-plus">+</span>
         </div>
         <p class="rm-empty-title">创建自定义角色</p>
         <p class="rm-empty-desc">定义一组独特的权限以满足特定需求。</p>
-      </div>
+      </button>
     </div>
 
     <!-- 空状态 -->
@@ -280,7 +299,12 @@ onMounted(() => loadRoles())
               </div>
               <p class="drawer-subtitle">用户列表 ({{ drawerUsers.length }})</p>
             </div>
-            <button class="drawer-close" @click="closeUserDrawer">
+            <button
+              class="drawer-close"
+              type="button"
+              aria-label="关闭用户列表"
+              @click="closeUserDrawer"
+            >
               <span class="material-symbols-outlined">close</span>
             </button>
           </div>
@@ -313,7 +337,7 @@ onMounted(() => loadRoles())
 
           <!-- Footer -->
           <div class="drawer-footer">
-            <button class="drawer-footer-btn">
+            <button class="drawer-footer-btn" type="button">
               <span class="material-symbols-outlined" style="font-size: 20px">person_add</span>
               添加新成员
             </button>
@@ -326,6 +350,7 @@ onMounted(() => loadRoles())
     <el-dialog
       v-model="roleDialogVisible"
       :title="editingRoleId ? '编辑角色' : '新建角色'"
+      class="rm-role-dialog"
       width="520px"
     >
       <el-form label-position="top">
@@ -879,6 +904,294 @@ onMounted(() => loadRoles())
 .rm-card-accent {
   opacity: 1;
 }
+
+.rm-root {
+  padding: 10px 12px 14px;
+  background: var(--tp-surface-base);
+}
+
+.rm-header {
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  background: var(--tp-glass-bg-strong);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.rm-title {
+  margin-bottom: 2px;
+  color: var(--tp-text-primary);
+  font-size: 18px;
+  letter-spacing: -0.01em;
+}
+
+.rm-subtitle {
+  color: var(--tp-text-muted);
+  font-size: 12px;
+}
+
+.rm-stats-panel {
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.rm-stat-item {
+  min-width: auto;
+  padding: 0 4px;
+  text-align: right;
+}
+
+.rm-stat-label {
+  margin-bottom: 0;
+  color: var(--tp-text-subtle);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.rm-stat-number {
+  color: var(--tp-text-primary);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.rm-stat-divider {
+  height: 18px;
+  background: var(--tp-border-subtle);
+}
+
+.rm-add-btn {
+  height: 32px;
+  margin-left: 4px;
+  padding: 0 14px;
+  border: 1px solid var(--tp-accent-primary-border);
+  border-radius: 10px;
+  background: var(--tp-primary);
+  box-shadow: none;
+  color: var(--tp-btn-text);
+}
+
+.rm-add-btn:hover {
+  background: var(--tp-primary-dark);
+  box-shadow: none;
+}
+
+.rm-add-btn:active {
+  transform: none;
+}
+
+.rm-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.rm-card {
+  min-height: 150px;
+  padding: 14px 14px 12px;
+  border-radius: 12px;
+  background: var(--tp-glass-bg-strong);
+  border-color: var(--tp-border-subtle);
+  box-shadow: none;
+  transition:
+    border-color 0.16s ease,
+    background-color 0.16s ease;
+}
+
+.rm-card:hover {
+  background: var(--tp-glass-bg-strong);
+  border-color: var(--tp-border-strong);
+  box-shadow: none;
+}
+
+.rm-card-accent {
+  width: 2px;
+  height: 100%;
+  background: var(--tp-primary);
+  opacity: 0.7;
+  transition: none;
+}
+
+.rm-card-top {
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.rm-card-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--tp-accent-primary-soft);
+  border: 1px solid var(--tp-accent-primary-border);
+  color: var(--tp-primary);
+}
+
+.rm-card-icon .material-symbols-outlined {
+  font-size: 20px;
+}
+
+.rm-badge {
+  gap: 4px;
+  min-height: 22px;
+  padding: 2px 8px;
+  background: var(--tp-accent-primary-soft);
+  border-color: var(--tp-accent-primary-border);
+  color: var(--tp-primary);
+}
+
+.rm-badge-icon {
+  font-size: 13px;
+}
+
+.rm-badge-text {
+  font-size: 11px;
+}
+
+.rm-card-name {
+  margin-bottom: 4px;
+  color: var(--tp-text-primary);
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.rm-card-desc {
+  min-height: 34px;
+  margin-bottom: 10px;
+  color: var(--tp-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.rm-perm-tags {
+  gap: 5px;
+  margin-bottom: 12px;
+}
+
+.rm-perm-tag {
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: var(--tp-surface-muted);
+  border-color: var(--tp-border-subtle);
+  color: var(--tp-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.rm-card-actions {
+  gap: 8px;
+}
+
+.rm-btn-edit,
+.rm-btn-view {
+  min-height: 30px;
+  border-radius: 8px;
+  background: var(--tp-glass-bg-strong);
+  border: 1px solid var(--tp-border-subtle);
+  color: var(--tp-text-secondary);
+  font-size: 11px;
+  box-shadow: none;
+}
+
+.rm-btn-edit {
+  background: var(--tp-accent-primary-soft);
+  border-color: var(--tp-accent-primary-border);
+  color: var(--tp-primary-dark);
+}
+
+.rm-btn-edit:hover,
+.rm-btn-view:hover {
+  background: var(--tp-surface-hover);
+  color: var(--tp-text-primary);
+  box-shadow: none;
+}
+
+.rm-card-empty {
+  min-height: 150px;
+  padding: 16px 14px;
+  border: 1px dashed var(--tp-border-subtle);
+  background: var(--tp-glass-bg-strong);
+  appearance: none;
+}
+
+.rm-card-empty:hover {
+  background: var(--tp-glass-bg-strong);
+  border-color: var(--tp-border-strong);
+}
+
+.rm-empty-icon {
+  width: 34px;
+  height: 34px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  background: var(--tp-surface-muted);
+  border: 1px solid var(--tp-border-subtle);
+}
+
+.rm-card-empty:hover .rm-empty-icon {
+  transform: none;
+}
+
+.rm-empty-plus {
+  color: var(--tp-text-subtle);
+  font-size: 20px;
+}
+
+.rm-empty-title {
+  color: var(--tp-text-primary);
+  font-size: 13px;
+}
+
+.rm-empty-desc {
+  color: var(--tp-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.rm-add-btn:focus-visible,
+.rm-btn-edit:focus-visible,
+.rm-btn-view:focus-visible,
+.rm-card-empty:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
+}
+
+.form-hint {
+  color: var(--tp-text-muted);
+}
+
+@media (max-width: 900px) {
+  .rm-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .rm-stats-panel {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 1280px) {
+  .rm-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1024px) {
+  .rm-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .rm-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 </style>
 
 <!-- Drawer 使用 teleport 到 body，必须单独放在 unscoped style 中 -->
@@ -1189,6 +1502,200 @@ onMounted(() => loadRoles())
 
 .drawer-user-item:hover {
   border-color: var(--tp-border-strong);
+}
+
+.drawer-overlay {
+  background: var(--tp-overlay-scrim);
+  backdrop-filter: none;
+}
+
+.drawer-panel {
+  width: 420px;
+  background: var(--tp-surface-card);
+  border-left: 1px solid var(--tp-border-subtle);
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.drawer-header {
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--tp-border-subtle);
+}
+
+.drawer-title-row {
+  gap: 8px;
+}
+
+.drawer-title-icon {
+  color: var(--tp-primary);
+  font-size: 18px;
+}
+
+.drawer-title {
+  color: var(--tp-text-primary);
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+
+.drawer-subtitle {
+  color: var(--tp-text-muted);
+  font-size: 12px;
+}
+
+.drawer-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--tp-text-muted);
+}
+
+.drawer-close:hover {
+  background: var(--tp-surface-hover);
+  color: var(--tp-text-primary);
+}
+
+.drawer-search {
+  padding: 14px 20px 0;
+  margin-bottom: 12px;
+}
+
+.drawer-search-icon {
+  left: 32px;
+  color: var(--tp-text-subtle);
+}
+
+.drawer-search-input {
+  height: 34px;
+  background: var(--tp-surface-input);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 9px;
+  color: var(--tp-text-primary);
+}
+
+.drawer-search-input:focus {
+  border-color: var(--tp-accent-primary-border);
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
+}
+
+.drawer-list {
+  gap: 8px;
+  padding: 0 20px 16px;
+}
+
+.drawer-user-item {
+  padding: 10px 12px;
+  background: var(--tp-surface-card);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 10px;
+}
+
+.drawer-user-item:hover {
+  background: var(--tp-surface-hover);
+  border-color: var(--tp-border-strong);
+}
+
+.drawer-user-info {
+  gap: 10px;
+}
+
+.drawer-avatar {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--tp-border-subtle);
+}
+
+.drawer-user-name {
+  color: var(--tp-text-primary);
+  font-size: 13px;
+}
+
+.drawer-user-email {
+  color: var(--tp-text-muted);
+  font-size: 11px;
+}
+
+.drawer-empty {
+  color: var(--tp-text-muted);
+}
+
+.drawer-footer {
+  padding: 14px 20px;
+  background: var(--tp-surface-card);
+  border-top: 1px solid var(--tp-border-subtle);
+  backdrop-filter: none;
+}
+
+.drawer-footer-btn {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--tp-accent-primary-border);
+  border-radius: 9px;
+  background: var(--tp-accent-primary-soft);
+  box-shadow: none;
+  color: var(--tp-primary-dark);
+}
+
+.drawer-footer-btn:hover {
+  background: var(--tp-surface-hover);
+  box-shadow: none;
+  color: var(--tp-text-primary);
+}
+
+.rm-role-dialog.el-dialog {
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 14px;
+  background: var(--tp-surface-card);
+  box-shadow: var(--tp-shadow-md);
+  overflow: hidden;
+}
+
+.rm-role-dialog .el-dialog__header {
+  margin: 0;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--tp-border-subtle);
+}
+
+.rm-role-dialog .el-dialog__title {
+  color: var(--tp-text-primary);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.rm-role-dialog .el-dialog__body {
+  padding: 16px 18px 6px;
+}
+
+.rm-role-dialog .el-dialog__footer {
+  padding: 12px 18px 16px;
+  border-top: 1px solid var(--tp-border-subtle);
+}
+
+.rm-role-dialog .el-form-item {
+  margin-bottom: 14px;
+}
+
+.rm-role-dialog .el-form-item__label {
+  margin-bottom: 6px;
+  color: var(--tp-text-secondary);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.rm-role-dialog .el-input__wrapper,
+.rm-role-dialog .el-textarea__inner {
+  background: var(--tp-surface-input);
+  border: 1px solid var(--tp-border-subtle);
+  box-shadow: none;
+}
+
+.rm-role-dialog .el-input__wrapper:hover,
+.rm-role-dialog .el-textarea__inner:hover {
+  border-color: var(--tp-border-strong);
+}
+
+.rm-role-dialog .el-input__wrapper.is-focus,
+.rm-role-dialog .el-textarea__inner:focus {
+  border-color: var(--tp-accent-primary-border);
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
 }
 
 /* Transitions */
