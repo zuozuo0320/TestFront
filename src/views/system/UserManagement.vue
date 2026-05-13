@@ -33,6 +33,8 @@ function onAvatarError(event: Event, name?: string) {
 
 /** 用户行类型，扩展了角色/项目关联 ID 和角色名称列表 */
 type UserRow = User & { role_ids: number[]; project_ids: number[]; role_names: string[] }
+type UserListItem = User & { role_ids?: number[]; project_ids?: number[] }
+type ApiError = { response?: { data?: { error?: string; message?: string } } }
 
 const users = ref<UserRow[]>([])
 const roles = ref<Role[]>([])
@@ -145,12 +147,17 @@ function resolveAvatarUrl(avatar?: string, fallbackName?: string) {
   return authStore.resolveAvatarUrl(avatar, fallbackName)
 }
 
+function getApiErrorMessage(error: unknown, fallback: string) {
+  const data = (error as ApiError).response?.data
+  return data?.error || data?.message || fallback
+}
+
 /** 加载用户列表，解析后端返回的 role_ids / project_ids，并补充 role_names */
 async function loadUsers() {
   usersLoading.value = true
   try {
     const data = await listUsers()
-    users.value = (data as any[]).map((u: any) => {
+    users.value = (data as UserListItem[]).map((u) => {
       const roleIds: number[] = u.role_ids ?? []
       const projectIds: number[] = u.project_ids ?? []
       return {
@@ -312,7 +319,7 @@ async function submitUser() {
         role_ids: userForm.roleIds,
         project_ids: userForm.projectIds,
       })
-      newUserId = (created as any)?.id ?? null
+      newUserId = created.id
       ElMessage.success('用户创建成功')
     }
     // 上传头像（如果选择了新文件）
@@ -326,8 +333,8 @@ async function submitUser() {
     }
     userDialogVisible.value = false
     await loadUsers()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '保存用户失败')
+  } catch (e: unknown) {
+    ElMessage.error(getApiErrorMessage(e, '保存用户失败'))
   } finally {
     savingUser.value = false
   }
@@ -353,8 +360,8 @@ async function toggleFreeze(row: UserRow) {
     await updateUser(row.id, { active: !row.active })
     ElMessage.success(`用户已${action}`)
     await loadUsers()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || `${action}失败`)
+  } catch (e: unknown) {
+    ElMessage.error(getApiErrorMessage(e, `${action}失败`))
   }
 }
 
@@ -373,8 +380,8 @@ async function removeUser(row: UserRow) {
     await deleteUserById(row.id)
     ElMessage.success('用户已删除')
     await loadUsers()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '删除用户失败')
+  } catch (e: unknown) {
+    ElMessage.error(getApiErrorMessage(e, '删除用户失败'))
   }
 }
 
@@ -397,8 +404,8 @@ async function submitResetPwd() {
     await resetUserPassword(resetPwdUserId.value!, resetPwdForm.newPassword)
     ElMessage.success('密码重置成功')
     resetPwdDialogVisible.value = false
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '重置密码失败')
+  } catch (e: unknown) {
+    ElMessage.error(getApiErrorMessage(e, '重置密码失败'))
   } finally {
     resettingPwd.value = false
   }
@@ -804,7 +811,7 @@ onMounted(async () => {
     </el-dialog>
 
     <el-dialog v-model="resetPwdDialogVisible" title="重置密码" width="440px" class="um-dialog">
-      <p style="margin-bottom: 12px; color: rgba(255, 255, 255, 0.6); font-size: 13px">
+      <p style="margin-bottom: 12px; color: var(--tp-text-muted); font-size: 13px">
         为用户【{{ resetPwdUserName }}】设置新密码
       </p>
       <el-form label-position="top">

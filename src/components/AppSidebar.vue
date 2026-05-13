@@ -36,7 +36,7 @@ function onAvatarError(event: Event, name?: string) {
 }
 
 type TopMenu = 'workbench' | 'project' | 'plan' | 'testcases' | 'e2e' | 'system'
-type SystemMenu = 'users' | 'roles' | 'projects' | 'tags'
+type SystemMenu = 'users' | 'roles' | 'projects' | 'tags' | 'ai-model'
 
 /** 无权访问系统管理一级菜单的角色集合（FR-02-22） */
 const NO_SYSTEM_ROLES = new Set(['readonly', 'developer', 'reviewer'])
@@ -52,6 +52,7 @@ const SYSTEM_ITEM_ALLOWED_ROLES: Record<SystemMenu, Set<string>> = {
   roles: new Set(['admin']),
   projects: new Set(['admin', 'manager']),
   tags: new Set(['admin', 'manager', 'tester']),
+  'ai-model': new Set(['admin']),
 }
 
 const props = defineProps<{
@@ -186,6 +187,7 @@ const ALL_SYSTEM_NAV_ITEMS: { key: SystemMenu; label: string }[] = [
   { key: 'roles', label: '角色管理' },
   { key: 'projects', label: '项目管理' },
   { key: 'tags', label: '标签管理' },
+  { key: 'ai-model', label: 'AI 模型配置' },
 ]
 
 /**

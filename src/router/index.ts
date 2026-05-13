@@ -74,6 +74,12 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresSystemMenu: true },
     },
     {
+      path: '/system/ai-model',
+      name: 'AiModelConfig',
+      component: () => import('../views/system/AiModelConfigPage.vue'),
+      meta: { requiresAuth: true, requiresAdminOnly: true },
+    },
+    {
       path: '/ai-script',
       name: 'AiScriptTaskList',
       component: () => import('../views/ai-script/AiScriptTaskList.vue'),

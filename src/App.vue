@@ -61,6 +61,7 @@ const routeToMenu: Record<string, TopMenu> = {
   '/system/roles': 'system',
   '/system/projects': 'system',
   '/system/tags': 'system',
+  '/system/ai-model': 'system',
 }
 
 const routeToSystemMenu: Record<string, SystemMenu> = {
@@ -68,6 +69,7 @@ const routeToSystemMenu: Record<string, SystemMenu> = {
   '/system/roles': 'roles',
   '/system/projects': 'projects',
   '/system/tags': 'tags',
+  '/system/ai-model': 'ai-model',
 }
 
 function resolveTopMenu(path: string): TopMenu | undefined {

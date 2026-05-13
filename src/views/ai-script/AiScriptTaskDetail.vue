@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, computed, ref } from 'vue'
+import { onMounted, onUnmounted, computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAiScriptStore } from '../../stores/aiScript'
 import type { AiScriptTrace } from '../../api/aiScript'
@@ -68,14 +68,20 @@ onMounted(async () => {
 // ── #3: 任务状态自动轮询 ──
 let taskPollTimer: ReturnType<typeof setInterval> | null = null
 let validationPollTimer: ReturnType<typeof setInterval> | null = null
+let generatingMotionTimer: ReturnType<typeof setInterval> | null = null
+
+function shouldPollTask(): boolean {
+  const status = task.value?.taskStatus
+  return status === TaskStatus.RUNNING || status === TaskStatus.PENDING_EXECUTE
+}
 
 function startTaskPolling() {
   stopTaskPolling()
-  if (task.value?.taskStatus !== TaskStatus.RUNNING) return
+  if (!shouldPollTask()) return
   taskPollTimer = setInterval(async () => {
     await store.loadTaskDetailFull(taskId.value)
     // 任务结束时停止轮询
-    if (task.value?.taskStatus !== TaskStatus.RUNNING) {
+    if (!shouldPollTask()) {
       stopTaskPolling()
     }
   }, 5000)
@@ -130,6 +136,7 @@ function stopValidationPolling() {
 onUnmounted(() => {
   stopTaskPolling()
   stopValidationPolling()
+  stopGeneratingMotion()
   if (pollTimer) clearInterval(pollTimer)
 })
 
@@ -138,6 +145,26 @@ const script = computed(() => store.currentScript)
 const traces = computed(() => store.traces)
 const validation = computed(() => store.latestValidation)
 const validationHistory = computed(() => store.validationHistory)
+const generatingFrame = ref(0)
+
+const GENERATING_STEPS = [
+  { icon: 'travel_explore', label: '页面探索' },
+  { icon: 'account_tree', label: '步骤编排' },
+  { icon: 'data_object', label: '脚本生成' },
+] as const
+const GENERATING_PHASE_TEXTS = [
+  '正在分析页面结构',
+  '正在识别交互路径',
+  '正在生成稳定定位器',
+  '正在编排 Playwright 步骤',
+  '正在整理工程化脚本',
+] as const
+const GENERATING_CODE_LINE_WIDTHS = [
+  [86, 62, 74, 48],
+  [54, 78, 44, 68],
+  [72, 46, 82, 56],
+  [64, 88, 58, 76],
+] as const
 
 // ── 操作轨迹（录制模式下用步骤模型填充）──
 type RecordingStep = {
@@ -660,6 +687,76 @@ const isTaskActive = computed(() => {
   const s = task.value?.taskStatus
   return s !== TaskStatus.DISCARDED && s !== TaskStatus.CONFIRMED
 })
+const isGeneratingScript = computed(() => {
+  const status = task.value?.taskStatus
+  return status === TaskStatus.RUNNING || status === TaskStatus.PENDING_EXECUTE
+})
+const scriptGeneratingTitle = computed(() =>
+  isRecordingMode.value ? 'AI 正在重构录制脚本' : 'AI 正在生成 Playwright 脚本',
+)
+const scriptGeneratingDesc = computed(() =>
+  isRecordingMode.value
+    ? '系统正在基于录制步骤提炼稳定定位器、断言与工程化文件，请稍候。'
+    : '系统正在探索页面、识别交互路径并编排可执行脚本，请稍候。',
+)
+const generatingProgress = computed(() => {
+  const f = generatingFrame.value
+  const t = f * 0.12
+  return Math.min(Math.round(95 * (1 - Math.exp(-t / 38))), 95)
+})
+const generatingActiveStep = computed(() => {
+  const p = generatingProgress.value
+  if (p < 30) return 0
+  if (p < 65) return 1
+  return 2
+})
+const generatingPhaseText = computed(() => {
+  const p = generatingProgress.value
+  if (p < 15) return GENERATING_PHASE_TEXTS[0]
+  if (p < 30) return GENERATING_PHASE_TEXTS[1]
+  if (p < 50) return GENERATING_PHASE_TEXTS[2]
+  if (p < 75) return GENERATING_PHASE_TEXTS[3]
+  return GENERATING_PHASE_TEXTS[4]
+})
+const generatingDots = computed(() => '.'.repeat((Math.floor(generatingFrame.value / 4) % 3) + 1))
+const generatingCodeLineWidths = computed(
+  () =>
+    GENERATING_CODE_LINE_WIDTHS[
+      Math.floor(generatingFrame.value / 6) % GENERATING_CODE_LINE_WIDTHS.length
+    ],
+)
+const generatingOrbScale = computed(() => 1 + Math.sin(generatingFrame.value / 3) * 0.08)
+const generatingOuterRotate = computed(() => `rotate(${generatingFrame.value * 18}deg)`)
+const generatingInnerRotate = computed(() => `rotate(${-generatingFrame.value * 25}deg)`)
+const generatingSatelliteRotate = computed(() => `rotate(${generatingFrame.value * 32}deg)`)
+const generatingSatelliteReverseRotate = computed(() => `rotate(${-generatingFrame.value * 27}deg)`)
+
+function startGeneratingMotion() {
+  if (generatingMotionTimer) return
+  generatingFrame.value = 0
+  generatingMotionTimer = setInterval(() => {
+    generatingFrame.value += 1
+  }, 120)
+}
+
+function stopGeneratingMotion() {
+  if (generatingMotionTimer) {
+    clearInterval(generatingMotionTimer)
+    generatingMotionTimer = null
+  }
+}
+
+watch(
+  isGeneratingScript,
+  (generating) => {
+    if (generating) {
+      startGeneratingMotion()
+      return
+    }
+    stopGeneratingMotion()
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -753,7 +850,7 @@ const isTaskActive = computed(() => {
           </button>
           <button
             v-if="canExport"
-            class="ai-btn ai-btn-ghost"
+            class="ai-btn ai-btn-ghost ai-btn-icon"
             title="导出脚本"
             @click="handleExport"
           >
@@ -761,7 +858,7 @@ const isTaskActive = computed(() => {
           </button>
           <button
             v-if="canDiscard && script"
-            class="ai-btn ai-btn-ghost"
+            class="ai-btn ai-btn-ghost ai-btn-icon"
             title="废弃当前脚本"
             @click="handleDiscardScript"
           >
@@ -774,7 +871,7 @@ const isTaskActive = computed(() => {
         >
           <button
             v-if="canDiscard"
-            class="ai-btn ai-btn-danger-ghost"
+            class="ai-btn ai-btn-danger-ghost ai-btn-icon"
             title="废弃任务"
             @click="handleDiscardTask"
           >
@@ -782,7 +879,7 @@ const isTaskActive = computed(() => {
           </button>
           <button
             v-if="canDelete"
-            class="ai-btn ai-btn-danger-ghost"
+            class="ai-btn ai-btn-danger-ghost ai-btn-icon"
             title="删除任务"
             @click="handleDeleteTask"
           >
@@ -942,7 +1039,7 @@ const isTaskActive = computed(() => {
       <!-- 右: 脚本 + 验证 -->
       <div class="ai-detail-right">
         <!-- 脚本代码预览 -->
-        <section v-if="script" class="ai-code-panel">
+        <section v-if="script && !isGeneratingScript" class="ai-code-panel">
           <div class="ai-code-header">
             <div class="ai-code-header-left">
               <span class="material-symbols-outlined">javascript</span>
@@ -976,10 +1073,84 @@ const isTaskActive = computed(() => {
             />
           </div>
         </section>
+        <section
+          v-else-if="isGeneratingScript"
+          class="ai-info-card ai-script-generating-card"
+          aria-live="polite"
+        >
+          <div class="ai-generating-visual" aria-hidden="true">
+            <span
+              class="ai-generating-orb"
+              :style="{ transform: `scale(${generatingOrbScale})` }"
+            ></span>
+            <span
+              class="ai-generating-ring ai-generating-ring--outer"
+              :style="{ transform: generatingOuterRotate }"
+            ></span>
+            <span
+              class="ai-generating-ring ai-generating-ring--inner"
+              :style="{ transform: generatingInnerRotate }"
+            ></span>
+            <span
+              class="ai-generating-satellite ai-generating-satellite--one"
+              :style="{ transform: generatingSatelliteRotate }"
+            ></span>
+            <span
+              class="ai-generating-satellite ai-generating-satellite--two"
+              :style="{ transform: generatingSatelliteReverseRotate }"
+            ></span>
+            <span
+              class="ai-generating-satellite ai-generating-satellite--three"
+              :style="{ transform: generatingInnerRotate }"
+            ></span>
+          </div>
+          <div class="ai-generating-content">
+            <span class="ai-generating-kicker">SCRIPT GENERATION</span>
+            <h3>{{ scriptGeneratingTitle }}</h3>
+            <p>{{ scriptGeneratingDesc }}</p>
+            <div class="ai-generating-progress-meta">
+              <span>{{ generatingPhaseText }}{{ generatingDots }}</span>
+              <strong>{{ generatingProgress }}%</strong>
+            </div>
+            <div class="ai-generating-progress">
+              <span :style="{ width: `${generatingProgress}%` }"></span>
+            </div>
+            <div class="ai-generating-code-stream" aria-hidden="true">
+              <span
+                v-for="(width, index) in generatingCodeLineWidths"
+                :key="index"
+                :style="{ width: `${width}%` }"
+              ></span>
+            </div>
+            <div class="ai-generating-steps">
+              <span
+                v-for="(step, index) in GENERATING_STEPS"
+                :key="step.label"
+                :class="{ active: index === generatingActiveStep }"
+              >
+                <i class="material-symbols-outlined">{{ step.icon }}</i>
+                {{ step.label }}
+              </span>
+            </div>
+          </div>
+        </section>
+        <section v-else class="ai-info-card ai-script-empty-card">
+          <div class="ai-script-empty">
+            <span class="material-symbols-outlined">code</span>
+            <h3>暂无可预览脚本</h3>
+            <p>
+              {{
+                isRecordingMode
+                  ? '请先开始录制并提交录制稿，系统会自动重构生成脚本'
+                  : '请先触发执行，系统会自动探索页面并生成 Playwright 脚本'
+              }}
+            </p>
+          </div>
+        </section>
 
         <!-- V1 多文件工程化面板 -->
         <section
-          v-if="script?.files && script.files.length > 0"
+          v-if="!isGeneratingScript && script?.files && script.files.length > 0"
           class="ai-info-card"
           style="margin-top: 16px"
         >
@@ -1137,19 +1308,6 @@ const isTaskActive = computed(() => {
             <div style="margin-top: 8px; font-size: 0.7rem; color: var(--tp-gray-600)">
               此为 Playwright Codegen 录制的原始代码，上方为 AI 重构后的标准化脚本
             </div>
-          </div>
-        </section>
-        <section v-else class="ai-info-card ai-script-empty-card">
-          <div class="ai-script-empty">
-            <span class="material-symbols-outlined">code</span>
-            <h3>暂无可预览脚本</h3>
-            <p>
-              {{
-                isRecordingMode
-                  ? '请先开始录制并提交录制稿，系统会自动重构生成脚本'
-                  : '请先触发执行，系统会自动探索页面并生成 Playwright 脚本'
-              }}
-            </p>
           </div>
         </section>
 

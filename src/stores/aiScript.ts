@@ -243,6 +243,12 @@ export const useAiScriptStore = defineStore('aiScript', () => {
   // ── 加载任务详情页全量数据 ──
   async function loadTaskDetailFull(taskId: number) {
     detailLoading.value = true
+    // 切换任务时先清空旧数据，避免残留上一个任务的验证报告和脚本
+    currentScript.value = null
+    scriptVersions.value = []
+    latestValidation.value = null
+    validationHistory.value = []
+    traces.value = []
     try {
       await Promise.all([
         loadTaskDetail(taskId),
@@ -250,10 +256,11 @@ export const useAiScriptStore = defineStore('aiScript', () => {
         loadCurrentScript(taskId),
         loadTraces(taskId),
       ])
-      if (currentScript.value) {
+      const loadedScript = currentScript.value as AiScriptVersion | null
+      if (loadedScript) {
         await Promise.all([
-          loadLatestValidation(currentScript.value.id),
-          loadValidationHistory(currentScript.value.id),
+          loadLatestValidation(loadedScript.id),
+          loadValidationHistory(loadedScript.id),
         ])
       }
     } finally {

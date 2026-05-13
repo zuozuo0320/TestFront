@@ -3046,6 +3046,69 @@
   color: var(--tp-btn-text) !important;
 }
 
+.el-overlay:has(.el-dialog) {
+  background: rgba(255, 255, 255, 0.7) !important;
+  background:
+    radial-gradient(circle at 50% 26%, var(--tp-ambient-primary), transparent 34%),
+    rgba(255, 255, 255, 0.7) !important;
+  backdrop-filter: blur(2px);
+}
+
+.el-overlay:has(.el-dialog) .el-dialog {
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: var(--tp-radius-lg);
+  background: var(--tp-surface-card);
+  box-shadow: var(--tp-shadow-md);
+  overflow: hidden;
+}
+
+.el-overlay:has(.el-dialog) .el-dialog__header {
+  margin: 0;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--tp-border-subtle);
+}
+
+.el-overlay:has(.el-dialog) .el-dialog__title {
+  color: var(--tp-text-primary);
+  font-size: var(--tp-text-lg);
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-tight);
+}
+
+.el-overlay:has(.el-dialog) .el-dialog__body {
+  padding: 16px 18px 8px;
+  color: var(--tp-text-secondary);
+}
+
+.el-overlay:has(.el-dialog) .el-dialog__footer {
+  padding: 12px 18px 16px;
+  border-top: 1px solid var(--tp-border-subtle);
+}
+
+.el-overlay:has(.el-dialog) .el-form-item__label {
+  color: var(--tp-text-secondary);
+  font-size: var(--tp-text-sm);
+  font-weight: var(--tp-font-semibold);
+}
+
+.el-overlay:has(.el-dialog) .el-input__wrapper,
+.el-overlay:has(.el-dialog) .el-textarea__inner {
+  background: var(--tp-surface-input);
+  border: 1px solid var(--tp-border-subtle);
+  box-shadow: none;
+}
+
+.el-overlay:has(.el-dialog) .el-input__wrapper:hover,
+.el-overlay:has(.el-dialog) .el-textarea__inner:hover {
+  border-color: var(--tp-border-strong);
+}
+
+.el-overlay:has(.el-dialog) .el-input__wrapper.is-focus,
+.el-overlay:has(.el-dialog) .el-textarea__inner:focus {
+  border-color: var(--tp-accent-primary-border);
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
+}
+
 @media (max-width: 900px) {
   .workbench-container,
   .case-page .right-table,
