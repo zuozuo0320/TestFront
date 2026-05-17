@@ -600,6 +600,11 @@ export async function fetchValidationHistory(scriptId: number): Promise<AiScript
   return toCamel(Array.isArray(data) ? data : []) as AiScriptValidation[]
 }
 
+/** 更新任务名称 */
+export async function renameTask(taskId: number, taskName: string): Promise<void> {
+  await apiClient.put(`/ai-script/tasks/${taskId}/name`, { task_name: taskName })
+}
+
 /** 更新任务关联用例 */
 export async function updateTaskCases(taskId: number, caseIds: number[]): Promise<void> {
   await apiClient.post(`/ai-script/tasks/${taskId}/cases/update`, { case_ids: caseIds })
@@ -688,4 +693,50 @@ export async function invalidateAuth(startUrl: string): Promise<void> {
   await fetch(`${EXECUTOR_BASE}/auth/invalidate?start_url=${encodeURIComponent(startUrl)}`, {
     method: 'POST',
   })
+}
+
+/** 手动登录获取Token 的响应 */
+export interface AuthLoginResult {
+  success: boolean
+  error: string
+  attempts: number
+  auth_state: AuthStateInfo
+}
+
+/** 手动触发自动登录，获取目标站点的认证 Token */
+export async function loginForToken(
+  startUrl: string,
+  username: string,
+  password: string,
+): Promise<AuthLoginResult> {
+  const resp = await fetch(`${EXECUTOR_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ start_url: startUrl, username, password }),
+  })
+  return resp.json()
+}
+
+/** 打开浏览器让用户手动登录 */
+export async function manualLoginStart(
+  startUrl: string,
+): Promise<{ success: boolean; message: string; domain: string; error?: string }> {
+  const resp = await fetch(`${EXECUTOR_BASE}/auth/manual-login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ start_url: startUrl }),
+  })
+  return resp.json()
+}
+
+/** 用户确认登录完成，保存认证状态 */
+export async function manualLoginComplete(
+  startUrl: string,
+): Promise<{ success: boolean; message: string; auth_state?: AuthStateInfo; error?: string }> {
+  const resp = await fetch(`${EXECUTOR_BASE}/auth/manual-login/complete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ start_url: startUrl }),
+  })
+  return resp.json()
 }

@@ -10,8 +10,14 @@ import {
   ValidationStatusColor,
   GenerationMode,
   GenerationModeLabel,
+  checkAuthStatus,
+  manualLoginStart,
+  manualLoginComplete,
+  invalidateAuth,
+  renameTask,
   type AiScriptTask,
   type AiScriptTaskListQuery,
+  type AuthStateInfo,
 } from '../../api/aiScript'
 import { TaskStatus } from '../../api/aiScript'
 import { listProjects } from '../../api/project'
@@ -28,11 +34,9 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 
 // ── 筛选状态 ──
-const showFilterPanel = ref(false)
 const filterProjectId = ref<number | undefined>(undefined)
 const filterStatus = ref<TaskStatus | ''>('')
 const filterKeyword = ref('')
-const sortDesc = ref(true)
 
 // ── Toast 提示 ──
 const toastMsg = ref('')
@@ -70,9 +74,6 @@ function buildQueryParams(page = currentPage.value): AiScriptTaskListQuery {
 /** 当前页面可见任务 ID。 */
 const currentPageTaskIds = computed(() => store.taskList.map((task) => task.id))
 
-/** 当前是否处于按筛选结果全选模式。 */
-const isFilterAllSelection = computed(() => store.taskSelection.selectionMode === 'FILTER_ALL')
-
 /** 当前页是否已经全部勾选。 */
 const currentPageAllSelected = computed(() => {
   if (currentPageTaskIds.value.length === 0) return false
@@ -98,7 +99,6 @@ async function applyFilter() {
   store.clearTaskSelection()
   currentPage.value = 1
   await store.loadTaskList(buildQueryParams(1))
-  showFilterPanel.value = false
 }
 
 function resetFilter() {
@@ -106,11 +106,6 @@ function resetFilter() {
   filterProjectId.value = undefined
   filterStatus.value = ''
   filterKeyword.value = ''
-  applyFilter()
-}
-
-function toggleSort() {
-  sortDesc.value = !sortDesc.value
   applyFilter()
 }
 
@@ -403,6 +398,38 @@ async function submitCreateTask() {
   }
 }
 
+// ── 重命名任务 ──
+const showRenameDialog = ref(false)
+const renameTaskId = ref(0)
+const renameNewName = ref('')
+const renameLoading = ref(false)
+
+function openRenameDialog(task: AiScriptTask) {
+  renameTaskId.value = task.id
+  renameNewName.value = task.taskName
+  showRenameDialog.value = true
+}
+
+async function confirmRename() {
+  const name = renameNewName.value.trim()
+  if (!name) {
+    showToast('任务名称不能为空')
+    return
+  }
+  renameLoading.value = true
+  try {
+    await renameTask(renameTaskId.value, name)
+    showRenameDialog.value = false
+    store.loadTaskList(buildQueryParams(currentPage.value))
+    showToast('任务名称已更新')
+  } catch (e) {
+    console.error('重命名失败:', e)
+    showToast('重命名失败')
+  } finally {
+    renameLoading.value = false
+  }
+}
+
 // ── 废弃任务 ──
 const showDiscardDialog = ref(false)
 const discardTaskId = ref(0)
@@ -489,21 +516,6 @@ function handleCurrentPageCheckboxChange(event: Event) {
   toggleCurrentPageSelection((event.target as HTMLInputElement).checked)
 }
 
-/** 按当前筛选结果全选。 */
-function selectAllByCurrentFilter() {
-  if (store.taskTotal <= 0) {
-    showToast('当前没有可选择的任务')
-    return
-  }
-  store.selectAllTasksByCurrentFilter()
-  showToast(`已选择当前筛选结果的 ${store.taskTotal} 条任务`)
-}
-
-/** 清空当前全部勾选。 */
-function clearSelectedTasks() {
-  store.clearTaskSelection()
-}
-
 /** 打开批量废弃确认弹窗。 */
 function openBatchDiscardDialog() {
   if (store.selectedTaskCount <= 0) {
@@ -564,125 +576,190 @@ async function handleExecute(task: AiScriptTask) {
     console.error('触发执行失败:', e)
   }
 }
+
+// ── Token 管理 Dialog ──
+const showTokenDialog = ref(false)
+const tokenTargetUrl = ref('')
+const tokenAuthState = ref<AuthStateInfo | null>(null)
+const tokenLoading = ref(false)
+const manualLoginActive = ref(false) // 浏览器已打开，等待用户登录
+const manualLoginLoading = ref(false)
+
+const tokenStatusText = computed(() => {
+  if (!tokenAuthState.value) return '未检测'
+  if (!tokenAuthState.value.exists) return '无认证文件'
+  if (tokenAuthState.value.valid) return '有效'
+  return '已过期'
+})
+
+const tokenStatusClass = computed(() => {
+  if (!tokenAuthState.value || !tokenAuthState.value.exists) return 'missing'
+  return tokenAuthState.value.valid ? 'valid' : 'expired'
+})
+
+async function openTokenDialog() {
+  tokenAuthState.value = null
+  manualLoginActive.value = false
+  showTokenDialog.value = true
+
+  // 如果还没加载过环境配置，先加载当前项目的环境
+  if (!selectedEnvironment.value && projectStore.selectedProjectId) {
+    await loadProjectEnvironments(projectStore.selectedProjectId)
+  }
+
+  // 同步当前环境的测试地址
+  tokenTargetUrl.value = selectedEnvironment.value?.base_url || ''
+
+  // 自动检测
+  if (tokenTargetUrl.value) {
+    loadTokenStatus()
+  }
+}
+
+async function loadTokenStatus() {
+  const url = tokenTargetUrl.value.trim()
+  if (!url) {
+    showToast('请输入目标站点地址')
+    return
+  }
+  tokenLoading.value = true
+  try {
+    tokenAuthState.value = await checkAuthStatus(url)
+  } catch (e) {
+    console.warn('查询认证状态失败:', e)
+    tokenAuthState.value = null
+    showToast('查询失败，请确认 Executor 服务正常')
+  } finally {
+    tokenLoading.value = false
+  }
+}
+
+async function handleManualLogin() {
+  const url = tokenTargetUrl.value.trim()
+  if (!url) {
+    showToast('请输入目标站点地址')
+    return
+  }
+  manualLoginLoading.value = true
+  try {
+    const result = await manualLoginStart(url)
+    if (result.success) {
+      manualLoginActive.value = true
+      showToast('浏览器已打开，请在浏览器中完成登录')
+    } else {
+      showToast(result.error || '打开浏览器失败')
+    }
+  } catch (e) {
+    console.error('打开浏览器失败:', e)
+    showToast('打开浏览器失败，请确认 Executor 服务正常')
+  } finally {
+    manualLoginLoading.value = false
+  }
+}
+
+async function handleManualLoginComplete() {
+  const url = tokenTargetUrl.value.trim()
+  if (!url) return
+  manualLoginLoading.value = true
+  try {
+    const result = await manualLoginComplete(url)
+    if (result.success) {
+      if (result.auth_state) {
+        tokenAuthState.value = result.auth_state
+      }
+      manualLoginActive.value = false
+      showToast('认证状态已保存')
+    } else {
+      showToast(result.error || '保存认证状态失败')
+    }
+  } catch (e) {
+    console.error('保存认证状态失败:', e)
+    showToast('保存认证状态失败，请确认 Executor 服务正常')
+  } finally {
+    manualLoginLoading.value = false
+  }
+}
+
+async function handleTokenInvalidate() {
+  const url = tokenTargetUrl.value.trim()
+  if (!url) return
+  try {
+    await invalidateAuth(url)
+    await loadTokenStatus()
+    showToast('认证状态已清除')
+  } catch (e) {
+    console.error('清除认证状态失败:', e)
+    showToast('清除认证状态失败')
+  }
+}
 </script>
 
 <template>
   <div class="ai-page">
-    <!-- 页面头部 -->
+    <!-- 页面头部：标题 + 工具栏合为一行 -->
     <div class="ai-page-header">
       <div class="ai-page-header-left">
         <h1>智能脚本生成任务列表</h1>
       </div>
       <div class="ai-action-group">
-        <button class="ai-btn ai-btn-ghost" @click="showFilterPanel = !showFilterPanel">
-          <span class="material-symbols-outlined">filter_alt</span>
-          筛选条件
+        <button class="ai-btn ai-btn-ghost ai-btn-sm" @click="openTokenDialog">
+          <span class="material-symbols-outlined">key</span>
+          Token
         </button>
-        <button class="ai-btn ai-btn-ghost" @click="toggleSort">
-          <span class="material-symbols-outlined">
-            {{ sortDesc ? 'arrow_downward' : 'arrow_upward' }}
-          </span>
-          {{ sortDesc ? '最新优先' : '最早优先' }}
-        </button>
-        <button class="ai-btn ai-btn-primary" @click="openCreateDialog">
+        <button class="ai-btn ai-btn-primary ai-btn-sm" @click="openCreateDialog">
           <span class="material-symbols-outlined">add</span>
           新建任务
         </button>
       </div>
     </div>
 
-    <!-- 筛选面板 -->
-    <div v-if="showFilterPanel" class="ai-filter-panel">
-      <div class="ai-filter-row">
-        <div class="ai-filter-item">
-          <label>项目</label>
-          <select v-model="filterProjectId" class="ai-form-select" style="min-width: 160px">
-            <option :value="undefined">全部项目</option>
-            <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
-          </select>
-        </div>
-        <div class="ai-filter-item">
-          <label>状态</label>
-          <select v-model="filterStatus" class="ai-form-select" style="min-width: 140px">
-            <option value="">全部状态</option>
-            <option v-for="(label, key) in TaskStatusLabel" :key="key" :value="key">
-              {{ label }}
-            </option>
-          </select>
-        </div>
-        <div class="ai-filter-item">
-          <label>关键字</label>
-          <input
-            v-model="filterKeyword"
-            class="ai-form-input"
-            style="min-width: 180px"
-            placeholder="任务名称 / 用例名称"
-            @keyup.enter="applyFilter"
+    <!-- 筛选栏 -->
+    <div class="ai-filter-bar">
+      <div class="ai-filter-bar-search">
+        <span class="material-symbols-outlined ai-filter-bar-icon">search</span>
+        <input
+          v-model="filterKeyword"
+          class="ai-filter-bar-input"
+          placeholder="搜索任务名称或关键词..."
+          @keyup.enter="applyFilter"
+        />
+        <button
+          v-if="filterKeyword"
+          class="ai-filter-bar-clear"
+          @click="
+            filterKeyword = ''
+            applyFilter()
+          "
+        >
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <div class="ai-filter-bar-selects">
+        <el-select
+          v-model="filterStatus"
+          placeholder="全部状态"
+          clearable
+          size="default"
+          class="ai-filter-el-select"
+          @change="applyFilter"
+        >
+          <template #prefix>
+            <span
+              class="material-symbols-outlined"
+              style="font-size: 16px; color: var(--tp-text-muted)"
+            >
+              tune
+            </span>
+          </template>
+          <el-option
+            v-for="(label, key) in TaskStatusLabel"
+            :key="key"
+            :label="label"
+            :value="key"
           />
-        </div>
-        <div class="ai-filter-actions">
-          <button
-            class="ai-btn ai-btn-primary"
-            style="padding: 6px 16px; font-size: 0.8rem"
-            @click="applyFilter"
-          >
-            <span class="material-symbols-outlined" style="font-size: 16px">search</span>
-            查询
-          </button>
-          <button
-            class="ai-btn ai-btn-ghost"
-            style="padding: 6px 12px; font-size: 0.8rem"
-            @click="resetFilter"
-          >
-            重置
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <div class="ai-bulk-toolbar">
-      <div class="ai-bulk-summary">
-        <span>已选择 {{ store.selectedTaskCount }} 条任务</span>
-        <span v-if="isFilterAllSelection">（按当前筛选结果全选）</span>
-        <span v-if="isFilterAllSelection && store.taskSelection.excludedIds.length > 0">
-          ，已排除 {{ store.taskSelection.excludedIds.length }} 条
-        </span>
-      </div>
-      <div class="ai-bulk-actions">
-        <button
-          class="ai-btn ai-btn-ghost"
-          :disabled="store.taskList.length === 0"
-          @click="toggleCurrentPageSelection(!currentPageAllSelected)"
-        >
-          {{ currentPageAllSelected ? '取消本页全选' : '本页全选' }}
-        </button>
-        <button
-          class="ai-btn ai-btn-ghost"
-          :disabled="store.taskTotal === 0 || isFilterAllSelection"
-          @click="selectAllByCurrentFilter"
-        >
-          按筛选结果全选
-        </button>
-        <button
-          class="ai-btn ai-btn-ghost"
-          :disabled="store.selectedTaskCount <= 0"
-          @click="clearSelectedTasks"
-        >
-          清空勾选
-        </button>
-        <button
-          class="ai-btn ai-btn-ghost"
-          :disabled="store.selectedTaskCount <= 0"
-          @click="openBatchDiscardDialog"
-        >
-          批量废弃
-        </button>
-        <button
-          class="ai-btn ai-btn-danger"
-          :disabled="store.selectedTaskCount <= 0"
-          @click="openBatchDeleteDialog"
-        >
-          批量删除
+        </el-select>
+        <button class="ai-filter-reset-btn" title="重置筛选" @click="resetFilter">
+          <span class="material-symbols-outlined" style="font-size: 16px">restart_alt</span>
         </button>
       </div>
     </div>
@@ -703,7 +780,6 @@ async function handleExecute(task: AiScriptTask) {
               />
             </th>
             <th>任务名称 / ID</th>
-            <th>所属项目</th>
             <th>关联用例</th>
             <th>输出框架</th>
             <th>任务状态</th>
@@ -730,11 +806,6 @@ async function handleExecute(task: AiScriptTask) {
                 <span class="ai-task-name">{{ task.taskName }}</span>
                 <span class="ai-task-id">TASK-{{ task.id }}</span>
               </div>
-            </td>
-            <td>
-              <span style="font-size: 0.85rem; color: var(--tp-gray-700)">
-                {{ task.projectName }}
-              </span>
             </td>
             <td>
               <div class="ai-case-tags">
@@ -797,6 +868,14 @@ async function handleExecute(task: AiScriptTask) {
               <div class="ai-row-actions">
                 <button class="ai-row-action-btn" title="查看详情" @click.stop="goDetail(task)">
                   <span class="material-symbols-outlined">visibility</span>
+                </button>
+                <button
+                  v-if="task.taskStatus !== TaskStatus.DISCARDED"
+                  class="ai-row-action-btn"
+                  title="修改名称"
+                  @click.stop="openRenameDialog(task)"
+                >
+                  <span class="material-symbols-outlined">edit</span>
                 </button>
                 <button
                   v-if="
@@ -937,6 +1016,37 @@ async function handleExecute(task: AiScriptTask) {
         <div class="ai-quickstart-glow"></div>
       </div>
     </div>
+
+    <!-- 浮动批量操作栏 -->
+    <Teleport to="body">
+      <Transition name="batch-slide">
+        <div v-if="store.selectedTaskCount > 0" class="batch-float-overlay">
+          <div class="batch-float-bar">
+            <div class="batch-left">
+              <div class="batch-count-badge">{{ store.selectedTaskCount }}</div>
+              <div class="batch-text">
+                <div class="batch-text-title">已选 {{ store.selectedTaskCount }} 项任务</div>
+                <div class="batch-text-sub">批量操作模式已启用</div>
+              </div>
+            </div>
+            <div class="batch-actions">
+              <button class="batch-action-item" @click="openBatchDiscardDialog">
+                <span class="material-symbols-outlined" style="color: #fbbf24">block</span>
+                <span>批量废弃</span>
+              </button>
+              <button class="batch-action-item batch-action-danger" @click="openBatchDeleteDialog">
+                <span class="material-symbols-outlined">delete</span>
+                <span>批量删除</span>
+              </button>
+              <div class="batch-divider"></div>
+              <button class="batch-close" @click="store.clearTaskSelection()">
+                <span class="material-symbols-outlined">close</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 
     <!-- FAB — 跳转脚本资产 -->
     <button class="ai-fab" title="脚本资产管理" @click="router.push('/ai-script/library')">
@@ -1183,6 +1293,135 @@ async function handleExecute(task: AiScriptTask) {
       </div>
     </div>
 
+    <!-- Token 管理 Dialog -->
+    <div v-if="showTokenDialog" class="ai-dialog-overlay" @click.self="showTokenDialog = false">
+      <div class="ai-dialog" style="max-width: 520px">
+        <div class="ai-dialog-header">
+          <div>
+            <h2>Token 管理</h2>
+            <p class="ai-dialog-subtitle">管理目标站点的认证状态，为测试脚本执行提供登录环境</p>
+          </div>
+          <button class="ai-dialog-close" @click="showTokenDialog = false">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="ai-dialog-body">
+          <!-- 目标站点 URL（只读回显） -->
+          <div class="ai-form-group">
+            <label class="ai-form-label">目标站点地址</label>
+            <div style="display: flex; align-items: center; gap: 8px">
+              <span
+                style="
+                  flex: 1;
+                  font-size: 0.85rem;
+                  color: var(--tp-text-primary);
+                  word-break: break-all;
+                "
+              >
+                {{ tokenTargetUrl || '未配置测试环境' }}
+              </span>
+              <button
+                class="ai-btn ai-btn-ghost"
+                style="padding: 6px 14px; white-space: nowrap"
+                :disabled="tokenLoading || !tokenTargetUrl"
+                @click="loadTokenStatus"
+              >
+                <span v-if="tokenLoading" class="ai-spinner"></span>
+                <span v-else class="material-symbols-outlined" style="font-size: 16px">
+                  refresh
+                </span>
+                刷新
+              </button>
+            </div>
+          </div>
+
+          <!-- 认证状态结果 -->
+          <div v-if="tokenAuthState" class="ai-token-status-panel">
+            <div class="ai-token-status-header">
+              <span class="ai-section-title" style="font-size: 0.82rem">认证状态</span>
+              <div class="ai-auth-status-badge" :class="tokenStatusClass">
+                <span class="ai-auth-dot"></span>
+                {{ tokenStatusText }}
+              </div>
+            </div>
+            <div v-if="tokenAuthState.exists" class="ai-auth-meta">
+              <div class="ai-auth-meta-item">
+                <span class="ai-info-label">文件年龄</span>
+                <span class="ai-info-value">
+                  {{
+                    tokenAuthState.file_age_hours !== null
+                      ? tokenAuthState.file_age_hours + ' 小时'
+                      : '-'
+                  }}
+                </span>
+              </div>
+              <div class="ai-auth-meta-item">
+                <span class="ai-info-label">Cookie 数</span>
+                <span class="ai-info-value">{{ tokenAuthState.cookie_count }}</span>
+              </div>
+            </div>
+            <div v-else class="ai-auth-empty-hint">
+              <span class="material-symbols-outlined">lock_open</span>
+              <span>暂无认证状态，请获取 Token 后再执行测试脚本</span>
+            </div>
+          </div>
+
+          <!-- 手动登录提示区 -->
+          <div
+            v-if="manualLoginActive"
+            class="ai-token-status-panel"
+            style="margin-top: 12px; border-color: var(--tp-accent, #7c5cfc)"
+          >
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px">
+              <span class="ai-spinner"></span>
+              <span
+                class="ai-section-title"
+                style="font-size: 0.82rem; color: var(--tp-accent, #7c5cfc)"
+              >
+                等待登录
+              </span>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--tp-text-secondary); margin: 0 0 12px 0">
+              浏览器已打开，请在浏览器窗口中完成登录操作（处理验证码、短信验证等），登录成功后点击下方按钮保存认证状态。
+            </p>
+            <button
+              class="ai-btn ai-btn-primary"
+              style="padding: 6px 14px; font-size: 0.8rem"
+              :disabled="manualLoginLoading"
+              @click="handleManualLoginComplete"
+            >
+              <span class="material-symbols-outlined" style="font-size: 16px">check_circle</span>
+              {{ manualLoginLoading ? '保存中...' : '登录完成，保存状态' }}
+            </button>
+          </div>
+        </div>
+        <div class="ai-dialog-footer">
+          <div class="ai-auth-actions" style="flex: 1">
+            <button
+              v-if="!manualLoginActive"
+              class="ai-btn ai-btn-primary"
+              style="padding: 6px 14px; font-size: 0.8rem"
+              :disabled="manualLoginLoading || !tokenTargetUrl.trim()"
+              @click="handleManualLogin"
+            >
+              <span class="material-symbols-outlined" style="font-size: 16px">open_in_browser</span>
+              手动登录
+            </button>
+            <button
+              v-if="tokenAuthState?.exists"
+              class="ai-btn ai-btn-danger-ghost"
+              style="padding: 6px 14px; font-size: 0.8rem"
+              @click="handleTokenInvalidate"
+            >
+              <span class="material-symbols-outlined" style="font-size: 16px">delete</span>
+              清除 Token
+            </button>
+          </div>
+          <button class="ai-btn ai-btn-ghost" @click="showTokenDialog = false">关闭</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast 提示 -->
     <Transition name="toast">
       <div v-if="toastMsg" class="task-list-toast">
@@ -1191,21 +1430,66 @@ async function handleExecute(task: AiScriptTask) {
       </div>
     </Transition>
 
+    <!-- 重命名任务 Dialog -->
+    <div v-if="showRenameDialog" class="ai-dialog-overlay" @click.self="showRenameDialog = false">
+      <div class="ai-dialog ai-rename-dialog" style="max-width: 400px">
+        <div class="ai-dialog-header">
+          <div>
+            <h2>修改任务名称</h2>
+            <p class="ai-dialog-subtitle">TASK-{{ renameTaskId }}</p>
+          </div>
+          <button class="ai-dialog-close" @click="showRenameDialog = false">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="ai-dialog-body">
+          <div class="ai-form-group">
+            <label class="ai-form-label">任务名称</label>
+            <input
+              v-model="renameNewName"
+              class="ai-form-input"
+              placeholder="请输入新的任务名称"
+              maxlength="128"
+              @keyup.enter="confirmRename"
+            />
+            <span class="ai-form-hint">{{ renameNewName.length }} / 128</span>
+          </div>
+        </div>
+        <div class="ai-dialog-footer">
+          <button class="ai-btn ai-btn-ghost" @click="showRenameDialog = false">取消</button>
+          <button
+            class="ai-btn ai-btn-primary"
+            :disabled="renameLoading || !renameNewName.trim()"
+            @click="confirmRename"
+          >
+            <span v-if="renameLoading" class="ai-spinner"></span>
+            {{ renameLoading ? '保存中...' : '确认修改' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 废弃确认 Dialog -->
     <div v-if="showDiscardDialog" class="ai-dialog-overlay" @click.self="showDiscardDialog = false">
-      <div class="ai-dialog" style="max-width: 440px">
+      <div class="ai-dialog ai-confirm-dialog" style="max-width: 440px">
         <div class="ai-dialog-header">
-          <h2>ℹ️ 废弃任务</h2>
+          <div>
+            <h2>废弃任务</h2>
+            <p class="ai-dialog-subtitle">此操作不可撤销，请谨慎确认</p>
+          </div>
           <button class="ai-dialog-close" @click="showDiscardDialog = false">
             <span class="material-symbols-outlined">close</span>
           </button>
         </div>
         <div class="ai-dialog-body">
-          <p class="discard-warning">
-            确定要废弃任务
-            <strong>{{ discardTaskName }}</strong>
-            （ID: {{ discardTaskId }}）吗？废弃后任务将不可恢复。
-          </p>
+          <div class="ai-confirm-alert">
+            <span class="material-symbols-outlined ai-confirm-alert-icon">warning</span>
+            <p>
+              确定要废弃任务
+              <strong>{{ discardTaskName }}</strong>
+              吗？废弃后任务将不可恢复。
+            </p>
+          </div>
           <div class="ai-form-group">
             <label class="ai-form-label">废弃原因 *</label>
             <textarea
@@ -1219,8 +1503,8 @@ async function handleExecute(task: AiScriptTask) {
         <div class="ai-dialog-footer">
           <button class="ai-btn ai-btn-ghost" @click="showDiscardDialog = false">取消</button>
           <button
-            class="ai-btn ai-btn-danger"
-            :disabled="store.actionLoading"
+            class="ai-btn ai-btn-danger-solid"
+            :disabled="store.actionLoading || !discardReason.trim()"
             @click="confirmDiscard"
           >
             <span v-if="store.actionLoading" class="ai-spinner"></span>
@@ -1232,29 +1516,35 @@ async function handleExecute(task: AiScriptTask) {
 
     <!-- 删除确认 Dialog -->
     <div v-if="showDeleteDialog" class="ai-dialog-overlay" @click.self="showDeleteDialog = false">
-      <div class="ai-dialog" style="max-width: 440px">
+      <div class="ai-dialog ai-confirm-dialog" style="max-width: 440px">
         <div class="ai-dialog-header">
-          <h2>⚠️ 删除任务</h2>
+          <div>
+            <h2>删除任务</h2>
+            <p class="ai-dialog-subtitle">此操作不可撤销，请谨慎确认</p>
+          </div>
           <button class="ai-dialog-close" @click="showDeleteDialog = false">
             <span class="material-symbols-outlined">close</span>
           </button>
         </div>
         <div class="ai-dialog-body">
-          <p class="discard-warning" style="color: #ff8a80">
-            确定要彻底删除任务
-            <strong>{{ deleteTaskName }}</strong>
-            （ID: {{ deleteTaskId }}）吗？
-          </p>
-          <p style="font-size: 0.8rem; color: var(--tp-gray-500); margin-top: 8px">
-            此操作将级联删除任务关联的所有脚本版本、验证记录、轨迹、证据和录制会话，
-            <strong style="color: #ff8a80">不可恢复</strong>
-            。
-          </p>
+          <div class="ai-confirm-alert ai-confirm-alert--danger">
+            <span class="material-symbols-outlined ai-confirm-alert-icon">delete_forever</span>
+            <div>
+              <p>
+                确定要彻底删除任务
+                <strong>{{ deleteTaskName }}</strong>
+                吗？
+              </p>
+              <p class="ai-confirm-alert-sub">
+                此操作将级联删除任务关联的所有脚本版本、验证记录、轨迹、证据和录制会话，不可恢复。
+              </p>
+            </div>
+          </div>
         </div>
         <div class="ai-dialog-footer">
           <button class="ai-btn ai-btn-ghost" @click="showDeleteDialog = false">取消</button>
           <button
-            class="ai-btn ai-btn-danger"
+            class="ai-btn ai-btn-danger-solid"
             :disabled="store.actionLoading"
             @click="confirmDelete"
           >
@@ -1271,19 +1561,25 @@ async function handleExecute(task: AiScriptTask) {
       class="ai-dialog-overlay"
       @click.self="showBatchDiscardDialog = false"
     >
-      <div class="ai-dialog" style="max-width: 460px">
+      <div class="ai-dialog ai-confirm-dialog" style="max-width: 460px">
         <div class="ai-dialog-header">
-          <h2>批量废弃任务</h2>
+          <div>
+            <h2>批量废弃任务</h2>
+            <p class="ai-dialog-subtitle">已选中 {{ store.selectedTaskCount }} 条任务</p>
+          </div>
           <button class="ai-dialog-close" @click="showBatchDiscardDialog = false">
             <span class="material-symbols-outlined">close</span>
           </button>
         </div>
         <div class="ai-dialog-body">
-          <p class="discard-warning">
-            确定要批量废弃已选中的
-            <strong>{{ store.selectedTaskCount }}</strong>
-            条任务吗？
-          </p>
+          <div class="ai-confirm-alert">
+            <span class="material-symbols-outlined ai-confirm-alert-icon">warning</span>
+            <p>
+              确定要批量废弃已选中的
+              <strong>{{ store.selectedTaskCount }}</strong>
+              条任务吗？废弃后不可恢复。
+            </p>
+          </div>
           <div class="ai-form-group">
             <label class="ai-form-label">废弃原因 *</label>
             <textarea
@@ -1297,8 +1593,8 @@ async function handleExecute(task: AiScriptTask) {
         <div class="ai-dialog-footer">
           <button class="ai-btn ai-btn-ghost" @click="showBatchDiscardDialog = false">取消</button>
           <button
-            class="ai-btn ai-btn-danger"
-            :disabled="store.actionLoading"
+            class="ai-btn ai-btn-danger-solid"
+            :disabled="store.actionLoading || !batchDiscardReason.trim()"
             @click="confirmBatchDiscard"
           >
             <span v-if="store.actionLoading" class="ai-spinner"></span>
@@ -1314,27 +1610,35 @@ async function handleExecute(task: AiScriptTask) {
       class="ai-dialog-overlay"
       @click.self="showBatchDeleteDialog = false"
     >
-      <div class="ai-dialog" style="max-width: 460px">
+      <div class="ai-dialog ai-confirm-dialog" style="max-width: 460px">
         <div class="ai-dialog-header">
-          <h2>批量删除任务</h2>
+          <div>
+            <h2>批量删除任务</h2>
+            <p class="ai-dialog-subtitle">已选中 {{ store.selectedTaskCount }} 条任务</p>
+          </div>
           <button class="ai-dialog-close" @click="showBatchDeleteDialog = false">
             <span class="material-symbols-outlined">close</span>
           </button>
         </div>
         <div class="ai-dialog-body">
-          <p class="discard-warning" style="color: #ff8a80">
-            确定要批量删除已选中的
-            <strong>{{ store.selectedTaskCount }}</strong>
-            条任务吗？
-          </p>
-          <p style="font-size: 0.8rem; color: var(--tp-gray-500); margin-top: 8px">
-            只有已废弃任务会被真正删除，不满足条件的任务会在结果中按“跳过/失败”统计返回。
-          </p>
+          <div class="ai-confirm-alert ai-confirm-alert--danger">
+            <span class="material-symbols-outlined ai-confirm-alert-icon">delete_forever</span>
+            <div>
+              <p>
+                确定要批量删除已选中的
+                <strong>{{ store.selectedTaskCount }}</strong>
+                条任务吗？
+              </p>
+              <p class="ai-confirm-alert-sub">
+                只有已废弃任务会被真正删除，不满足条件的任务会在结果中按"跳过/失败"统计返回。
+              </p>
+            </div>
+          </div>
         </div>
         <div class="ai-dialog-footer">
           <button class="ai-btn ai-btn-ghost" @click="showBatchDeleteDialog = false">取消</button>
           <button
-            class="ai-btn ai-btn-danger"
+            class="ai-btn ai-btn-danger-solid"
             :disabled="store.actionLoading"
             @click="confirmBatchDelete"
           >

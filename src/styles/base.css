@@ -9,8 +9,7 @@ body {
   font-weight: var(--tp-font-regular);
   line-height: var(--tp-line-body);
   color: var(--tp-text-primary);
-  /* 默认黑色 → 防止登录页刷新时白闪 */
-  background: #000;
+  background: #ffffff;
 }
 /* ========== Global Scrollbar ========== */
 ::-webkit-scrollbar {

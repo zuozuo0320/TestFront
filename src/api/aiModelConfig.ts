@@ -10,6 +10,7 @@ export interface AIModelConfig {
   provider: string
   name: string
   model_id: string
+  model_strength: AIModelStrength
   base_url: string
   api_key: string
   is_active: boolean
@@ -18,11 +19,20 @@ export interface AIModelConfig {
   updated_at: string
 }
 
+/** 上游模型选项 */
+export interface AIModelOption {
+  id: string
+  name: string
+}
+
+export type AIModelStrength = 'low' | 'medium' | 'high'
+
 /** 创建模型配置入参 */
 export interface CreateAIModelInput {
   provider: string
   name: string
   model_id: string
+  model_strength: AIModelStrength
   base_url: string
   api_key: string
 }
@@ -32,18 +42,31 @@ export interface UpdateAIModelInput {
   provider?: string
   name?: string
   model_id?: string
+  model_strength?: AIModelStrength
   base_url?: string
   api_key?: string
 }
 
 /** 测试模型连接（编辑已有配置时可传 config_id，api_key 留空则用已存的） */
 export async function testAIModelConnection(input: {
+  provider: string
   api_key: string
   base_url: string
   model_id: string
   config_id?: number
 }): Promise<{ status: string; message: string }> {
   const res = await apiClient.post('/ai-model-configs/test', input, { timeout: 30000 })
+  return res.data
+}
+
+/** 从上游接口拉取可用模型列表 */
+export async function listAIModelOptions(input: {
+  provider: string
+  api_key: string
+  base_url: string
+  config_id?: number
+}): Promise<AIModelOption[]> {
+  const res = await apiClient.post('/ai-model-configs/models', input, { timeout: 30000 })
   return res.data
 }
 

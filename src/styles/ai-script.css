@@ -4650,3 +4650,620 @@
     animation: none;
   }
 }
+
+/* ── 认证状态管理卡片 ── */
+
+.ai-auth-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.ai-auth-status-badge.valid {
+  background: rgba(76, 175, 80, 0.12);
+  color: #66bb6a;
+  border: 1px solid rgba(76, 175, 80, 0.25);
+}
+
+.ai-auth-status-badge.expired {
+  background: rgba(255, 152, 0, 0.12);
+  color: #ffa726;
+  border: 1px solid rgba(255, 152, 0, 0.25);
+}
+
+.ai-auth-status-badge.missing {
+  background: var(--tp-surface-muted);
+  color: var(--tp-text-muted);
+  border: 1px solid var(--tp-border-subtle);
+}
+
+.ai-auth-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.ai-auth-status-badge.valid .ai-auth-dot {
+  background: #66bb6a;
+}
+
+.ai-auth-status-badge.expired .ai-auth-dot {
+  background: #ffa726;
+}
+
+.ai-auth-status-badge.missing .ai-auth-dot {
+  background: var(--tp-text-disabled);
+}
+
+.ai-auth-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ai-auth-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--tp-text-muted);
+  padding: 8px 0;
+}
+
+.ai-auth-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.ai-auth-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ai-auth-empty-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--tp-surface-muted);
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: var(--tp-text-muted);
+}
+
+.ai-auth-empty-hint .material-symbols-outlined {
+  font-size: 20px;
+  color: var(--tp-text-disabled);
+}
+
+.ai-auth-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--tp-surface-muted);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 8px;
+}
+
+.ai-auth-login-form .ai-form-group {
+  margin-bottom: 0;
+}
+
+.ai-auth-login-form .ai-form-label {
+  font-size: 0.72rem;
+  margin-bottom: 4px;
+}
+
+.ai-auth-login-form .ai-form-input {
+  font-size: 0.8rem;
+  padding: 6px 10px;
+}
+
+.ai-auth-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.ai-auth-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-btn-sm {
+  padding: 5px 12px;
+  font-size: 12px;
+  gap: 4px;
+  height: 30px;
+}
+
+.ai-btn-sm .material-symbols-outlined {
+  font-size: 15px;
+}
+
+/* ── 筛选栏（inline，与用例列表 filter-bar 一致） ── */
+.ai-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--tp-surface-card);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 12px;
+  margin-bottom: 10px;
+  min-height: 50px;
+}
+
+.ai-filter-bar-search {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  gap: 8px;
+  padding: 0 12px;
+  background: var(--tp-surface-base, #f8f9fa);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 9px;
+  height: 36px;
+  transition: all 0.15s ease;
+}
+
+.ai-filter-bar-search:hover {
+  border-color: var(--tp-border-strong);
+}
+
+.ai-filter-bar-search:focus-within {
+  border-color: var(--tp-accent-primary-border, #818cf8);
+  background: #fff;
+  box-shadow:
+    0 0 0 1px var(--tp-accent-primary-border, #818cf8) inset,
+    0 0 0 3px var(--tp-accent-primary-soft, rgba(99, 102, 241, 0.08));
+}
+
+.ai-filter-bar-icon {
+  font-size: 18px;
+  color: var(--tp-text-muted);
+  flex-shrink: 0;
+}
+
+.ai-filter-bar-search:focus-within .ai-filter-bar-icon {
+  color: var(--tp-primary);
+}
+
+.ai-filter-bar-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--tp-text-primary);
+  width: 100%;
+  height: 100%;
+  font-family: inherit;
+}
+
+.ai-filter-bar-input::placeholder {
+  color: var(--tp-text-muted);
+}
+
+/* 搜索框内清空按钮 */
+.ai-filter-bar-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: var(--tp-border-subtle);
+  color: var(--tp-text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.ai-filter-bar-clear .material-symbols-outlined {
+  font-size: 14px;
+}
+
+.ai-filter-bar-clear:hover {
+  background: var(--tp-text-muted);
+  color: #fff;
+}
+
+.ai-filter-bar-selects {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.ai-filter-dropdown {
+  height: 36px;
+  padding: 0 30px 0 12px;
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 9px;
+  background: var(--tp-surface-card);
+  color: var(--tp-text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' stroke='%239ca3af' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  transition: all 0.15s ease;
+}
+
+.ai-filter-dropdown:hover {
+  border-color: var(--tp-border-strong);
+}
+
+.ai-filter-dropdown:focus {
+  border-color: var(--tp-accent-primary-border, #818cf8);
+  box-shadow:
+    0 0 0 1px var(--tp-accent-primary-border, #818cf8) inset,
+    0 0 0 3px var(--tp-accent-primary-soft, rgba(99, 102, 241, 0.08));
+}
+
+/* el-select 在筛选栏内的样式覆盖 */
+.ai-filter-el-select {
+  width: 150px;
+}
+
+.ai-filter-el-select :deep(.el-select__wrapper) {
+  min-height: 36px;
+  height: 36px;
+  border-radius: 9px;
+  box-shadow: 0 0 0 1px var(--tp-border-subtle) inset;
+  background: var(--tp-surface-card);
+  font-size: 13px;
+}
+
+.ai-filter-el-select :deep(.el-select__wrapper:hover) {
+  box-shadow: 0 0 0 1px var(--tp-border-strong) inset;
+}
+
+.ai-filter-el-select :deep(.el-select__wrapper.is-focused) {
+  box-shadow:
+    0 0 0 1px var(--tp-accent-primary-border, #818cf8) inset,
+    0 0 0 3px var(--tp-accent-primary-soft, rgba(99, 102, 241, 0.08));
+}
+
+.ai-filter-reset-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 9px;
+  background: var(--tp-surface-card);
+  color: var(--tp-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ai-filter-reset-btn:hover {
+  border-color: var(--tp-primary);
+  color: var(--tp-primary);
+  background: var(--tp-accent-primary-soft, rgba(99, 102, 241, 0.06));
+}
+
+/* 工具栏分隔线 */
+.ai-toolbar-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--tp-border-subtle);
+  margin: 0 4px;
+}
+
+/* 批量操作条 */
+.ai-bulk-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: var(--tp-accent-primary-soft, rgba(99, 102, 241, 0.06));
+  border: 1px solid var(--tp-accent-primary-border, rgba(99, 102, 241, 0.15));
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+
+.ai-bulk-summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--tp-text-secondary);
+}
+
+.ai-bulk-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--tp-primary);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ai-bulk-hint {
+  color: var(--tp-text-muted);
+}
+
+.ai-bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 批量操作条展开动画 */
+.toolbar-slide-enter-active,
+.toolbar-slide-leave-active {
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.toolbar-slide-enter-from,
+.toolbar-slide-leave-to {
+  opacity: 0;
+  max-height: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.toolbar-slide-enter-to,
+.toolbar-slide-leave-from {
+  opacity: 1;
+  max-height: 60px;
+}
+
+/* 任务详情页内的认证卡片微调 */
+.ai-task-detail-page .ai-auth-card-body {
+  gap: 10px;
+}
+
+.ai-task-detail-page .ai-auth-meta {
+  padding: 8px 10px;
+  background: var(--ai-detail-panel-muted, var(--tp-surface-muted));
+  border: 1px solid var(--ai-detail-border-soft, var(--tp-border-subtle));
+  border-radius: 8px;
+}
+
+/* Token 管理 Dialog 内状态面板 */
+.ai-token-status-panel {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--tp-surface-muted);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 8px;
+}
+
+.ai-token-status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.ai-btn-danger-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  color: #ff8a80;
+  border: 1px solid rgba(255, 138, 128, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ai-btn-danger-ghost:hover {
+  background: rgba(255, 138, 128, 0.08);
+  border-color: rgba(255, 138, 128, 0.5);
+}
+
+/* ── 操作类小 Dialog 统一样式（重命名 / 确认 / 废弃 / 删除） ── */
+.ai-rename-dialog,
+.ai-confirm-dialog {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.ai-rename-dialog .ai-dialog-header,
+.ai-confirm-dialog .ai-dialog-header {
+  align-items: flex-start;
+  padding: 16px 18px 12px;
+  background: linear-gradient(180deg, var(--tp-surface-elevated) 0%, var(--tp-surface-card) 100%);
+  border-bottom: 1px solid var(--tp-border-subtle);
+}
+
+.ai-rename-dialog .ai-dialog-header h2,
+.ai-confirm-dialog .ai-dialog-header h2 {
+  font-size: 15px;
+  font-weight: var(--tp-font-semibold);
+  line-height: 22px;
+  color: var(--tp-text-primary);
+}
+
+.ai-rename-dialog .ai-dialog-close,
+.ai-confirm-dialog .ai-dialog-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 8px;
+}
+
+.ai-rename-dialog .ai-dialog-close .material-symbols-outlined,
+.ai-confirm-dialog .ai-dialog-close .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.ai-rename-dialog .ai-dialog-body,
+.ai-confirm-dialog .ai-dialog-body {
+  padding: 16px 18px;
+  background: var(--tp-surface-base);
+}
+
+.ai-rename-dialog .ai-dialog-footer,
+.ai-confirm-dialog .ai-dialog-footer {
+  padding: 10px 18px;
+  border-top: 1px solid var(--tp-border-subtle);
+  background: var(--tp-surface-card);
+}
+
+.ai-rename-dialog .ai-btn-primary,
+.ai-confirm-dialog .ai-btn-primary {
+  min-width: 96px;
+  background: var(--tp-btn-bg);
+  color: var(--tp-btn-text);
+  font-weight: var(--tp-font-semibold);
+  box-shadow: var(--tp-btn-shadow);
+}
+
+.ai-rename-dialog .ai-btn-ghost,
+.ai-confirm-dialog .ai-btn-ghost {
+  min-width: 72px;
+  background: var(--tp-surface-card);
+}
+
+/* 表单控件：浅色 Dialog 内覆盖深色默认样式 */
+.ai-rename-dialog .ai-form-input,
+.ai-rename-dialog .ai-form-select,
+.ai-rename-dialog .ai-form-textarea,
+.ai-confirm-dialog .ai-form-input,
+.ai-confirm-dialog .ai-form-select,
+.ai-confirm-dialog .ai-form-textarea {
+  min-height: 36px;
+  padding: 8px 12px;
+  background: var(--tp-surface-card);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 8px;
+  color: var(--tp-text-primary);
+  font-size: 13px;
+  line-height: 20px;
+  box-shadow: none;
+}
+
+.ai-rename-dialog .ai-form-input:hover,
+.ai-rename-dialog .ai-form-textarea:hover,
+.ai-confirm-dialog .ai-form-input:hover,
+.ai-confirm-dialog .ai-form-textarea:hover {
+  border-color: var(--tp-border-strong);
+}
+
+.ai-rename-dialog .ai-form-input:focus,
+.ai-rename-dialog .ai-form-textarea:focus,
+.ai-confirm-dialog .ai-form-input:focus,
+.ai-confirm-dialog .ai-form-textarea:focus {
+  border-color: var(--tp-accent-primary-border);
+  box-shadow: 0 0 0 2px var(--tp-accent-primary-soft);
+}
+
+.ai-rename-dialog .ai-form-label,
+.ai-confirm-dialog .ai-form-label {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--tp-text-secondary);
+}
+
+/* 表单字数提示 */
+.ai-form-hint {
+  font-size: 11px;
+  color: var(--tp-text-muted);
+  text-align: right;
+  margin-top: 4px;
+}
+
+/* 确认警告面板 */
+.ai-confirm-alert {
+  display: flex;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(251, 191, 36, 0.06);
+  border: 1px solid rgba(251, 191, 36, 0.18);
+}
+
+.ai-confirm-alert p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--tp-text-primary);
+}
+
+.ai-confirm-alert-icon {
+  font-size: 20px;
+  color: #f59e0b;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.ai-confirm-alert-sub {
+  margin-top: 6px !important;
+  font-size: 12px !important;
+  color: var(--tp-text-muted) !important;
+}
+
+.ai-confirm-alert--danger {
+  background: rgba(239, 68, 68, 0.04);
+  border-color: rgba(239, 68, 68, 0.14);
+}
+
+.ai-confirm-alert--danger .ai-confirm-alert-icon {
+  color: #ef4444;
+}
+
+/* 实心危险按钮 — 与系统 primary 按钮一致的圆润风格 */
+.ai-btn-danger-solid {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 96px;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #fff;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: var(--tp-font-semibold);
+  font-size: 13px;
+  padding: 0 16px;
+  height: 32px;
+  box-shadow: 0 1px 3px rgba(239, 68, 68, 0.2);
+  transition: all 0.15s ease;
+}
+
+.ai-btn-danger-solid:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
+.ai-btn-danger-solid:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}

@@ -55,11 +55,11 @@ function showToast(msg: string, type: 'success' | 'error' = 'success') {
 onMounted(async () => {
   if (taskId.value) {
     await store.loadTaskDetailFull(taskId.value)
-    // ??????????????????????
+    // 录制增强模式加载录制状态
     if (task.value?.generationMode === GenerationMode.RECORDING_ENHANCED) {
       await loadRecording()
     }
-    // #3: RUNNING ??????????
+    // #3: RUNNING 状态自动轮询
     startTaskPolling()
     startValidationPolling()
   }
@@ -321,6 +321,10 @@ async function markRecordingFailed(reason: string) {
     })
   } catch (e) {
     console.warn('标记录制失败失败:', e)
+  }
+  recording.value = {
+    ...recording.value,
+    recordingStatus: 'FAILED',
   }
 }
 
@@ -628,8 +632,17 @@ async function openRecordingSubmitDialog() {
 
 async function submitRecordingScript() {
   if (!finishScriptContent.value.trim() || !recording.value) return
-  await handleFinishRecording()
   showRecordingDialog.value = false
+  recording.value = {
+    ...recording.value,
+    recordingStatus: 'FINISHED',
+  }
+  try {
+    await handleFinishRecording()
+  } catch (e) {
+    console.error('提交录制脚本失败:', e)
+    showToast('提交录制脚本失败，请重试', 'error')
+  }
 }
 
 /** 权限计算 */
@@ -689,7 +702,10 @@ const isTaskActive = computed(() => {
 })
 const isGeneratingScript = computed(() => {
   const status = task.value?.taskStatus
-  return status === TaskStatus.RUNNING || status === TaskStatus.PENDING_EXECUTE
+  const isRunning = status === TaskStatus.RUNNING || status === TaskStatus.PENDING_EXECUTE
+  if (!isRunning) return false
+  if (!isRecordingMode.value) return true
+  return recording.value?.recordingStatus === 'FINISHED'
 })
 const scriptGeneratingTitle = computed(() =>
   isRecordingMode.value ? 'AI 正在重构录制脚本' : 'AI 正在生成 Playwright 脚本',
@@ -806,7 +822,11 @@ watch(
               @click="handleStartRecording"
             >
               <span class="material-symbols-outlined">fiber_manual_record</span>
-              {{ recording?.recordingStatus === 'FINISHED' ? '重新录制' : '开始录制' }}
+              {{
+                recording?.recordingStatus === 'FINISHED' || recording?.recordingStatus === 'FAILED'
+                  ? '重新录制'
+                  : '开始录制'
+              }}
             </button>
             <button v-else class="ai-btn ai-btn-warning" @click="openRecordingSubmitDialog">
               <span class="material-symbols-outlined">stop_circle</span>

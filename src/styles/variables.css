@@ -76,24 +76,24 @@
   --tp-gray-800: #1f2937;
   --tp-gray-900: #111827;
 
-  /* 导航专用色 — 深海军蓝 (Design B) */
-  --tp-nav-bg: rgba(255, 255, 255, 0.82);
-  --tp-nav-bg-light: rgba(255, 255, 255, 0.72);
+  /* 导航专用色 */
+  --tp-nav-bg: #ffffff;
+  --tp-nav-bg-light: #fafafa;
   --tp-nav-border: rgba(229, 231, 235, 0.82);
   --tp-nav-text: #6b7280;
   --tp-nav-text-bright: #111827;
 
-  /* 内容区表面色 — 深空极致暗黑底色 (Design B) */
-  --tp-surface-base: #fbfaf8;
-  --tp-surface-card: rgba(255, 255, 255, 0.88);
-  --tp-surface-elevated: rgba(255, 255, 255, 0.78);
-  --tp-surface-input: rgba(255, 255, 255, 0.82);
-  --tp-surface-hover: #f7f2ff;
-  --tp-surface-sheen: rgba(236, 72, 153, 0.04);
-  --tp-surface-sheen-strong: rgba(139, 92, 246, 0.055);
-  --tp-surface-muted: rgba(250, 245, 255, 0.72);
-  --tp-surface-row-hover: rgba(139, 92, 246, 0.055);
-  --tp-surface-header: rgba(250, 245, 255, 0.72);
+  /* 内容区表面色 — 纯白专业 SaaS 底色 */
+  --tp-surface-base: #ffffff;
+  --tp-surface-card: #ffffff;
+  --tp-surface-elevated: #ffffff;
+  --tp-surface-input: #f8f9fa;
+  --tp-surface-hover: #f5f3ff;
+  --tp-surface-sheen: rgba(99, 102, 241, 0.02);
+  --tp-surface-sheen-strong: rgba(99, 102, 241, 0.04);
+  --tp-surface-muted: #f9fafb;
+  --tp-surface-row-hover: #f5f3ff;
+  --tp-surface-header: #fafafa;
   --tp-overlay-scrim: rgba(15, 23, 42, 0.45);
   --tp-ambient-primary: rgba(139, 92, 246, 0.12);
   --tp-ambient-info: rgba(236, 72, 153, 0.1);

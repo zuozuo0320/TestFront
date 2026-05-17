@@ -1780,16 +1780,6 @@ watch(selectedProject, (newId) => {
             <el-option label="已通过" value="已通过" />
             <el-option label="已失败" value="已失败" />
           </el-select>
-          <el-select
-            v-model="moduleIdFilter"
-            placeholder="所属模块"
-            clearable
-            size="default"
-            class="filter-dropdown"
-            @change="onSearch"
-          >
-            <el-option v-for="n in flatModules" :key="n.id" :label="n.path" :value="n.id" />
-          </el-select>
           <button
             type="button"
             class="filter-icon-btn"
@@ -2218,6 +2208,8 @@ watch(selectedProject, (newId) => {
       size="360px"
       direction="rtl"
       class="advanced-filter-drawer"
+      modal-class="advanced-filter-overlay"
+      append-to-body
     >
       <div class="advanced-filter-form">
         <el-form label-position="top">
@@ -2258,50 +2250,50 @@ watch(selectedProject, (newId) => {
             <el-input v-model="updaterFilter" placeholder="输入更新人ID" clearable />
           </el-form-item>
           <el-form-item label="创建时间">
-            <div style="display: flex; gap: 8px; align-items: center">
+            <div style="display: flex; gap: 8px; align-items: center; width: 100%">
               <el-date-picker
                 v-model="createdAfter"
                 type="date"
                 value-format="YYYY-MM-DD"
                 placeholder="开始日期"
                 clearable
-                style="flex: 1"
+                style="flex: 1; width: 100%"
               />
-              <span style="color: var(--tp-gray-400)">~</span>
+              <span style="color: var(--tp-text-muted); font-size: 13px">-</span>
               <el-date-picker
                 v-model="createdBefore"
                 type="date"
                 value-format="YYYY-MM-DD"
                 placeholder="结束日期"
                 clearable
-                style="flex: 1"
+                style="flex: 1; width: 100%"
               />
             </div>
           </el-form-item>
           <el-form-item label="更新时间">
-            <div style="display: flex; gap: 8px; align-items: center">
+            <div style="display: flex; gap: 8px; align-items: center; width: 100%">
               <el-date-picker
                 v-model="updatedAfter"
                 type="date"
                 value-format="YYYY-MM-DD"
                 placeholder="开始日期"
                 clearable
-                style="flex: 1"
+                style="flex: 1; width: 100%"
               />
-              <span style="color: var(--tp-gray-400)">~</span>
+              <span style="color: var(--tp-text-muted); font-size: 13px">-</span>
               <el-date-picker
                 v-model="updatedBefore"
                 type="date"
                 value-format="YYYY-MM-DD"
                 placeholder="结束日期"
                 clearable
-                style="flex: 1"
+                style="flex: 1; width: 100%"
               />
             </div>
           </el-form-item>
         </el-form>
         <div class="advanced-filter-actions">
-          <el-button @click="filterPanelVisible = false">取消</el-button>
+          <el-button class="btn-cancel" @click="filterPanelVisible = false">取消</el-button>
           <el-button class="btn-reset" @click="onResetSearch">重置</el-button>
           <el-button class="btn-query" @click="applyAdvancedFilters">应用筛选</el-button>
         </div>
@@ -2374,6 +2366,8 @@ watch(selectedProject, (newId) => {
       size="min(100vw, 1320px)"
       direction="rtl"
       class="stitch-case-drawer"
+      modal-class="advanced-filter-overlay"
+      append-to-body
       @closed="onCaseDrawerClosed"
     >
       <div class="stitch-drawer-wrapper" :class="{ 'is-hydrated': caseDrawerHydrated }">
@@ -2630,7 +2624,7 @@ watch(selectedProject, (newId) => {
                 </div>
 
                 <!-- Tags -->
-                <div class="stitch-form-item col-span-full">
+                <div class="stitch-form-item case-tags-field">
                   <label id="case-tags-label">标签</label>
                   <el-select
                     v-model="selectedTagIds"
@@ -2639,8 +2633,10 @@ watch(selectedProject, (newId) => {
                     collapse-tags
                     :collapse-tags-tooltip="false"
                     :max-collapse-tags="99"
+                    :fit-input-width="false"
                     placeholder="搜索或选择标签..."
                     class="tag-selector"
+                    popper-class="tag-selector-dropdown"
                     aria-labelledby="case-tags-label"
                     :reserve-keyword="true"
                     no-data-text="无匹配标签"
@@ -2782,6 +2778,7 @@ watch(selectedProject, (newId) => {
                         <el-dropdown
                           trigger="click"
                           placement="bottom-end"
+                          popper-class="step-icon-dropdown"
                           @command="(cmd: string) => onStepMenuCommand(cmd, idx)"
                         >
                           <button
@@ -2795,47 +2792,22 @@ watch(selectedProject, (newId) => {
                             </span>
                           </button>
                           <template #dropdown>
-                            <el-dropdown-menu>
-                              <el-dropdown-item command="insertAbove">
-                                <span
-                                  class="material-symbols-outlined"
-                                  style="font-size: 16px; margin-right: 6px; vertical-align: middle"
-                                >
-                                  arrow_upward
-                                </span>
-                                在上方插入
+                            <el-dropdown-menu class="step-icon-menu">
+                              <el-dropdown-item command="insertAbove" title="在上方插入">
+                                <span class="material-symbols-outlined">arrow_upward</span>
                               </el-dropdown-item>
-                              <el-dropdown-item command="insertBelow">
-                                <span
-                                  class="material-symbols-outlined"
-                                  style="font-size: 16px; margin-right: 6px; vertical-align: middle"
-                                >
-                                  arrow_downward
-                                </span>
-                                在下方插入
+                              <el-dropdown-item command="insertBelow" title="在下方插入">
+                                <span class="material-symbols-outlined">arrow_downward</span>
                               </el-dropdown-item>
-                              <el-dropdown-item command="copy">
-                                <span
-                                  class="material-symbols-outlined"
-                                  style="font-size: 16px; margin-right: 6px; vertical-align: middle"
-                                >
-                                  content_copy
-                                </span>
-                                复制步骤
+                              <el-dropdown-item command="copy" title="复制步骤">
+                                <span class="material-symbols-outlined">content_copy</span>
                               </el-dropdown-item>
-                              <el-dropdown-item command="delete" divided>
-                                <span
-                                  class="material-symbols-outlined"
-                                  style="
-                                    font-size: 16px;
-                                    margin-right: 6px;
-                                    vertical-align: middle;
-                                    color: #ff5252;
-                                  "
-                                >
-                                  delete
-                                </span>
-                                <span style="color: #ff5252">删除步骤</span>
+                              <el-dropdown-item
+                                command="delete"
+                                class="danger-item"
+                                title="删除步骤"
+                              >
+                                <span class="material-symbols-outlined">delete</span>
                               </el-dropdown-item>
                             </el-dropdown-menu>
                           </template>
@@ -2993,7 +2965,7 @@ watch(selectedProject, (newId) => {
                     >
                       <span
                         class="material-symbols-outlined"
-                        style="color: #ff5252; font-size: 20px"
+                        style="color: var(--tp-accent-danger); font-size: 20px"
                       >
                         delete
                       </span>
@@ -3023,7 +2995,7 @@ watch(selectedProject, (newId) => {
                     >
                       <span
                         class="material-symbols-outlined"
-                        style="color: #ff5252; font-size: 20px"
+                        style="color: var(--tp-accent-danger); font-size: 20px"
                       >
                         delete
                       </span>
@@ -3072,7 +3044,7 @@ watch(selectedProject, (newId) => {
                     >
                       <span
                         class="material-symbols-outlined"
-                        style="color: #ff5252; font-size: 20px"
+                        style="color: var(--tp-accent-danger); font-size: 20px"
                       >
                         delete
                       </span>
@@ -3112,7 +3084,7 @@ watch(selectedProject, (newId) => {
                     >
                       <span
                         class="material-symbols-outlined"
-                        style="color: #ff5252; font-size: 20px"
+                        style="color: var(--tp-accent-danger); font-size: 20px"
                       >
                         delete
                       </span>
@@ -4382,32 +4354,88 @@ watch(selectedProject, (newId) => {
 .case-page .filter-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-height: 50px;
   padding: 8px 10px !important;
-  border-radius: 12px !important;
+  border-radius: 10px !important;
   box-shadow: none !important;
+  background: var(--tp-surface-card) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
 }
 
-.case-page .filter-search-input :deep(.el-input__wrapper),
-.case-page .filter-dropdown :deep(.el-select__wrapper),
-.case-page .filter-icon-btn {
+.case-page .filter-search-input :deep(.el-input__wrapper) {
   min-height: 36px;
-  border-radius: 9px !important;
-  box-shadow: 0 0 0 1px var(--tp-border-subtle) inset !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 1px transparent inset !important;
+  background: var(--tp-surface-base, #f8f9fa) !important;
+  transition: all 0.15s ease;
+  padding: 0 10px !important;
 }
 
-.case-page .filter-search-input :deep(.el-input__wrapper:hover),
-.case-page .filter-dropdown :deep(.el-select__wrapper:hover),
-.case-page .filter-icon-btn:hover {
+.case-page .filter-search-input :deep(.el-input__wrapper:hover) {
   box-shadow: 0 0 0 1px var(--tp-border-strong) inset !important;
+  background: var(--tp-surface-card) !important;
 }
 
-.case-page .filter-search-input :deep(.el-input__wrapper.is-focus),
+.case-page .filter-search-input :deep(.el-input__wrapper.is-focus) {
+  background: #fff !important;
+  box-shadow:
+    0 0 0 1px var(--tp-accent-primary-border) inset,
+    0 0 0 2px var(--tp-accent-primary-soft) !important;
+}
+
+.case-page .filter-dropdown :deep(.el-select__wrapper) {
+  min-height: 36px;
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 1px var(--tp-border-subtle) inset !important;
+  background: transparent !important;
+  border: none !important;
+  transition: all 0.15s ease;
+  padding: 0 10px !important;
+}
+
+.case-page .filter-dropdown :deep(.el-select__wrapper.is-hovering:not(.is-focused)) {
+  box-shadow: 0 0 0 1px var(--tp-border-strong) inset !important;
+  background: var(--tp-surface-base, #f8f9fa) !important;
+}
+
 .case-page .filter-dropdown :deep(.el-select__wrapper.is-focused) {
   box-shadow:
     0 0 0 1px var(--tp-accent-primary-border) inset,
-    0 0 0 3px var(--tp-accent-primary-soft) !important;
+    0 0 0 2px var(--tp-accent-primary-soft) !important;
+  background: #fff !important;
+}
+
+.case-page .filter-dropdown :deep(.el-select__suffix) {
+  color: var(--tp-text-muted) !important;
+}
+
+.case-page .filter-icon-btn {
+  min-height: 36px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  background: transparent !important;
+  transition: all 0.15s ease;
+  color: var(--tp-text-muted);
+}
+
+.case-page .filter-icon-btn:hover {
+  border-color: var(--tp-border-strong) !important;
+  color: var(--tp-text-primary) !important;
+  background: var(--tp-surface-base, #f8f9fa) !important;
+}
+
+.case-page .filter-search-input :deep(.el-input__prefix .el-icon) {
+  color: var(--tp-text-muted) !important;
+  font-size: 15px !important;
+  transition: color 0.15s ease;
+}
+
+.case-page .filter-search-input :deep(.el-input__wrapper.is-focus .el-input__prefix .el-icon) {
+  color: var(--tp-primary) !important;
 }
 
 .case-page .filter-bar-selects {
@@ -4724,37 +4752,18 @@ watch(selectedProject, (newId) => {
   width: 3px;
 }
 
-.case-page .filter-bar {
-  min-height: 42px;
-  gap: 8px;
-  padding: 6px 8px !important;
-  border-radius: 12px !important;
-}
-
-.case-page .filter-search-input :deep(.el-input__wrapper),
-.case-page .filter-dropdown :deep(.el-select__wrapper),
-.case-page .filter-icon-btn {
-  min-height: 30px;
-  border-radius: 8px !important;
-}
-
 .case-page .filter-search-input :deep(.el-input__inner),
 .case-page .filter-dropdown :deep(.el-select__placeholder),
 .case-page .filter-dropdown :deep(.el-select__selected-item) {
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .case-page .filter-dropdown {
-  width: 112px;
+  width: 120px;
 }
 
 .case-page .filter-dropdown:nth-child(3) {
-  width: 136px;
-}
-
-.case-page .filter-icon-btn {
-  width: 30px;
-  height: 30px;
+  width: 140px;
 }
 
 .case-page .filter-chips {

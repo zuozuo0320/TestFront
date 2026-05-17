@@ -2022,41 +2022,46 @@
   flex-shrink: 0;
 }
 
-/* Dark-filled pill dropdown selects (Design B) */
+/* Dropdown selects in filter bar */
 .filter-dropdown {
-  width: 110px !important;
+  width: 120px !important;
 }
 
 .filter-dropdown .el-select__wrapper,
 .filter-dropdown .el-input__wrapper {
-  background: var(--tp-surface-input) !important;
-  border: 1px solid var(--tp-border-subtle) !important;
-  border-radius: 10px !important;
-  box-shadow: inset 0 0 0 1px var(--tp-border-subtle) !important;
+  background: var(--tp-surface-card) !important;
+  border: none !important;
+  border-radius: 9px !important;
+  box-shadow: 0 0 0 1px var(--tp-border-subtle) inset !important;
   padding: 4px 12px !important;
-  height: 38px !important;
+  height: 36px !important;
 }
 
 .filter-dropdown .el-select__wrapper:hover,
+.filter-dropdown .el-select__wrapper.is-hovering,
 .filter-dropdown .el-input__wrapper:hover {
-  border-color: var(--tp-border-strong) !important;
-  background: var(--tp-surface-hover) !important;
-  box-shadow: inset 0 0 0 1px var(--tp-border-strong) !important;
+  box-shadow: 0 0 0 1px var(--tp-border-strong) inset !important;
+}
+
+.filter-dropdown .el-select__wrapper.is-focused {
+  box-shadow:
+    0 0 0 1px var(--tp-accent-primary-border) inset,
+    0 0 0 3px var(--tp-accent-primary-soft) !important;
 }
 
 .filter-dropdown .el-input__inner,
 .filter-dropdown .el-select__selected-item {
-  color: var(--tp-gray-800) !important;
+  color: var(--tp-text-primary) !important;
   font-size: 13px !important;
 }
 
 .filter-dropdown .el-input__inner::placeholder,
 .filter-dropdown .el-select__placeholder {
-  color: var(--tp-gray-400) !important;
+  color: var(--tp-text-muted) !important;
 }
 
 .filter-dropdown .el-select__suffix .el-icon {
-  color: var(--tp-gray-500) !important;
+  color: var(--tp-text-muted) !important;
 }
 
 /* Filter icon button — dark pill (Design B) */
@@ -2295,26 +2300,172 @@
 
 /* filter-bar overrides handled in main filter-bar section above */
 
+/* Advanced filter overlay */
+.advanced-filter-overlay {
+  background-color: rgba(255, 255, 255, 0.4) !important;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
 /* Advanced filter drawer */
+.advanced-filter-drawer .el-drawer {
+  border-radius: 14px 0 0 14px !important;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.06) !important;
+}
+
 .advanced-filter-drawer .el-drawer__header {
-  border-bottom: 1px solid var(--tp-gray-200);
+  border-bottom: 1px solid var(--tp-border-subtle);
   margin-bottom: 0;
+  padding: 16px 24px !important;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--tp-text-primary);
+}
+
+.advanced-filter-drawer .el-drawer__close-btn {
+  color: var(--tp-text-muted) !important;
+  transition: all 0.15s ease;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.advanced-filter-drawer .el-drawer__close-btn:hover {
+  background: var(--tp-surface-hover) !important;
+  color: var(--tp-text-primary) !important;
+}
+
+.advanced-filter-drawer .el-drawer__body {
+  padding: 0 !important;
 }
 
 .advanced-filter-form {
   display: flex;
   flex-direction: column;
   height: 100%;
-  gap: 12px;
+  padding: 20px 24px;
+  overflow-y: auto;
+}
+
+.advanced-filter-form .el-form {
+  flex: 1;
+}
+
+.advanced-filter-form .el-form-item {
+  margin-bottom: 20px;
+}
+
+.advanced-filter-form .el-form-item__label {
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  color: var(--tp-text-primary) !important;
+  padding-bottom: 6px !important;
+  line-height: 1.2;
+}
+
+.advanced-filter-form .el-date-editor.el-input {
+  width: 100% !important;
+  flex: 1;
+}
+
+.advanced-filter-form .el-input__wrapper,
+.advanced-filter-form .el-select__wrapper,
+.advanced-filter-form .el-date-editor.el-input__wrapper {
+  border-radius: 9px !important;
+  box-shadow: 0 0 0 1px var(--tp-border-subtle) inset !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  background: var(--tp-surface-base, #f8f9fa) !important;
+  border: none !important;
+  transition: all 0.15s ease;
+  padding: 0 12px !important;
+  width: 100% !important;
+}
+
+.advanced-filter-form .el-input__wrapper:hover,
+.advanced-filter-form .el-select__wrapper:hover,
+.advanced-filter-form .el-select__wrapper.is-hovering {
+  box-shadow: 0 0 0 1px var(--tp-border-strong) inset !important;
+  background: var(--tp-surface-card) !important;
+}
+
+.advanced-filter-form .el-input__wrapper.is-focus,
+.advanced-filter-form .el-select__wrapper.is-focused {
+  background: var(--tp-surface-card) !important;
+  box-shadow:
+    0 0 0 1px var(--tp-accent-primary-border) inset,
+    0 0 0 3px var(--tp-accent-primary-soft) !important;
+}
+
+.advanced-filter-form .el-input__inner {
+  font-size: 13px !important;
+  color: var(--tp-text-primary) !important;
+}
+
+.advanced-filter-form .el-input__inner::placeholder {
+  color: var(--tp-text-muted) !important;
+}
+
+/* 覆盖日期选择器的 prefix icon */
+.advanced-filter-form .el-input__prefix .el-icon {
+  color: var(--tp-text-muted);
 }
 
 .advanced-filter-actions {
   margin-top: auto;
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  border-top: 1px solid var(--tp-gray-200);
-  padding-top: 10px;
+  gap: 10px;
+  border-top: 1px solid var(--tp-border-subtle);
+  padding: 16px 24px;
+  background: var(--tp-surface-card);
+  position: sticky;
+  bottom: 0;
+}
+
+.advanced-filter-actions .el-button {
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  height: 36px !important;
+  padding: 0 18px !important;
+  font-weight: 500;
+  margin-left: 0 !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  background: var(--tp-surface-card) !important;
+  color: var(--tp-text-secondary) !important;
+  transition: all 0.15s ease;
+}
+
+.advanced-filter-actions .el-button:hover,
+.advanced-filter-actions .btn-reset:hover,
+.advanced-filter-actions .btn-cancel:hover {
+  border-color: var(--tp-border-strong) !important;
+  color: var(--tp-text-primary) !important;
+  background: var(--tp-surface-base) !important;
+}
+
+.advanced-filter-actions .btn-reset,
+.advanced-filter-actions .btn-cancel {
+  border: 1px solid var(--tp-border-subtle) !important;
+  background: var(--tp-surface-card) !important;
+  color: var(--tp-text-secondary) !important;
+}
+
+.advanced-filter-actions .btn-query {
+  background: var(--tp-primary) !important;
+  border-color: var(--tp-primary) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.2) !important;
+}
+
+.advanced-filter-actions .btn-query:hover {
+  background: var(--tp-primary-dark, #4f46e5) !important;
+  box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3) !important;
+  border-color: var(--tp-primary-dark, #4f46e5) !important;
+  color: #fff !important;
 }
 
 /* Filter chips */
@@ -2427,54 +2578,44 @@
   box-shadow: -8px 0 16px -4px rgba(0, 0, 0, 0.3);
 }
 
-/* Row Cards Styling — Design B: visible dark card background */
+/* Row Cards Styling */
 .table-shell tbody tr {
   transition: all 0.2s ease;
-  background: #151a25;
+  background: var(--tp-surface-card);
 }
 
 .table-shell tbody tr.row-selected {
-  background: rgba(124, 58, 237, 0.08);
+  background: var(--tp-accent-primary-soft);
 }
 
 .table-shell tbody tr:hover {
-  background: #1a2030;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+  background: var(--tp-surface-row-hover, #f8f9fa);
 }
 
 .table-shell tbody tr:hover td {
-  color: var(--tp-gray-900);
+  color: var(--tp-text-primary);
 }
 
-/* Cell-level borders and rounding for the row cards */
+/* Cell-level borders */
 .table-shell tbody td {
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--tp-border-subtle);
 }
 
-.table-shell tbody td:first-child {
-  border-left: 1px solid rgba(255, 255, 255, 0.04);
-  border-top-left-radius: 10px;
-  border-bottom-left-radius: 10px;
-}
-
-.table-shell tbody td:last-child {
-  border-right: 1px solid rgba(255, 255, 255, 0.04);
-  border-top-right-radius: 10px;
-  border-bottom-right-radius: 10px;
+.table-shell tbody tr:last-child td {
+  border-bottom: none;
 }
 
 /* Ensure sticky columns have backgrounds that match the row card */
 .table-shell tbody tr .sticky-action {
-  background: #151a25;
+  background: var(--tp-surface-card);
 }
 
 .table-shell tbody tr:hover .sticky-action {
-  background: #1a2030;
+  background: var(--tp-surface-row-hover, #f8f9fa);
 }
 
 .table-shell tbody tr.row-selected .sticky-action {
-  background: rgba(124, 58, 237, 0.08);
+  background: var(--tp-accent-primary-soft);
 }
 
 .table-shell th.sortable {
@@ -2934,11 +3075,11 @@
 
 .case-editor-drawer :deep(.el-drawer__header) {
   margin-bottom: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--tp-border-subtle);
   padding: 16px 24px;
-  color: #fff;
+  color: var(--tp-text-primary);
   font-weight: 600;
-  background: var(--tp-surface-base);
+  background: var(--tp-surface-card);
 }
 
 .case-editor-drawer :deep(.el-drawer__body) {
