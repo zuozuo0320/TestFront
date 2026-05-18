@@ -4459,6 +4459,48 @@
   border-color: var(--tp-surface-card);
 }
 
+.ai-task-detail-page .ai-validation-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--tp-accent-danger-border);
+  border-radius: 12px;
+  background: var(--tp-accent-danger-soft);
+  color: var(--tp-text-primary);
+}
+
+.ai-task-detail-page .ai-validation-alert--auth {
+  border-color: var(--tp-accent-warning-border);
+  background: var(--tp-accent-warning-soft);
+}
+
+.ai-task-detail-page .ai-validation-alert .material-symbols-outlined {
+  color: var(--tp-accent-danger);
+  font-size: 18px;
+  line-height: 20px;
+}
+
+.ai-task-detail-page .ai-validation-alert--auth .material-symbols-outlined {
+  color: var(--tp-accent-warning);
+}
+
+.ai-task-detail-page .ai-validation-alert strong {
+  display: block;
+  color: var(--tp-text-primary);
+  font-size: 13px;
+  font-weight: var(--tp-font-semibold);
+  line-height: 18px;
+}
+
+.ai-task-detail-page .ai-validation-alert p {
+  margin: 2px 0 0;
+  color: var(--tp-text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
 .ai-task-detail-page {
   padding: 10px 12px 14px;
 }
@@ -4718,7 +4760,7 @@
 
 .ai-auth-meta {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -4742,6 +4784,27 @@
 .ai-auth-empty-hint .material-symbols-outlined {
   font-size: 20px;
   color: var(--tp-text-disabled);
+}
+
+.ai-auth-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in oklch, var(--tp-accent-warning-border) 72%, transparent);
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--tp-accent-warning-soft) 82%, var(--tp-surface-card));
+  color: var(--tp-text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.ai-auth-warning .material-symbols-outlined {
+  flex: 0 0 auto;
+  color: var(--tp-accent-warning);
+  font-size: 17px;
+  line-height: 18px;
 }
 
 .ai-auth-login-form {

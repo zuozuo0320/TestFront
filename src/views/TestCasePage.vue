@@ -3438,12 +3438,14 @@ watch(selectedProject, (newId) => {
 .tag-selected-item {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 12px;
+  gap: 5px;
+  min-height: 22px;
+  padding: 2px 7px;
+  border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
   border: 1px solid;
+  line-height: 1;
 }
 
 .tag-remove-btn {
@@ -3463,16 +3465,17 @@ watch(selectedProject, (newId) => {
 
 .tag-option-dot {
   display: inline-block;
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  margin-right: 8px;
+  margin-right: 10px;
+  box-shadow: 0 0 0 3px var(--tp-primary-lighter);
   vertical-align: middle;
 }
 
 /* tag-selector 内部微调：让自定义 chip 在输入框内更紧凑 */
 .tag-selector :deep(.el-select__selection) {
-  gap: 4px;
+  gap: 5px;
 }
 .tag-selector :deep(.el-select__input) {
   min-width: 80px;

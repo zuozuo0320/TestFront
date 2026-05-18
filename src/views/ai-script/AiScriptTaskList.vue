@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, reactive, computed, watch } from 'vue'
+import { onMounted, onUnmounted, ref, reactive, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAiScriptStore } from '../../stores/aiScript'
 import { useProjectStore } from '../../stores/project'
@@ -11,6 +11,7 @@ import {
   GenerationMode,
   GenerationModeLabel,
   checkAuthStatus,
+  refreshAuthStatus,
   manualLoginStart,
   manualLoginComplete,
   invalidateAuth,
@@ -112,6 +113,10 @@ function resetFilter() {
 onMounted(async () => {
   store.loadTaskList(buildQueryParams(1))
   projects.value = await listProjects()
+})
+
+onUnmounted(() => {
+  stopTokenKeepAlive()
 })
 
 // ── 统计卡片聚合 ──
@@ -582,8 +587,12 @@ const showTokenDialog = ref(false)
 const tokenTargetUrl = ref('')
 const tokenAuthState = ref<AuthStateInfo | null>(null)
 const tokenLoading = ref(false)
+const tokenKeepAliveLoading = ref(false)
+const tokenLastCheckedAt = ref('')
+const tokenLastError = ref('')
 const manualLoginActive = ref(false) // 浏览器已打开，等待用户登录
 const manualLoginLoading = ref(false)
+let tokenKeepAliveTimer: ReturnType<typeof setInterval> | null = null
 
 const tokenStatusText = computed(() => {
   if (!tokenAuthState.value) return '未检测'
@@ -596,6 +605,50 @@ const tokenStatusClass = computed(() => {
   if (!tokenAuthState.value || !tokenAuthState.value.exists) return 'missing'
   return tokenAuthState.value.valid ? 'valid' : 'expired'
 })
+
+const tokenKeepAliveLabel = computed(() => {
+  if (tokenKeepAliveLoading.value) return '保活中...'
+  return '保活刷新'
+})
+
+const tokenWarningText = computed(() => {
+  if (tokenLastError.value) return tokenLastError.value
+  if (!tokenAuthState.value) return ''
+  if (!tokenAuthState.value.exists) return '暂无认证状态，请先手动登录并保存。'
+  if (!tokenAuthState.value.valid) return '认证状态已过期，请重新手动登录。'
+  if (tokenAuthState.value.remaining_hours !== null && tokenAuthState.value.remaining_hours <= 4) {
+    return `认证状态剩余约 ${tokenAuthState.value.remaining_hours} 小时，建议执行一次保活刷新。`
+  }
+  return ''
+})
+
+function formatCheckedTime(timestamp?: number): string {
+  const date = timestamp ? new Date(timestamp * 1000) : new Date()
+  if (isNaN(date.getTime())) return ''
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+function stopTokenKeepAlive() {
+  if (tokenKeepAliveTimer) {
+    clearInterval(tokenKeepAliveTimer)
+    tokenKeepAliveTimer = null
+  }
+}
+
+function closeTokenDialog() {
+  showTokenDialog.value = false
+}
+
+function startTokenKeepAlive() {
+  stopTokenKeepAlive()
+  if (!tokenTargetUrl.value.trim() || !tokenAuthState.value?.valid) return
+  tokenKeepAliveTimer = setInterval(
+    () => {
+      handleTokenKeepAlive(true)
+    },
+    30 * 60 * 1000,
+  )
+}
 
 async function openTokenDialog() {
   tokenAuthState.value = null
@@ -612,7 +665,8 @@ async function openTokenDialog() {
 
   // 自动检测
   if (tokenTargetUrl.value) {
-    loadTokenStatus()
+    await loadTokenStatus()
+    startTokenKeepAlive()
   }
 }
 
@@ -623,14 +677,52 @@ async function loadTokenStatus() {
     return
   }
   tokenLoading.value = true
+  tokenLastError.value = ''
   try {
     tokenAuthState.value = await checkAuthStatus(url)
+    tokenLastCheckedAt.value = formatCheckedTime()
+    if (tokenAuthState.value.valid) {
+      startTokenKeepAlive()
+    } else {
+      stopTokenKeepAlive()
+    }
   } catch (e) {
     console.warn('查询认证状态失败:', e)
     tokenAuthState.value = null
+    tokenLastError.value = '查询失败，请确认 Executor 服务正常'
     showToast('查询失败，请确认 Executor 服务正常')
   } finally {
     tokenLoading.value = false
+  }
+}
+
+async function handleTokenKeepAlive(silent = false) {
+  const url = tokenTargetUrl.value.trim()
+  if (!url) {
+    if (!silent) showToast('请输入目标站点地址')
+    return
+  }
+  if (tokenKeepAliveLoading.value) return
+  tokenKeepAliveLoading.value = true
+  tokenLastError.value = ''
+  try {
+    const result = await refreshAuthStatus(url)
+    tokenAuthState.value = result.auth_state
+    tokenLastCheckedAt.value = formatCheckedTime(result.checked_at)
+    if (result.success) {
+      if (!silent) startTokenKeepAlive()
+      if (!silent) showToast('认证状态已保活刷新')
+    } else {
+      stopTokenKeepAlive()
+      tokenLastError.value = result.error || '认证状态不可用，请重新手动登录'
+      if (!silent) showToast(tokenLastError.value)
+    }
+  } catch (e) {
+    console.warn('认证状态保活失败:', e)
+    tokenLastError.value = '保活失败，请确认 Executor 服务正常'
+    if (!silent) showToast(tokenLastError.value)
+  } finally {
+    tokenKeepAliveLoading.value = false
   }
 }
 
@@ -668,6 +760,7 @@ async function handleManualLoginComplete() {
         tokenAuthState.value = result.auth_state
       }
       manualLoginActive.value = false
+      startTokenKeepAlive()
       showToast('认证状态已保存')
     } else {
       showToast(result.error || '保存认证状态失败')
@@ -685,6 +778,7 @@ async function handleTokenInvalidate() {
   if (!url) return
   try {
     await invalidateAuth(url)
+    stopTokenKeepAlive()
     await loadTokenStatus()
     showToast('认证状态已清除')
   } catch (e) {
@@ -1294,14 +1388,14 @@ async function handleTokenInvalidate() {
     </div>
 
     <!-- Token 管理 Dialog -->
-    <div v-if="showTokenDialog" class="ai-dialog-overlay" @click.self="showTokenDialog = false">
+    <div v-if="showTokenDialog" class="ai-dialog-overlay" @click.self="closeTokenDialog">
       <div class="ai-dialog" style="max-width: 520px">
         <div class="ai-dialog-header">
           <div>
             <h2>Token 管理</h2>
             <p class="ai-dialog-subtitle">管理目标站点的认证状态，为测试脚本执行提供登录环境</p>
           </div>
-          <button class="ai-dialog-close" @click="showTokenDialog = false">
+          <button class="ai-dialog-close" @click="closeTokenDialog">
             <span class="material-symbols-outlined">close</span>
           </button>
         </div>
@@ -1332,6 +1426,16 @@ async function handleTokenInvalidate() {
                 </span>
                 刷新
               </button>
+              <button
+                class="ai-btn ai-btn-ghost"
+                style="padding: 6px 14px; white-space: nowrap"
+                :disabled="tokenKeepAliveLoading || !tokenTargetUrl || !tokenAuthState?.exists"
+                @click="handleTokenKeepAlive(false)"
+              >
+                <span v-if="tokenKeepAliveLoading" class="ai-spinner"></span>
+                <span v-else class="material-symbols-outlined" style="font-size: 16px">sync</span>
+                {{ tokenKeepAliveLabel }}
+              </button>
             </div>
           </div>
 
@@ -1359,8 +1463,16 @@ async function handleTokenInvalidate() {
                 <span class="ai-info-label">Cookie 数</span>
                 <span class="ai-info-value">{{ tokenAuthState.cookie_count }}</span>
               </div>
+              <div class="ai-auth-meta-item">
+                <span class="ai-info-label">最近检查</span>
+                <span class="ai-info-value">{{ tokenLastCheckedAt || '-' }}</span>
+              </div>
             </div>
-            <div v-else class="ai-auth-empty-hint">
+            <div v-if="tokenWarningText" class="ai-auth-warning">
+              <span class="material-symbols-outlined">info</span>
+              <span>{{ tokenWarningText }}</span>
+            </div>
+            <div v-if="!tokenAuthState.exists" class="ai-auth-empty-hint">
               <span class="material-symbols-outlined">lock_open</span>
               <span>暂无认证状态，请获取 Token 后再执行测试脚本</span>
             </div>
@@ -1417,7 +1529,7 @@ async function handleTokenInvalidate() {
               清除 Token
             </button>
           </div>
-          <button class="ai-btn ai-btn-ghost" @click="showTokenDialog = false">关闭</button>
+          <button class="ai-btn ai-btn-ghost" @click="closeTokenDialog">关闭</button>
         </div>
       </div>
     </div>

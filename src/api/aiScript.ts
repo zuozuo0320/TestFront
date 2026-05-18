@@ -679,12 +679,32 @@ export interface AuthStateInfo {
   valid: boolean
   file_path: string | null
   file_age_hours: number | null
+  max_age_hours: number
+  remaining_hours: number | null
   cookie_count: number
+}
+
+export interface AuthRefreshResult {
+  success: boolean
+  error: string
+  checked_at?: number
+  auth_state: AuthStateInfo
 }
 
 /** 查询目标 URL 的认证状态 */
 export async function checkAuthStatus(startUrl: string): Promise<AuthStateInfo> {
   const resp = await fetch(`${EXECUTOR_BASE}/auth/status?start_url=${encodeURIComponent(startUrl)}`)
+  return resp.json()
+}
+
+/** 主动探测并刷新目标 URL 的认证状态 */
+export async function refreshAuthStatus(startUrl: string): Promise<AuthRefreshResult> {
+  const resp = await fetch(
+    `${EXECUTOR_BASE}/auth/refresh?start_url=${encodeURIComponent(startUrl)}`,
+    {
+      method: 'POST',
+    },
+  )
   return resp.json()
 }
 

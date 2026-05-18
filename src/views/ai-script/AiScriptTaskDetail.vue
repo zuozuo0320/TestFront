@@ -145,6 +145,11 @@ const script = computed(() => store.currentScript)
 const traces = computed(() => store.traces)
 const validation = computed(() => store.latestValidation)
 const validationHistory = computed(() => store.validationHistory)
+const validationFailReason = computed(() => validation.value?.failReason?.trim() || '')
+const validationNeedsLogin = computed(() => {
+  const reason = validationFailReason.value
+  return reason.includes('认证状态') || reason.includes('Token') || reason.includes('重新手动登录')
+})
 const generatingFrame = ref(0)
 
 const GENERATING_STEPS = [
@@ -1344,6 +1349,20 @@ watch(
                 <span class="dot fail"></span>
                 <span>失败: {{ validation.totalStepCount - validation.passedStepCount }}</span>
               </div>
+            </div>
+          </div>
+
+          <div
+            v-if="validationFailReason"
+            class="ai-validation-alert"
+            :class="{ 'ai-validation-alert--auth': validationNeedsLogin }"
+          >
+            <span class="material-symbols-outlined">
+              {{ validationNeedsLogin ? 'key' : 'error' }}
+            </span>
+            <div>
+              <strong>{{ validationNeedsLogin ? '认证状态需要重新登录' : '验证失败原因' }}</strong>
+              <p>{{ validationFailReason }}</p>
             </div>
           </div>
 
