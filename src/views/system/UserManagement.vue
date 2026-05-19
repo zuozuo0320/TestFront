@@ -488,7 +488,6 @@ onMounted(async () => {
     <div class="um-top-header">
       <div class="um-header-left">
         <h2 class="um-title">用户管理</h2>
-        <p class="um-subtitle">管理系统用户、角色权限与安全审计状态。</p>
       </div>
       <div class="um-header-right">
         <div class="um-stats-panel">

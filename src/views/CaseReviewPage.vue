@@ -661,8 +661,7 @@ function reviewStatusLabel(review: CaseReview) {
     <div class="pipeline-header">
       <div class="pipeline-header-top">
         <div>
-          <h1 class="pipeline-title">评审流程 (Review Pipeline)</h1>
-          <p class="pipeline-subtitle">管理和跟踪所有挂起的测试用例评审任务。</p>
+          <h1 class="pipeline-title">智能评审中心</h1>
         </div>
         <div class="pipeline-actions">
           <div class="pipeline-search-box">
@@ -2653,11 +2652,12 @@ function reviewStatusLabel(review: CaseReview) {
 
 .case-review-page {
   min-height: calc(100vh - 56px - 16px);
-  gap: 8px;
-  padding: 8px !important;
+  gap: 0 !important;
+  padding: 4px !important;
 }
 
 .case-review-page .pipeline-header {
+  margin-bottom: 12px !important;
   padding-top: 0;
 }
 
@@ -2681,15 +2681,30 @@ function reviewStatusLabel(review: CaseReview) {
   gap: 6px;
 }
 
+@media (min-width: 641px) and (max-width: 900px) {
+  .case-review-page .pipeline-actions {
+    width: auto;
+    flex-wrap: nowrap;
+  }
+
+  .case-review-page .pipeline-search-box {
+    width: auto;
+  }
+
+  .case-review-page .pipeline-search-input {
+    width: min(260px, 28vw);
+  }
+}
+
 .case-review-page .pipeline-search-box {
   min-height: 30px;
-  min-width: min(320px, 100%);
+  min-width: min(260px, 100%);
   padding: 4px 9px;
   border-radius: 9px;
 }
 
 .case-review-page .pipeline-search-input {
-  width: min(320px, 34vw);
+  width: min(260px, 28vw);
   font-size: 12px;
 }
 
@@ -2902,6 +2917,7 @@ function reviewStatusLabel(review: CaseReview) {
 }
 
 .case-review-page .pipeline-title {
+  margin: 0 0 2px !important;
   font-family: var(--tp-font-family-sans) !important;
   font-size: 18px !important;
   font-weight: var(--tp-font-bold) !important;
@@ -2940,6 +2956,7 @@ function reviewStatusLabel(review: CaseReview) {
 .case-review-page .stats-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px !important;
+  margin-bottom: 8px !important;
 }
 
 .case-review-page .stat-card-pl {

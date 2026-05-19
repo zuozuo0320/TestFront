@@ -620,7 +620,14 @@ export interface CodegenSession {
 }
 
 export interface CodegenPollResult {
-  status: 'starting' | 'logging_in' | 'recording' | 'completed' | 'error' | 'not_found'
+  status:
+    | 'starting'
+    | 'logging_in'
+    | 'recording'
+    | 'completed'
+    | 'cancelled'
+    | 'error'
+    | 'not_found'
   script_content: string
   error: string
 }
@@ -647,6 +654,12 @@ export async function launchCodegen(
 export async function pollCodegenStatus(sessionId: string): Promise<CodegenPollResult> {
   const resp = await fetch(`${EXECUTOR_BASE}/recording/codegen/${sessionId}`)
   return resp.json()
+}
+
+export async function cancelCodegen(sessionId: string): Promise<void> {
+  await fetch(`${EXECUTOR_BASE}/recording/codegen/${sessionId}`, {
+    method: 'DELETE',
+  })
 }
 
 // ── Executor Pending Script API（录制脚本恢复） ──

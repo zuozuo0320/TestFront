@@ -205,7 +205,6 @@ onMounted(() => loadRoles())
     <div class="rm-header">
       <div class="rm-header-left">
         <h2 class="rm-title">角色管理</h2>
-        <p class="rm-subtitle">配置和分配组织内的细粒度权限。</p>
       </div>
       <div class="rm-header-right">
         <div class="rm-stats-panel">

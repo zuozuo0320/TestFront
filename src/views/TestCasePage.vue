@@ -1606,8 +1606,7 @@ watch(selectedProject, (newId) => {
       <div class="insights-section">
         <div class="insights-header">
           <div class="insights-title-area">
-            <h2 class="insights-title">用例质量概览</h2>
-            <p class="insights-desc">聚焦用例规模、通过率、缺陷与执行效率。</p>
+            <h2 class="insights-title">测试用例中心</h2>
           </div>
           <div class="insights-actions">
             <button class="insights-btn-primary" @click="onExportReport">

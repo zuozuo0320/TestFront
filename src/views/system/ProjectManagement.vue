@@ -597,7 +597,6 @@ void Search // suppress unused import warning
     <div class="pm-header">
       <div class="pm-header-left">
         <h2 class="pm-title">项目管理</h2>
-        <p class="pm-subtitle">统一维护项目、成员、测试环境和质量状态</p>
       </div>
       <div class="pm-header-right">
         <div class="pm-stats-panel">

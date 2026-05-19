@@ -10,7 +10,6 @@ import {
   ValidationStatusColor,
   GenerationMode,
   GenerationModeLabel,
-  checkAuthStatus,
   refreshAuthStatus,
   manualLoginStart,
   manualLoginComplete,
@@ -598,6 +597,7 @@ const tokenLastError = ref('')
 const manualLoginActive = ref(false) // 浏览器已打开，等待用户登录
 const manualLoginLoading = ref(false)
 let tokenKeepAliveTimer: ReturnType<typeof setInterval> | null = null
+const TOKEN_KEEP_ALIVE_INTERVAL_MS = 15 * 60 * 1000
 
 const tokenStatusText = computed(() => {
   if (!tokenAuthState.value) return '未检测'
@@ -617,10 +617,10 @@ const tokenKeepAliveLabel = computed(() => {
 })
 
 const tokenWarningText = computed(() => {
-  if (tokenLastError.value) return tokenLastError.value
   if (!tokenAuthState.value) return ''
   if (!tokenAuthState.value.exists) return '暂无认证状态，请先手动登录并保存。'
   if (!tokenAuthState.value.valid) return '认证状态已过期，请重新手动登录。'
+  if (tokenLastError.value) return ''
   if (tokenAuthState.value.remaining_hours !== null && tokenAuthState.value.remaining_hours <= 4) {
     return `认证状态剩余约 ${tokenAuthState.value.remaining_hours} 小时，建议执行一次保活刷新。`
   }
@@ -647,12 +647,9 @@ function closeTokenDialog() {
 function startTokenKeepAlive() {
   stopTokenKeepAlive()
   if (!tokenTargetUrl.value.trim() || !tokenAuthState.value?.valid) return
-  tokenKeepAliveTimer = setInterval(
-    () => {
-      handleTokenKeepAlive(true)
-    },
-    30 * 60 * 1000,
-  )
+  tokenKeepAliveTimer = setInterval(() => {
+    handleTokenKeepAlive(true)
+  }, TOKEN_KEEP_ALIVE_INTERVAL_MS)
 }
 
 async function openTokenDialog() {
@@ -684,12 +681,14 @@ async function loadTokenStatus() {
   tokenLoading.value = true
   tokenLastError.value = ''
   try {
-    tokenAuthState.value = await checkAuthStatus(url)
-    tokenLastCheckedAt.value = formatCheckedTime()
-    if (tokenAuthState.value.valid) {
+    const result = await refreshAuthStatus(url)
+    tokenAuthState.value = result.auth_state
+    tokenLastCheckedAt.value = formatCheckedTime(result.checked_at)
+    if (result.success) {
       startTokenKeepAlive()
     } else {
       stopTokenKeepAlive()
+      tokenLastError.value = result.error || '认证状态不可用，请重新手动登录'
     }
   } catch (e) {
     console.warn('查询认证状态失败:', e)
@@ -764,10 +763,17 @@ async function handleManualLoginComplete() {
       if (result.auth_state) {
         tokenAuthState.value = result.auth_state
       }
+      tokenLastError.value = ''
+      tokenLastCheckedAt.value = formatCheckedTime()
       manualLoginActive.value = false
       startTokenKeepAlive()
       showToast('认证状态已保存')
     } else {
+      if (result.auth_state) {
+        tokenAuthState.value = result.auth_state
+      }
+      stopTokenKeepAlive()
+      tokenLastError.value = result.error || '保存后在线校验失败，请确认已完成登录'
       showToast(result.error || '保存认证状态失败')
     }
   } catch (e) {
@@ -794,11 +800,11 @@ async function handleTokenInvalidate() {
 </script>
 
 <template>
-  <div class="ai-page">
+  <div class="ai-page ai-task-list-page">
     <!-- 页面头部：标题 + 工具栏合为一行 -->
     <div class="ai-page-header">
       <div class="ai-page-header-left">
-        <h1>智能脚本生成任务列表</h1>
+        <h1>智能脚本中心</h1>
       </div>
       <div class="ai-action-group">
         <button class="ai-btn ai-btn-ghost ai-btn-sm" @click="openTokenDialog">
@@ -861,7 +867,7 @@ async function handleTokenInvalidate() {
       <table class="ai-table">
         <thead>
           <tr>
-            <th style="width: 54px">
+            <th class="ai-col-check">
               <input
                 type="checkbox"
                 class="ai-row-checkbox"
@@ -879,11 +885,19 @@ async function handleTokenInvalidate() {
             <th>创建人</th>
             <th>创建时间</th>
             <th>更新时间</th>
-            <th style="text-align: right">操作</th>
+            <th class="ai-col-actions">操作</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="task in store.taskList" :key="task.id" @click="goDetail(task)">
+          <tr
+            v-for="task in store.taskList"
+            :key="task.id"
+            :class="{
+              'is-selected': store.isTaskSelected(task.id),
+              'is-running': isRunning(task.taskStatus),
+            }"
+            @click="goDetail(task)"
+          >
             <td @click.stop>
               <input
                 type="checkbox"
@@ -908,9 +922,7 @@ async function handleTokenInvalidate() {
               </div>
             </td>
             <td>
-              <span style="font-family: monospace; font-size: 0.85rem; color: var(--tp-gray-700)">
-                {{ task.frameworkType }}
-              </span>
+              <span class="ai-framework-text">{{ task.frameworkType }}</span>
             </td>
             <td>
               <div class="ai-status-badge" :class="getStatusColor(task.taskStatus)">
@@ -919,15 +931,13 @@ async function handleTokenInvalidate() {
                   :class="{ 'animate-pulse': isRunning(task.taskStatus) }"
                 ></span>
                 <template v-if="task.taskStatus === TaskStatus.GENERATE_SUCCESS">
-                  <span class="material-symbols-outlined" style="font-size: 12px">
-                    check_circle
-                  </span>
+                  <span class="material-symbols-outlined ai-status-icon">check_circle</span>
                 </template>
                 <template v-else-if="task.taskStatus === TaskStatus.GENERATE_FAILED">
-                  <span class="material-symbols-outlined" style="font-size: 12px">error</span>
+                  <span class="material-symbols-outlined ai-status-icon">error</span>
                 </template>
                 <template v-else-if="task.taskStatus === TaskStatus.PENDING_CONFIRM">
-                  <span class="material-symbols-outlined" style="font-size: 12px">pending</span>
+                  <span class="material-symbols-outlined ai-status-icon">pending</span>
                 </template>
                 {{ TaskStatusLabel[task.taskStatus] }}
               </div>
@@ -937,24 +947,19 @@ async function handleTokenInvalidate() {
                 v-if="task.latestValidationStatus"
                 class="ai-status-badge"
                 :class="ValidationStatusColor[task.latestValidationStatus]"
-                style="font-size: 0.7rem"
               >
                 {{ ValidationStatusLabel[task.latestValidationStatus] }}
               </div>
-              <span v-else style="font-size: 0.75rem; color: var(--tp-gray-600)">—</span>
+              <span v-else class="ai-validation-empty">—</span>
             </td>
             <td>
-              <span style="font-size: 0.8rem; font-weight: 500">{{ task.createdName }}</span>
+              <span class="ai-task-creator">{{ task.createdName }}</span>
             </td>
             <td>
-              <span style="font-size: 0.75rem; color: var(--tp-gray-500)">
-                {{ formatTime(task.createdAt) }}
-              </span>
+              <span class="ai-task-time">{{ formatTime(task.createdAt) }}</span>
             </td>
             <td>
-              <span style="font-size: 0.75rem; color: var(--tp-gray-500)">
-                {{ formatTime(task.updatedAt) }}
-              </span>
+              <span class="ai-task-time">{{ formatTime(task.updatedAt) }}</span>
             </td>
             <td>
               <div class="ai-row-actions">
@@ -1050,60 +1055,44 @@ async function handleTokenInvalidate() {
     <!-- 底部统计卡片 -->
     <div class="ai-stats-grid">
       <!-- 成功率 -->
-      <div class="ai-stat-card">
-        <div class="ai-stat-label" style="color: #adc6ff">
+      <div class="ai-stat-card ai-stat-card--success-rate">
+        <div class="ai-stat-label">
           成功率
-          <span class="material-symbols-outlined" style="color: #adc6ff">trending_up</span>
+          <span class="material-symbols-outlined">trending_up</span>
         </div>
         <div class="ai-stat-value">{{ statsSuccessRate }}%</div>
         <div class="ai-stat-desc">当前页 {{ store.taskList.length }} 条任务统计</div>
         <div class="ai-stat-bar">
-          <div
-            class="ai-stat-bar-fill"
-            :style="{ width: statsSuccessRate + '%', background: '#adc6ff' }"
-          ></div>
+          <div class="ai-stat-bar-fill" :style="{ width: statsSuccessRate + '%' }"></div>
         </div>
       </div>
 
       <!-- 活跃运行器 -->
-      <div class="ai-stat-card">
-        <div class="ai-stat-label" style="color: var(--tp-primary-light)">
+      <div class="ai-stat-card ai-stat-card--running">
+        <div class="ai-stat-label">
           活跃运行器
-          <span class="material-symbols-outlined" style="color: var(--tp-primary-light)">bolt</span>
+          <span class="material-symbols-outlined">bolt</span>
         </div>
         <div class="ai-stat-value">{{ statsRunningCount }}</div>
         <div class="ai-stat-desc">当前正在生成中的任务</div>
-        <div style="display: flex; gap: 4px; margin-top: 14px">
-          <div
-            style="height: 4px; flex: 1; background: var(--tp-primary-light); border-radius: 4px"
-          ></div>
-          <div
-            style="height: 4px; flex: 1; background: var(--tp-primary-light); border-radius: 4px"
-          ></div>
-          <div
-            class="animate-pulse"
-            style="height: 4px; flex: 1; background: var(--tp-primary-light); border-radius: 4px"
-          ></div>
-          <div
-            style="height: 4px; flex: 1; background: var(--tp-surface-elevated); border-radius: 4px"
-          ></div>
+        <div class="ai-stat-segments">
+          <div class="ai-stat-segment is-active"></div>
+          <div class="ai-stat-segment is-active"></div>
+          <div class="ai-stat-segment is-active animate-pulse"></div>
+          <div class="ai-stat-segment"></div>
         </div>
       </div>
 
       <!-- 快速入口 -->
-      <div class="ai-quickstart-card">
-        <div style="position: relative; z-index: 1">
-          <div class="ai-stat-label" style="color: #ffb784">快速入口</div>
+      <div class="ai-quickstart-card ai-quickstart-card--recording">
+        <div class="ai-quickstart-content">
+          <div class="ai-stat-label">快速入口</div>
           <h4>从 UI 轨迹生成</h4>
           <p>将手动录制的操作日志直接转换为 Playwright 代码</p>
         </div>
-        <button
-          class="ai-quickstart-link"
-          style="position: relative; z-index: 1"
-          @click="openCreateDialog"
-        >
+        <button class="ai-quickstart-link" @click="openCreateDialog">
           立即体验
-          <span class="material-symbols-outlined" style="font-size: 14px">arrow_forward</span>
+          <span class="material-symbols-outlined ai-quickstart-link-icon">arrow_forward</span>
         </button>
         <div class="ai-quickstart-glow"></div>
       </div>
@@ -1112,8 +1101,8 @@ async function handleTokenInvalidate() {
     <!-- 浮动批量操作栏 -->
     <Teleport to="body">
       <Transition name="batch-slide">
-        <div v-if="store.selectedTaskCount > 0" class="batch-float-overlay">
-          <div class="batch-float-bar">
+        <div v-if="store.selectedTaskCount > 0" class="batch-float-overlay ai-task-batch-overlay">
+          <div class="batch-float-bar ai-task-batch-bar">
             <div class="batch-left">
               <div class="batch-count-badge">{{ store.selectedTaskCount }}</div>
               <div class="batch-text">
@@ -1122,8 +1111,11 @@ async function handleTokenInvalidate() {
               </div>
             </div>
             <div class="batch-actions">
-              <button class="batch-action-item" @click="openBatchDiscardDialog">
-                <span class="material-symbols-outlined" style="color: #fbbf24">block</span>
+              <button
+                class="batch-action-item batch-action-warning"
+                @click="openBatchDiscardDialog"
+              >
+                <span class="material-symbols-outlined">block</span>
                 <span>批量废弃</span>
               </button>
               <button class="batch-action-item batch-action-danger" @click="openBatchDeleteDialog">
@@ -1131,7 +1123,11 @@ async function handleTokenInvalidate() {
                 <span>批量删除</span>
               </button>
               <div class="batch-divider"></div>
-              <button class="batch-close" @click="store.clearTaskSelection()">
+              <button
+                class="batch-close"
+                aria-label="关闭批量操作栏"
+                @click="store.clearTaskSelection()"
+              >
                 <span class="material-symbols-outlined">close</span>
               </button>
             </div>
@@ -1141,7 +1137,12 @@ async function handleTokenInvalidate() {
     </Teleport>
 
     <!-- FAB — 跳转脚本资产 -->
-    <button class="ai-fab" title="脚本资产管理" @click="router.push('/ai-script/library')">
+    <button
+      class="ai-fab ai-task-library-fab"
+      title="脚本资产管理"
+      aria-label="脚本资产管理"
+      @click="router.push('/ai-script/library')"
+    >
       <span class="material-symbols-outlined">inventory_2</span>
     </button>
 
@@ -1438,7 +1439,23 @@ async function handleTokenInvalidate() {
           </div>
 
           <!-- 认证状态结果 -->
-          <div v-if="tokenAuthState" class="ai-token-status-panel">
+          <div
+            v-if="tokenLoading && !tokenAuthState"
+            class="ai-token-status-panel ai-auth-checking"
+          >
+            <div class="ai-token-status-header">
+              <span class="ai-section-title" style="font-size: 0.82rem">认证状态</span>
+              <div class="ai-auth-status-badge missing">
+                <span class="ai-spinner"></span>
+                校验中
+              </div>
+            </div>
+            <div class="ai-auth-empty-hint">
+              <span class="material-symbols-outlined">sync</span>
+              <span>正在打开目标站点做在线校验，请稍候...</span>
+            </div>
+          </div>
+          <div v-else-if="tokenAuthState" class="ai-token-status-panel">
             <div class="ai-token-status-header">
               <span class="ai-section-title" style="font-size: 0.82rem">认证状态</span>
               <div class="ai-auth-status-badge" :class="tokenStatusClass">

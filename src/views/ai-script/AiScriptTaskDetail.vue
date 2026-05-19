@@ -27,6 +27,7 @@ import {
   fetchLatestRecording,
   launchCodegen,
   pollCodegenStatus,
+  cancelCodegen,
   getPendingScript,
   clearPendingScript,
   type RecordingSession,
@@ -333,6 +334,40 @@ async function markRecordingFailed(reason: string) {
   }
 }
 
+async function handleRestartRecording() {
+  recordingLoading.value = true
+  recordingStatusText.value = '正在中断当前录制并准备重新录制...'
+  try {
+    stopPolling()
+    if (codegenSessionId.value) {
+      await cancelCodegen(codegenSessionId.value)
+    }
+    if (
+      recording.value?.id &&
+      ['RECORDING', 'FINISHED'].includes(recording.value.recordingStatus)
+    ) {
+      await failRecording(taskId.value, {
+        recordingId: recording.value.id,
+        reason: '用户放弃当前录制并重新录制',
+      })
+    }
+    await clearPendingScript(taskId.value)
+    finishScriptContent.value = ''
+    codegenSessionId.value = ''
+    showRecordingDialog.value = false
+    await store.loadTaskDetailFull(taskId.value)
+    await loadRecording()
+    recording.value = null
+    await handleStartRecording()
+  } catch (e) {
+    console.error('重新录制失败:', e)
+    recordingStatusText.value = '重新录制失败，请稍后重试'
+    showToast('重新录制失败，请稍后重试', 'error')
+  } finally {
+    recordingLoading.value = false
+  }
+}
+
 function startPolling(sessionId: string) {
   if (pollTimer) clearInterval(pollTimer)
   pollTimer = setInterval(async () => {
@@ -359,6 +394,10 @@ function startPolling(sessionId: string) {
         recordingLoading.value = false
         await markRecordingFailed(result.error || '录制执行失败')
         recordingStatusText.value = `录制失败: ${result.error || '请重新发起录制'}`
+      } else if (result.status === 'cancelled') {
+        stopPolling()
+        recordingLoading.value = false
+        recordingStatusText.value = '录制已取消，可重新发起录制'
       } else if (result.status === 'not_found') {
         stopPolling()
         recordingLoading.value = false
@@ -688,6 +727,7 @@ const canConfirm = computed(() => {
   if (task.value?.permissions) return task.value.permissions.canConfirm
   return false
 })
+const isScriptConfirmed = computed(() => task.value?.taskStatus === TaskStatus.CONFIRMED)
 const canExport = computed(() => {
   if (task.value?.permissions) return task.value.permissions.canExport
   return !!script.value
@@ -837,6 +877,16 @@ watch(
               <span class="material-symbols-outlined">stop_circle</span>
               提交录制
             </button>
+            <button
+              v-if="recording?.recordingStatus === 'RECORDING'"
+              class="ai-btn ai-btn-danger-ghost"
+              :disabled="recordingLoading"
+              @click="handleRestartRecording"
+            >
+              <span v-if="recordingLoading" class="ai-spinner"></span>
+              <span v-else class="material-symbols-outlined">restart_alt</span>
+              放弃并重录
+            </button>
           </template>
           <button
             v-if="isAIDirectMode"
@@ -863,9 +913,14 @@ watch(
             </span>
             执行验证
           </button>
-          <button v-if="canConfirm" class="ai-btn ai-btn-success" @click="handleConfirm">
+          <button
+            v-if="canConfirm || isScriptConfirmed"
+            class="ai-btn ai-btn-success"
+            :disabled="isScriptConfirmed"
+            @click="handleConfirm"
+          >
             <span class="material-symbols-outlined">check_circle</span>
-            确认脚本
+            {{ isScriptConfirmed ? '脚本已确认' : '确认脚本' }}
           </button>
         </div>
         <div class="ai-detail-action-group ai-detail-action-group--secondary">
@@ -1611,7 +1666,16 @@ watch(
           </div>
         </div>
         <div class="ai-dialog-footer">
-          <button class="ai-btn ai-btn-ghost" @click="showRecordingDialog = false">取消</button>
+          <button
+            class="ai-btn ai-btn-danger-ghost"
+            :disabled="recordingLoading"
+            @click="handleRestartRecording"
+          >
+            <span v-if="recordingLoading" class="ai-spinner"></span>
+            <span v-else class="material-symbols-outlined">restart_alt</span>
+            放弃并重新录制
+          </button>
+          <button class="ai-btn ai-btn-ghost" @click="showRecordingDialog = false">稍后提交</button>
           <button
             class="ai-btn ai-btn-primary"
             :disabled="recordingLoading || !finishScriptContent.trim()"
