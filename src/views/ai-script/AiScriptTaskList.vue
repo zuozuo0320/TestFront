@@ -110,6 +110,11 @@ function resetFilter() {
   applyFilter()
 }
 
+function clearFilterKeyword() {
+  filterKeyword.value = ''
+  applyFilter()
+}
+
 onMounted(async () => {
   store.loadTaskList(buildQueryParams(1))
   projects.value = await listProjects()
@@ -817,14 +822,7 @@ async function handleTokenInvalidate() {
           placeholder="搜索任务名称或关键词..."
           @keyup.enter="applyFilter"
         />
-        <button
-          v-if="filterKeyword"
-          class="ai-filter-bar-clear"
-          @click="
-            filterKeyword = ''
-            applyFilter()
-          "
-        >
+        <button v-if="filterKeyword" class="ai-filter-bar-clear" @click="clearFilterKeyword">
           <span class="material-symbols-outlined">close</span>
         </button>
       </div>
