@@ -1147,407 +1147,419 @@ async function handleTokenInvalidate() {
     </button>
 
     <!-- 新建任务 Dialog -->
-    <div
-      v-if="showCreateDialog"
-      class="ai-dialog-overlay ai-create-dialog-overlay"
-      @click.self="showCreateDialog = false"
-    >
+    <Teleport to="body">
       <div
-        class="ai-dialog ai-create-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="create-task-title"
-        @click="showEnvironmentDropdown = false"
+        v-if="showCreateDialog"
+        class="ai-dialog-overlay ai-create-dialog-overlay"
+        @click.self="showCreateDialog = false"
       >
-        <div class="ai-dialog-header">
-          <div>
-            <h2 id="create-task-title">新建智能生成任务</h2>
-            <p class="ai-dialog-subtitle">配置场景、关联用例后生成可验证的自动化脚本</p>
+        <div
+          class="ai-dialog ai-create-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-task-title"
+          @click="showEnvironmentDropdown = false"
+        >
+          <div class="ai-dialog-header">
+            <div>
+              <h2 id="create-task-title">新建智能生成任务</h2>
+              <p class="ai-dialog-subtitle">配置场景、关联用例后生成可验证的自动化脚本</p>
+            </div>
+            <button class="ai-dialog-close" aria-label="关闭弹窗" @click="showCreateDialog = false">
+              <span class="material-symbols-outlined">close</span>
+            </button>
           </div>
-          <button class="ai-dialog-close" aria-label="关闭弹窗" @click="showCreateDialog = false">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-        <div class="ai-dialog-body ai-create-dialog-body">
-          <div class="ai-create-form">
-            <section class="ai-create-section">
-              <div class="ai-create-section-head">
-                <span class="ai-create-section-index">01</span>
-                <div>
-                  <h3>生成配置</h3>
-                  <p>选择脚本生成路径和本次任务使用的项目环境</p>
-                </div>
-              </div>
-              <div class="ai-form-grid">
-                <div class="ai-form-group ai-form-group-half">
-                  <label class="ai-form-label">生成模式 *</label>
-                  <div class="ai-choice-grid">
-                    <button
-                      v-for="mode in generationModeOptions"
-                      :key="mode.value"
-                      type="button"
-                      class="ai-choice-card"
-                      :class="{ active: createForm.generationMode === mode.value }"
-                      :aria-pressed="createForm.generationMode === mode.value"
-                      @click="createForm.generationMode = mode.value"
-                    >
-                      <span class="ai-choice-title">{{ mode.label }}</span>
-                      <span class="ai-choice-desc">{{ mode.desc }}</span>
-                    </button>
+          <div class="ai-dialog-body ai-create-dialog-body">
+            <div class="ai-create-form">
+              <section class="ai-create-section">
+                <div class="ai-create-section-head">
+                  <span class="ai-create-section-index">01</span>
+                  <div>
+                    <h3>生成配置</h3>
+                    <p>选择脚本生成路径和本次任务使用的项目环境</p>
                   </div>
                 </div>
-                <div class="ai-form-group ai-form-group-half">
-                  <label class="ai-form-label">测试环境 *</label>
-                  <div
-                    class="ai-env-select"
-                    :class="{ open: showEnvironmentDropdown, loading: environmentLoading }"
-                    @click.stop
-                  >
-                    <button
-                      type="button"
-                      class="ai-env-select-trigger"
-                      :disabled="environmentLoading"
-                      :aria-expanded="showEnvironmentDropdown"
-                      @click="showEnvironmentDropdown = !showEnvironmentDropdown"
-                    >
-                      <span class="ai-env-choice-dot active"></span>
-                      <span class="ai-env-select-copy">
-                        <span class="ai-env-choice-name">
-                          {{ selectedEnvironment?.name || '请选择测试环境' }}
-                        </span>
-                        <span class="ai-env-choice-url">
-                          {{ selectedEnvironment?.base_url || '请先在项目管理中配置测试环境' }}
-                        </span>
-                      </span>
-                      <span v-if="selectedEnvironment?.is_default" class="ai-env-choice-badge">
-                        默认
-                      </span>
-                      <span class="material-symbols-outlined ai-env-select-arrow">expand_more</span>
-                    </button>
-                    <div v-if="showEnvironmentDropdown" class="ai-env-dropdown">
+                <div class="ai-form-grid">
+                  <div class="ai-form-group ai-form-group-half">
+                    <label class="ai-form-label">生成模式 *</label>
+                    <div class="ai-choice-grid">
                       <button
-                        v-for="env in environmentOptions"
-                        :key="env.id"
+                        v-for="mode in generationModeOptions"
+                        :key="mode.value"
                         type="button"
-                        class="ai-env-option"
-                        :class="{ active: selectedEnvironmentId === env.id }"
-                        @click="selectEnvironment(env.id)"
+                        class="ai-choice-card"
+                        :class="{ active: createForm.generationMode === mode.value }"
+                        :aria-pressed="createForm.generationMode === mode.value"
+                        @click="createForm.generationMode = mode.value"
                       >
-                        <span class="ai-env-choice-dot"></span>
-                        <span class="ai-env-select-copy">
-                          <span class="ai-env-choice-name">{{ env.name }}</span>
-                          <span class="ai-env-choice-url">{{ env.base_url }}</span>
-                        </span>
-                        <span v-if="selectedEnvironmentId === env.id" class="ai-env-choice-badge">
-                          当前
-                        </span>
-                        <span v-else-if="env.is_default" class="ai-env-choice-badge">默认</span>
+                        <span class="ai-choice-title">{{ mode.label }}</span>
+                        <span class="ai-choice-desc">{{ mode.desc }}</span>
                       </button>
                     </div>
                   </div>
-                </div>
-              </div>
-            </section>
-            <section class="ai-create-section">
-              <div class="ai-create-section-head">
-                <span class="ai-create-section-index">02</span>
-                <div>
-                  <h3>任务详情</h3>
-                  <p>描述本次自动化任务的目标、路径和验证结果</p>
-                </div>
-              </div>
-              <div class="ai-form-grid">
-                <div class="ai-form-group ai-form-group-full">
-                  <label class="ai-form-label">任务名称 *</label>
-                  <input
-                    v-model="createForm.taskName"
-                    class="ai-form-input"
-                    placeholder="例如：登录流程回归测试"
-                  />
-                </div>
-                <div class="ai-form-group ai-form-group-full">
-                  <div class="ai-case-field-head">
-                    <label class="ai-form-label">场景描述 *</label>
-                    <span class="ai-prompt-count">{{ createForm.scenarioDesc.length }} 字</span>
-                  </div>
-                  <div class="ai-prompt-helper">
-                    <span class="material-symbols-outlined">tips_and_updates</span>
-                    建议写清入口页面、操作路径、关键数据和断言目标
-                  </div>
-                  <textarea
-                    v-model="createForm.scenarioDesc"
-                    class="ai-form-textarea ai-prompt-textarea"
-                    placeholder="例如：登录系统 → 进入订单列表 → 筛选待处理订单 → 验证订单状态为待处理"
-                  />
-                </div>
-              </div>
-            </section>
-            <section class="ai-create-section">
-              <div class="ai-create-section-head">
-                <span class="ai-create-section-index">03</span>
-                <div>
-                  <h3>执行上下文</h3>
-                  <p>关联用例和测试账号会作为生成脚本的上下文</p>
-                </div>
-              </div>
-              <div class="ai-form-grid">
-                <div class="ai-form-group ai-form-group-full ai-case-field">
-                  <div class="ai-case-field-head">
-                    <label class="ai-form-label">关联用例 *</label>
-                    <span class="ai-case-selected-count">
-                      已选择 {{ selectedCaseIds.length }} 条
-                    </span>
-                  </div>
-                  <div class="ai-case-picker-panel">
-                    <div class="ai-case-toolbar">
-                      <div class="ai-case-picker">
-                        <input
-                          class="ai-form-input"
-                          :value="caseSearchKeyword"
-                          placeholder="搜索用例名称或 ID..."
-                          @input="handleCaseSearch"
-                          @focus="showCaseDropdown = true"
-                        />
-                      </div>
-                      <span v-if="caseLoadError && !caseLoading" class="ai-case-inline-error">
-                        {{ caseLoadError }}
-                      </span>
-                    </div>
-                    <div v-if="showCaseDropdown" class="ai-case-dropdown">
-                      <div v-if="caseLoading" class="ai-case-dropdown-state">正在加载用例...</div>
-                      <div v-else-if="caseCandidates.length === 0" class="ai-case-dropdown-state">
-                        {{ caseLoadError || '当前没有可关联用例' }}
-                      </div>
-                      <template v-else>
-                        <div
-                          v-for="c in caseCandidates"
-                          :key="c.id"
-                          class="ai-case-option"
-                          :class="{ selected: isCaseSelected(c.id) }"
-                          @mousedown.prevent="toggleCase(c)"
-                        >
-                          <span
-                            class="material-symbols-outlined ai-case-check"
-                            :class="{ selected: isCaseSelected(c.id) }"
-                          >
-                            {{ isCaseSelected(c.id) ? 'check_box' : 'check_box_outline_blank' }}
+                  <div class="ai-form-group ai-form-group-half">
+                    <label class="ai-form-label">测试环境 *</label>
+                    <div
+                      class="ai-env-select"
+                      :class="{ open: showEnvironmentDropdown, loading: environmentLoading }"
+                      @click.stop
+                    >
+                      <button
+                        type="button"
+                        class="ai-env-select-trigger"
+                        :disabled="environmentLoading"
+                        :aria-expanded="showEnvironmentDropdown"
+                        @click="showEnvironmentDropdown = !showEnvironmentDropdown"
+                      >
+                        <span class="ai-env-choice-dot active"></span>
+                        <span class="ai-env-select-copy">
+                          <span class="ai-env-choice-name">
+                            {{ selectedEnvironment?.name || '请选择测试环境' }}
                           </span>
-                          <span class="ai-case-id">TC-{{ c.id }}</span>
-                          <span class="ai-case-title">
-                            {{ c.title }}
+                          <span class="ai-env-choice-url">
+                            {{ selectedEnvironment?.base_url || '请先在项目管理中配置测试环境' }}
                           </span>
-                          <span v-if="c.level" class="ai-case-level">
-                            {{ c.level }}
-                          </span>
-                        </div>
-                      </template>
-                    </div>
-                    <div v-if="selectedCaseIds.length" class="ai-selected-case-list">
-                      <span v-for="cid in selectedCaseIds" :key="cid" class="ai-selected-case-tag">
-                        TC-{{ cid }}
+                        </span>
+                        <span v-if="selectedEnvironment?.is_default" class="ai-env-choice-badge">
+                          默认
+                        </span>
+                        <span class="material-symbols-outlined ai-env-select-arrow">
+                          expand_more
+                        </span>
+                      </button>
+                      <div v-if="showEnvironmentDropdown" class="ai-env-dropdown">
                         <button
+                          v-for="env in environmentOptions"
+                          :key="env.id"
                           type="button"
-                          class="ai-selected-case-remove"
-                          aria-label="移除关联用例"
-                          @click="removeSelectedCase(cid)"
+                          class="ai-env-option"
+                          :class="{ active: selectedEnvironmentId === env.id }"
+                          @click="selectEnvironment(env.id)"
                         >
-                          <span class="material-symbols-outlined">close</span>
+                          <span class="ai-env-choice-dot"></span>
+                          <span class="ai-env-select-copy">
+                            <span class="ai-env-choice-name">{{ env.name }}</span>
+                            <span class="ai-env-choice-url">{{ env.base_url }}</span>
+                          </span>
+                          <span v-if="selectedEnvironmentId === env.id" class="ai-env-choice-badge">
+                            当前
+                          </span>
+                          <span v-else-if="env.is_default" class="ai-env-choice-badge">默认</span>
                         </button>
-                      </span>
+                      </div>
                     </div>
                   </div>
                 </div>
-                <div class="ai-form-group ai-form-group-full">
-                  <label class="ai-form-label">测试账号 (可选)</label>
-                  <input
-                    v-model="createForm.accountRef"
-                    class="ai-form-input"
-                    placeholder="引用的测试账号标识"
-                  />
+              </section>
+              <section class="ai-create-section">
+                <div class="ai-create-section-head">
+                  <span class="ai-create-section-index">02</span>
+                  <div>
+                    <h3>任务详情</h3>
+                    <p>描述本次自动化任务的目标、路径和验证结果</p>
+                  </div>
                 </div>
-              </div>
-            </section>
+                <div class="ai-form-grid">
+                  <div class="ai-form-group ai-form-group-full">
+                    <label class="ai-form-label">任务名称 *</label>
+                    <input
+                      v-model="createForm.taskName"
+                      class="ai-form-input"
+                      placeholder="例如：登录流程回归测试"
+                    />
+                  </div>
+                  <div class="ai-form-group ai-form-group-full">
+                    <div class="ai-case-field-head">
+                      <label class="ai-form-label">场景描述 *</label>
+                      <span class="ai-prompt-count">{{ createForm.scenarioDesc.length }} 字</span>
+                    </div>
+                    <div class="ai-prompt-helper">
+                      <span class="material-symbols-outlined">tips_and_updates</span>
+                      建议写清入口页面、操作路径、关键数据和断言目标
+                    </div>
+                    <textarea
+                      v-model="createForm.scenarioDesc"
+                      class="ai-form-textarea ai-prompt-textarea"
+                      placeholder="例如：登录系统 → 进入订单列表 → 筛选待处理订单 → 验证订单状态为待处理"
+                    />
+                  </div>
+                </div>
+              </section>
+              <section class="ai-create-section">
+                <div class="ai-create-section-head">
+                  <span class="ai-create-section-index">03</span>
+                  <div>
+                    <h3>执行上下文</h3>
+                    <p>关联用例和测试账号会作为生成脚本的上下文</p>
+                  </div>
+                </div>
+                <div class="ai-form-grid">
+                  <div class="ai-form-group ai-form-group-full ai-case-field">
+                    <div class="ai-case-field-head">
+                      <label class="ai-form-label">关联用例 *</label>
+                      <span class="ai-case-selected-count">
+                        已选择 {{ selectedCaseIds.length }} 条
+                      </span>
+                    </div>
+                    <div class="ai-case-picker-panel">
+                      <div class="ai-case-toolbar">
+                        <div class="ai-case-picker">
+                          <input
+                            class="ai-form-input"
+                            :value="caseSearchKeyword"
+                            placeholder="搜索用例名称或 ID..."
+                            @input="handleCaseSearch"
+                            @focus="showCaseDropdown = true"
+                          />
+                        </div>
+                        <span v-if="caseLoadError && !caseLoading" class="ai-case-inline-error">
+                          {{ caseLoadError }}
+                        </span>
+                      </div>
+                      <div v-if="showCaseDropdown" class="ai-case-dropdown">
+                        <div v-if="caseLoading" class="ai-case-dropdown-state">正在加载用例...</div>
+                        <div v-else-if="caseCandidates.length === 0" class="ai-case-dropdown-state">
+                          {{ caseLoadError || '当前没有可关联用例' }}
+                        </div>
+                        <template v-else>
+                          <div
+                            v-for="c in caseCandidates"
+                            :key="c.id"
+                            class="ai-case-option"
+                            :class="{ selected: isCaseSelected(c.id) }"
+                            @mousedown.prevent="toggleCase(c)"
+                          >
+                            <span
+                              class="material-symbols-outlined ai-case-check"
+                              :class="{ selected: isCaseSelected(c.id) }"
+                            >
+                              {{ isCaseSelected(c.id) ? 'check_box' : 'check_box_outline_blank' }}
+                            </span>
+                            <span class="ai-case-id">TC-{{ c.id }}</span>
+                            <span class="ai-case-title">
+                              {{ c.title }}
+                            </span>
+                            <span v-if="c.level" class="ai-case-level">
+                              {{ c.level }}
+                            </span>
+                          </div>
+                        </template>
+                      </div>
+                      <div v-if="selectedCaseIds.length" class="ai-selected-case-list">
+                        <span
+                          v-for="cid in selectedCaseIds"
+                          :key="cid"
+                          class="ai-selected-case-tag"
+                        >
+                          TC-{{ cid }}
+                          <button
+                            type="button"
+                            class="ai-selected-case-remove"
+                            aria-label="移除关联用例"
+                            @click="removeSelectedCase(cid)"
+                          >
+                            <span class="material-symbols-outlined">close</span>
+                          </button>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="ai-form-group ai-form-group-full">
+                    <label class="ai-form-label">测试账号 (可选)</label>
+                    <input
+                      v-model="createForm.accountRef"
+                      class="ai-form-input"
+                      placeholder="引用的测试账号标识"
+                    />
+                  </div>
+                </div>
+              </section>
+            </div>
           </div>
-        </div>
-        <div class="ai-dialog-footer ai-create-footer">
-          <span class="ai-create-footer-note">创建后将进入任务详情，可继续录制或执行验证</span>
-          <div class="ai-create-footer-actions">
-            <button class="ai-btn ai-btn-ghost" @click="showCreateDialog = false">取消</button>
-            <button
-              class="ai-btn ai-btn-primary"
-              :disabled="store.actionLoading"
-              @click="submitCreateTask"
-            >
-              <span v-if="store.actionLoading" class="ai-spinner"></span>
-              {{ store.actionLoading ? '创建中...' : '创建任务' }}
-            </button>
+          <div class="ai-dialog-footer ai-create-footer">
+            <span class="ai-create-footer-note">创建后将进入任务详情，可继续录制或执行验证</span>
+            <div class="ai-create-footer-actions">
+              <button class="ai-btn ai-btn-ghost" @click="showCreateDialog = false">取消</button>
+              <button
+                class="ai-btn ai-btn-primary"
+                :disabled="store.actionLoading"
+                @click="submitCreateTask"
+              >
+                <span v-if="store.actionLoading" class="ai-spinner"></span>
+                {{ store.actionLoading ? '创建中...' : '创建任务' }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </Teleport>
 
     <!-- Token 管理 Dialog -->
-    <div v-if="showTokenDialog" class="ai-dialog-overlay" @click.self="closeTokenDialog">
-      <div class="ai-dialog" style="max-width: 520px">
-        <div class="ai-dialog-header">
-          <div>
-            <h2>Token 管理</h2>
-            <p class="ai-dialog-subtitle">管理目标站点的认证状态，为测试脚本执行提供登录环境</p>
-          </div>
-          <button class="ai-dialog-close" @click="closeTokenDialog">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-        <div class="ai-dialog-body">
-          <!-- 目标站点 URL（只读回显） -->
-          <div class="ai-form-group">
-            <label class="ai-form-label">目标站点地址</label>
-            <div style="display: flex; align-items: center; gap: 8px">
-              <span
-                style="
-                  flex: 1;
-                  font-size: 0.85rem;
-                  color: var(--tp-text-primary);
-                  word-break: break-all;
-                "
-              >
-                {{ tokenTargetUrl || '未配置测试环境' }}
-              </span>
-              <button
-                class="ai-btn ai-btn-ghost"
-                style="padding: 6px 14px; white-space: nowrap"
-                :disabled="tokenLoading || !tokenTargetUrl"
-                @click="loadTokenStatus"
-              >
-                <span v-if="tokenLoading" class="ai-spinner"></span>
-                <span v-else class="material-symbols-outlined" style="font-size: 16px">
-                  refresh
-                </span>
-                刷新
-              </button>
-              <button
-                class="ai-btn ai-btn-ghost"
-                style="padding: 6px 14px; white-space: nowrap"
-                :disabled="tokenKeepAliveLoading || !tokenTargetUrl || !tokenAuthState?.exists"
-                @click="handleTokenKeepAlive(false)"
-              >
-                <span v-if="tokenKeepAliveLoading" class="ai-spinner"></span>
-                <span v-else class="material-symbols-outlined" style="font-size: 16px">sync</span>
-                {{ tokenKeepAliveLabel }}
-              </button>
+    <Teleport to="body">
+      <div v-if="showTokenDialog" class="ai-dialog-overlay" @click.self="closeTokenDialog">
+        <div class="ai-dialog" style="max-width: 520px">
+          <div class="ai-dialog-header">
+            <div>
+              <h2>Token 管理</h2>
+              <p class="ai-dialog-subtitle">管理目标站点的认证状态，为测试脚本执行提供登录环境</p>
             </div>
+            <button class="ai-dialog-close" @click="closeTokenDialog">
+              <span class="material-symbols-outlined">close</span>
+            </button>
           </div>
+          <div class="ai-dialog-body">
+            <!-- 目标站点 URL（只读回显） -->
+            <div class="ai-form-group">
+              <label class="ai-form-label">目标站点地址</label>
+              <div style="display: flex; align-items: center; gap: 8px">
+                <span
+                  style="
+                    flex: 1;
+                    font-size: 0.85rem;
+                    color: var(--tp-text-primary);
+                    word-break: break-all;
+                  "
+                >
+                  {{ tokenTargetUrl || '未配置测试环境' }}
+                </span>
+                <button
+                  class="ai-btn ai-btn-ghost"
+                  style="padding: 6px 14px; white-space: nowrap"
+                  :disabled="tokenLoading || !tokenTargetUrl"
+                  @click="loadTokenStatus"
+                >
+                  <span v-if="tokenLoading" class="ai-spinner"></span>
+                  <span v-else class="material-symbols-outlined" style="font-size: 16px">
+                    refresh
+                  </span>
+                  刷新
+                </button>
+                <button
+                  class="ai-btn ai-btn-ghost"
+                  style="padding: 6px 14px; white-space: nowrap"
+                  :disabled="tokenKeepAliveLoading || !tokenTargetUrl || !tokenAuthState?.exists"
+                  @click="handleTokenKeepAlive(false)"
+                >
+                  <span v-if="tokenKeepAliveLoading" class="ai-spinner"></span>
+                  <span v-else class="material-symbols-outlined" style="font-size: 16px">sync</span>
+                  {{ tokenKeepAliveLabel }}
+                </button>
+              </div>
+            </div>
 
-          <!-- 认证状态结果 -->
-          <div
-            v-if="tokenLoading && !tokenAuthState"
-            class="ai-token-status-panel ai-auth-checking"
-          >
-            <div class="ai-token-status-header">
-              <span class="ai-section-title" style="font-size: 0.82rem">认证状态</span>
-              <div class="ai-auth-status-badge missing">
+            <!-- 认证状态结果 -->
+            <div
+              v-if="tokenLoading && !tokenAuthState"
+              class="ai-token-status-panel ai-auth-checking"
+            >
+              <div class="ai-token-status-header">
+                <span class="ai-section-title" style="font-size: 0.82rem">认证状态</span>
+                <div class="ai-auth-status-badge missing">
+                  <span class="ai-spinner"></span>
+                  校验中
+                </div>
+              </div>
+              <div class="ai-auth-empty-hint">
+                <span class="material-symbols-outlined">sync</span>
+                <span>正在打开目标站点做在线校验，请稍候...</span>
+              </div>
+            </div>
+            <div v-else-if="tokenAuthState" class="ai-token-status-panel">
+              <div class="ai-token-status-header">
+                <span class="ai-section-title" style="font-size: 0.82rem">认证状态</span>
+                <div class="ai-auth-status-badge" :class="tokenStatusClass">
+                  <span class="ai-auth-dot"></span>
+                  {{ tokenStatusText }}
+                </div>
+              </div>
+              <div v-if="tokenAuthState.exists" class="ai-auth-meta">
+                <div class="ai-auth-meta-item">
+                  <span class="ai-info-label">文件年龄</span>
+                  <span class="ai-info-value">
+                    {{
+                      tokenAuthState.file_age_hours !== null
+                        ? tokenAuthState.file_age_hours + ' 小时'
+                        : '-'
+                    }}
+                  </span>
+                </div>
+                <div class="ai-auth-meta-item">
+                  <span class="ai-info-label">Cookie 数</span>
+                  <span class="ai-info-value">{{ tokenAuthState.cookie_count }}</span>
+                </div>
+                <div class="ai-auth-meta-item">
+                  <span class="ai-info-label">最近检查</span>
+                  <span class="ai-info-value">{{ tokenLastCheckedAt || '-' }}</span>
+                </div>
+              </div>
+              <div v-if="tokenWarningText" class="ai-auth-warning">
+                <span class="material-symbols-outlined">info</span>
+                <span>{{ tokenWarningText }}</span>
+              </div>
+              <div v-if="!tokenAuthState.exists" class="ai-auth-empty-hint">
+                <span class="material-symbols-outlined">lock_open</span>
+                <span>暂无认证状态，请获取 Token 后再执行测试脚本</span>
+              </div>
+            </div>
+
+            <!-- 手动登录提示区 -->
+            <div
+              v-if="manualLoginActive"
+              class="ai-token-status-panel"
+              style="margin-top: 12px; border-color: var(--tp-accent, #7c5cfc)"
+            >
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px">
                 <span class="ai-spinner"></span>
-                校验中
-              </div>
-            </div>
-            <div class="ai-auth-empty-hint">
-              <span class="material-symbols-outlined">sync</span>
-              <span>正在打开目标站点做在线校验，请稍候...</span>
-            </div>
-          </div>
-          <div v-else-if="tokenAuthState" class="ai-token-status-panel">
-            <div class="ai-token-status-header">
-              <span class="ai-section-title" style="font-size: 0.82rem">认证状态</span>
-              <div class="ai-auth-status-badge" :class="tokenStatusClass">
-                <span class="ai-auth-dot"></span>
-                {{ tokenStatusText }}
-              </div>
-            </div>
-            <div v-if="tokenAuthState.exists" class="ai-auth-meta">
-              <div class="ai-auth-meta-item">
-                <span class="ai-info-label">文件年龄</span>
-                <span class="ai-info-value">
-                  {{
-                    tokenAuthState.file_age_hours !== null
-                      ? tokenAuthState.file_age_hours + ' 小时'
-                      : '-'
-                  }}
+                <span
+                  class="ai-section-title"
+                  style="font-size: 0.82rem; color: var(--tp-accent, #7c5cfc)"
+                >
+                  等待登录
                 </span>
               </div>
-              <div class="ai-auth-meta-item">
-                <span class="ai-info-label">Cookie 数</span>
-                <span class="ai-info-value">{{ tokenAuthState.cookie_count }}</span>
-              </div>
-              <div class="ai-auth-meta-item">
-                <span class="ai-info-label">最近检查</span>
-                <span class="ai-info-value">{{ tokenLastCheckedAt || '-' }}</span>
-              </div>
-            </div>
-            <div v-if="tokenWarningText" class="ai-auth-warning">
-              <span class="material-symbols-outlined">info</span>
-              <span>{{ tokenWarningText }}</span>
-            </div>
-            <div v-if="!tokenAuthState.exists" class="ai-auth-empty-hint">
-              <span class="material-symbols-outlined">lock_open</span>
-              <span>暂无认证状态，请获取 Token 后再执行测试脚本</span>
-            </div>
-          </div>
-
-          <!-- 手动登录提示区 -->
-          <div
-            v-if="manualLoginActive"
-            class="ai-token-status-panel"
-            style="margin-top: 12px; border-color: var(--tp-accent, #7c5cfc)"
-          >
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px">
-              <span class="ai-spinner"></span>
-              <span
-                class="ai-section-title"
-                style="font-size: 0.82rem; color: var(--tp-accent, #7c5cfc)"
+              <p style="font-size: 0.8rem; color: var(--tp-text-secondary); margin: 0 0 12px 0">
+                浏览器已打开，请在浏览器窗口中完成登录操作（处理验证码、短信验证等），登录成功后点击下方按钮保存认证状态。
+              </p>
+              <button
+                class="ai-btn ai-btn-primary"
+                style="padding: 6px 14px; font-size: 0.8rem"
+                :disabled="manualLoginLoading"
+                @click="handleManualLoginComplete"
               >
-                等待登录
-              </span>
+                <span class="material-symbols-outlined" style="font-size: 16px">check_circle</span>
+                {{ manualLoginLoading ? '保存中...' : '登录完成，保存状态' }}
+              </button>
             </div>
-            <p style="font-size: 0.8rem; color: var(--tp-text-secondary); margin: 0 0 12px 0">
-              浏览器已打开，请在浏览器窗口中完成登录操作（处理验证码、短信验证等），登录成功后点击下方按钮保存认证状态。
-            </p>
-            <button
-              class="ai-btn ai-btn-primary"
-              style="padding: 6px 14px; font-size: 0.8rem"
-              :disabled="manualLoginLoading"
-              @click="handleManualLoginComplete"
-            >
-              <span class="material-symbols-outlined" style="font-size: 16px">check_circle</span>
-              {{ manualLoginLoading ? '保存中...' : '登录完成，保存状态' }}
-            </button>
           </div>
-        </div>
-        <div class="ai-dialog-footer">
-          <div class="ai-auth-actions" style="flex: 1">
-            <button
-              v-if="!manualLoginActive"
-              class="ai-btn ai-btn-primary"
-              style="padding: 6px 14px; font-size: 0.8rem"
-              :disabled="manualLoginLoading || !tokenTargetUrl.trim()"
-              @click="handleManualLogin"
-            >
-              <span class="material-symbols-outlined" style="font-size: 16px">open_in_browser</span>
-              手动登录
-            </button>
-            <button
-              v-if="tokenAuthState?.exists"
-              class="ai-btn ai-btn-danger-ghost"
-              style="padding: 6px 14px; font-size: 0.8rem"
-              @click="handleTokenInvalidate"
-            >
-              <span class="material-symbols-outlined" style="font-size: 16px">delete</span>
-              清除 Token
-            </button>
+          <div class="ai-dialog-footer">
+            <div class="ai-auth-actions" style="flex: 1">
+              <button
+                v-if="!manualLoginActive"
+                class="ai-btn ai-btn-primary"
+                style="padding: 6px 14px; font-size: 0.8rem"
+                :disabled="manualLoginLoading || !tokenTargetUrl.trim()"
+                @click="handleManualLogin"
+              >
+                <span class="material-symbols-outlined" style="font-size: 16px">
+                  open_in_browser
+                </span>
+                手动登录
+              </button>
+              <button
+                v-if="tokenAuthState?.exists"
+                class="ai-btn ai-btn-danger-ghost"
+                style="padding: 6px 14px; font-size: 0.8rem"
+                @click="handleTokenInvalidate"
+              >
+                <span class="material-symbols-outlined" style="font-size: 16px">delete</span>
+                清除 Token
+              </button>
+            </div>
+            <button class="ai-btn ai-btn-ghost" @click="closeTokenDialog">关闭</button>
           </div>
-          <button class="ai-btn ai-btn-ghost" @click="closeTokenDialog">关闭</button>
         </div>
       </div>
-    </div>
+    </Teleport>
 
     <!-- Toast 提示 -->
     <Transition name="toast">
@@ -1558,223 +1570,239 @@ async function handleTokenInvalidate() {
     </Transition>
 
     <!-- 重命名任务 Dialog -->
-    <div v-if="showRenameDialog" class="ai-dialog-overlay" @click.self="showRenameDialog = false">
-      <div class="ai-dialog ai-rename-dialog" style="max-width: 400px">
-        <div class="ai-dialog-header">
-          <div>
-            <h2>修改任务名称</h2>
-            <p class="ai-dialog-subtitle">TASK-{{ renameTaskId }}</p>
+    <Teleport to="body">
+      <div v-if="showRenameDialog" class="ai-dialog-overlay" @click.self="showRenameDialog = false">
+        <div class="ai-dialog ai-rename-dialog" style="max-width: 400px">
+          <div class="ai-dialog-header">
+            <div>
+              <h2>修改任务名称</h2>
+              <p class="ai-dialog-subtitle">TASK-{{ renameTaskId }}</p>
+            </div>
+            <button class="ai-dialog-close" @click="showRenameDialog = false">
+              <span class="material-symbols-outlined">close</span>
+            </button>
           </div>
-          <button class="ai-dialog-close" @click="showRenameDialog = false">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-        <div class="ai-dialog-body">
-          <div class="ai-form-group">
-            <label class="ai-form-label">任务名称</label>
-            <input
-              v-model="renameNewName"
-              class="ai-form-input"
-              placeholder="请输入新的任务名称"
-              maxlength="128"
-              @keyup.enter="confirmRename"
-            />
-            <span class="ai-form-hint">{{ renameNewName.length }} / 128</span>
+          <div class="ai-dialog-body">
+            <div class="ai-form-group">
+              <label class="ai-form-label">任务名称</label>
+              <input
+                v-model="renameNewName"
+                class="ai-form-input"
+                placeholder="请输入新的任务名称"
+                maxlength="128"
+                @keyup.enter="confirmRename"
+              />
+              <span class="ai-form-hint">{{ renameNewName.length }} / 128</span>
+            </div>
           </div>
-        </div>
-        <div class="ai-dialog-footer">
-          <button class="ai-btn ai-btn-ghost" @click="showRenameDialog = false">取消</button>
-          <button
-            class="ai-btn ai-btn-primary"
-            :disabled="renameLoading || !renameNewName.trim()"
-            @click="confirmRename"
-          >
-            <span v-if="renameLoading" class="ai-spinner"></span>
-            {{ renameLoading ? '保存中...' : '确认修改' }}
-          </button>
+          <div class="ai-dialog-footer">
+            <button class="ai-btn ai-btn-ghost" @click="showRenameDialog = false">取消</button>
+            <button
+              class="ai-btn ai-btn-primary"
+              :disabled="renameLoading || !renameNewName.trim()"
+              @click="confirmRename"
+            >
+              <span v-if="renameLoading" class="ai-spinner"></span>
+              {{ renameLoading ? '保存中...' : '确认修改' }}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </Teleport>
 
     <!-- 废弃确认 Dialog -->
-    <div v-if="showDiscardDialog" class="ai-dialog-overlay" @click.self="showDiscardDialog = false">
-      <div class="ai-dialog ai-confirm-dialog" style="max-width: 440px">
-        <div class="ai-dialog-header">
-          <div>
-            <h2>废弃任务</h2>
-            <p class="ai-dialog-subtitle">此操作不可撤销，请谨慎确认</p>
+    <Teleport to="body">
+      <div
+        v-if="showDiscardDialog"
+        class="ai-dialog-overlay"
+        @click.self="showDiscardDialog = false"
+      >
+        <div class="ai-dialog ai-confirm-dialog" style="max-width: 440px">
+          <div class="ai-dialog-header">
+            <div>
+              <h2>废弃任务</h2>
+              <p class="ai-dialog-subtitle">此操作不可撤销，请谨慎确认</p>
+            </div>
+            <button class="ai-dialog-close" @click="showDiscardDialog = false">
+              <span class="material-symbols-outlined">close</span>
+            </button>
           </div>
-          <button class="ai-dialog-close" @click="showDiscardDialog = false">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-        <div class="ai-dialog-body">
-          <div class="ai-confirm-alert">
-            <span class="material-symbols-outlined ai-confirm-alert-icon">warning</span>
-            <p>
-              确定要废弃任务
-              <strong>{{ discardTaskName }}</strong>
-              吗？废弃后任务将不可恢复。
-            </p>
+          <div class="ai-dialog-body">
+            <div class="ai-confirm-alert">
+              <span class="material-symbols-outlined ai-confirm-alert-icon">warning</span>
+              <p>
+                确定要废弃任务
+                <strong>{{ discardTaskName }}</strong>
+                吗？废弃后任务将不可恢复。
+              </p>
+            </div>
+            <div class="ai-form-group">
+              <label class="ai-form-label">废弃原因 *</label>
+              <textarea
+                v-model="discardReason"
+                class="ai-form-textarea"
+                placeholder="请输入废弃原因..."
+                rows="3"
+              />
+            </div>
           </div>
-          <div class="ai-form-group">
-            <label class="ai-form-label">废弃原因 *</label>
-            <textarea
-              v-model="discardReason"
-              class="ai-form-textarea"
-              placeholder="请输入废弃原因..."
-              rows="3"
-            />
+          <div class="ai-dialog-footer">
+            <button class="ai-btn ai-btn-ghost" @click="showDiscardDialog = false">取消</button>
+            <button
+              class="ai-btn ai-btn-danger-solid"
+              :disabled="store.actionLoading || !discardReason.trim()"
+              @click="confirmDiscard"
+            >
+              <span v-if="store.actionLoading" class="ai-spinner"></span>
+              {{ store.actionLoading ? '处理中...' : '确认废弃' }}
+            </button>
           </div>
-        </div>
-        <div class="ai-dialog-footer">
-          <button class="ai-btn ai-btn-ghost" @click="showDiscardDialog = false">取消</button>
-          <button
-            class="ai-btn ai-btn-danger-solid"
-            :disabled="store.actionLoading || !discardReason.trim()"
-            @click="confirmDiscard"
-          >
-            <span v-if="store.actionLoading" class="ai-spinner"></span>
-            {{ store.actionLoading ? '处理中...' : '确认废弃' }}
-          </button>
         </div>
       </div>
-    </div>
+    </Teleport>
 
     <!-- 删除确认 Dialog -->
-    <div v-if="showDeleteDialog" class="ai-dialog-overlay" @click.self="showDeleteDialog = false">
-      <div class="ai-dialog ai-confirm-dialog" style="max-width: 440px">
-        <div class="ai-dialog-header">
-          <div>
-            <h2>删除任务</h2>
-            <p class="ai-dialog-subtitle">此操作不可撤销，请谨慎确认</p>
-          </div>
-          <button class="ai-dialog-close" @click="showDeleteDialog = false">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-        <div class="ai-dialog-body">
-          <div class="ai-confirm-alert ai-confirm-alert--danger">
-            <span class="material-symbols-outlined ai-confirm-alert-icon">delete_forever</span>
+    <Teleport to="body">
+      <div v-if="showDeleteDialog" class="ai-dialog-overlay" @click.self="showDeleteDialog = false">
+        <div class="ai-dialog ai-confirm-dialog" style="max-width: 440px">
+          <div class="ai-dialog-header">
             <div>
-              <p>
-                确定要彻底删除任务
-                <strong>{{ deleteTaskName }}</strong>
-                吗？
-              </p>
-              <p class="ai-confirm-alert-sub">
-                此操作将级联删除任务关联的所有脚本版本、验证记录、轨迹、证据和录制会话，不可恢复。
-              </p>
+              <h2>删除任务</h2>
+              <p class="ai-dialog-subtitle">此操作不可撤销，请谨慎确认</p>
+            </div>
+            <button class="ai-dialog-close" @click="showDeleteDialog = false">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+          <div class="ai-dialog-body">
+            <div class="ai-confirm-alert ai-confirm-alert--danger">
+              <span class="material-symbols-outlined ai-confirm-alert-icon">delete_forever</span>
+              <div>
+                <p>
+                  确定要彻底删除任务
+                  <strong>{{ deleteTaskName }}</strong>
+                  吗？
+                </p>
+                <p class="ai-confirm-alert-sub">
+                  此操作将级联删除任务关联的所有脚本版本、验证记录、轨迹、证据和录制会话，不可恢复。
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="ai-dialog-footer">
-          <button class="ai-btn ai-btn-ghost" @click="showDeleteDialog = false">取消</button>
-          <button
-            class="ai-btn ai-btn-danger-solid"
-            :disabled="store.actionLoading"
-            @click="confirmDelete"
-          >
-            <span v-if="store.actionLoading" class="ai-spinner"></span>
-            {{ store.actionLoading ? '删除中...' : '确认删除' }}
-          </button>
+          <div class="ai-dialog-footer">
+            <button class="ai-btn ai-btn-ghost" @click="showDeleteDialog = false">取消</button>
+            <button
+              class="ai-btn ai-btn-danger-solid"
+              :disabled="store.actionLoading"
+              @click="confirmDelete"
+            >
+              <span v-if="store.actionLoading" class="ai-spinner"></span>
+              {{ store.actionLoading ? '删除中...' : '确认删除' }}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </Teleport>
 
     <!-- 批量废弃确认 Dialog -->
-    <div
-      v-if="showBatchDiscardDialog"
-      class="ai-dialog-overlay"
-      @click.self="showBatchDiscardDialog = false"
-    >
-      <div class="ai-dialog ai-confirm-dialog" style="max-width: 460px">
-        <div class="ai-dialog-header">
-          <div>
-            <h2>批量废弃任务</h2>
-            <p class="ai-dialog-subtitle">已选中 {{ store.selectedTaskCount }} 条任务</p>
-          </div>
-          <button class="ai-dialog-close" @click="showBatchDiscardDialog = false">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-        <div class="ai-dialog-body">
-          <div class="ai-confirm-alert">
-            <span class="material-symbols-outlined ai-confirm-alert-icon">warning</span>
-            <p>
-              确定要批量废弃已选中的
-              <strong>{{ store.selectedTaskCount }}</strong>
-              条任务吗？废弃后不可恢复。
-            </p>
-          </div>
-          <div class="ai-form-group">
-            <label class="ai-form-label">废弃原因 *</label>
-            <textarea
-              v-model="batchDiscardReason"
-              class="ai-form-textarea"
-              placeholder="请输入统一废弃原因..."
-              rows="3"
-            />
-          </div>
-        </div>
-        <div class="ai-dialog-footer">
-          <button class="ai-btn ai-btn-ghost" @click="showBatchDiscardDialog = false">取消</button>
-          <button
-            class="ai-btn ai-btn-danger-solid"
-            :disabled="store.actionLoading || !batchDiscardReason.trim()"
-            @click="confirmBatchDiscard"
-          >
-            <span v-if="store.actionLoading" class="ai-spinner"></span>
-            {{ store.actionLoading ? '处理中...' : '确认批量废弃' }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 批量删除确认 Dialog -->
-    <div
-      v-if="showBatchDeleteDialog"
-      class="ai-dialog-overlay"
-      @click.self="showBatchDeleteDialog = false"
-    >
-      <div class="ai-dialog ai-confirm-dialog" style="max-width: 460px">
-        <div class="ai-dialog-header">
-          <div>
-            <h2>批量删除任务</h2>
-            <p class="ai-dialog-subtitle">已选中 {{ store.selectedTaskCount }} 条任务</p>
-          </div>
-          <button class="ai-dialog-close" @click="showBatchDeleteDialog = false">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-        <div class="ai-dialog-body">
-          <div class="ai-confirm-alert ai-confirm-alert--danger">
-            <span class="material-symbols-outlined ai-confirm-alert-icon">delete_forever</span>
+    <Teleport to="body">
+      <div
+        v-if="showBatchDiscardDialog"
+        class="ai-dialog-overlay"
+        @click.self="showBatchDiscardDialog = false"
+      >
+        <div class="ai-dialog ai-confirm-dialog" style="max-width: 460px">
+          <div class="ai-dialog-header">
             <div>
+              <h2>批量废弃任务</h2>
+              <p class="ai-dialog-subtitle">已选中 {{ store.selectedTaskCount }} 条任务</p>
+            </div>
+            <button class="ai-dialog-close" @click="showBatchDiscardDialog = false">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+          <div class="ai-dialog-body">
+            <div class="ai-confirm-alert">
+              <span class="material-symbols-outlined ai-confirm-alert-icon">warning</span>
               <p>
-                确定要批量删除已选中的
+                确定要批量废弃已选中的
                 <strong>{{ store.selectedTaskCount }}</strong>
-                条任务吗？
-              </p>
-              <p class="ai-confirm-alert-sub">
-                只有已废弃任务会被真正删除，不满足条件的任务会在结果中按"跳过/失败"统计返回。
+                条任务吗？废弃后不可恢复。
               </p>
             </div>
+            <div class="ai-form-group">
+              <label class="ai-form-label">废弃原因 *</label>
+              <textarea
+                v-model="batchDiscardReason"
+                class="ai-form-textarea"
+                placeholder="请输入统一废弃原因..."
+                rows="3"
+              />
+            </div>
+          </div>
+          <div class="ai-dialog-footer">
+            <button class="ai-btn ai-btn-ghost" @click="showBatchDiscardDialog = false">
+              取消
+            </button>
+            <button
+              class="ai-btn ai-btn-danger-solid"
+              :disabled="store.actionLoading || !batchDiscardReason.trim()"
+              @click="confirmBatchDiscard"
+            >
+              <span v-if="store.actionLoading" class="ai-spinner"></span>
+              {{ store.actionLoading ? '处理中...' : '确认批量废弃' }}
+            </button>
           </div>
         </div>
-        <div class="ai-dialog-footer">
-          <button class="ai-btn ai-btn-ghost" @click="showBatchDeleteDialog = false">取消</button>
-          <button
-            class="ai-btn ai-btn-danger-solid"
-            :disabled="store.actionLoading"
-            @click="confirmBatchDelete"
-          >
-            <span v-if="store.actionLoading" class="ai-spinner"></span>
-            {{ store.actionLoading ? '删除中...' : '确认批量删除' }}
-          </button>
+      </div>
+    </Teleport>
+
+    <!-- 批量删除确认 Dialog -->
+    <Teleport to="body">
+      <div
+        v-if="showBatchDeleteDialog"
+        class="ai-dialog-overlay"
+        @click.self="showBatchDeleteDialog = false"
+      >
+        <div class="ai-dialog ai-confirm-dialog" style="max-width: 460px">
+          <div class="ai-dialog-header">
+            <div>
+              <h2>批量删除任务</h2>
+              <p class="ai-dialog-subtitle">已选中 {{ store.selectedTaskCount }} 条任务</p>
+            </div>
+            <button class="ai-dialog-close" @click="showBatchDeleteDialog = false">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+          <div class="ai-dialog-body">
+            <div class="ai-confirm-alert ai-confirm-alert--danger">
+              <span class="material-symbols-outlined ai-confirm-alert-icon">delete_forever</span>
+              <div>
+                <p>
+                  确定要批量删除已选中的
+                  <strong>{{ store.selectedTaskCount }}</strong>
+                  条任务吗？
+                </p>
+                <p class="ai-confirm-alert-sub">
+                  只有已废弃任务会被真正删除，不满足条件的任务会在结果中按"跳过/失败"统计返回。
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="ai-dialog-footer">
+            <button class="ai-btn ai-btn-ghost" @click="showBatchDeleteDialog = false">取消</button>
+            <button
+              class="ai-btn ai-btn-danger-solid"
+              :disabled="store.actionLoading"
+              @click="confirmBatchDelete"
+            >
+              <span v-if="store.actionLoading" class="ai-spinner"></span>
+              {{ store.actionLoading ? '删除中...' : '确认批量删除' }}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </Teleport>
   </div>
 </template>
 

@@ -577,8 +577,6 @@ onMounted(() => loadConfigs())
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 16px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--tp-gray-100);
 }
 
 .amc-header-left h1 {
@@ -709,7 +707,7 @@ onMounted(() => loadConfigs())
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
   gap: 20px;
-  margin-top: 24px;
+  margin-top: 12px;
   min-height: 200px;
 }
 

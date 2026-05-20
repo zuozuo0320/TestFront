@@ -15,6 +15,7 @@ export const TaskStatus = {
   PENDING_REVALIDATE: 'PENDING_REVALIDATE',
   CONFIRMED: 'CONFIRMED',
   DISCARDED: 'DISCARDED',
+  MANUAL_REVIEW: 'MANUAL_REVIEW',
 } as const
 export type TaskStatus = (typeof TaskStatus)[keyof typeof TaskStatus]
 
@@ -81,6 +82,7 @@ export const TaskStatusLabel: Record<TaskStatus, string> = {
   [TaskStatus.PENDING_REVALIDATE]: '待重新验证',
   [TaskStatus.CONFIRMED]: '已确认',
   [TaskStatus.DISCARDED]: '已废弃',
+  [TaskStatus.MANUAL_REVIEW]: '人工审核',
 }
 
 export const ScriptStatusLabel: Record<ScriptStatus, string> = {
@@ -138,6 +140,7 @@ export const TaskStatusColor: Record<TaskStatus, StatusColor> = {
   [TaskStatus.PENDING_REVALIDATE]: 'warning',
   [TaskStatus.CONFIRMED]: 'success',
   [TaskStatus.DISCARDED]: 'info',
+  [TaskStatus.MANUAL_REVIEW]: 'warning',
 }
 
 export const ScriptStatusColor: Record<ScriptStatus, StatusColor> = {

@@ -30,6 +30,7 @@ import {
   cancelCodegen,
   getPendingScript,
   clearPendingScript,
+  fetchTaskDetail,
   type RecordingSession,
 } from '../../api/aiScript'
 import CodeEditor from '../../components/CodeEditor.vue'
@@ -80,10 +81,15 @@ function startTaskPolling() {
   stopTaskPolling()
   if (!shouldPollTask()) return
   taskPollTimer = setInterval(async () => {
-    await store.loadTaskDetailFull(taskId.value)
-    // 任务结束时停止轮询
-    if (!shouldPollTask()) {
+    // 轻量轮询：只刷新任务元数据，不清空页面数据、不设 loading，避免页面闪动
+    const fresh = await fetchTaskDetail(taskId.value)
+    if (!fresh) return
+    const prevStatus = task.value?.taskStatus
+    store.currentTask = fresh
+    // 状态从 RUNNING 变为完成态时，做一次全量刷新以加载新脚本
+    if (prevStatus !== fresh.taskStatus && !shouldPollTask()) {
       stopTaskPolling()
+      await store.loadTaskDetailFull(taskId.value)
     }
   }, 5000)
 }
@@ -164,12 +170,6 @@ const GENERATING_PHASE_TEXTS = [
   '正在生成稳定定位器',
   '正在编排 Playwright 步骤',
   '正在整理工程化脚本',
-] as const
-const GENERATING_CODE_LINE_WIDTHS = [
-  [86, 62, 74, 48],
-  [54, 78, 44, 68],
-  [72, 46, 82, 56],
-  [64, 88, 58, 76],
 ] as const
 
 // ── 操作轨迹（录制模式下用步骤模型填充）──
@@ -309,10 +309,12 @@ async function handleStartRecording() {
 
     // 4. 开始轮询 codegen 状态
     startPolling(session_id)
-  } catch (e) {
+  } catch (e: any) {
     console.error('启动录制失败:', e)
-    await markRecordingFailed('录制浏览器启动失败，请重新发起录制')
-    recordingStatusText.value = '录制启动失败，请重新发起录制'
+    const msg = e?.response?.data?.message || e?.message || '录制浏览器启动失败'
+    await markRecordingFailed(msg)
+    recordingStatusText.value = `录制启动失败: ${msg}`
+    showToast(`录制启动失败: ${msg}`, 'error')
     recordingLoading.value = false
   }
 }
@@ -374,7 +376,7 @@ function startPolling(sessionId: string) {
     try {
       const result = await pollCodegenStatus(sessionId)
       if (result.status === 'logging_in') {
-        recordingStatusText.value = '🔐 正在自动登录系统（识别验证码中）...'
+        recordingStatusText.value = '🔐 正在自动登录系统（识别验证码中，最多 15 秒后自动跳过）...'
       } else if (result.status === 'recording') {
         recordingStatusText.value = '🔴 录制中... 请在弹出的浏览器中操作，完成后关闭浏览器'
       } else if (result.status === 'completed') {
@@ -407,7 +409,7 @@ function startPolling(sessionId: string) {
     } catch (e) {
       console.error('轮询失败:', e)
     }
-  }, 2000) // 每 2 秒轮询
+  }, 1000) // 每 1 秒轮询，配合快速启动优化
 }
 
 function stopPolling() {
@@ -432,6 +434,8 @@ async function handleFinishRecording() {
     await loadRecording()
     finishScriptContent.value = ''
     recordingStatusText.value = ''
+    // 提交后任务进入 RUNNING（AI 重构中），启动轮询以捕获完成状态
+    startTaskPolling()
   } finally {
     recordingLoading.value = false
   }
@@ -636,6 +640,20 @@ const editContent = ref('')
 const editComment = ref('')
 // ── 录制提交 Dialog ──
 const showRecordingDialog = ref(false)
+// ── 覆盖确认 Dialog ──
+const showOverwriteConfirm = ref(false)
+let _overwriteResolve: ((v: boolean) => void) | null = null
+
+function handleOverwriteConfirm() {
+  showOverwriteConfirm.value = false
+  _overwriteResolve?.(true)
+  _overwriteResolve = null
+}
+function handleOverwriteCancel() {
+  showOverwriteConfirm.value = false
+  _overwriteResolve?.(false)
+  _overwriteResolve = null
+}
 
 function openEditDialog() {
   editContent.value = script.value?.scriptContent || ''
@@ -676,6 +694,16 @@ async function openRecordingSubmitDialog() {
 
 async function submitRecordingScript() {
   if (!finishScriptContent.value.trim() || !recording.value) return
+
+  // 覆盖保护：当任务已有成功脚本时，弹出确认框防止误覆盖
+  if (script.value?.scriptContent) {
+    const confirmed = await new Promise<boolean>((resolve) => {
+      _overwriteResolve = resolve
+      showOverwriteConfirm.value = true
+    })
+    if (!confirmed) return
+  }
+
   showRecordingDialog.value = false
   recording.value = {
     ...recording.value,
@@ -779,18 +807,18 @@ const generatingPhaseText = computed(() => {
   if (p < 75) return GENERATING_PHASE_TEXTS[3]
   return GENERATING_PHASE_TEXTS[4]
 })
-const generatingDots = computed(() => '.'.repeat((Math.floor(generatingFrame.value / 4) % 3) + 1))
-const generatingCodeLineWidths = computed(
-  () =>
-    GENERATING_CODE_LINE_WIDTHS[
-      Math.floor(generatingFrame.value / 6) % GENERATING_CODE_LINE_WIDTHS.length
-    ],
-)
 const generatingOrbScale = computed(() => 1 + Math.sin(generatingFrame.value / 3) * 0.08)
 const generatingOuterRotate = computed(() => `rotate(${generatingFrame.value * 18}deg)`)
 const generatingInnerRotate = computed(() => `rotate(${-generatingFrame.value * 25}deg)`)
 const generatingSatelliteRotate = computed(() => `rotate(${generatingFrame.value * 32}deg)`)
 const generatingSatelliteReverseRotate = computed(() => `rotate(${-generatingFrame.value * 27}deg)`)
+
+const isGeneratingCardRendered = ref(false)
+const isExploding = ref(false)
+const cushioningProgress = computed(() => {
+  if (isExploding.value) return 100
+  return generatingProgress.value
+})
 
 function startGeneratingMotion() {
   if (generatingMotionTimer) return
@@ -811,10 +839,61 @@ watch(
   isGeneratingScript,
   (generating) => {
     if (generating) {
+      isGeneratingCardRendered.value = true
+      isExploding.value = false
       startGeneratingMotion()
       return
     }
     stopGeneratingMotion()
+
+    // 触发成功时的编译终态爆裂庆祝
+    if (task.value?.taskStatus === TaskStatus.GENERATE_SUCCESS) {
+      isExploding.value = true
+      setTimeout(() => {
+        isGeneratingCardRendered.value = false
+        isExploding.value = false
+      }, 1400)
+    } else {
+      isGeneratingCardRendered.value = false
+    }
+  },
+  { immediate: true },
+)
+
+const isValidationRunning = computed(() => {
+  if (!script.value) return false
+  return (
+    validation.value?.validationStatus === 'VALIDATING' ||
+    script.value.validationStatus === 'VALIDATING' ||
+    task.value?.latestValidationStatus === 'VALIDATING'
+  )
+})
+
+const runningElapsedSeconds = ref(0)
+let elapsedTimer: ReturnType<typeof setInterval> | null = null
+
+function formatElapsed(sec: number): string {
+  const m = Math.floor(sec / 60)
+    .toString()
+    .padStart(2, '0')
+  const s = (sec % 60).toString().padStart(2, '0')
+  return `${m}:${s}`
+}
+
+watch(
+  isValidationRunning,
+  (running) => {
+    if (running) {
+      runningElapsedSeconds.value = 0
+      elapsedTimer = setInterval(() => {
+        runningElapsedSeconds.value += 1
+      }, 1000)
+    } else {
+      if (elapsedTimer) {
+        clearInterval(elapsedTimer)
+        elapsedTimer = null
+      }
+    }
   },
   { immediate: true },
 )
@@ -1154,10 +1233,14 @@ watch(
           </div>
         </section>
         <section
-          v-else-if="isGeneratingScript"
+          v-else-if="isGeneratingCardRendered"
           class="ai-info-card ai-script-generating-card"
+          :class="{ 'is-exploding': isExploding }"
           aria-live="polite"
         >
+          <!-- 编译完成时的爆裂冲击波 -->
+          <div v-if="isExploding" class="ai-shockwave" aria-hidden="true"></div>
+
           <div class="ai-generating-visual" aria-hidden="true">
             <span
               class="ai-generating-orb"
@@ -1184,31 +1267,44 @@ watch(
               :style="{ transform: generatingInnerRotate }"
             ></span>
           </div>
+
+          <!-- SVG 极简光流桥接线 -->
+          <div class="ai-fiber-connector-container" aria-hidden="true">
+            <svg viewBox="0 0 120 40" class="ai-fiber-svg" fill="none">
+              <path d="M 0 20 Q 30 10, 60 20 T 120 20" class="ai-fiber-pipe" />
+              <path d="M 0 20 Q 30 10, 60 20 T 120 20" class="ai-fiber-pulse-stroke" />
+            </svg>
+            <div class="ai-fiber-photon"></div>
+          </div>
+
           <div class="ai-generating-content">
             <span class="ai-generating-kicker">SCRIPT GENERATION</span>
             <h3>{{ scriptGeneratingTitle }}</h3>
             <p>{{ scriptGeneratingDesc }}</p>
             <div class="ai-generating-progress-meta">
-              <span>{{ generatingPhaseText }}{{ generatingDots }}</span>
-              <strong>{{ generatingProgress }}%</strong>
+              <span class="ai-loading-dots-container">
+                {{ generatingPhaseText }}
+                <span class="ai-loading-dot dot-1">.</span>
+                <span class="ai-loading-dot dot-2">.</span>
+                <span class="ai-loading-dot dot-3">.</span>
+              </span>
+              <strong>{{ cushioningProgress }}%</strong>
             </div>
             <div class="ai-generating-progress">
-              <span :style="{ width: `${generatingProgress}%` }"></span>
-            </div>
-            <div class="ai-generating-code-stream" aria-hidden="true">
-              <span
-                v-for="(width, index) in generatingCodeLineWidths"
-                :key="index"
-                :style="{ width: `${width}%` }"
-              ></span>
+              <span :style="{ width: `${cushioningProgress}%` }"></span>
             </div>
             <div class="ai-generating-steps">
               <span
                 v-for="(step, index) in GENERATING_STEPS"
                 :key="step.label"
-                :class="{ active: index === generatingActiveStep }"
+                :class="{
+                  active: index === generatingActiveStep,
+                  completed: index < generatingActiveStep,
+                }"
               >
-                <i class="material-symbols-outlined">{{ step.icon }}</i>
+                <i class="material-symbols-outlined">
+                  {{ index < generatingActiveStep ? 'check_circle' : step.icon }}
+                </i>
                 {{ step.label }}
               </span>
             </div>
@@ -1421,7 +1517,73 @@ watch(
             </div>
           </div>
 
-          <div class="ai-validation-body">
+          <!-- 运行中仿真舱 -->
+          <div v-if="isValidationRunning" class="ai-validation-body ai-replay-running-body">
+            <!-- 终端仿真器 -->
+            <div class="ai-replay-simulator-terminal">
+              <div class="terminal-header">
+                <span class="terminal-dot red"></span>
+                <span class="terminal-dot yellow"></span>
+                <span class="terminal-dot green"></span>
+                <span class="terminal-title">PLAYWRIGHT ENGINE TERMINAL</span>
+              </div>
+              <div class="terminal-logs">
+                <div class="log-row">
+                  <span class="log-time">[00:01]</span>
+                  <span class="log-tag system">SYSTEM</span>
+                  <span class="log-text">Initializing headless Chromium instance...</span>
+                </div>
+                <div v-if="runningElapsedSeconds > 2" class="log-row">
+                  <span class="log-time">[00:03]</span>
+                  <span class="log-tag browser">BROWSER</span>
+                  <span class="log-text">Loading session cookies and context...</span>
+                </div>
+                <div v-if="runningElapsedSeconds > 5" class="log-row">
+                  <span class="log-time">[00:06]</span>
+                  <span class="log-tag replay">REPLAY</span>
+                  <span class="log-text">Replaying steps and interaction actions...</span>
+                </div>
+                <div v-if="runningElapsedSeconds > 8" class="log-row">
+                  <span class="log-time">[00:09]</span>
+                  <span class="log-tag assert">ASSERT</span>
+                  <span class="log-text">Validating structural element locators...</span>
+                </div>
+                <div v-if="runningElapsedSeconds > 11" class="log-row current-row">
+                  <span class="log-time">[{{ formatElapsed(runningElapsedSeconds) }}]</span>
+                  <span class="log-tag stream">STREAM</span>
+                  <span class="log-text">
+                    Replay active, compiling validation report
+                    <span class="dots-blink">...</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 取景器 HUD 仿真 -->
+            <div class="ai-replay-simulator-viewport">
+              <div class="viewport-hud-corners">
+                <span class="hud-corner top-left"></span>
+                <span class="hud-corner top-right"></span>
+                <span class="hud-corner bottom-left"></span>
+                <span class="hud-corner bottom-right"></span>
+              </div>
+              <div class="viewport-hud-grid"></div>
+              <div class="viewport-laser-line"></div>
+              <div class="viewport-scanner-core">
+                <div class="scanner-circle outer"></div>
+                <div class="scanner-circle middle"></div>
+                <div class="scanner-circle inner"></div>
+                <span class="material-symbols-outlined scanner-icon">videocam</span>
+                <span class="scanner-label">
+                  <span class="rec-dot"></span>
+                  BROWSER PLAYBACK RUNNING
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 常规结果展示 -->
+          <div v-else class="ai-validation-body">
             <!-- 日志流 -->
             <div class="ai-log-stream">
               <div
@@ -1467,7 +1629,10 @@ watch(
           </div>
 
           <!-- 断言标签 -->
-          <div class="ai-assertion-pills">
+          <div
+            v-if="!isValidationRunning && validation.assertionSummary?.length"
+            class="ai-assertion-pills"
+          >
             <span
               v-for="a in validation.assertionSummary"
               :key="a.name"
@@ -1634,133 +1799,182 @@ watch(
     </div>
 
     <!-- 提交录制脚本 Dialog -->
-    <div
-      v-if="showRecordingDialog"
-      class="ai-dialog-overlay"
-      @click.self="showRecordingDialog = false"
-    >
-      <div class="ai-dialog wide">
-        <div class="ai-dialog-header">
-          <h2>提交录制脚本</h2>
-          <button class="ai-dialog-close" @click="showRecordingDialog = false">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-        <div class="ai-dialog-body">
-          <div class="ai-form-group">
-            <label class="ai-form-label">粘贴 Playwright Codegen 录制的脚本 *</label>
-            <textarea
-              v-model="finishScriptContent"
-              class="ai-form-textarea"
-              style="
-                min-height: 300px;
-                font-family: 'JetBrains Mono', 'Fira Code', monospace;
-                font-size: 0.8rem;
-              "
-              placeholder="将 npx playwright codegen 输出的 TypeScript 脚本粘贴到这里..."
-            />
+    <Teleport to="body">
+      <div
+        v-if="showRecordingDialog"
+        class="ai-dialog-overlay"
+        @click.self="showRecordingDialog = false"
+      >
+        <div class="ai-dialog wide">
+          <div class="ai-dialog-header">
+            <h2>提交录制脚本</h2>
+            <button class="ai-dialog-close" @click="showRecordingDialog = false">
+              <span class="material-symbols-outlined">close</span>
+            </button>
           </div>
-          <div class="ai-form-hint" style="margin-top: -8px">
-            <span class="material-symbols-outlined" style="font-size: 14px">info</span>
-            提交后系统将自动调用 AI 重构为标准化脚本
+          <div class="ai-dialog-body">
+            <div class="ai-form-group">
+              <label class="ai-form-label">粘贴 Playwright Codegen 录制的脚本 *</label>
+              <textarea
+                v-model="finishScriptContent"
+                class="ai-form-textarea"
+                style="
+                  min-height: 300px;
+                  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+                  font-size: 0.8rem;
+                "
+                placeholder="将 npx playwright codegen 输出的 TypeScript 脚本粘贴到这里..."
+              />
+            </div>
+            <div class="ai-form-hint" style="margin-top: -8px">
+              <span class="material-symbols-outlined" style="font-size: 14px">info</span>
+              提交后系统将自动调用 AI 重构为标准化脚本
+            </div>
           </div>
-        </div>
-        <div class="ai-dialog-footer">
-          <button
-            class="ai-btn ai-btn-danger-ghost"
-            :disabled="recordingLoading"
-            @click="handleRestartRecording"
-          >
-            <span v-if="recordingLoading" class="ai-spinner"></span>
-            <span v-else class="material-symbols-outlined">restart_alt</span>
-            放弃并重新录制
-          </button>
-          <button class="ai-btn ai-btn-ghost" @click="showRecordingDialog = false">稍后提交</button>
-          <button
-            class="ai-btn ai-btn-primary"
-            :disabled="recordingLoading || !finishScriptContent.trim()"
-            @click="submitRecordingScript"
-          >
-            <span v-if="recordingLoading" class="ai-spinner"></span>
-            {{ recordingLoading ? 'AI 重构中...' : '提交并 AI 重构' }}
-          </button>
+          <div class="ai-dialog-footer">
+            <button
+              class="ai-btn ai-btn-danger-ghost"
+              :disabled="recordingLoading"
+              @click="handleRestartRecording"
+            >
+              <span v-if="recordingLoading" class="ai-spinner"></span>
+              <span v-else class="material-symbols-outlined">restart_alt</span>
+              放弃并重新录制
+            </button>
+            <button class="ai-btn ai-btn-ghost" @click="showRecordingDialog = false">
+              稍后提交
+            </button>
+            <button
+              class="ai-btn ai-btn-primary"
+              :disabled="recordingLoading || !finishScriptContent.trim()"
+              @click="submitRecordingScript"
+            >
+              <span v-if="recordingLoading" class="ai-spinner"></span>
+              {{ recordingLoading ? 'AI 重构中...' : '提交并 AI 重构' }}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </Teleport>
+
+    <!-- 覆盖确认 Dialog -->
+    <Teleport to="body">
+      <div
+        v-if="showOverwriteConfirm"
+        class="ai-dialog-overlay"
+        @click.self="handleOverwriteCancel"
+      >
+        <div class="ai-dialog" style="max-width: 460px">
+          <div class="ai-dialog-header">
+            <h2>⚠️ 覆盖确认</h2>
+            <button class="ai-dialog-close" @click="handleOverwriteCancel">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+          <div class="ai-dialog-body">
+            <p style="font-size: 0.85rem; color: var(--tp-text-secondary); margin-bottom: 8px">
+              当前任务已有一个
+              <strong style="color: var(--tp-primary)">已生成的脚本</strong>
+              ，提交新录制将触发 AI 重新重构，
+              <strong>原脚本会被新版本替代</strong>
+              。
+            </p>
+            <p style="font-size: 0.8rem; color: var(--tp-text-muted)">
+              确定要用本次录制覆盖现有脚本吗？
+            </p>
+          </div>
+          <div class="ai-dialog-footer">
+            <button class="ai-btn ai-btn-ghost" @click="handleOverwriteCancel">取消</button>
+            <button class="ai-btn ai-btn-warning" @click="handleOverwriteConfirm">
+              <span class="material-symbols-outlined">warning</span>
+              确认覆盖
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- 废弃任务 Dialog -->
-    <div
-      v-if="showDetailDiscardDialog"
-      class="ai-dialog-overlay"
-      @click.self="showDetailDiscardDialog = false"
-    >
-      <div class="ai-dialog" style="max-width: 440px">
-        <div class="ai-dialog-header">
-          <h2>ℹ️ 废弃任务</h2>
-          <button class="ai-dialog-close" @click="showDetailDiscardDialog = false">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-        <div class="ai-dialog-body">
-          <p style="font-size: 0.85rem; color: var(--tp-gray-300); margin-bottom: 12px">
-            确定要废弃任务
-            <strong>{{ task?.taskName }}</strong>
-            吗？废弃后任务将不可恢复。
-          </p>
-          <div class="ai-form-group">
-            <label class="ai-form-label">废弃原因 *</label>
-            <textarea
-              v-model="detailDiscardReason"
-              class="ai-form-textarea"
-              placeholder="请输入废弃原因..."
-              rows="3"
-            />
+    <Teleport to="body">
+      <div
+        v-if="showDetailDiscardDialog"
+        class="ai-dialog-overlay"
+        @click.self="showDetailDiscardDialog = false"
+      >
+        <div class="ai-dialog" style="max-width: 440px">
+          <div class="ai-dialog-header">
+            <h2>ℹ️ 废弃任务</h2>
+            <button class="ai-dialog-close" @click="showDetailDiscardDialog = false">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+          <div class="ai-dialog-body">
+            <p style="font-size: 0.85rem; color: var(--tp-gray-300); margin-bottom: 12px">
+              确定要废弃任务
+              <strong>{{ task?.taskName }}</strong>
+              吗？废弃后任务将不可恢复。
+            </p>
+            <div class="ai-form-group">
+              <label class="ai-form-label">废弃原因 *</label>
+              <textarea
+                v-model="detailDiscardReason"
+                class="ai-form-textarea"
+                placeholder="请输入废弃原因..."
+                rows="3"
+              />
+            </div>
+          </div>
+          <div class="ai-dialog-footer">
+            <button class="ai-btn ai-btn-ghost" @click="showDetailDiscardDialog = false">
+              取消
+            </button>
+            <button
+              class="ai-btn ai-btn-danger"
+              :disabled="!detailDiscardReason.trim()"
+              @click="confirmDetailDiscard"
+            >
+              确认废弃
+            </button>
           </div>
         </div>
-        <div class="ai-dialog-footer">
-          <button class="ai-btn ai-btn-ghost" @click="showDetailDiscardDialog = false">取消</button>
-          <button
-            class="ai-btn ai-btn-danger"
-            :disabled="!detailDiscardReason.trim()"
-            @click="confirmDetailDiscard"
-          >
-            确认废弃
-          </button>
-        </div>
       </div>
-    </div>
+    </Teleport>
 
     <!-- 删除任务 Dialog -->
-    <div
-      v-if="showDetailDeleteDialog"
-      class="ai-dialog-overlay"
-      @click.self="showDetailDeleteDialog = false"
-    >
-      <div class="ai-dialog" style="max-width: 440px">
-        <div class="ai-dialog-header">
-          <h2>⚠️ 删除任务</h2>
-          <button class="ai-dialog-close" @click="showDetailDeleteDialog = false">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-        <div class="ai-dialog-body">
-          <p style="font-size: 0.85rem; color: #ff8a80">
-            确定要彻底删除任务
-            <strong>{{ task?.taskName }}</strong>
-            吗？
-          </p>
-          <p style="font-size: 0.8rem; color: var(--tp-gray-500); margin-top: 8px">
-            此操作将级联删除任务关联的所有脚本版本、验证记录、轨迹、证据和录制会话，
-            <strong style="color: #ff8a80">不可恢复</strong>
-            。
-          </p>
-        </div>
-        <div class="ai-dialog-footer">
-          <button class="ai-btn ai-btn-ghost" @click="showDetailDeleteDialog = false">取消</button>
-          <button class="ai-btn ai-btn-danger" @click="confirmDetailDelete">确认删除</button>
+    <Teleport to="body">
+      <div
+        v-if="showDetailDeleteDialog"
+        class="ai-dialog-overlay"
+        @click.self="showDetailDeleteDialog = false"
+      >
+        <div class="ai-dialog" style="max-width: 440px">
+          <div class="ai-dialog-header">
+            <h2>⚠️ 删除任务</h2>
+            <button class="ai-dialog-close" @click="showDetailDeleteDialog = false">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+          <div class="ai-dialog-body">
+            <p style="font-size: 0.85rem; color: #ff8a80">
+              确定要彻底删除任务
+              <strong>{{ task?.taskName }}</strong>
+              吗？
+            </p>
+            <p style="font-size: 0.8rem; color: var(--tp-gray-500); margin-top: 8px">
+              此操作将级联删除任务关联的所有脚本版本、验证记录、轨迹、证据和录制会话，
+              <strong style="color: #ff8a80">不可恢复</strong>
+              。
+            </p>
+          </div>
+          <div class="ai-dialog-footer">
+            <button class="ai-btn ai-btn-ghost" @click="showDetailDeleteDialog = false">
+              取消
+            </button>
+            <button class="ai-btn ai-btn-danger" @click="confirmDetailDelete">确认删除</button>
+          </div>
         </div>
       </div>
-    </div>
+    </Teleport>
 
     <!-- Toast 提示 -->
     <Transition name="detail-toast">
