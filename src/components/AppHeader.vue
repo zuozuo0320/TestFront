@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { Bell, LogOut as LogOutIcon, User as UserIcon } from 'lucide-vue-next'
+import { Bell, LogOut as LogOutIcon, Moon, Sun, User as UserIcon } from 'lucide-vue-next'
 import { useAuthStore } from '../stores/auth'
+import { useTheme } from '../composables/useTheme'
 
 const props = defineProps<{
   userName: string
@@ -13,6 +14,7 @@ defineEmits<{
 }>()
 
 const authStore = useAuthStore()
+const { isGenArtTheme, toggleTheme } = useTheme()
 
 function onAvatarError(event: Event) {
   authStore.handleAvatarError(event, props.userName)
@@ -29,6 +31,19 @@ function onAvatarError(event: Event) {
     </div>
 
     <div class="header-right">
+      <button
+        type="button"
+        class="header-icon-btn header-theme-btn"
+        :class="{ 'is-active': isGenArtTheme }"
+        :aria-pressed="isGenArtTheme"
+        :aria-label="isGenArtTheme ? '切换到默认主题' : '切换到黑曜主题'"
+        :title="isGenArtTheme ? '切换到默认主题' : '切换到黑曜主题'"
+        @click="toggleTheme"
+      >
+        <Sun v-if="isGenArtTheme" :size="18" />
+        <Moon v-else :size="18" />
+      </button>
+
       <button class="header-icon-btn" title="通知">
         <Bell :size="18" />
       </button>

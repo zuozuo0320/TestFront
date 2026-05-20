@@ -11,7 +11,9 @@ import './styles/animations.css'
 import './styles/ai-script.css'
 import router from './router'
 import App from './App.vue'
+import { initializeTheme } from './composables/useTheme'
 
+initializeTheme()
 const app = createApp(App)
 app.use(createPinia())
 app.use(router)

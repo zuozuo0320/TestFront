@@ -285,7 +285,6 @@ onMounted(() => loadConfigs())
           <span class="material-symbols-outlined">smart_toy</span>
           AI 模型配置
         </h1>
-        <p class="amc-subtitle">管理 LLM 模型提供商、API Key 和模型版本</p>
       </div>
       <div class="amc-header-right">
         <div class="amc-stat-pills">

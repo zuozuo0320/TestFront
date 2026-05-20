@@ -2,6 +2,11 @@
 * {
   box-sizing: border-box;
 }
+html,
+body {
+  min-height: 100%;
+  background: var(--tp-surface-base);
+}
 body {
   margin: 0;
   font-family: var(--tp-font-family-sans);
@@ -9,7 +14,12 @@ body {
   font-weight: var(--tp-font-regular);
   line-height: var(--tp-line-body);
   color: var(--tp-text-primary);
-  background: #ffffff;
+  background: var(--tp-surface-base);
+}
+#app,
+.page {
+  min-height: 100vh;
+  background: var(--tp-surface-base);
 }
 /* ========== Global Scrollbar ========== */
 ::-webkit-scrollbar {
@@ -125,14 +135,14 @@ body {
     0 0 0 3px var(--tp-accent-primary-soft) !important;
 }
 .el-input__inner {
-  color: var(--tp-gray-900) !important;
+  color: var(--tp-text-primary) !important;
 }
 .el-input__inner::placeholder,
 .el-select__placeholder {
   color: var(--tp-gray-400) !important;
 }
 .el-select__selected-item {
-  color: var(--tp-gray-800) !important;
+  color: var(--tp-text-secondary) !important;
 }
 
 /* 全局 dropdown/popover 暗色 */
