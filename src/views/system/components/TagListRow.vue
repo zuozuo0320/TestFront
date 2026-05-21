@@ -472,27 +472,127 @@ function formatCount(n: number): string {
   height: 28px;
 }
 
+/* ==================== 统一高保真双主题卡片与微交互样式 ==================== */
 .tc-card {
-  background: var(--tp-surface-card);
-  border-color: var(--tp-border-subtle);
-  box-shadow: var(--tp-shadow-sm);
-  transform: none;
-}
-
-.tc-card::before {
-  display: none;
+  overflow: hidden !important;
+  position: relative !important;
+  border-radius: 16px !important;
+  padding: 18px 20px !important;
+  cursor: default !important;
+  /* 默认浅色主题：温润白紫 + 极简发光 aura */
+  background:
+    radial-gradient(
+      circle at 10% 0%,
+      color-mix(in srgb, var(--accent) 12%, transparent),
+      transparent 35%
+    ),
+    #ffffff !important;
+  border: 1px solid rgba(139, 92, 246, 0.08) !important;
+  box-shadow:
+    0 10px 24px rgba(139, 92, 246, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+  transform: translateY(0) !important;
 }
 
 .tc-card:hover {
-  background: var(--tp-surface-row-hover);
-  border-color: var(--tp-border-strong);
-  box-shadow: var(--tp-shadow-sm);
-  transform: none;
+  /* 默认浅色悬停：轻量 3D 浮升 + 外发光 */
+  background:
+    radial-gradient(
+      circle at 10% 0%,
+      color-mix(in srgb, var(--accent) 18%, transparent),
+      transparent 35%
+    ),
+    #ffffff !important;
+  border-color: color-mix(in srgb, var(--accent) 30%, rgba(139, 92, 246, 0.22)) !important;
+  box-shadow:
+    0 16px 36px color-mix(in srgb, var(--accent) 10%, rgba(139, 92, 246, 0.06)),
+    0 0 0 3px color-mix(in srgb, var(--accent) 6%, transparent) !important;
+  transform: translateY(-3px) !important;
 }
 
+/* 黑曜深色主题卡片自适应 */
+html[data-theme='genart'] .tc-card {
+  background:
+    radial-gradient(
+      circle at 10% 0%,
+      color-mix(in srgb, var(--accent) 15%, transparent),
+      transparent 38%
+    ),
+    #0d0e15 !important;
+  border: 1px solid rgba(255, 255, 255, 0.04) !important;
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.02) !important;
+}
+
+html[data-theme='genart'] .tc-card:hover {
+  background:
+    radial-gradient(
+      circle at 10% 0%,
+      color-mix(in srgb, var(--accent) 22%, transparent),
+      transparent 38%
+    ),
+    #0d0e15 !important;
+  border-color: color-mix(in srgb, var(--accent) 35%, rgba(255, 255, 255, 0.12)) !important;
+  box-shadow:
+    0 20px 40px color-mix(in srgb, var(--accent) 15%, rgba(0, 0, 0, 0.65)),
+    0 0 0 4px color-mix(in srgb, var(--accent) 10%, transparent) !important;
+}
+
+/* 统一图标框：高亮玻璃质感 */
 .tc-icon-box {
-  background: color-mix(in srgb, var(--accent) 10%, var(--tp-surface-card));
-  box-shadow: none;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 8px !important;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, rgba(148, 163, 184, 0.12)) !important;
+  background: color-mix(in srgb, var(--accent) 8%, rgba(255, 255, 255, 0.05)) !important;
+  box-shadow: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* 卡片指标行及操作按钮微调 */
+.tc-stats {
+  border-top: 1px solid rgba(148, 163, 184, 0.08) !important;
+}
+
+html[data-theme='genart'] .tc-stats {
+  border-top-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+.tc-divider {
+  background: rgba(148, 163, 184, 0.1) !important;
+}
+
+html[data-theme='genart'] .tc-divider {
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+.tc-act-btn {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 50% !important;
+  border: 1px solid rgba(148, 163, 184, 0.12) !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+  color: var(--tp-text-subtle) !important;
+  box-shadow: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.tc-act-btn:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent) !important;
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent) !important;
+  color: var(--accent) !important;
+}
+
+.tc-act-btn--del:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+  color: #ef4444 !important;
 }
 
 .tc-name,
@@ -503,24 +603,6 @@ function formatCount(n: number): string {
 .tc-desc,
 .tc-stat-label {
   color: var(--tp-text-muted);
-}
-
-.tc-act-btn {
-  background: var(--tp-surface-input);
-  border-color: var(--tp-border-subtle);
-  box-shadow: none;
-  color: var(--tp-text-muted);
-}
-
-.tc-act-btn:hover {
-  background: var(--tp-surface-hover);
-  border-color: var(--tp-border-strong);
-  color: var(--tp-primary);
-}
-
-.tc-act-btn--del:hover {
-  background: var(--tp-accent-danger-soft);
-  color: var(--tp-accent-danger);
 }
 
 .tc-stat-value--primary {

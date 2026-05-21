@@ -54,6 +54,27 @@ function showToast(msg: string, type: 'success' | 'error' = 'success') {
   }, 3000)
 }
 
+function formatDate(dateStr?: string) {
+  if (!dateStr) return '-'
+  try {
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return dateStr
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  } catch {
+    return dateStr
+  }
+}
+
+function cleanAnsi(text?: string) {
+  if (!text) return ''
+  // 清洗 ANSI 控制字符 (如 [1m, [2K, [36m 等)，防止干扰终端阅读
+  const esc = String.fromCharCode(0x1b)
+  return text
+    .replace(new RegExp(esc + '\\[[0-9;]*[a-zA-Z]', 'g'), '')
+    .replace(/\[[0-9;]*[a-zA-Z]/g, '')
+}
+
 onMounted(async () => {
   if (taskId.value) {
     await store.loadTaskDetailFull(taskId.value)
@@ -309,9 +330,10 @@ async function handleStartRecording() {
 
     // 4. 开始轮询 codegen 状态
     startPolling(session_id)
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('启动录制失败:', e)
-    const msg = e?.response?.data?.message || e?.message || '录制浏览器启动失败'
+    const err = e as { response?: { data?: { message?: string } }; message?: string }
+    const msg = err?.response?.data?.message || err?.message || '录制浏览器启动失败'
     await markRecordingFailed(msg)
     recordingStatusText.value = `录制启动失败: ${msg}`
     showToast(`录制启动失败: ${msg}`, 'error')
@@ -1086,9 +1108,9 @@ watch(
                 </div>
               </div>
             </div>
-            <div>
+            <div v-if="task?.startUrl">
               <div class="ai-info-label">起始地址</div>
-              <div class="ai-info-url">{{ task?.startUrl || '-' }}</div>
+              <div class="ai-info-url">{{ task.startUrl }}</div>
             </div>
             <!-- 场景描述 -->
             <div v-if="task?.scenarioDesc">
@@ -1648,7 +1670,7 @@ watch(
                 class="ai-log-line"
                 :class="log.level.toLowerCase()"
               >
-                {{ log.message }}
+                {{ cleanAnsi(log.message) }}
               </div>
             </div>
 
@@ -1660,7 +1682,7 @@ watch(
                   最终状态截图
                 </span>
                 <span class="ai-fail-label-time">
-                  截取于 {{ validation.screenshots?.[0]?.createdAt || '-' }}
+                  截取于 {{ formatDate(validation.screenshots?.[0]?.createdAt) }}
                 </span>
               </div>
               <div class="ai-fail-screenshot">
@@ -1711,19 +1733,11 @@ watch(
             </span>
             验证历史 ({{ validationHistory.length }})
           </span>
-          <div style="display: flex; flex-direction: column; gap: 8px">
+          <div class="validation-history-scroll-container">
             <div
               v-for="(v, idx) in validationHistory"
               :key="v.id || idx"
-              style="
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                padding: 8px 12px;
-                border-radius: 6px;
-                background: rgba(255, 255, 255, 0.03);
-                border: 1px solid rgba(255, 255, 255, 0.06);
-              "
+              class="validation-history-row"
             >
               <div
                 class="ai-status-badge"
@@ -1732,16 +1746,19 @@ watch(
               >
                 {{ ValidationStatusLabel[v.validationStatus] }}
               </div>
-              <div style="flex: 1; font-size: 0.75rem; color: var(--tp-gray-400)">
-                {{ v.startedAt }}
+              <div class="history-time-col">
+                {{ formatDate(v.startedAt) }}
               </div>
-              <div style="font-size: 0.7rem; color: var(--tp-gray-500)">
+              <div class="history-user-col">
+                <span class="material-symbols-outlined history-meta-icon">person</span>
                 {{ v.triggeredName || '-' }}
               </div>
-              <div v-if="v.durationMs" style="font-size: 0.7rem; color: var(--tp-gray-600)">
+              <div v-if="v.durationMs" class="history-duration-col">
+                <span class="material-symbols-outlined history-meta-icon">schedule</span>
                 {{ (v.durationMs / 1000).toFixed(1) }}s
               </div>
-              <div style="font-size: 0.7rem; color: var(--tp-gray-600)">
+              <div class="history-steps-col">
+                <span class="material-symbols-outlined history-meta-icon">done_all</span>
                 通过 {{ v.passedStepCount }}/{{ v.totalStepCount }}
               </div>
             </div>
@@ -2047,9 +2064,8 @@ watch(
 <style scoped>
 .detail-toast {
   position: fixed;
-  top: 24px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 80px; /* 避开最顶部全局导航，完美悬浮于右上角内容侧方 */
+  right: 24px;
   z-index: 9999;
   display: inline-flex;
   align-items: center;
@@ -2058,41 +2074,311 @@ watch(
   border-radius: 10px;
   font-size: 0.82rem;
   font-weight: 500;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow:
+    0 10px 30px rgba(139, 92, 246, 0.08),
+    0 1px 3px rgba(0, 0, 0, 0.02);
   backdrop-filter: blur(12px);
   max-width: 400px;
   white-space: nowrap;
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .detail-toast.success {
-  background: rgba(30, 46, 30, 0.95);
-  border: 1px solid rgba(76, 175, 80, 0.3);
-  color: #81c784;
+  background: rgba(240, 253, 244, 0.96);
+  border: 1px solid rgba(34, 197, 94, 0.22);
+  color: #16a34a;
 }
 .detail-toast.error {
-  background: rgba(46, 30, 30, 0.95);
-  border: 1px solid rgba(255, 138, 128, 0.3);
-  color: #ff8a80;
+  background: rgba(254, 242, 242, 0.96);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  color: #dc2626;
 }
+
+/* 在黑曜深色主题下，回归暗黑深空底色，避免刺眼 */
+:global(html[data-theme='genart']) .detail-toast {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+}
+:global(html[data-theme='genart']) .detail-toast.success {
+  background: rgba(30, 46, 30, 0.95) !important;
+  border: 1px solid rgba(76, 175, 80, 0.3) !important;
+  color: #81c784 !important;
+}
+:global(html[data-theme='genart']) .detail-toast.error {
+  background: rgba(46, 30, 30, 0.95) !important;
+  border: 1px solid rgba(255, 138, 128, 0.3) !important;
+  color: #ff8a80 !important;
+}
+
 .detail-toast-enter-active {
-  animation: detail-toast-in 0.3s ease;
+  animation: detail-toast-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .detail-toast-leave-active {
-  animation: detail-toast-in 0.2s ease reverse;
+  animation: detail-toast-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) reverse;
 }
 @keyframes detail-toast-in {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(-12px);
+    transform: translateX(35px); /* 从右侧柔和滑入，绝不遮挡中央 */
   }
   to {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
+    transform: translateX(0);
   }
 }
 </style>
 
 <style>
 /* ==================== Default / Light Theme Styles (默认浅色优雅白紫主题) ==================== */
+
+/* 0. 验证历史滚动容器与行样式 (默认浅色) */
+.validation-history-scroll-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+/* 适配 Chrome/Firefox 极简滚动条 */
+.validation-history-scroll-container::-webkit-scrollbar {
+  width: 5px;
+}
+.validation-history-scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.validation-history-scroll-container::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.15);
+  border-radius: 99px;
+}
+.validation-history-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.3);
+}
+
+/* 验证历史行样式 (默认浅色) */
+.validation-history-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: rgba(139, 92, 246, 0.02) !important;
+  border: 1px solid rgba(139, 92, 246, 0.06) !important;
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.validation-history-row:hover {
+  background: rgba(139, 92, 246, 0.05) !important;
+  border-color: rgba(139, 92, 246, 0.22) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.04);
+}
+
+.validation-history-row .history-time-col {
+  flex: 1;
+  font-size: 0.75rem;
+  color: #4b5563 !important;
+  font-family: var(--tp-font-mono, monospace);
+  font-weight: 500;
+}
+
+.validation-history-row .history-user-col,
+.validation-history-row .history-duration-col,
+.validation-history-row .history-steps-col {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: #6b7280 !important;
+}
+
+.validation-history-row .history-meta-icon {
+  font-size: 13px !important;
+  color: #9ca3af;
+  vertical-align: middle;
+}
+
+/* 顶部操作区、标题与按钮高保真优化 (默认浅色) */
+.ai-task-detail-page .ai-detail-back-icon {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 50% !important;
+  background: rgba(139, 92, 246, 0.03) !important;
+  border: 1px solid rgba(139, 92, 246, 0.1) !important;
+  color: var(--tp-primary) !important;
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02) !important;
+}
+
+.ai-task-detail-page .ai-detail-back-icon:hover {
+  background: var(--tp-primary) !important;
+  border-color: var(--tp-primary) !important;
+  color: #ffffff !important;
+  transform: translateX(-2px) scale(1.04);
+  box-shadow: 0 4px 10px rgba(139, 92, 246, 0.18) !important;
+}
+
+.ai-task-detail-page .ai-detail-title-block h1 {
+  font-size: 1.15rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.2px;
+}
+
+.ai-task-detail-page .ai-detail-subtitle {
+  font-size: 0.72rem !important;
+  color: var(--tp-gray-500) !important;
+  margin-top: 1px;
+}
+
+.ai-task-detail-page .ai-mode-tag {
+  font-size: 0.68rem !important;
+  padding: 2px 8px !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+}
+
+.ai-task-detail-page .ai-mode-tag.recording {
+  background: rgba(139, 92, 246, 0.08) !important;
+  color: var(--tp-primary) !important;
+  border: 1px solid rgba(139, 92, 246, 0.15) !important;
+}
+
+.ai-task-detail-actions .ai-btn {
+  min-height: 32px !important;
+  padding: 0 14px !important;
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+}
+
+/* “重新录制” 录音室专属呼吸红圈图标 */
+.ai-task-detail-actions .ai-btn-secondary {
+  border: 1px solid rgba(139, 92, 246, 0.16) !important;
+  background: rgba(139, 92, 246, 0.02) !important;
+  color: var(--tp-primary) !important;
+}
+
+.ai-task-detail-actions .ai-btn-secondary .material-symbols-outlined {
+  color: #ef4444 !important;
+}
+
+.ai-task-detail-actions .ai-btn-secondary:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.06) !important;
+  border-color: rgba(139, 92, 246, 0.3) !important;
+  transform: translateY(-1px);
+}
+
+/* “执行验证” 主要 CTA 彩虹渐变 */
+.ai-task-detail-actions .ai-btn-primary {
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
+  border: none !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2) !important;
+}
+
+.ai-task-detail-actions .ai-btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 6px 16px rgba(236, 72, 153, 0.25) !important;
+}
+
+/* “确认脚本” 成功翡翠绿色 */
+.ai-task-detail-actions .ai-btn-success {
+  background: rgba(16, 185, 129, 0.05) !important;
+  border: 1px solid rgba(16, 185, 129, 0.22) !important;
+  color: #059669 !important;
+}
+
+.ai-task-detail-actions .ai-btn-success:hover:not(:disabled) {
+  background: #10b981 !important;
+  border-color: #10b981 !important;
+  color: #ffffff !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15) !important;
+}
+
+/* 纯图标功能键：优雅小圆镜，支持缩放 */
+.ai-task-detail-page .ai-detail-action-group .ai-btn-icon {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  border-radius: 50% !important;
+  border: 1px solid rgba(139, 92, 246, 0.1) !important;
+  background: rgba(139, 92, 246, 0.02) !important;
+  color: var(--tp-text-secondary) !important;
+}
+
+.ai-task-detail-page .ai-detail-action-group .ai-btn-icon:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.08) !important;
+  border-color: var(--tp-primary) !important;
+  color: var(--tp-primary) !important;
+  transform: scale(1.05);
+}
+
+/* 危险操作键 (废弃、删除等) */
+.ai-task-detail-page .ai-detail-action-group--danger .ai-btn-icon {
+  border-color: rgba(239, 68, 68, 0.12) !important;
+  background: rgba(239, 68, 68, 0.01) !important;
+  color: #ef4444 !important;
+}
+
+.ai-task-detail-page .ai-detail-action-group--danger .ai-btn-icon:hover:not(:disabled) {
+  background: #ef4444 !important;
+  border-color: #ef4444 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 10px rgba(239, 68, 68, 0.18) !important;
+}
+
+/* 起始地址一键复制卡片样式 (默认浅色) */
+.ai-task-detail-page .ai-info-url {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  cursor: pointer !important;
+  background: rgba(139, 92, 246, 0.02) !important;
+  border: 1px solid rgba(139, 92, 246, 0.08) !important;
+  color: var(--tp-primary) !important;
+  font-family: var(--tp-font-mono, monospace) !important;
+  font-weight: 500 !important;
+  padding: 8px 12px !important;
+  border-radius: 8px !important;
+  font-size: 11px !important;
+  line-height: 17px !important;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+}
+
+.ai-task-detail-page .ai-info-url:hover {
+  background: rgba(139, 92, 246, 0.06) !important;
+  border-color: rgba(139, 92, 246, 0.22) !important;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.04) !important;
+  transform: translateY(-0.5px);
+}
+
+.ai-task-detail-page .ai-info-url .url-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 8px;
+}
+
+.ai-task-detail-page .ai-info-url .copy-icon {
+  font-size: 13px !important;
+  color: rgba(139, 92, 246, 0.4) !important;
+  transition: color 0.2s !important;
+}
+
+.ai-task-detail-page .ai-info-url:hover .copy-icon {
+  color: var(--tp-primary) !important;
+}
+
+/* 小标题样式微调 (默认浅色) */
+.ai-task-detail-page .ai-info-label {
+  font-size: 10px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  font-weight: 600 !important;
+  margin-bottom: 5px !important;
+  color: var(--tp-text-subtle) !important;
+}
 
 /* 1. 仿真终端外壳 (默认浅色) */
 .ai-replay-simulator-terminal {
@@ -2527,6 +2813,124 @@ watch(
 }
 
 /* ==================== Dark Theme Overrides (html[data-theme='genart'] 赛博黑曜主题重写) ==================== */
+
+/* 0. 验证历史列表 (深色黑曜) */
+html[data-theme='genart'] .validation-history-scroll-container::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+html[data-theme='genart'] .validation-history-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(168, 85, 247, 0.3) !important;
+}
+
+html[data-theme='genart'] .validation-history-row {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.04) !important;
+}
+
+html[data-theme='genart'] .validation-history-row:hover {
+  background: rgba(168, 85, 247, 0.06) !important;
+  border-color: rgba(168, 85, 247, 0.2) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4) !important;
+}
+
+html[data-theme='genart'] .validation-history-row .history-time-col {
+  color: #9ca3af !important;
+}
+
+html[data-theme='genart'] .validation-history-row .history-user-col,
+html[data-theme='genart'] .validation-history-row .history-duration-col,
+html[data-theme='genart'] .validation-history-row .history-steps-col {
+  color: #6b7280 !important;
+}
+
+html[data-theme='genart'] .validation-history-row .history-meta-icon {
+  color: #4b5563 !important;
+}
+
+/* 顶部操作区、标题与按钮高保真优化 (深色黑曜) */
+html[data-theme='genart'] .ai-task-detail-page .ai-detail-back-icon {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  color: #a0aec0 !important;
+}
+
+html[data-theme='genart'] .ai-task-detail-page .ai-detail-back-icon:hover {
+  background: var(--tp-primary) !important;
+  border-color: var(--tp-primary) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.3) !important;
+}
+
+html[data-theme='genart'] .ai-task-detail-page .ai-mode-tag.recording {
+  background: rgba(168, 85, 247, 0.15) !important;
+  color: #c084fc !important;
+  border: 1px solid rgba(168, 85, 247, 0.25) !important;
+}
+
+html[data-theme='genart'] .ai-task-detail-actions .ai-btn-secondary {
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  color: #e2e8f0 !important;
+}
+
+html[data-theme='genart'] .ai-task-detail-actions .ai-btn-secondary .material-symbols-outlined {
+  color: #f87171 !important;
+}
+
+html[data-theme='genart'] .ai-task-detail-actions .ai-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+html[data-theme='genart'] .ai-task-detail-page .ai-detail-action-group .ai-btn-icon {
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  background: rgba(255, 255, 255, 0.01) !important;
+  color: #a0aec0 !important;
+}
+
+html[data-theme='genart'] .ai-task-detail-page .ai-detail-action-group .ai-btn-icon:hover {
+  background: rgba(168, 85, 247, 0.12) !important;
+  border-color: #a855f7 !important;
+  color: #ffffff !important;
+}
+
+html[data-theme='genart'] .ai-task-detail-page .ai-detail-action-group--danger .ai-btn-icon {
+  border-color: rgba(239, 68, 68, 0.2) !important;
+  background: rgba(239, 68, 68, 0.05) !important;
+  color: #f87171 !important;
+}
+
+html[data-theme='genart'] .ai-task-detail-page .ai-detail-action-group--danger .ai-btn-icon:hover {
+  background: #ef4444 !important;
+  border-color: #ef4444 !important;
+  color: #ffffff !important;
+}
+
+/* 起始地址一键复制卡片样式 (深色黑曜) */
+html[data-theme='genart'] .ai-task-detail-page .ai-info-url {
+  background: rgba(255, 255, 255, 0.01) !important;
+  border: 1px solid rgba(255, 255, 255, 0.04) !important;
+  color: #adc6ff !important;
+}
+
+html[data-theme='genart'] .ai-task-detail-page .ai-info-url:hover {
+  background: rgba(168, 85, 247, 0.06) !important;
+  border-color: rgba(168, 85, 247, 0.2) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+html[data-theme='genart'] .ai-task-detail-page .ai-info-url .copy-icon {
+  color: rgba(255, 255, 255, 0.25) !important;
+}
+
+html[data-theme='genart'] .ai-task-detail-page .ai-info-url:hover .copy-icon {
+  color: #adc6ff !important;
+}
+
+/* 小标题样式微调 (深色黑曜) */
+html[data-theme='genart'] .ai-task-detail-page .ai-info-label {
+  color: rgba(255, 255, 255, 0.35) !important;
+}
 
 /* 1. 仿真终端外壳 (深色黑曜) */
 html[data-theme='genart'] .ai-replay-simulator-terminal {
