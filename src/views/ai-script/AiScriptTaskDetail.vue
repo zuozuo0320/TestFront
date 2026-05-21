@@ -1569,11 +1569,67 @@ watch(
               </div>
               <div class="viewport-hud-grid"></div>
               <div class="viewport-laser-line"></div>
+
+              <!-- 仿真浏览器主体 -->
+              <div class="mock-browser">
+                <!-- 浏览器标题栏与控制纽 -->
+                <div class="mock-browser-header">
+                  <div class="mock-browser-dots">
+                    <span class="dot red"></span>
+                    <span class="dot yellow"></span>
+                    <span class="dot green"></span>
+                  </div>
+                  <div class="mock-browser-url">
+                    <span class="material-symbols-outlined secure-icon">lock</span>
+                    <span class="url-text">localhost:5173/cases/review</span>
+                  </div>
+                </div>
+
+                <!-- 模拟浏览器内容区 -->
+                <div class="mock-browser-content">
+                  <!-- 模拟侧边栏 -->
+                  <div class="mock-sidebar">
+                    <div class="sidebar-item active"></div>
+                    <div class="sidebar-item"></div>
+                    <div class="sidebar-item"></div>
+                  </div>
+                  <!-- 模拟主工作区（增加滚动和多步骤包裹） -->
+                  <div class="mock-main-scroll-viewport">
+                    <div class="mock-main">
+                      <div class="mock-card bento-1">
+                        <div class="skeleton-line title"></div>
+                        <div class="skeleton-line text"></div>
+                        <!-- Bounding Box AI 瞄准框 -->
+                        <div class="ai-inspect-box"></div>
+                      </div>
+                      <div class="mock-card bento-2">
+                        <div class="skeleton-line text-sm"></div>
+                        <!-- 模拟输入闪烁光标 -->
+                        <div class="mock-typing-cursor"></div>
+                      </div>
+                      <div class="mock-card bento-3">
+                        <div class="mock-btn-target">
+                          <span class="btn-glow-pulse"></span>
+                          <span class="btn-text">RUN TEST</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 模拟高科技瞄准器 & 鼠标指针 -->
+                  <div class="mock-target-pointer">
+                    <!-- 声呐雷达定位圈 -->
+                    <div class="pointer-radar">
+                      <div class="radar-circle rc1"></div>
+                      <div class="radar-circle rc2"></div>
+                    </div>
+                    <span class="material-symbols-outlined cursor-icon">navigation</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- HUD 状态指示层 -->
               <div class="viewport-scanner-core">
-                <div class="scanner-circle outer"></div>
-                <div class="scanner-circle middle"></div>
-                <div class="scanner-circle inner"></div>
-                <span class="material-symbols-outlined scanner-icon">videocam</span>
                 <span class="scanner-label">
                   <span class="rec-dot"></span>
                   BROWSER PLAYBACK RUNNING
@@ -2031,6 +2087,812 @@ watch(
   to {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
+  }
+}
+</style>
+
+<style>
+/* ==================== Default / Light Theme Styles (默认浅色优雅白紫主题) ==================== */
+
+/* 1. 仿真取景器 HUD (默认浅色) */
+.ai-replay-simulator-viewport {
+  position: relative;
+  background: linear-gradient(135deg, #f4f1fe 0%, #fbf9ff 100%) !important;
+  border: 1px solid rgba(139, 92, 246, 0.15) !important;
+  border-radius: var(--tp-radius-lg);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 250px;
+  box-shadow: inset 0 0 35px rgba(139, 92, 246, 0.05) !important;
+}
+
+/* CRT 扫描线 (默认浅色) */
+.ai-replay-simulator-viewport::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(139, 92, 246, 0) 50%, rgba(139, 92, 246, 0.03) 50%);
+  background-size: 100% 4px;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0.35;
+}
+
+/* Vignette 镜头暗角 (默认浅色) */
+.ai-replay-simulator-viewport::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, transparent 60%, rgba(139, 92, 246, 0.06) 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* 浅色网格 */
+.ai-replay-simulator-viewport .viewport-hud-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(90deg, rgba(139, 92, 246, 0.04) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(139, 92, 246, 0.04) 1px, transparent 1px) !important;
+  background-size: 20px 20px;
+  opacity: 0.85;
+  z-index: 1;
+}
+
+/* 仿真浏览器容器 (默认浅白玻璃) */
+.ai-replay-simulator-viewport .mock-browser {
+  width: 82%;
+  height: 175px;
+  background: rgba(255, 255, 255, 0.88) !important;
+  border: 1.5px solid rgba(139, 92, 246, 0.2) !important;
+  border-radius: 12px;
+  box-shadow:
+    0 12px 30px rgba(139, 92, 246, 0.08),
+    0 0 15px rgba(139, 92, 246, 0.03) !important;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 2;
+  position: relative;
+  backdrop-filter: blur(8px);
+  animation: mock-browser-flicker 16s ease-in-out infinite !important;
+}
+
+/* 模拟浏览器头部 (默认浅色) */
+.ai-replay-simulator-viewport .mock-browser-header {
+  height: 32px;
+  background: rgba(243, 244, 248, 0.95) !important;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.12) !important;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--tp-space-3);
+  gap: var(--tp-space-4);
+  flex-shrink: 0;
+}
+
+/* 模拟三个控制小圆点 */
+.ai-replay-simulator-viewport .mock-browser-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.ai-replay-simulator-viewport .mock-browser-dots .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.ai-replay-simulator-viewport .mock-browser-dots .dot.red {
+  background: #ff5f56;
+}
+.ai-replay-simulator-viewport .mock-browser-dots .dot.yellow {
+  background: #ffbd2e;
+}
+.ai-replay-simulator-viewport .mock-browser-dots .dot.green {
+  background: #27c93f;
+}
+
+/* 模拟 URL 输入框 (默认浅色) */
+.ai-replay-simulator-viewport .mock-browser-url {
+  flex-grow: 1;
+  max-width: 240px;
+  height: 20px;
+  background: #ffffff !important;
+  border: 1px solid rgba(139, 92, 246, 0.18) !important;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  gap: 4px;
+  color: #4b5563 !important;
+  transition: all 0.4s ease;
+  animation: mock-url-focus 16s infinite !important;
+}
+
+.ai-replay-simulator-viewport .mock-browser-url .secure-icon {
+  font-size: 11px;
+  color: #10b981;
+}
+
+.ai-replay-simulator-viewport .mock-browser-url .url-text {
+  font-size: 10px;
+  font-family: var(--tp-font-mono, monospace);
+  letter-spacing: 0.2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 模拟页面内容 */
+.ai-replay-simulator-viewport .mock-browser-content {
+  flex-grow: 1;
+  display: flex;
+  position: relative;
+  background: #ffffff !important;
+}
+
+/* 模拟侧边栏 (默认浅色) */
+.ai-replay-simulator-viewport .mock-sidebar {
+  width: 40px;
+  border-right: 1px solid rgba(139, 92, 246, 0.08) !important;
+  background: rgba(245, 243, 255, 0.5) !important;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 4px;
+  gap: 6px;
+  align-items: center;
+}
+
+.ai-replay-simulator-viewport .mock-sidebar .sidebar-item {
+  width: 100%;
+  height: 8px;
+  border-radius: 3px;
+  background: rgba(139, 92, 246, 0.08) !important;
+}
+
+.ai-replay-simulator-viewport .mock-sidebar .sidebar-item.active {
+  background: linear-gradient(90deg, var(--tp-primary), var(--tp-secondary));
+  box-shadow: 0 0 6px var(--tp-primary-shadow);
+}
+
+/* 模拟滚动容器 */
+.ai-replay-simulator-viewport .mock-main-scroll-viewport {
+  flex-grow: 1;
+  overflow: hidden;
+  position: relative;
+  height: 100%;
+}
+
+.ai-replay-simulator-viewport .mock-main {
+  flex-grow: 1;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+  animation: mock-content-scroll-step 16s cubic-bezier(0.25, 1, 0.5, 1) infinite !important;
+}
+
+/* 模拟卡片组件 (默认浅色) */
+.ai-replay-simulator-viewport .mock-card {
+  background: rgba(248, 249, 250, 0.92) !important;
+  border: 1px solid rgba(139, 92, 246, 0.06) !important;
+  border-radius: 6px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  position: relative;
+  transition: all 0.4s ease;
+}
+
+.ai-replay-simulator-viewport .skeleton-line {
+  height: 6px;
+  background: rgba(139, 92, 246, 0.07) !important;
+  border-radius: 3px;
+  animation: mock-skeleton-pulse 1.8s ease-in-out infinite !important;
+}
+
+.ai-replay-simulator-viewport .skeleton-line.title {
+  width: 60%;
+  height: 8px;
+  background: rgba(139, 92, 246, 0.14) !important;
+}
+
+.ai-replay-simulator-viewport .skeleton-line.text {
+  width: 85%;
+}
+
+.ai-replay-simulator-viewport .skeleton-line.text-sm {
+  width: 45%;
+}
+
+/* 1. 卡片1 瞄准定位动画 (0s - 3s) */
+.ai-replay-simulator-viewport .mock-card.bento-1 {
+  animation: mock-bento1-active 16s infinite !important;
+}
+
+.ai-replay-simulator-viewport .ai-inspect-box {
+  position: absolute;
+  inset: 0;
+  border: 1.5px solid var(--tp-primary);
+  border-radius: 6px;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 8px var(--tp-primary-shadow);
+  animation: mock-inspect-pulse 16s infinite !important;
+}
+
+/* 2. 卡片2 打字状态绑定 (3s - 6s) */
+.ai-replay-simulator-viewport .mock-card.bento-2 {
+  animation: mock-bento2-active 16s infinite !important;
+}
+
+.ai-replay-simulator-viewport .mock-typing-cursor {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 2px;
+  height: 10px;
+  background: var(--tp-secondary);
+  opacity: 0;
+  animation: mock-cursor-blink 16s infinite !important;
+}
+
+/* 4. 按钮点击高亮 (9s - 12s) */
+.ai-replay-simulator-viewport .mock-btn-target {
+  align-self: center;
+  width: 100%;
+  height: 24px;
+  border: 1px solid var(--tp-primary);
+  border-radius: 4px;
+  background: rgba(139, 92, 246, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  color: var(--tp-primary);
+  text-shadow: none;
+  position: relative;
+  overflow: hidden;
+  animation: mock-btn-click 16s infinite !important;
+}
+
+.ai-replay-simulator-viewport .btn-glow-pulse {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transform: translateX(-100%);
+  animation: mock-btn-sweep 2.4s infinite !important;
+}
+
+/* 5. 鼠标飞行航线控制 (默认品牌紫色指针) */
+.ai-replay-simulator-viewport .mock-target-pointer {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  z-index: 10;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  animation: mock-pointer-path 16s cubic-bezier(0.25, 1, 0.5, 1) infinite !important;
+}
+
+.ai-replay-simulator-viewport .cursor-icon {
+  font-size: 14px;
+  color: var(--tp-primary) !important;
+  transform: rotate(-35deg);
+  filter: drop-shadow(0 2px 4px rgba(139, 92, 246, 0.2)) !important;
+  z-index: 12;
+}
+
+.ai-replay-simulator-viewport .pointer-radar {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 11;
+}
+
+.ai-replay-simulator-viewport .radar-circle {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid var(--tp-primary);
+  pointer-events: none;
+  opacity: 0;
+}
+
+.ai-replay-simulator-viewport .radar-circle.rc1 {
+  animation: mock-radar-ping 16s infinite !important;
+}
+
+.ai-replay-simulator-viewport .radar-circle.rc2 {
+  border-style: dashed;
+  animation: mock-radar-ping-delayed 16s infinite !important;
+}
+
+/* 垂直扫描激光 (浅色) */
+.ai-replay-simulator-viewport .viewport-laser-line {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 2.5px;
+  background: linear-gradient(90deg, transparent, var(--tp-primary), transparent);
+  box-shadow: 0 0 10px var(--tp-primary);
+  animation: ai-viewport-laser 3.5s cubic-bezier(0.4, 0, 0.2, 1) infinite !important;
+  opacity: 0.65;
+  z-index: 3;
+}
+
+/* 底部状态指示条 (默认浅色) */
+.ai-replay-simulator-viewport .viewport-scanner-core {
+  position: absolute;
+  bottom: 12px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff !important;
+  border: 1px solid rgba(139, 92, 246, 0.15) !important;
+  border-radius: 20px;
+  padding: 4px 14px;
+  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.08) !important;
+  backdrop-filter: blur(8px);
+}
+
+.ai-replay-simulator-viewport .scanner-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tp-space-2);
+  font-size: var(--tp-text-xs);
+  color: var(--tp-primary) !important;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-shadow: none !important;
+}
+
+.ai-replay-simulator-viewport .rec-dot {
+  width: 6.5px;
+  height: 6.5px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow:
+    0 0 4px #ef4444,
+    0 0 8px #ef4444;
+  animation: ai-rec-blink 0.8s infinite alternate !important;
+}
+
+/* ==================== Dark Theme Overrides (html[data-theme='genart'] 赛博黑曜主题重写) ==================== */
+
+html[data-theme='genart'] .ai-replay-simulator-viewport {
+  background: linear-gradient(135deg, #090a10 0%, #111422 100%) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.8) !important;
+}
+
+html[data-theme='genart'] .ai-replay-simulator-viewport::before {
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%) !important;
+  opacity: 0.45;
+}
+
+html[data-theme='genart'] .ai-replay-simulator-viewport::after {
+  background: radial-gradient(
+    circle at 50% 50%,
+    transparent 55%,
+    rgba(0, 0, 0, 0.55) 100%
+  ) !important;
+}
+
+html[data-theme='genart'] .ai-replay-simulator-viewport .viewport-hud-grid {
+  background-image:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px) !important;
+  opacity: 0.85 !important;
+}
+
+html[data-theme='genart'] .ai-replay-simulator-viewport .mock-browser {
+  background: rgba(10, 11, 18, 0.85) !important;
+  border: 1.5px solid rgba(168, 85, 247, 0.25) !important;
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.6),
+    0 0 20px rgba(168, 85, 247, 0.1) !important;
+}
+
+html[data-theme='genart'] .ai-replay-simulator-viewport .mock-browser-header {
+  background: rgba(20, 21, 35, 0.9) !important;
+  border-bottom: 1px solid rgba(168, 85, 247, 0.2) !important;
+}
+
+html[data-theme='genart'] .ai-replay-simulator-viewport .mock-browser-url {
+  background: rgba(10, 11, 18, 0.7) !important;
+  border: 1px solid rgba(168, 85, 247, 0.15) !important;
+  color: rgba(255, 255, 255, 0.55) !important;
+}
+
+html[data-theme='genart'] .ai-replay-simulator-viewport .mock-browser-content {
+  background: rgba(8, 9, 15, 0.95) !important;
+}
+
+html[data-theme='genart'] .ai-replay-simulator-viewport .mock-sidebar {
+  border-right: 1px solid rgba(255, 255, 255, 0.03) !important;
+  background: rgba(13, 14, 25, 0.5) !important;
+}
+
+html[data-theme='genart'] .ai-replay-simulator-viewport .mock-sidebar .sidebar-item {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+html[data-theme='genart'] .ai-replay-simulator-viewport .mock-card {
+  background: rgba(18, 19, 30, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.04) !important;
+}
+
+html[data-theme='genart'] .ai-replay-simulator-viewport .skeleton-line {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+html[data-theme='genart'] .ai-replay-simulator-viewport .skeleton-line.title {
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+html[data-theme='genart'] .ai-replay-simulator-viewport .mock-btn-target {
+  background: rgba(168, 85, 247, 0.12) !important;
+  text-shadow: 0 0 4px var(--tp-primary-shadow) !important;
+}
+
+html[data-theme='genart'] .ai-replay-simulator-viewport .cursor-icon {
+  color: #ffffff !important;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5)) !important;
+}
+
+html[data-theme='genart'] .ai-replay-simulator-viewport .viewport-laser-line {
+  box-shadow: 0 0 14px var(--tp-primary) !important;
+  opacity: 0.8;
+}
+
+html[data-theme='genart'] .ai-replay-simulator-viewport .viewport-scanner-core {
+  background: rgba(18, 19, 30, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important;
+}
+
+html[data-theme='genart'] .ai-replay-simulator-viewport .scanner-label {
+  color: #ffffff !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.4) !important;
+}
+
+/* ─── 统一 16s 强同步时间轴关键帧 ─── */
+
+/* 1. 鼠标 16 秒飞行航线 */
+@keyframes mock-pointer-path {
+  0%,
+  10% {
+    /* 停在 Bento 1 (0s - 1.6s) */
+    top: 45%;
+    left: 20%;
+  }
+  22% {
+    /* 飞达 Bento 2 */
+    top: 50%;
+    left: 55%;
+  }
+  32% {
+    /* 停在 Bento 2 打字 (3.5s - 5.1s) */
+    top: 50%;
+    left: 55%;
+  }
+  44% {
+    /* 飞达 URL 框 */
+    top: -12px;
+    left: 45%;
+  }
+  53% {
+    /* 停在 URL 框 (7s - 8.5s) */
+    top: -12px;
+    left: 45%;
+  }
+  63% {
+    /* 飞达目标按钮 */
+    top: 55%;
+    left: 78%;
+  }
+  64.3% {
+    /* 按钮按下瞬间 (第10.3s) */
+    top: 55%;
+    left: 78%;
+    transform: scale(0.85);
+  }
+  72% {
+    /* 停留 */
+    top: 55%;
+    left: 78%;
+    transform: scale(1);
+  }
+  84% {
+    /* 移开到中下观察区 */
+    top: 75%;
+    left: 50%;
+  }
+  94% {
+    /* 飞回起始过渡区 */
+    top: 45%;
+    left: 20%;
+  }
+  100% {
+    top: 45%;
+    left: 20%;
+  }
+}
+
+/* 2. Bento 1 高亮定位动画 */
+@keyframes mock-bento1-active {
+  0%,
+  15% {
+    /* 0s - 2.4s 间高亮 */
+    border-color: rgba(139, 92, 246, 0.6) !important;
+    box-shadow: 0 0 10px rgba(139, 92, 246, 0.2) !important;
+  }
+  20%,
+  100% {
+    border-color: rgba(139, 92, 246, 0.08) !important;
+    box-shadow: none !important;
+  }
+}
+
+@keyframes mock-inspect-pulse {
+  0%,
+  5% {
+    opacity: 0.9;
+    transform: scale(1.02);
+  }
+  10% {
+    opacity: 0.5;
+    transform: scale(0.98);
+  }
+  15% {
+    opacity: 0;
+  }
+  16%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* 3. Bento 2 表单键入动画 */
+@keyframes mock-bento2-active {
+  21%,
+  33% {
+    /* 3.3s - 5.3s 间激活 */
+    border-color: rgba(139, 92, 246, 0.5) !important;
+    background: rgba(139, 92, 246, 0.04) !important;
+    box-shadow: 0 0 8px rgba(139, 92, 246, 0.12) !important;
+  }
+  0%,
+  20%,
+  35%,
+  100% {
+    border-color: rgba(139, 92, 246, 0.08) !important;
+    background: rgba(248, 249, 250, 0.92) !important;
+    box-shadow: none !important;
+  }
+}
+
+@keyframes mock-cursor-blink {
+  21%,
+  33% {
+    opacity: 1;
+    animation: steps(2) infinite alternate;
+  }
+  0%,
+  20%,
+  34%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* 4. URL 框重新聚焦加载动画 */
+@keyframes mock-url-focus {
+  43%,
+  54% {
+    /* 6.8s - 8.6s 间激活 */
+    border-color: rgba(139, 92, 246, 0.5) !important;
+    box-shadow: 0 0 8px rgba(139, 92, 246, 0.12) !important;
+  }
+  0%,
+  42%,
+  55%,
+  100% {
+    border-color: rgba(139, 92, 246, 0.18) !important;
+    box-shadow: none !important;
+  }
+}
+
+/* 5. 目标测试执行点击 (第 10.3 秒触发) */
+@keyframes mock-btn-click {
+  0%,
+  63% {
+    /* 点击前：普通测试就绪态 */
+    background: rgba(139, 92, 246, 0.08) !important;
+    border-color: var(--tp-primary) !important;
+    color: var(--tp-primary) !important;
+    transform: scale(1) !important;
+  }
+  64.3%,
+  71.5% {
+    /* 按下并释放瞬间 */
+    background: var(--tp-primary) !important;
+    border-color: #7c3aed !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 12px rgba(139, 92, 246, 0.4) !important;
+    transform: scale(0.95) !important;
+  }
+  72%,
+  84% {
+    /* 11.5s - 13.5s 成功状态常驻 */
+    background: rgba(16, 185, 129, 0.15) !important;
+    border-color: #10b981 !important;
+    color: #10b981 !important;
+    transform: scale(1) !important;
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.2) !important;
+  }
+  85%,
+  100% {
+    /* 13.6s 页面离开或复位 */
+    background: rgba(139, 92, 246, 0.08) !important;
+    border-color: var(--tp-primary) !important;
+    color: var(--tp-primary) !important;
+    transform: scale(1) !important;
+    box-shadow: none !important;
+  }
+}
+
+/* 6. 精准点击声呐冲击圈 */
+@keyframes mock-radar-ping {
+  0%,
+  63% {
+    width: 4px;
+    height: 4px;
+    opacity: 0;
+  }
+  64.3% {
+    /* 精准在 10.3s 的 64.3% 帧引爆第一个脉冲 */
+    width: 8px;
+    height: 8px;
+    opacity: 0.95;
+  }
+  74% {
+    width: 32px;
+    height: 32px;
+    opacity: 0;
+  }
+  100% {
+    width: 32px;
+    height: 32px;
+    opacity: 0;
+  }
+}
+
+@keyframes mock-radar-ping-delayed {
+  0%,
+  64.5% {
+    width: 4px;
+    height: 4px;
+    opacity: 0;
+  }
+  66% {
+    /* 稍滞后一点引爆第二个虚线脉冲 */
+    width: 10px;
+    height: 10px;
+    opacity: 0.75;
+  }
+  80% {
+    width: 60px;
+    height: 60px;
+    opacity: 0;
+  }
+  100% {
+    width: 60px;
+    height: 60px;
+    opacity: 0;
+  }
+}
+
+/* 7. 点击成功后，页面向下滚动，进行底层元素 Assert 校验 (12s - 15s) */
+@keyframes mock-content-scroll-step {
+  0%,
+  75% {
+    /* 前 12 秒稳在顶部 */
+    transform: translateY(0);
+  }
+  80%,
+  93% {
+    /* 12.8s - 14.8s 页面滚动断言 */
+    transform: translateY(-22px);
+  }
+  96%,
+  100% {
+    /* 复位 */
+    transform: translateY(0);
+  }
+}
+
+/* 按钮微弱反光掠过 */
+@keyframes mock-btn-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* 骨架条呼吸 */
+@keyframes mock-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+/* 整体扫描器 CRT 荧光抖动 */
+@keyframes mock-browser-flicker {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  35% {
+    filter: brightness(1.02);
+  }
+  36% {
+    filter: brightness(0.98);
+  }
+  37% {
+    filter: brightness(1.01);
+  }
+  85% {
+    filter: brightness(1);
+  }
+  86% {
+    filter: brightness(0.97);
+  }
+  87% {
+    filter: brightness(1.03);
+  }
+}
+
+/* 底部状态指示灯闪烁 */
+@keyframes ai-rec-blink {
+  0% {
+    opacity: 0.25;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* 垂直紫光栅格激光扫描动画 */
+@keyframes ai-viewport-laser {
+  0% {
+    top: 0%;
+  }
+  50% {
+    top: 100%;
+  }
+  100% {
+    top: 0%;
   }
 }
 </style>

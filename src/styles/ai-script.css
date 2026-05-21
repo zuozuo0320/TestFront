@@ -6879,83 +6879,261 @@ html[data-theme='genart'] .ai-replay-simulator-viewport .viewport-hud-grid {
   }
 }
 
-/* 声呐雷达核心 */
-.ai-replay-simulator-viewport .viewport-scanner-core {
-  position: relative;
-  z-index: 3;
+/* 仿真浏览器容器 */
+.ai-replay-simulator-viewport .mock-browser {
+  width: 82%;
+  height: 175px;
+  background: rgba(10, 11, 18, 0.85);
+  border: 1.5px solid rgba(168, 85, 247, 0.25);
+  border-radius: 12px;
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.6),
+    0 0 20px rgba(168, 85, 247, 0.1);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  z-index: 2;
+  position: relative;
+  backdrop-filter: blur(4px);
+  animation: mock-browser-flicker 8s ease-in-out infinite;
+}
+
+/* 模拟浏览器头部 */
+.ai-replay-simulator-viewport .mock-browser-header {
+  height: 32px;
+  background: rgba(20, 21, 35, 0.9);
+  border-bottom: 1px solid rgba(168, 85, 247, 0.2);
+  display: flex;
   align-items: center;
+  padding: 0 var(--tp-space-3);
   gap: var(--tp-space-4);
+  flex-shrink: 0;
 }
 
-.ai-replay-simulator-viewport .scanner-circle {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+/* 模拟三个控制小圆点 */
+.ai-replay-simulator-viewport .mock-browser-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.ai-replay-simulator-viewport .mock-browser-dots .dot {
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  pointer-events: none;
+}
+.ai-replay-simulator-viewport .mock-browser-dots .dot.red {
+  background: #ff5f56;
+}
+.ai-replay-simulator-viewport .mock-browser-dots .dot.yellow {
+  background: #ffbd2e;
+}
+.ai-replay-simulator-viewport .mock-browser-dots .dot.green {
+  background: #27c93f;
 }
 
-/* 声呐扩张水波纹特效 */
-.ai-replay-simulator-viewport .scanner-circle.outer {
-  width: 54px;
-  height: 54px;
-  border: 1.5px solid var(--tp-primary);
-  animation: ai-sonar-ripple 2.4s cubic-bezier(0.1, 0.8, 0.1, 1) infinite;
+/* 模拟 URL 输入框 */
+.ai-replay-simulator-viewport .mock-browser-url {
+  flex-grow: 1;
+  max-width: 240px;
+  height: 20px;
+  background: rgba(10, 11, 18, 0.7);
+  border: 1px solid rgba(168, 85, 247, 0.15);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  gap: 4px;
+  color: rgba(255, 255, 255, 0.55);
 }
 
-.ai-replay-simulator-viewport .scanner-circle.middle {
-  width: 54px;
-  height: 54px;
-  border: 1.5px solid var(--tp-secondary);
-  animation: ai-sonar-ripple 2.4s cubic-bezier(0.1, 0.8, 0.1, 1) infinite;
-  animation-delay: 0.8s;
+.ai-replay-simulator-viewport .mock-browser-url .secure-icon {
+  font-size: 11px;
+  color: #10b981;
 }
 
-.ai-replay-simulator-viewport .scanner-circle.inner {
-  width: 54px;
-  height: 54px;
-  border: 1.5px solid var(--tp-primary);
-  animation: ai-sonar-ripple 2.4s cubic-bezier(0.1, 0.8, 0.1, 1) infinite;
-  animation-delay: 1.6s;
+.ai-replay-simulator-viewport .mock-browser-url .url-text {
+  font-size: 10px;
+  font-family: var(--tp-font-mono, monospace);
+  letter-spacing: 0.2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-@keyframes ai-sonar-ripple {
-  0% {
-    width: 45px;
-    height: 45px;
-    opacity: 0.8;
-    transform: translate(-50%, -50%) scale(1);
-    box-shadow: 0 0 4px var(--tp-primary-shadow);
-  }
-  100% {
-    width: 140px;
-    height: 140px;
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(1.6);
-    box-shadow: 0 0 16px transparent;
-  }
+/* 模拟页面内容 */
+.ai-replay-simulator-viewport .mock-browser-content {
+  flex-grow: 1;
+  display: flex;
+  position: relative;
+  background: rgba(8, 9, 15, 0.95);
 }
 
-.ai-replay-simulator-viewport .scanner-icon {
-  font-size: 30px;
+/* 模拟侧边栏 */
+.ai-replay-simulator-viewport .mock-sidebar {
+  width: 40px;
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
+  background: rgba(13, 14, 25, 0.5);
+  display: flex;
+  flex-direction: column;
+  padding: 8px 4px;
+  gap: 6px;
+  align-items: center;
+}
+
+.ai-replay-simulator-viewport .mock-sidebar .sidebar-item {
+  width: 100%;
+  height: 8px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.ai-replay-simulator-viewport .mock-sidebar .sidebar-item.active {
+  background: linear-gradient(90deg, var(--tp-primary), var(--tp-secondary));
+  box-shadow: 0 0 6px var(--tp-primary-shadow);
+}
+
+/* 模拟主屏区 */
+.ai-replay-simulator-viewport .mock-main {
+  flex-grow: 1;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+/* 模拟卡片组件 */
+.ai-replay-simulator-viewport .mock-card {
+  background: rgba(18, 19, 30, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.ai-replay-simulator-viewport .skeleton-line {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  animation: mock-skeleton-pulse 1.8s ease-in-out infinite;
+}
+
+.ai-replay-simulator-viewport .skeleton-line.title {
+  width: 60%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.ai-replay-simulator-viewport .skeleton-line.text {
+  width: 85%;
+}
+
+.ai-replay-simulator-viewport .skeleton-line.text-sm {
+  width: 45%;
+}
+
+/* 模拟被点击的目标按钮 */
+.ai-replay-simulator-viewport .mock-btn-target {
+  align-self: center;
+  width: 100%;
+  height: 24px;
+  border: 1px solid var(--tp-primary);
+  border-radius: 4px;
+  background: rgba(168, 85, 247, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
   color: var(--tp-primary);
-  filter: drop-shadow(0 0 8px var(--tp-primary));
-  animation: ai-recording-icon-blink 1.2s infinite alternate;
-  z-index: 4;
+  text-shadow: 0 0 4px var(--tp-primary-shadow);
+  position: relative;
+  animation: mock-btn-click 4.8s infinite;
+  overflow: hidden;
 }
 
-@keyframes ai-recording-icon-blink {
-  0% {
-    opacity: 0.45;
-    transform: scale(0.92);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1.08);
-  }
+.ai-replay-simulator-viewport .btn-glow-pulse {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+  transform: translateX(-100%);
+  animation: mock-btn-sweep 2.4s infinite;
+}
+
+/* 模拟鼠标指针与高级雷达十字线 */
+.ai-replay-simulator-viewport .mock-target-pointer {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  z-index: 10;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  animation: mock-pointer-path 4.8s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+}
+
+/* 鼠标指针图标 */
+.ai-replay-simulator-viewport .cursor-icon {
+  font-size: 14px;
+  color: #ffffff;
+  transform: rotate(-35deg);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  z-index: 12;
+}
+
+/* 指针跟随的雷达声呐环 */
+.ai-replay-simulator-viewport .pointer-radar {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 11;
+}
+
+.ai-replay-simulator-viewport .radar-circle {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid var(--tp-primary);
+  pointer-events: none;
+  opacity: 0;
+}
+
+.ai-replay-simulator-viewport .radar-circle.rc1 {
+  width: 24px;
+  height: 24px;
+  animation: mock-radar-ping 4.8s infinite;
+}
+
+.ai-replay-simulator-viewport .radar-circle.rc2 {
+  width: 44px;
+  height: 44px;
+  border-style: dashed;
+  animation: mock-radar-ping-delayed 4.8s infinite;
+}
+
+/* 底部状态指示条层 */
+.ai-replay-simulator-viewport .viewport-scanner-core {
+  position: absolute;
+  bottom: 12px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(18, 19, 30, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  padding: 4px 14px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
 }
 
 .ai-replay-simulator-viewport .scanner-label {
@@ -6978,6 +7156,167 @@ html[data-theme='genart'] .ai-replay-simulator-viewport .viewport-hud-grid {
     0 0 4px #ef4444,
     0 0 10px #ef4444;
   animation: ai-rec-blink 0.8s infinite alternate;
+}
+
+/* ─── 关键帧动画部分 ─── */
+
+/* 1. 模拟鼠标路径 */
+@keyframes mock-pointer-path {
+  0% {
+    top: 50%;
+    left: 45%;
+  }
+  25% {
+    top: 35%;
+    left: 65%;
+  }
+  50% {
+    top: 58%;
+    left: 80%;
+  }
+  62% {
+    top: 58%;
+    left: 80%;
+    transform: scale(0.85);
+  }
+  85% {
+    top: 30%;
+    left: 20%;
+  }
+  100% {
+    top: 50%;
+    left: 45%;
+  }
+}
+
+/* 2. 模拟按钮点击效果 */
+@keyframes mock-btn-click {
+  0%,
+  48% {
+    background: rgba(168, 85, 247, 0.12);
+    border-color: var(--tp-primary);
+    color: var(--tp-primary);
+    transform: scale(1);
+  }
+  50%,
+  62% {
+    background: var(--tp-primary);
+    border-color: #a855f7;
+    color: #ffffff;
+    box-shadow: 0 0 12px rgba(168, 85, 247, 0.6);
+    transform: scale(0.95);
+  }
+  65%,
+  82% {
+    background: rgba(16, 185, 129, 0.2);
+    border-color: #10b981;
+    color: #10b981;
+    transform: scale(1);
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+  }
+  85%,
+  100% {
+    background: rgba(168, 85, 247, 0.12);
+    border-color: var(--tp-primary);
+    color: var(--tp-primary);
+    transform: scale(1);
+  }
+}
+
+/* 3. 雷达声呐环脉冲 */
+@keyframes mock-radar-ping {
+  0%,
+  48% {
+    width: 4px;
+    height: 4px;
+    opacity: 0;
+  }
+  50% {
+    width: 8px;
+    height: 8px;
+    opacity: 0.95;
+  }
+  65% {
+    width: 32px;
+    height: 32px;
+    opacity: 0;
+  }
+  100% {
+    width: 32px;
+    height: 32px;
+    opacity: 0;
+  }
+}
+
+@keyframes mock-radar-ping-delayed {
+  0%,
+  52% {
+    width: 4px;
+    height: 4px;
+    opacity: 0;
+  }
+  54% {
+    width: 10px;
+    height: 10px;
+    opacity: 0.75;
+  }
+  75% {
+    width: 60px;
+    height: 60px;
+    opacity: 0;
+  }
+  100% {
+    width: 60px;
+    height: 60px;
+    opacity: 0;
+  }
+}
+
+/* 4. 按钮光芒闪烁 */
+@keyframes mock-btn-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* 5. 模拟骨架屏呼吸 */
+@keyframes mock-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+/* 6. 浏览器闪烁（模拟荧光感） */
+@keyframes mock-browser-flicker {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  45% {
+    filter: brightness(1.02);
+  }
+  46% {
+    filter: brightness(0.97);
+  }
+  47% {
+    filter: brightness(1.01);
+  }
+  92% {
+    filter: brightness(1);
+  }
+  93% {
+    filter: brightness(0.98);
+  }
+  94% {
+    filter: brightness(1.03);
+  }
 }
 
 @keyframes ai-rec-blink {
