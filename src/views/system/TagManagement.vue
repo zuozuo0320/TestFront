@@ -3,7 +3,7 @@
  * 标签管理页面 — 页面编排层
  *
  * 职责：仅组合子组件 + 注入 Composable，严禁包含业务逻辑。
- * 子组件：TagHeatGrid / TagBatchPanel / TagListRow / TagFormDialog
+ * 子组件：TagBatchPanel / TagListRow / TagFormDialog
  * 业务逻辑：useTagManagement composable
  *
  * 完全参考设计图 code.html 实现右侧页面
@@ -62,17 +62,56 @@ function switchToRecent() {
   sortBy.value = 'created_at'
 }
 
-// 柱状图数据：取用例数 TOP 7
-const pulseData = computed(() => {
-  const sorted = [...tags.value].sort((a, b) => b.case_count - a.case_count).slice(0, 7)
-  const max = sorted.length > 0 ? sorted[0]?.case_count || 1 : 1
-  return sorted.map((t, i) => ({
-    name: t.name,
-    color: t.color || '#7c3aed',
-    count: t.case_count,
-    pct: Math.max(Math.round((t.case_count / max) * 100), 10),
-    isTop: i === 0,
-  }))
+// 全站绑定的总关联用例数
+const totalCases = computed(() => {
+  return tags.value.reduce((acc, t) => acc + (t.case_count || 0), 0)
+})
+
+// 计算前 5 个圆环仪表盘数据 (完全契合最新的极客遥测面板风格)
+const top5Rings = computed(() => {
+  // 获取用例数降序排列的前 5 大标签
+  const sorted = [...tags.value]
+    .sort((a, b) => (b.case_count || 0) - (a.case_count || 0))
+    .slice(0, 5)
+  const top5Total = sorted.reduce((acc, t) => acc + (t.case_count || 0), 0)
+
+  // 设计图专属 5 列配色及 Material 极客图标
+  const slotConfigs = [
+    { rank: '01', color: '#f59e0b', icon: 'shield' }, // 琥珀金/盾牌 (专享测试)
+    { rank: '02', color: '#3b82f6', icon: 'widgets' }, // 天空蓝/组件 (普通测试)
+    { rank: '03', color: '#10b981', icon: 'grid_view' }, // 翡翠绿/格子 (回归测试)
+    { rank: '04', color: '#a78bfa', icon: 'construction' }, // 罗兰紫/工具 (兼容性测试)
+    { rank: '05', color: '#38bdf8', icon: 'verified' }, // 天空蓝/安全 (安全测试)
+  ]
+
+  return slotConfigs.map((config, index) => {
+    const tag = sorted[index]
+    if (tag) {
+      const count = tag.case_count || 0
+      const pct = top5Total > 0 ? Number(((count / top5Total) * 100).toFixed(1)) : 0
+      return {
+        rank: config.rank,
+        name: tag.name,
+        color: tag.color || config.color,
+        icon:
+          getTagIcon(tag) ||
+          config.icon /* 动态获取该标签实际关联的系统自定义图标，若无则使用默认齿轮槽备用 */,
+        count,
+        pct,
+        isEmpty: false,
+      }
+    } else {
+      return {
+        rank: config.rank,
+        name: '未分配槽位',
+        color: 'rgba(255, 255, 255, 0.04)',
+        icon: 'do_not_disturb_on',
+        count: 0,
+        pct: 0,
+        isEmpty: true,
+      }
+    }
+  })
 })
 </script>
 
@@ -120,38 +159,131 @@ const pulseData = computed(() => {
         </div>
       </header>
 
-      <!-- ═══ Quality Insights Dashboard ═══ -->
+      <!-- ═══ Quality Insights Dashboard (极客 TOP 5 + 热度排行榜) ═══ -->
       <section class="tm-insights">
-        <!-- Left: Tag Coverage Pulse -->
-        <div class="tm-panel tm-panel--pulse">
+        <!-- Left Column: Circular Dials Dashboard -->
+        <div class="tm-panel tm-panel--dials-dashboard">
+          <!-- 背景网格流光微透 -->
           <div class="tm-panel-glow"></div>
-          <div class="tm-panel-head">
-            <div>
-              <h3 class="tm-panel-title">标签覆盖脉冲</h3>
-              <p class="tm-panel-desc">全局用例关联分布</p>
+
+          <!-- 1. 顶端：科技感标题栏 -->
+          <div class="tm-dials-head">
+            <div class="tm-dials-title-group">
+              <div class="tm-dials-title-row">
+                <h3 class="tm-dials-title">标签覆盖分布 TOP 5</h3>
+                <el-tooltip
+                  content="按标签绑定用例的次数降序统计前 5 名标签的分布占比"
+                  placement="top"
+                  effect="dark"
+                >
+                  <span class="material-symbols-outlined tm-dials-info-icon">help</span>
+                </el-tooltip>
+              </div>
             </div>
-            <span class="material-symbols-outlined tm-panel-icon-right">trending_up</span>
           </div>
-          <div class="tm-pulse-chart">
-            <div class="tm-pulse-bars">
-              <div v-for="(bar, i) in pulseData" :key="i" class="tm-pulse-col">
-                <div class="tm-pulse-tooltip">{{ bar.name }}: {{ bar.count }}</div>
-                <div
-                  :class="['tm-pulse-bar', { 'tm-pulse-bar--top': bar.isTop }]"
-                  :style="{ height: bar.pct + '%', '--bar-color': bar.color }"
-                ></div>
+
+          <!-- 2. 中间：5 列对称排布的数码环形仪表盘 (5-Column Tactical Dials Grid) -->
+          <div class="tm-dials-grid">
+            <div
+              v-for="(seg, idx) in top5Rings"
+              :key="'dial-' + idx"
+              class="tm-dial-item"
+              :class="{ 'is-empty': seg.isEmpty }"
+              :style="{
+                '--accent': seg.color,
+                '--accent-glow': seg.isEmpty ? 'rgba(255,255,255,0.01)' : seg.color + '40',
+              }"
+            >
+              <!-- 环形 SVG 轨道区 (半径 56, 周长 351.85, 起点为顶部正上方旋转 -90deg) -->
+              <div class="tm-dial-circle-wrapper">
+                <!-- 3D 霓虹空气流光发光内胆 aura (Glassmorphism ambient halo) -->
+                <div v-if="!seg.isEmpty" class="tm-dial-bg-glow"></div>
+
+                <svg class="tm-dial-svg" viewBox="0 0 160 160">
+                  <defs>
+                    <!-- 动态霓虹模糊发光滤镜 -->
+                    <filter :id="'glow-' + idx" x="-20%" y="-20%" width="140%" height="140%">
+                      <feGaussianBlur stdDeviation="3" result="blur" />
+                      <feMerge>
+                        <feMergeNode in="blur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
+
+                    <!-- 动态高精密圆弧遮罩，用于平滑剪裁出比例部分的 Segment 齿轨 -->
+                    <mask :id="'active-mask-' + idx">
+                      <circle
+                        cx="80"
+                        cy="80"
+                        r="56"
+                        stroke="white"
+                        stroke-width="12"
+                        fill="none"
+                        transform="rotate(-90 80 80)"
+                        stroke-dasharray="351.85"
+                        :stroke-dashoffset="351.85 * (1 - seg.pct / 100)"
+                        stroke-linecap="butt"
+                        style="transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)"
+                      />
+                    </mask>
+                  </defs>
+
+                  <!-- A. 引导圆弧背景齿轮轨道 (Muted Dashed Gear Track) -->
+                  <circle
+                    cx="80"
+                    cy="80"
+                    r="56"
+                    class="tm-dial-track"
+                    stroke-width="6.5"
+                    fill="none"
+                    stroke-dasharray="2.5 3.5"
+                  />
+
+                  <!-- B. 活跃状态流光发光齿弧轨道 (Glowing Active Dash Gear Track) -->
+                  <circle
+                    v-if="!seg.isEmpty && seg.pct > 0"
+                    cx="80"
+                    cy="80"
+                    r="56"
+                    :stroke="seg.color"
+                    stroke-width="7.5"
+                    fill="none"
+                    stroke-dasharray="2.5 3.5"
+                    :mask="'url(#active-mask-' + idx + ')'"
+                    :filter="'url(#glow-' + idx + ')'"
+                  />
+                </svg>
+
+                <!-- C. 轨道正中心多维数据核心 (Core Panel) -->
+                <div class="tm-dial-core">
+                  <!-- 图标舱 -->
+                  <div class="tm-dial-icon-container">
+                    <span class="material-symbols-outlined tm-dial-icon">{{ seg.icon }}</span>
+                  </div>
+
+                  <!-- 标签名 -->
+                  <span class="tm-dial-name">{{ seg.name }}</span>
+
+                  <!-- 使用次数 -->
+                  <span class="tm-dial-count">{{ seg.isEmpty ? '-' : seg.count }}</span>
+                </div>
               </div>
-              <div
-                v-for="n in Math.max(0, 7 - pulseData.length)"
-                :key="'e-' + n"
-                class="tm-pulse-col"
-              >
-                <div class="tm-pulse-bar" style="height: 6%"></div>
+
+              <!-- D. 轨道最下方百分比数值 (Colored Percentage Highlight) -->
+              <div class="tm-dial-pct">
+                {{ seg.isEmpty ? '0.0%' : seg.pct + '%' }}
               </div>
             </div>
+          </div>
+
+          <!-- 3. 底端：对称式仪表盘数据总览尾舱 -->
+          <div class="tm-dials-footer">
+            <span class="tm-footer-dot"></span>
+            共 {{ tags.length }} 个标签，累计使用 {{ totalCases }} 次
           </div>
         </div>
-        <!-- Right: Top 5 Heatmap -->
+
+        <!-- Right Column: Top 5 Heatmap Bar Chart (保留的核心热度统计图) -->
         <div class="tm-panel tm-panel--heat">
           <h3 class="tm-panel-title tm-heat-title">热度 Top 5</h3>
           <TagHeatGrid
@@ -488,137 +620,377 @@ const pulseData = computed(() => {
 }
 
 /* ══════════════════════════════════════════
-   Quality Insights Dashboard
+   Quality Insights Dashboard (Concentric Dials TOP 5)
    ══════════════════════════════════════════ */
 .tm-insights {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 24px;
-  padding: 0 32px;
-}
-.tm-panel {
-  background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
-  border-radius: 12px;
-  padding: 24px;
-  position: relative;
-  overflow: hidden;
-}
-.tm-panel--pulse {
-  background: var(--surface-container-low);
-}
-.tm-panel--heat {
-  background: var(--surface-container-low);
-  display: flex;
-  flex-direction: column;
-}
-.tm-panel-glow {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 256px;
-  height: 256px;
-  background: var(--primary-container);
-  border-radius: 50%;
-  mix-blend-mode: screen;
-  filter: blur(100px);
-  opacity: 0.2;
-  pointer-events: none;
-}
-.tm-panel-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 24px;
-  position: relative;
-  z-index: 1;
-}
-.tm-panel-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #fff;
-  margin: 0;
-  letter-spacing: -0.02em;
-}
-.tm-panel-desc {
-  font-size: 14px;
-  color: var(--on-surface-variant);
-  margin: 4px 0 0;
-  font-weight: 300;
-}
-.tm-panel-icon-right {
-  color: var(--secondary);
-  font-size: 24px;
-}
-.tm-panel-empty {
-  font-size: 13px;
-  color: var(--outline);
-  text-align: center;
-  padding: 40px 0;
+  display: grid !important; /* 恢复双栏排布 */
+  grid-template-columns: 2.3fr 1fr !important; /* 增加左栏宽度，给 5 个大仪表盘创造宽裕的空间 */
+  gap: 12px !important;
+  padding: 0 !important; /* 彻底取消左右 Indent 边距，让卡片横向100%填满并与底部列表边缘完美对齐 */
+  margin-bottom: 0 !important;
 }
 
-/* ── Pulse Bar Chart ── */
-.tm-pulse-chart {
-  position: relative;
-  z-index: 1;
-  margin-top: 16px;
+@media (max-width: 1200px) {
+  .tm-insights {
+    grid-template-columns: 1fr !important; /* 窄屏自动切换单列垂直堆叠 */
+    gap: 16px !important;
+  }
 }
-.tm-pulse-bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  height: 160px;
+
+.tm-panel--dials-dashboard {
+  background: var(--surface-container-low) !important;
+  border-radius: 13px !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  padding: 8px 12px !important;
+  position: relative !important;
+  overflow: hidden !important;
+  box-shadow: var(--tp-shadow-sm) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
 }
-.tm-pulse-col {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  height: 100%;
-  position: relative;
+
+.tm-panel--heat {
+  background: var(--surface-container-low) !important;
+  border-radius: 13px !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  padding: 8px 12px !important;
+  position: relative !important;
+  overflow: hidden !important;
+  box-shadow: var(--tp-shadow-sm) !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
-.tm-pulse-col:hover .tm-pulse-tooltip {
-  opacity: 1;
+
+/* 标题区域 */
+.tm-dials-head {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: flex-start !important;
+  margin-bottom: 2px !important;
+  position: relative !important;
+  z-index: 2 !important;
 }
-.tm-pulse-tooltip {
-  position: absolute;
-  top: -8px;
-  left: 50%;
-  transform: translateX(-50%) translateY(-100%);
-  font-size: 12px;
-  color: var(--secondary);
-  opacity: 0;
-  transition: opacity 0.15s;
-  white-space: nowrap;
-  pointer-events: none;
+
+.tm-dials-title-group {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
 }
-.tm-pulse-col:first-child .tm-pulse-tooltip,
-.tm-pulse-bar--top + .tm-pulse-tooltip {
-  color: var(--primary);
-  font-weight: 600;
+
+.tm-dials-title-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
 }
-.tm-pulse-bar {
-  width: 100%;
-  background: color-mix(in srgb, var(--bar-color, #958da1) 20%, transparent);
-  border-radius: 4px 4px 0 0;
-  transition:
-    height 0.6s ease,
-    background 0.2s,
-    filter 0.2s;
-  min-height: 4px;
-  border-top: 1px solid color-mix(in srgb, var(--bar-color, #958da1) 40%, transparent);
+
+.tm-dials-title {
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  margin: 0 !important;
+  letter-spacing: -0.01em !important;
 }
-.tm-pulse-bar:hover {
-  filter: brightness(1.5);
+
+.tm-dials-info-icon {
+  font-size: 16px !important;
+  color: var(--tp-text-muted) !important;
+  cursor: help !important;
+  transition: color 0.2s ease !important;
 }
-.tm-pulse-bar--top {
-  background: color-mix(in srgb, var(--bar-color) 50%, transparent);
-  border-top: 2px solid var(--bar-color);
+
+.tm-dials-info-icon:hover {
+  color: #ffffff !important;
 }
-.tm-pulse-bar--top:hover {
-  filter: brightness(1.3);
+
+.tm-dials-desc {
+  font-size: 11px !important;
+  color: var(--tp-text-muted) !important;
+  margin: 0 !important;
+  font-weight: 400 !important;
+}
+
+/* 5 列对称圆轨仪网格 (拓宽 gap，让大圆盘舒展排列) */
+.tm-dials-grid {
+  display: grid !important;
+  grid-template-columns: repeat(5, 1fr) !important;
+  gap: 16px !important;
+  width: 100% !important;
+  position: relative !important;
+  z-index: 2 !important;
+  margin: 12px 0 !important;
+}
+
+/* 单个环形仪主体舱 */
+.tm-dial-item {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+  cursor: pointer !important;
+}
+
+.tm-dial-item:hover {
+  transform: translateY(-4px) !important;
+}
+
+/* 环形包装器 (黄金比例增重放大至 138px，大幅增强视觉饱满度) */
+.tm-dial-circle-wrapper {
+  position: relative !important;
+  width: 160px !important;
+  height: 160px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.tm-dial-svg {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: visible !important;
+  transform: rotate(0deg) !important;
+}
+
+/* 中轴对称数据核心层 */
+.tm-dial-core {
+  position: absolute !important;
+  inset: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  pointer-events: none !important;
+}
+
+/* 3D 霓虹空气发光内胆 (仅在深色模式显示，浅色隐藏) */
+.tm-dial-bg-glow {
+  position: absolute !important;
+  inset: -12px !important;
+  background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%) !important;
+  opacity: 0 !important; /* 浅色模式下完全隐藏发光背景 */
+  pointer-events: none !important;
+  z-index: 0 !important;
+  transition: opacity 0.3s ease !important;
+}
+
+/* 引导圆弧背景轨道颜色 */
+.tm-dial-track {
+  stroke: rgba(0, 0, 0, 0.05) !important; /* 浅色模式采用精细冷灰轨道 */
+}
+
+/* 核心图标舱 */
+.tm-dial-icon-container {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(0, 0, 0, 0.02) !important;
+  border: 1px solid rgba(0, 0, 0, 0.04) !important;
+  margin-top: 8px !important;
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+}
+
+.tm-dial-item:not(.is-empty) .tm-dial-icon-container {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+.tm-dial-item:not(.is-empty):hover .tm-dial-icon-container {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 25%, transparent) !important;
+}
+
+.tm-dial-icon {
+  font-size: 17px !important;
+  color: var(--tp-text-disabled, #94a3b8) !important;
+  transition: all 0.3s ease !important;
+}
+
+.tm-dial-item:not(.is-empty) .tm-dial-icon {
+  color: var(--accent) !important;
+}
+
+.tm-dial-item:not(.is-empty):hover .tm-dial-icon {
+  color: #ffffff !important; /* hover 时变为白图标 */
+  transform: scale(1.1) !important;
+}
+
+/* 标签名 (浅色高对比度，超强阅读) */
+.tm-dial-name {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--tp-text-disabled, #94a3b8) !important;
+  margin-top: 4px !important;
+  max-width: 100px !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  transition: color 0.25s ease !important;
+}
+
+.tm-dial-item:not(.is-empty) .tm-dial-name {
+  color: var(--tp-text-primary, #1e293b) !important;
+}
+
+.tm-dial-item:not(.is-empty):hover .tm-dial-name {
+  color: var(--accent) !important;
+}
+
+/* 用例数量 (浅色黑底色，去阴影保证清晰度) */
+.tm-dial-count {
+  font-size: 27px !important;
+  font-weight: 800 !important;
+  color: var(--tp-text-disabled, #94a3b8) !important;
+  font-family: var(--tp-font-mono, monospace) !important;
+  line-height: 1.1 !important;
+  margin-top: 1px !important;
+  transition: all 0.3s ease !important;
+}
+
+.tm-dial-item:not(.is-empty) .tm-dial-count {
+  color: var(--tp-text-primary, #0f172a) !important;
+  text-shadow: none !important;
+}
+
+.tm-dial-item:not(.is-empty):hover .tm-dial-count {
+  color: var(--accent) !important;
+  text-shadow: none !important;
+}
+
+/* 最下方百分比 */
+.tm-dial-pct {
+  font-size: 12.5px !important;
+  font-weight: 700 !important;
+  color: var(--tp-text-disabled, #94a3b8) !important;
+  margin-top: 10px !important;
+  font-family: var(--tp-font-mono, monospace) !important;
+  transition: all 0.3s ease !important;
+}
+
+.tm-dial-item:not(.is-empty) .tm-dial-pct {
+  color: var(--accent) !important;
+  text-shadow: none !important;
+}
+
+.tm-dial-item:not(.is-empty):hover .tm-dial-pct {
+  text-shadow: none !important;
+  transform: scale(1.05) !important;
+}
+
+/* ══════════════════════════════════════════
+   黑曜深色模式专属重置 overrides (html[data-theme='genart'])
+   ══════════════════════════════════════════ */
+
+html[data-theme='genart'] .tm-dial-bg-glow {
+  opacity: 0.05 !important;
+}
+
+html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-bg-glow {
+  opacity: 0.2 !important;
+}
+
+html[data-theme='genart'] .tm-dial-track {
+  stroke: rgba(255, 255, 255, 0.03) !important;
+}
+
+html[data-theme='genart'] .tm-dial-icon-container {
+  background: rgba(255, 255, 255, 0.01) !important;
+  border: 1px solid rgba(255, 255, 255, 0.03) !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3) !important;
+}
+
+html[data-theme='genart'] .tm-dial-item:not(.is-empty) .tm-dial-icon-container {
+  background: rgba(255, 255, 255, 0.015) !important;
+  border-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-icon-container {
+  background: var(--accent-glow) !important;
+  border-color: color-mix(in oklch, var(--accent) 30%, transparent) !important;
+  box-shadow:
+    0 0 14px var(--accent-glow),
+    0 4px 10px rgba(0, 0, 0, 0.4) !important;
+}
+
+html[data-theme='genart'] .tm-dial-icon {
+  color: rgba(255, 255, 255, 0.12) !important;
+}
+
+html[data-theme='genart'] .tm-dial-item:not(.is-empty) .tm-dial-icon {
+  color: var(--accent) !important;
+}
+
+html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-icon {
+  color: var(--accent) !important;
+}
+
+html[data-theme='genart'] .tm-dial-name {
+  color: rgba(255, 255, 255, 0.28) !important;
+}
+
+html[data-theme='genart'] .tm-dial-item:not(.is-empty) .tm-dial-name {
+  color: rgba(255, 255, 255, 0.72) !important;
+}
+
+html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-name {
+  color: #ffffff !important;
+}
+
+html[data-theme='genart'] .tm-dial-count {
+  color: rgba(255, 255, 255, 0.18) !important;
+}
+
+html[data-theme='genart'] .tm-dial-item:not(.is-empty) .tm-dial-count {
+  color: #ffffff !important;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5) !important;
+}
+
+html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-count {
+  color: #ffffff !important;
+  text-shadow: 0 0 12px var(--accent-glow) !important;
+}
+
+html[data-theme='genart'] .tm-dial-pct {
+  color: rgba(255, 255, 255, 0.14) !important;
+}
+
+html[data-theme='genart'] .tm-dial-item:not(.is-empty) .tm-dial-pct {
+  color: var(--accent) !important;
+  text-shadow: 0 0 6px var(--accent-glow) !important;
+}
+
+html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-pct {
+  text-shadow:
+    0 0 10px var(--accent),
+    0 2px 4px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* 对称底座尾舱 */
+.tm-dials-footer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  font-size: 11px !important;
+  color: var(--tp-text-muted) !important;
+  margin-top: 18px !important;
+  font-weight: 400;
+}
+
+.tm-footer-dot {
+  width: 4px !important;
+  height: 4px !important;
+  border-radius: 50% !important;
+  background: var(--tp-primary, #3b82f6) !important;
+  box-shadow: 0 0 8px var(--tp-primary, #3b82f6) !important;
+  display: inline-block !important;
 }
 
 /* ══════════════════════════════════════════
@@ -1597,8 +1969,8 @@ const pulseData = computed(() => {
 }
 
 .tm-root {
-  gap: 4px;
-  padding: 4px;
+  gap: 4px !important;
+  padding: 8px 12px 16px !important;
   background:
     linear-gradient(
       180deg,
@@ -1619,16 +1991,16 @@ const pulseData = computed(() => {
 .tm-panel--pulse,
 .tm-panel--heat,
 .tm-tag-workbench {
-  border: 1px solid color-mix(in oklch, var(--tp-border-subtle) 90%, var(--tp-text-muted) 6%);
+  border: 1px solid var(--tp-border-subtle) !important;
   border-radius: 13px;
-  background: color-mix(in oklch, var(--tp-surface-card) 96%, var(--tp-surface-base) 4%);
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--tp-text-primary) 4%, transparent);
+  background: var(--tp-surface-card);
+  box-shadow: var(--tp-shadow-sm);
 }
 
 .tm-topnav {
   align-items: center;
-  min-height: 38px;
-  padding: 6px 10px;
+  min-height: 32px;
+  padding: 4px 12px !important;
 }
 
 .tm-topnav-right {
@@ -1641,7 +2013,7 @@ const pulseData = computed(() => {
   padding: 5px 10px;
   border-radius: 10px;
   background: var(--tp-surface-input);
-  border-color: color-mix(in oklch, var(--tp-border-subtle) 92%, var(--tp-text-muted) 8%);
+  border-color: var(--tp-border-subtle);
   box-shadow: none;
 }
 
@@ -1670,20 +2042,20 @@ const pulseData = computed(() => {
 }
 
 .tm-insights {
-  gap: 8px;
+  gap: 8px !important;
 }
 
 .tm-panel {
-  padding: 12px;
+  padding: 8px 12px !important;
 }
 
 .tm-tag-workbench {
-  padding: 10px 10px 12px;
+  padding: 8px 12px !important;
 }
 
 .tm-tag-workbench-head {
   align-items: flex-start;
-  padding: 0 2px 8px;
+  padding: 0 2px 2px;
 }
 
 .tm-tag-workbench-title {
