@@ -2094,7 +2094,62 @@ watch(
 <style>
 /* ==================== Default / Light Theme Styles (默认浅色优雅白紫主题) ==================== */
 
-/* 1. 仿真取景器 HUD (默认浅色) */
+/* 1. 仿真终端外壳 (默认浅色) */
+.ai-replay-simulator-terminal {
+  background: rgba(246, 245, 252, 0.85) !important;
+  border: 1px solid rgba(139, 92, 246, 0.16) !important;
+  box-shadow: inset 0 2px 6px rgba(139, 92, 246, 0.05) !important;
+}
+
+/* 终端头部 (默认浅色) */
+.ai-replay-simulator-terminal .terminal-header {
+  background: rgba(236, 235, 245, 0.9) !important;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.12) !important;
+}
+
+/* 终端标题 (默认浅色) */
+.ai-replay-simulator-terminal .terminal-title {
+  color: #4b5563 !important;
+}
+
+/* 日志文本行 (默认浅色) */
+.ai-replay-simulator-terminal .log-row {
+  color: #1f2937 !important;
+}
+
+/* 浅色日志行高亮 */
+.ai-replay-simulator-terminal .log-row.current-row {
+  color: var(--tp-primary) !important;
+  font-weight: 700 !important;
+}
+
+.ai-replay-simulator-terminal .log-row.current-row .log-text {
+  color: var(--tp-primary) !important;
+}
+
+/* 日志标签适配 (默认浅色) */
+.ai-replay-simulator-terminal .log-tag.system {
+  background: rgba(59, 130, 246, 0.08) !important;
+  color: #2563eb !important;
+}
+.ai-replay-simulator-terminal .log-tag.browser {
+  background: rgba(139, 92, 246, 0.08) !important;
+  color: #7c3aed !important;
+}
+.ai-replay-simulator-terminal .log-tag.replay {
+  background: rgba(16, 185, 129, 0.08) !important;
+  color: #059669 !important;
+}
+.ai-replay-simulator-terminal .log-tag.assert {
+  background: rgba(245, 158, 11, 0.08) !important;
+  color: #d97706 !important;
+}
+.ai-replay-simulator-terminal .log-tag.stream {
+  background: rgba(236, 72, 153, 0.08) !important;
+  color: #db2777 !important;
+}
+
+/* 2. 仿真取景器 HUD (默认浅色) */
 .ai-replay-simulator-viewport {
   position: relative;
   background: linear-gradient(135deg, #f4f1fe 0%, #fbf9ff 100%) !important;
@@ -2472,6 +2527,61 @@ watch(
 }
 
 /* ==================== Dark Theme Overrides (html[data-theme='genart'] 赛博黑曜主题重写) ==================== */
+
+/* 1. 仿真终端外壳 (深色黑曜) */
+html[data-theme='genart'] .ai-replay-simulator-terminal {
+  background: #090a10 !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* 终端头部 (深色黑曜) */
+html[data-theme='genart'] .ai-replay-simulator-terminal .terminal-header {
+  background: #10121a !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+/* 终端标题 (深色黑曜) */
+html[data-theme='genart'] .ai-replay-simulator-terminal .terminal-title {
+  color: #a0aec0 !important;
+}
+
+/* 日志文本行 (深色黑曜) */
+html[data-theme='genart'] .ai-replay-simulator-terminal .log-row {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+/* 日志行高亮 (深色黑曜) */
+html[data-theme='genart'] .ai-replay-simulator-terminal .log-row.current-row {
+  color: #ffffff !important;
+  text-shadow: 0 0 6px var(--tp-primary-light, rgba(139, 92, 246, 0.6)) !important;
+}
+
+html[data-theme='genart'] .ai-replay-simulator-terminal .log-row.current-row .log-text {
+  color: var(--tp-primary-light, #c084fc) !important;
+}
+
+/* 日志标签适配 (深色黑曜) */
+html[data-theme='genart'] .ai-replay-simulator-terminal .log-tag.system {
+  background: rgba(66, 153, 225, 0.15) !important;
+  color: #4299e1 !important;
+}
+html[data-theme='genart'] .ai-replay-simulator-terminal .log-tag.browser {
+  background: rgba(159, 122, 234, 0.15) !important;
+  color: #9f7aea !important;
+}
+html[data-theme='genart'] .ai-replay-simulator-terminal .log-tag.replay {
+  background: rgba(72, 187, 120, 0.15) !important;
+  color: #48bb78 !important;
+}
+html[data-theme='genart'] .ai-replay-simulator-terminal .log-tag.assert {
+  background: rgba(237, 137, 54, 0.15) !important;
+  color: #ed8936 !important;
+}
+html[data-theme='genart'] .ai-replay-simulator-terminal .log-tag.stream {
+  background: rgba(236, 72, 153, 0.15) !important;
+  color: #ec4899 !important;
+}
 
 html[data-theme='genart'] .ai-replay-simulator-viewport {
   background: linear-gradient(135deg, #090a10 0%, #111422 100%) !important;
