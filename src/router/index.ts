@@ -98,6 +98,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/requirement-gen',
+      name: 'RequirementGen',
+      component: () => import('../views/requirement-gen/RequirementGenPage.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/defects',
       name: 'Defects',
       component: () => import('../views/ComingSoonPage.vue'),

@@ -35,7 +35,7 @@ function onAvatarError(event: Event, name?: string) {
   authStore.handleAvatarError(event, name)
 }
 
-type TopMenu = 'workbench' | 'project' | 'plan' | 'testcases' | 'e2e' | 'system'
+type TopMenu = 'workbench' | 'project' | 'plan' | 'testcases' | 'e2e' | 'reqgen' | 'system'
 type SystemMenu = 'users' | 'roles' | 'projects' | 'tags' | 'ai-model'
 
 /** 无权访问系统管理一级菜单的角色集合（FR-02-22） */
@@ -179,6 +179,7 @@ const navItems: { key: TopMenu; label: string; icon: string }[] = [
   { key: 'testcases', label: '测试用例', icon: 'rule' },
   { key: 'plan', label: '用例评审', icon: 'analytics' },
   { key: 'e2e', label: '测试智编', icon: 'history_edu' },
+  { key: 'reqgen', label: '需求智生', icon: 'auto_awesome' },
   { key: 'project', label: '缺陷管理', icon: 'bug_report' },
 ]
 

@@ -55,6 +55,7 @@ const routeToMenu: Record<string, TopMenu> = {
   '/testcases': 'testcases',
   '/ai-script': 'e2e',
   '/ai-script/library': 'e2e',
+  '/requirement-gen': 'reqgen',
   '/defects': 'project',
   '/case-reviews': 'plan',
   '/system/users': 'system',
@@ -101,6 +102,7 @@ function switchTopMenu(menu: TopMenu) {
     project: '/defects',
     plan: '/case-reviews',
     e2e: '/ai-script',
+    reqgen: '/requirement-gen',
   }
   router.push(menuRoutes[menu])
   projectStore.persistNavState()
