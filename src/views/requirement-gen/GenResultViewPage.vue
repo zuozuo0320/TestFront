@@ -118,8 +118,10 @@ async function loadResults() {
     )
     caseResults.value = uniqueResults(resultGroups.flat())
     selectedCaseId.value = caseResults.value[0]?.id || null
-  } catch {
-    ElMessage.error('无法加载用例生成结果')
+  } catch (err: unknown) {
+    console.error('[GenResultView] loadResults failed:', err)
+    const msg = err instanceof Error ? err.message : String(err)
+    ElMessage.error(`无法加载用例生成结果: ${msg}`)
   } finally {
     loading.value = false
   }
