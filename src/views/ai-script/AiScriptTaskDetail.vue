@@ -332,8 +332,7 @@ async function handleStartRecording() {
     startPolling(session_id)
   } catch (e: unknown) {
     console.error('启动录制失败:', e)
-    const err = e as { response?: { data?: { message?: string } }; message?: string }
-    const msg = err?.response?.data?.message || err?.message || '录制浏览器启动失败'
+    const msg = e?.response?.data?.message || e?.message || '录制浏览器启动失败'
     await markRecordingFailed(msg)
     recordingStatusText.value = `录制启动失败: ${msg}`
     showToast(`录制启动失败: ${msg}`, 'error')
