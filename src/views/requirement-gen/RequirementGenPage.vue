@@ -1,118 +1,135 @@
 <script setup lang="ts">
 /**
- * 需求智生主页面（文档驱动一体化视图）
- *
- * 以需求文档表格为主视图，展开行内联展示该文档的生成任务。
- * "智能生成"作为已解析文档的行级操作。
+ * 需求智生主页面。
  */
-import { ref, reactive, computed } from 'vue'
-import { InfoFilled, SuccessFilled, Clock } from '@element-plus/icons-vue'
-import { useRequirementDocs, useGenTasks } from '@/composables/useRequirementGen'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import type { UploadFile } from 'element-plus'
+import { InfoFilled, SuccessFilled } from '@element-plus/icons-vue'
+import { useGenTasks, useRequirementDocs } from '@/composables/useRequirementGen'
+
 import type { RequirementDoc } from '@/api/requirementDoc'
-import type { GenTask, SmartGeneratePayload, SmartGenerateResult } from '@/api/requirementGen'
+import type { SmartGeneratePayload, SmartGenerateResult } from '@/api/requirementGen'
 
-// ─── 文档逻辑 ───
-const {
-  docs,
-  total,
-  loading,
-  page,
-  pageSize,
-  keyword,
-  parseStatusFilter,
-  fetchDocs,
-  handleUpload,
-  handlePaste,
-  handleDelete,
-} = useRequirementDocs()
+const router = useRouter()
+const { docs, fetchDocs, handleUpload, handlePaste } = useRequirementDocs()
+const { tasks, smartGenerating, handleSmartGenerate } = useGenTasks()
 
-// ─── 任务逻辑 ───
-const {
-  smartGenerating,
-  currentTask,
-  currentResults,
-  detailLoading,
-  fetchTasksByDocId,
-  fetchTaskDetail,
-  handleSmartGenerate,
-  handleAdopt,
-  handleDiscard,
-  handleClose,
-} = useGenTasks()
-
-// ─── 展开行：文档 → 任务映射 ───
-const docTasksMap = reactive<Record<number, GenTask[]>>({})
-const docTasksLoading = reactive<Record<number, boolean>>({})
 const parsedDocCount = computed(
   () => docs.value.filter((doc) => doc.parse_status === 'parsed').length,
 )
-
-/** 解析成功率 */
 const parseSuccessRate = computed(() => {
-  if (docs.value.length === 0) return 0
-  const success = docs.value.filter((doc) => doc.parse_status === 'parsed').length
-  return Math.round((success / docs.value.length) * 100)
+  if (!docs.value.length) return 0
+  return Math.round((parsedDocCount.value / docs.value.length) * 100)
 })
-
-/** 活跃生成任务数 */
-const runningTaskCount = computed(() => {
-  return Object.values(docTasksMap)
-    .flat()
-    .filter((t) => t.status === 'running').length
+const runningTaskCount = computed(
+  () => tasks.value.filter((task) => task.status === 'running').length,
+)
+const generatedCaseTotal = computed(() =>
+  tasks.value.reduce((sum, task) => sum + (task.generated_count || 0), 0),
+)
+const latestDoc = computed(() => docs.value[0] || null)
+const activeEngineStatus = computed(() => {
+  if (smartGenerating.value) return '流式处理中'
+  if (runningTaskCount.value) return '生成中'
+  if (docs.value.some((d) => d.parse_status === 'parsing')) return '解析中'
+  return '待机'
 })
+const centralNumber = computed(() => {
+  if (smartGenerating.value) return parsedDocCount.value || docs.value.length || 'AI'
+  if (smartResultData.value) return smartResultData.value.created_tasks.length
+  return docs.value.length || 0
+})
+const diagnosticsSkillMatch = computed(() => {
+  if (smartResultData.value?.recommended_skills.length) {
+    return `${smartResultData.value.recommended_skills.length} 条路由`
+  }
+  return `${parseSuccessRate.value}%`
+})
+const pipelineSteps = computed(() => [
+  {
+    no: '01',
+    title: '需求读取',
+    desc: docs.value.length ? `${docs.value.length} 份资产已映射` : '等待资产...',
+    progress: docs.value.length ? 100 : 14,
+    active: docs.value.length > 0,
+  },
+  {
+    no: '02',
+    title: '需求解析',
+    desc: parsedDocCount.value
+      ? `${parsedDocCount.value} 个实体已验证`
+      : docs.value.some((d) => d.parse_status === 'parsing')
+        ? '解析中...'
+        : '解析信号中...',
+    progress: parsedDocCount.value
+      ? parseSuccessRate.value
+      : docs.value.some((d) => d.parse_status === 'parsing')
+        ? 38
+        : 22,
+    active: parsedDocCount.value > 0 || docs.value.some((d) => d.parse_status === 'parsing'),
+  },
+  {
+    no: '03',
+    title: '策略匹配',
+    desc: smartGenerating.value ? '节点处理中...' : '等待路由...',
+    progress: smartGenerating.value || smartResultData.value ? 58 : 18,
+    active: smartGenerating.value || Boolean(smartResultData.value),
+  },
+  {
+    no: '04',
+    title: '用例生成',
+    desc: generatedCaseTotal.value ? `已生成 ${generatedCaseTotal.value} 个用例` : '等待生成...',
+    progress: generatedCaseTotal.value ? 100 : runningTaskCount.value ? 64 : 0,
+    active: runningTaskCount.value > 0 || generatedCaseTotal.value > 0,
+  },
+])
 
-async function handleExpandChange(row: RequirementDoc, expandedRows: RequirementDoc[]) {
-  const isExpanding = expandedRows.some((r) => r.id === row.id)
-  if (isExpanding && !docTasksMap[row.id]) {
-    docTasksLoading[row.id] = true
-    docTasksMap[row.id] = await fetchTasksByDocId(row.id)
-    docTasksLoading[row.id] = false
+const uploading = ref(false)
+const pasting = ref(false)
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
+// 当有文档处于解析中状态时，自动轮询刷新
+function startPollIfNeeded() {
+  if (pollTimer) return
+  pollTimer = setInterval(async () => {
+    const hasParsing = docs.value.some(
+      (d) => d.parse_status === 'parsing' || d.parse_status === 'not_parsed',
+    )
+    if (!hasParsing) {
+      stopPoll()
+      return
+    }
+    await fetchDocs()
+  }, 3000)
+}
+
+function stopPoll() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
   }
 }
 
-/** 刷新某文档的任务列表 */
-async function refreshDocTasks(docId: number) {
-  docTasksLoading[docId] = true
-  docTasksMap[docId] = await fetchTasksByDocId(docId)
-  docTasksLoading[docId] = false
-}
+onMounted(() => {
+  // 挂载后如果有待解析文档立即开始轮询
+  if (docs.value.some((d) => d.parse_status === 'parsing' || d.parse_status === 'not_parsed')) {
+    startPollIfNeeded()
+  }
+})
 
-// ─── 上传对话框 ───
+onUnmounted(() => {
+  stopPoll()
+})
+
 const showUploadDialog = ref(false)
 const uploadFile = ref<File | null>(null)
 const uploadTitle = ref('')
 const uploadRemark = ref('')
-
-function onFileChange(file: any) {
-  uploadFile.value = file.raw
-  if (!uploadTitle.value) uploadTitle.value = file.name
-}
-
-async function submitUpload() {
-  if (!uploadFile.value || !uploadTitle.value) return
-  await handleUpload(uploadFile.value, uploadTitle.value, uploadRemark.value)
-  showUploadDialog.value = false
-  uploadFile.value = null
-  uploadTitle.value = ''
-  uploadRemark.value = ''
-}
-
-// ─── 粘贴对话框 ───
 const showPasteDialog = ref(false)
 const pasteTitle = ref('')
 const pasteContent = ref('')
 const pasteRemark = ref('')
-
-async function submitPaste() {
-  if (!pasteTitle.value || !pasteContent.value) return
-  await handlePaste(pasteTitle.value, pasteContent.value, pasteRemark.value)
-  showPasteDialog.value = false
-  pasteTitle.value = ''
-  pasteContent.value = ''
-  pasteRemark.value = ''
-}
-
-// ─── 智能生成对话框 ───
 const showSmartDialog = ref(false)
 const smartDocId = ref(0)
 const smartDocTitle = ref('')
@@ -124,6 +141,41 @@ const smartForm = ref<SmartGeneratePayload>({
   extra_prompt: '',
 })
 const smartResultData = ref<SmartGenerateResult | null>(null)
+
+function onFileChange(file: UploadFile) {
+  uploadFile.value = file.raw ?? null
+  if (!uploadTitle.value) uploadTitle.value = file.name
+}
+
+async function submitUpload() {
+  if (!uploadFile.value || !uploadTitle.value.trim()) return
+  uploading.value = true
+  try {
+    await handleUpload(uploadFile.value, uploadTitle.value.trim(), uploadRemark.value.trim())
+    showUploadDialog.value = false
+    uploadFile.value = null
+    uploadTitle.value = ''
+    uploadRemark.value = ''
+    startPollIfNeeded()
+  } finally {
+    uploading.value = false
+  }
+}
+
+async function submitPaste() {
+  if (!pasteTitle.value.trim() || !pasteContent.value.trim()) return
+  pasting.value = true
+  try {
+    await handlePaste(pasteTitle.value.trim(), pasteContent.value.trim(), pasteRemark.value.trim())
+    showPasteDialog.value = false
+    pasteTitle.value = ''
+    pasteContent.value = ''
+    pasteRemark.value = ''
+    startPollIfNeeded()
+  } finally {
+    pasting.value = false
+  }
+}
 
 function openSmartGenerate(doc: RequirementDoc) {
   smartDocId.value = doc.id
@@ -141,365 +193,140 @@ function openSmartGenerate(doc: RequirementDoc) {
 
 async function submitSmartGenerate() {
   const result = await handleSmartGenerate(smartForm.value)
-  if (result) {
-    smartResultData.value = result
-    // 刷新该文档的任务列表
-    await refreshDocTasks(smartDocId.value)
-  }
+  if (!result) return
+  smartResultData.value = result
 }
 
 function onSmartDialogClose() {
   showSmartDialog.value = false
 }
 
-// ─── 任务详情对话框 ───
-const showDetailDialog = ref(false)
-
-function openDetail(taskId: number) {
-  fetchTaskDetail(taskId)
-  showDetailDialog.value = true
-}
-
-// ─── 搜索 & 分页 ───
-function onSearch() {
-  page.value = 1
-  fetchDocs()
-}
-
-function handlePageChange(p: number) {
-  page.value = p
-  fetchDocs()
-}
-
-// ─── 显示工具 ───
-function parseStatusLabel(status: string) {
-  const map: Record<string, string> = {
-    not_parsed: '待解析',
-    parsing: '解析中',
-    parsed: '已解析',
-    parse_failed: '解析失败',
-  }
-  return map[status] || status
-}
-function parseStatusType(status: string) {
-  const map: Record<string, string> = {
-    not_parsed: 'info',
-    parsing: 'warning',
-    parsed: 'success',
-    parse_failed: 'danger',
-  }
-  return map[status] || 'info'
-}
-function sourceLabel(type: string) {
-  return type === 'upload' ? '文件上传' : '粘贴文本'
-}
-function taskStatusLabel(status: string) {
-  const map: Record<string, string> = {
-    pending: '等待中',
-    running: '生成中',
-    success: '已完成',
-    failed: '失败',
-    partially_closed: '部分关闭',
-    fully_closed: '已关闭',
-  }
-  return map[status] || status
-}
-function parseSteps(stepsJson: string): Array<{ action: string; expected: string }> {
-  try {
-    return JSON.parse(stepsJson)
-  } catch {
-    return []
-  }
+function goToDocs() {
+  router.push({ name: 'RequirementGenDocs' })
 }
 </script>
 
 <template>
   <div class="requirement-gen-page">
-    <div class="page-header">
-      <h2 class="page-title">需求智生</h2>
-      <p class="page-desc">上传需求文档，展开查看 AI 生成的测试用例任务</p>
-    </div>
+    <div class="grid-overlay"></div>
+    <div class="ambient-glow"></div>
 
-    <div class="content-card">
-      <div class="card-head">
-        <div>
-          <div class="card-title">需求文档与生成任务</div>
-          <div class="card-subtitle">展开文档行查看关联任务，已解析文档可直接智能生成</div>
+    <header class="top-bar">
+      <div class="top-bar-left">
+        <span class="brand-title">Aisight</span>
+        <div class="global-search">
+          <span class="material-symbols-outlined">search</span>
+          <input class="search-input" placeholder="全局搜索..." readonly />
         </div>
       </div>
+    </header>
 
-      <div class="flow-strip">
-        <div class="flow-step completed">
-          <span class="flow-index">1</span>
-          <span class="flow-text">导入需求</span>
+    <main class="intel-canvas">
+      <section class="floating-panel status-panel">
+        <div class="panel-title">
+          <span class="panel-title-left">
+            <span class="panel-dot"></span>
+            SYSTEM STATUS
+          </span>
+          <em class="streaming-tag">{{ activeEngineStatus === '待机' ? 'IDLE' : 'STREAMING' }}</em>
         </div>
-        <div class="flow-divider"></div>
-        <div class="flow-step active">
-          <span class="flow-index">2</span>
-          <span class="flow-text">解析文档</span>
-          <span class="flow-count">{{ total }}</span>
-        </div>
-        <div class="flow-divider"></div>
-        <div class="flow-step">
-          <span class="flow-index">3</span>
-          <span class="flow-text">智能生成</span>
-          <span class="flow-count">{{ parsedDocCount }}</span>
-        </div>
-        <div class="flow-divider"></div>
-        <div class="flow-step">
-          <span class="flow-index">4</span>
-          <span class="flow-text">采纳用例</span>
-        </div>
-      </div>
-
-      <!-- 工具栏 -->
-      <div class="toolbar">
-        <div class="toolbar-left">
-          <el-input
-            v-model="keyword"
-            placeholder="搜索文档标题..."
-            clearable
-            style="width: 220px"
-            @keyup.enter="onSearch"
-            @clear="onSearch"
-          />
-          <el-select
-            v-model="parseStatusFilter"
-            placeholder="解析状态"
-            clearable
-            style="width: 130px"
-            @change="onSearch"
-          >
-            <el-option label="待解析" value="not_parsed" />
-            <el-option label="解析中" value="parsing" />
-            <el-option label="已解析" value="parsed" />
-            <el-option label="解析失败" value="parse_failed" />
-          </el-select>
-        </div>
-        <div class="toolbar-right">
-          <el-button type="primary" @click="showUploadDialog = true">上传文档</el-button>
-          <el-button @click="showPasteDialog = true">粘贴文本</el-button>
-        </div>
-      </div>
-
-      <!-- 文档表格（含展开行） -->
-      <el-table
-        v-loading="loading"
-        class="main-table"
-        :data="docs"
-        stripe
-        style="width: 100%"
-        row-key="id"
-        @expand-change="handleExpandChange"
-      >
-        <template #empty>
-          <div class="table-empty">
-            <div class="table-empty-title">暂无需求文档</div>
-            <div class="table-empty-desc">
-              上传需求文档或粘贴需求文本后，即可在当前列表中发起智能生成
-            </div>
-            <div class="table-empty-actions">
-              <el-button type="primary" @click="showUploadDialog = true">上传文档</el-button>
-              <el-button @click="showPasteDialog = true">粘贴文本</el-button>
-            </div>
+        <div class="panel-lines">
+          <div class="panel-row">
+            <span>Engine Ver:</span>
+            <strong>v2.8.4-ALPHA</strong>
           </div>
-        </template>
+          <div class="panel-row">
+            <span>Latency:</span>
+            <strong class="cyan">14ms</strong>
+          </div>
+          <div class="panel-row">
+            <span>Processing:</span>
+            <strong>{{ parsedDocCount ? '94.2 TFLOPS' : 'Idle' }}</strong>
+          </div>
+        </div>
+      </section>
 
-        <el-table-column type="expand" width="42">
-          <template #default="{ row }">
-            <div v-loading="docTasksLoading[row.id]" class="expand-content">
-              <template v-if="docTasksMap[row.id]?.length">
-                <div class="expand-header">
-                  <span class="expand-label">
-                    生成任务（{{ docTasksMap[row.id]?.length ?? 0 }}）
-                  </span>
+      <section class="floating-panel diagnostic-panel">
+        <div class="panel-title">
+          <span>AI DIAGNOSTICS</span>
+          <span class="material-symbols-outlined panel-icon">bolt</span>
+        </div>
+        <div class="panel-lines">
+          <div class="panel-row">
+            <span>Model:</span>
+            <strong class="primary-text">GPT-4o-COGNITIVE</strong>
+          </div>
+          <div class="panel-row">
+            <span>Skill Match:</span>
+            <strong class="primary-text">{{ diagnosticsSkillMatch }}</strong>
+          </div>
+          <div class="panel-row">
+            <span>Token Flux:</span>
+            <strong>{{ runningTaskCount ? '1.2k/sec' : '0.0k/sec' }}</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="central-zone" :class="{ 'is-generating': smartGenerating }">
+        <div class="orbit orbit-one"></div>
+        <div class="orbit orbit-two"></div>
+        <div class="orbit orbit-three"></div>
+        <div class="orbit orbit-four"></div>
+        <div class="orbit-orb"></div>
+
+        <div class="data-lines-wrap">
+          <svg class="data-lines" viewBox="0 0 1000 1000" aria-hidden="true">
+            <path class="data-line" d="M500,500 L700,300" />
+            <path class="data-line dl-2" d="M500,500 L300,700" />
+            <path class="data-line dl-3" d="M500,500 L300,300" />
+            <path class="data-line dl-4" d="M500,500 L700,700" />
+          </svg>
+        </div>
+
+        <button
+          class="central-hub"
+          type="button"
+          @click="latestDoc && openSmartGenerate(latestDoc)"
+        >
+          <span class="material-symbols-outlined hub-icon">psychology</span>
+          <strong class="hub-number">{{ centralNumber }}</strong>
+          <em class="hub-label">ACTIVE ANALYSIS</em>
+        </button>
+      </section>
+
+      <div class="pipeline-footer">
+        <div class="pipeline-inner">
+          <div class="pipeline-steps">
+            <template v-for="(step, idx) in pipelineSteps" :key="step.no">
+              <div class="pipeline-step" :class="{ active: step.active }">
+                <div class="step-head">
+                  <div class="step-no">{{ step.no }}</div>
+                  <h3 class="step-title">{{ step.title }}</h3>
                 </div>
-                <el-table :data="docTasksMap[row.id]" size="small" class="inner-table">
-                  <el-table-column
-                    prop="task_name"
-                    label="任务名称"
-                    min-width="180"
-                    show-overflow-tooltip
-                  />
-                  <el-table-column label="状态" width="100">
-                    <template #default="{ row: task }">
-                      <span class="status-indicator" :class="task.status?.toLowerCase()">
-                        <span class="status-dot"></span>
-                        <span class="status-text">
-                          {{ taskStatusLabel(task.status?.toLowerCase()) }}
-                        </span>
-                      </span>
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="AI 模型" width="150" show-overflow-tooltip>
-                    <template #default="{ row: task }">
-                      <span class="model-badge">{{ task.ai_model_snapshot }}</span>
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="用例统计 (生成 / 采纳 / 丢弃)" width="180">
-                    <template #default="{ row: task }">
-                      <div class="metrics-row">
-                        <span class="metric-chip total" title="已生成用例">
-                          {{ task.generated_count }}
-                        </span>
-                        <span
-                          v-if="task.adopted_count > 0"
-                          class="metric-chip adopt"
-                          title="已采纳用例"
-                        >
-                          {{ task.adopted_count }}
-                        </span>
-                        <span
-                          v-if="task.discarded_count > 0"
-                          class="metric-chip discard"
-                          title="已丢弃用例"
-                        >
-                          {{ task.discarded_count }}
-                        </span>
-                      </div>
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="耗时" width="90">
-                    <template #default="{ row: task }">
-                      <span v-if="task.duration_ms" class="duration-badge">
-                        <el-icon class="clock-icon"><Clock /></el-icon>
-                        <span class="num">{{ (task.duration_ms / 1000).toFixed(1) }}</span>
-                        <span class="unit">s</span>
-                      </span>
-                      <span v-else class="duration-badge empty">-</span>
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="操作" width="120" fixed="right">
-                    <template #default="{ row: task }">
-                      <div class="row-actions">
-                        <el-button link size="small" @click="openDetail(task.id)">详情</el-button>
-                        <el-button
-                          v-if="task.status === 'success'"
-                          type="warning"
-                          link
-                          size="small"
-                          @click="handleClose(task.id).then(() => refreshDocTasks(row.id))"
-                        >
-                          关闭
-                        </el-button>
-                      </div>
-                    </template>
-                  </el-table-column>
-                </el-table>
-              </template>
-              <div v-else class="expand-empty">暂无生成任务，点击操作栏"智能生成"开始</div>
-            </div>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="标题" min-width="240" show-overflow-tooltip>
-          <template #default="{ row }">
-            <div class="doc-title-cell">
-              <span class="doc-title-text">{{ row.title }}</span>
-              <span class="doc-title-hint">展开查看关联任务</span>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="来源" width="90">
-          <template #default="{ row }">
-            <span class="source-badge">{{ sourceLabel(row.source_type) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="格式" width="70" prop="file_format" />
-        <el-table-column label="字数" width="70">
-          <template #default="{ row }">
-            <span class="num-text">{{ row.word_count }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="解析状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="parseStatusType(row.parse_status)" size="small">
-              {{ parseStatusLabel(row.parse_status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="创建时间" width="150">
-          <template #default="{ row }">
-            {{ row.created_at?.slice(0, 16).replace('T', ' ') }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="168" fixed="right">
-          <template #default="{ row }">
-            <div class="row-actions">
-              <el-button
-                v-if="row.parse_status === 'parsed'"
-                class="ai-generate-btn"
-                link
-                size="small"
-                @click="openSmartGenerate(row)"
-              >
-                智能生成
-              </el-button>
-              <el-button class="delete-btn" link size="small" @click="handleDelete(row.id)">
-                删除
-              </el-button>
-            </div>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <!-- 分页 -->
-      <div v-if="total > pageSize" class="pagination-wrap">
-        <el-pagination
-          v-model:current-page="page"
-          :page-size="pageSize"
-          :total="total"
-          layout="total, prev, pager, next"
-          @current-change="handlePageChange"
-        />
-      </div>
-
-      <!-- 底部统计卡片 (Consistent with "测试智编" / ai-script style) -->
-      <div class="ai-stats-grid">
-        <!-- 解析成功率 -->
-        <div class="ai-stat-card ai-stat-card--success-rate">
-          <div class="ai-stat-label">
-            文档解析成功率
-            <span class="material-symbols-outlined">trending_up</span>
-          </div>
-          <div class="ai-stat-value">{{ parseSuccessRate }}%</div>
-          <div class="ai-stat-desc">当前页已成功解析 {{ parsedDocCount }} 份文档</div>
-          <div class="ai-stat-bar">
-            <div class="ai-stat-bar-fill" :style="{ width: parseSuccessRate + '%' }"></div>
-          </div>
-        </div>
-
-        <!-- 活跃生成任务 -->
-        <div class="ai-stat-card ai-stat-card--running">
-          <div class="ai-stat-label">
-            活跃生成任务
-            <span class="material-symbols-outlined">bolt</span>
-          </div>
-          <div class="ai-stat-value">{{ runningTaskCount }}</div>
-          <div class="ai-stat-desc">后台正在进行 AI 用例生成的活跃任务数</div>
-          <div class="ai-stat-segments">
-            <div
-              class="ai-stat-segment"
-              :class="{ 'is-active animate-pulse': runningTaskCount > 0 }"
-            ></div>
-            <div class="ai-stat-segment"></div>
-            <div class="ai-stat-segment"></div>
-            <div class="ai-stat-segment"></div>
-          </div>
-        </div>
-
-        <!-- 快速入口 / 快捷提示 -->
-        <div class="ai-quickstart-card ai-quickstart-card--recording">
-          <div class="ai-quickstart-content">
-            <div class="ai-stat-label">快速入口</div>
-            <h4>智能用例生成</h4>
-            <p>AI 自动读取已解析的需求条目，一键并发生成多维度用例</p>
+                <div class="step-track">
+                  <i :style="{ width: step.progress + '%' }"></i>
+                  <b v-if="step.active"></b>
+                </div>
+                <p class="step-desc">{{ step.desc }}</p>
+              </div>
+              <div v-if="idx < pipelineSteps.length - 1" class="step-chevron">
+                <span class="material-symbols-outlined">chevron_right</span>
+              </div>
+            </template>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- ─── 上传对话框 ─── -->
+      <button class="fab-btn" type="button" @click="showUploadDialog = true">
+        <div class="fab-border">
+          <div class="fab-inner">
+            <span class="material-symbols-outlined">add_task</span>
+            <span class="fab-label">NEW REQUIREMENT</span>
+          </div>
+        </div>
+      </button>
+    </main>
+
     <el-dialog v-model="showUploadDialog" title="上传需求文档" width="500px">
       <el-form label-width="80px">
         <el-form-item label="文件">
@@ -524,11 +351,17 @@ function parseSteps(stepsJson: string): Array<{ action: string; expected: string
       </el-form>
       <template #footer>
         <el-button @click="showUploadDialog = false">取消</el-button>
-        <el-button type="primary" :disabled="!uploadFile" @click="submitUpload">确定上传</el-button>
+        <el-button
+          type="primary"
+          :disabled="!uploadFile || uploading"
+          :loading="uploading"
+          @click="submitUpload"
+        >
+          确定上传
+        </el-button>
       </template>
     </el-dialog>
 
-    <!-- ─── 粘贴对话框 ─── -->
     <el-dialog v-model="showPasteDialog" title="粘贴需求文本" width="600px">
       <el-form label-width="80px">
         <el-form-item label="标题">
@@ -548,17 +381,21 @@ function parseSteps(stepsJson: string): Array<{ action: string; expected: string
       </el-form>
       <template #footer>
         <el-button @click="showPasteDialog = false">取消</el-button>
-        <el-button type="primary" :disabled="!pasteTitle || !pasteContent" @click="submitPaste">
+        <el-button
+          type="primary"
+          :disabled="!pasteTitle || !pasteContent || pasting"
+          :loading="pasting"
+          @click="submitPaste"
+        >
           确定创建
         </el-button>
       </template>
     </el-dialog>
 
-    <!-- ─── 智能生成对话框 ─── -->
     <el-dialog
       v-model="showSmartDialog"
       title="智能生成测试用例"
-      width="600px"
+      width="620px"
       :close-on-click-modal="false"
     >
       <div v-if="!smartResultData">
@@ -572,9 +409,7 @@ function parseSteps(stepsJson: string): Array<{ action: string; expected: string
           </el-form-item>
           <el-form-item label="每类最大条数">
             <el-input-number v-model="smartForm.max_cases_per_skill" :min="5" :max="50" />
-            <span class="form-tip" style="margin-left: 8px">
-              每个匹配的测试策略最多生成的用例数
-            </span>
+            <span class="form-tip" style="margin-left: 8px">每个匹配策略最多生成的用例数</span>
           </el-form-item>
           <el-form-item label="默认优先级">
             <el-select v-model="smartForm.default_level" style="width: 120px">
@@ -618,1481 +453,733 @@ function parseSteps(stepsJson: string): Array<{ action: string; expected: string
         </div>
       </div>
       <template #footer>
-        <template v-if="!smartResultData">
+        <span v-if="!smartResultData">
           <el-button @click="onSmartDialogClose">取消</el-button>
           <el-button type="primary" :loading="smartGenerating" @click="submitSmartGenerate">
             {{ smartGenerating ? 'AI 分析中...' : '开始智能生成' }}
           </el-button>
-        </template>
-        <template v-else>
+        </span>
+        <span v-else>
+          <el-button @click="goToDocs">查看结果</el-button>
           <el-button type="primary" @click="onSmartDialogClose">完成</el-button>
-        </template>
+        </span>
       </template>
-    </el-dialog>
-
-    <!-- ─── 任务详情对话框 ─── -->
-    <el-dialog
-      v-model="showDetailDialog"
-      title="任务详情"
-      width="900px"
-      top="5vh"
-      class="task-detail-dialog"
-    >
-      <div v-loading="detailLoading" class="task-detail-body">
-        <div v-if="currentTask" class="task-meta">
-          <div class="task-meta-grid">
-            <div class="task-meta-item task-meta-item--wide">
-              <span class="task-meta-label">任务名称</span>
-              <span class="task-meta-value">{{ currentTask.task_name }}</span>
-            </div>
-            <div class="task-meta-item">
-              <span class="task-meta-label">状态</span>
-              <span class="status-indicator" :class="currentTask.status?.toLowerCase()">
-                <span class="status-dot"></span>
-                <span class="status-text">
-                  {{ taskStatusLabel(currentTask.status?.toLowerCase()) }}
-                </span>
-              </span>
-            </div>
-            <div class="task-meta-item">
-              <span class="task-meta-label">模型</span>
-              <span class="task-meta-value mono">{{ currentTask.ai_model_snapshot }}</span>
-            </div>
-            <div class="task-meta-item">
-              <span class="task-meta-label">生成</span>
-              <span class="task-meta-value num">{{ currentTask.generated_count }}</span>
-            </div>
-            <div class="task-meta-item">
-              <span class="task-meta-label">已采纳</span>
-              <span class="task-meta-value num success">{{ currentTask.adopted_count }}</span>
-            </div>
-            <div class="task-meta-item">
-              <span class="task-meta-label">已丢弃</span>
-              <span class="task-meta-value num muted">{{ currentTask.discarded_count }}</span>
-            </div>
-            <div v-if="currentTask.fail_reason" class="task-meta-item task-meta-item--full">
-              <span class="task-meta-label">失败原因</span>
-              <span class="fail-reason">{{ currentTask.fail_reason }}</span>
-            </div>
-          </div>
-        </div>
-        <div v-if="currentResults.length > 0" class="results-section">
-          <div class="results-heading">
-            <h4 class="results-title">生成产物</h4>
-            <span class="results-count">{{ currentResults.length }} 条</span>
-          </div>
-          <div class="result-cards">
-            <div
-              v-for="result in currentResults"
-              :key="result.id"
-              class="result-card"
-              :class="{ adopted: result.adopted, discarded: result.discarded }"
-            >
-              <div class="result-header">
-                <div class="result-title-row">
-                  <span class="result-seq">#{{ result.seq_no }}</span>
-                  <span class="result-title-text">{{ result.title }}</span>
-                </div>
-                <div class="result-header-tags">
-                  <span class="result-level" :class="result.level?.toLowerCase()">
-                    {{ result.level }}
-                  </span>
-                  <span v-if="result.adopted" class="result-badge adopted">已采纳</span>
-                  <span v-if="result.discarded" class="result-badge discarded">已丢弃</span>
-                </div>
-              </div>
-              <div v-if="result.precondition" class="result-field result-field--precondition">
-                <span class="field-label">前置条件</span>
-                <span class="field-content">{{ result.precondition }}</span>
-              </div>
-              <div v-if="parseSteps(result.steps).length" class="result-field">
-                <span class="field-label">测试步骤</span>
-                <ol class="steps-list">
-                  <li v-for="(step, idx) in parseSteps(result.steps)" :key="idx">
-                    <span class="step-index">{{ idx + 1 }}</span>
-                    <span class="step-action">{{ step.action }}</span>
-                    <span v-if="step.expected" class="step-expected">{{ step.expected }}</span>
-                  </li>
-                </ol>
-              </div>
-              <div v-if="!result.adopted && !result.discarded" class="result-actions">
-                <el-button
-                  class="result-action-adopt"
-                  type="primary"
-                  size="small"
-                  @click="handleAdopt(result.id)"
-                >
-                  采纳
-                </el-button>
-                <el-button
-                  class="result-action-discard"
-                  size="small"
-                  @click="handleDiscard(result.id)"
-                >
-                  丢弃
-                </el-button>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div v-else-if="!detailLoading" class="empty-state">
-          <p>暂无产物数据</p>
-        </div>
-      </div>
     </el-dialog>
   </div>
 </template>
 
 <style scoped>
+/* ═══════ Base ═══════ */
 .requirement-gen-page {
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 56px - 8px);
-  padding: 6px;
-  background: transparent;
+  height: 100vh;
+  overflow: hidden;
+  color: #e1e2eb;
+  font-family: 'Inter', sans-serif;
+  background: #0b0e14;
 }
 
-.page-header {
+.grid-overlay,
+.ambient-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.grid-overlay {
+  background-image: radial-gradient(rgba(182, 196, 255, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.ambient-glow {
+  background: linear-gradient(
+    135deg,
+    rgba(182, 196, 255, 0.05),
+    transparent,
+    rgba(216, 185, 255, 0.05)
+  );
+  animation: pulse-glow 8s ease-in-out infinite;
+}
+
+/* ═══════ Top Bar ═══════ */
+.top-bar {
+  position: relative;
+  z-index: 40;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
-  padding: 8px 10px 10px;
+  height: 64px;
+  padding: 0 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(16, 19, 26, 0.6);
+  backdrop-filter: blur(16px);
 }
 
-.page-title {
+.top-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.brand-title {
+  font-family: 'Geist', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: #e1e2eb;
+}
+
+.global-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 9999px;
+  background: rgba(39, 42, 49, 0.4);
+}
+
+.global-search .material-symbols-outlined {
+  color: rgba(196, 197, 215, 0.6);
   font-size: 18px;
-  font-weight: 600;
-  color: var(--tp-text-primary, var(--el-text-color-primary));
-  margin: 0 0 4px;
-  line-height: var(--tp-line-tight, 1.3);
 }
 
-.page-desc {
-  font-size: 12px;
-  color: var(--tp-text-muted, var(--el-text-color-secondary));
-  margin: 0;
-  line-height: var(--tp-line-ui, 1.5);
+.search-input {
+  width: 192px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: rgba(196, 197, 215, 0.6);
+  font-size: 14px;
+  line-height: 20px;
 }
 
-.content-card {
+.search-input::placeholder {
+  color: rgba(196, 197, 215, 0.4);
+}
+
+/* ═══════ Canvas ═══════ */
+.intel-canvas {
+  position: relative;
+  z-index: 1;
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: var(--tp-surface-card);
-  border: 1px solid var(--tp-border-subtle);
-  border-radius: var(--tp-radius-md, 8px);
-  padding: 12px;
-  box-shadow: none;
   overflow: hidden;
 }
 
-.card-head {
+/* ═══════ Floating Panels ═══════ */
+.floating-panel {
+  position: absolute;
+  z-index: 30;
+  width: 288px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  background: rgba(16, 19, 26, 0.6);
+  backdrop-filter: blur(16px);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.floating-panel:hover {
+  background: rgba(29, 32, 38, 0.7);
+  border-color: rgba(182, 196, 255, 0.2);
+  transform: translateY(-4px);
+  box-shadow:
+    0 10px 30px -10px rgba(0, 0, 0, 0.5),
+    0 0 20px rgba(182, 196, 255, 0.05);
+}
+
+.status-panel {
+  top: 24px;
+  left: 24px;
+}
+
+.diagnostic-panel {
+  top: 24px;
+  right: 24px;
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.05em;
+  color: rgba(196, 197, 215, 0.6);
+  text-transform: uppercase;
+}
+
+.panel-title-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: #00dce5;
+  box-shadow: 0 0 8px rgba(0, 220, 229, 0.5);
+  animation: dot-pulse 2s ease-in-out infinite;
+}
+
+.streaming-tag {
+  font-size: 10px;
+  color: rgba(0, 220, 229, 0.6);
+  animation: blink-tag 2s ease-in-out infinite;
+  font-style: normal;
+}
+
+.panel-icon {
+  font-size: 16px;
+  color: #b6c4ff;
+  animation: blink-tag 2s ease-in-out infinite;
+}
+
+.panel-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: 0.02em;
+}
+
+.panel-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.panel-row span {
+  color: rgba(196, 197, 215, 0.6);
+}
+
+.panel-row strong {
+  color: #e1e2eb;
+  font-weight: 500;
+}
+
+.panel-row .cyan {
+  color: #00dce5;
+}
+
+.panel-row .primary-text {
+  color: #b6c4ff;
+}
+
+/* ═══════ Central Zone ═══════ */
+.central-zone {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.orbit {
+  position: absolute;
+  border-radius: 0;
+  pointer-events: none;
+}
+
+.orbit-one {
+  width: 600px;
+  height: 600px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  animation: rotate-slow 25s linear infinite;
+}
+
+.orbit-two {
+  width: 520px;
+  height: 520px;
+  border: 1px dashed rgba(182, 196, 255, 0.1);
+  animation: rotate-slow 15s linear infinite;
+}
+
+.orbit-three {
+  width: 440px;
+  height: 440px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  animation: rotate-reverse 35s linear infinite;
+}
+
+.orbit-four {
+  width: 380px;
+  height: 380px;
+  border: 1px dotted rgba(216, 185, 255, 0.2);
+  animation: rotate-slow 40s linear infinite;
+}
+
+.data-lines-wrap {
+  position: absolute;
+  width: 700px;
+  height: 700px;
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+.data-lines {
+  width: 100%;
+  height: 100%;
+}
+
+.data-line {
+  fill: none;
+  stroke: rgba(182, 196, 255, 0.5);
+  stroke-dasharray: 10;
+  stroke-width: 1;
+  animation: line-glow 10s linear infinite;
+}
+
+.dl-2 {
+  animation-delay: -2s;
+}
+.dl-3 {
+  animation-delay: -4s;
+}
+.dl-4 {
+  animation-delay: -6s;
+}
+
+.central-hub {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 208px;
+  height: 208px;
+  border: 1px solid rgba(182, 196, 255, 0.3);
+  border-radius: 16px;
+  color: #e1e2eb;
+  background: rgba(16, 19, 26, 0.8);
+  backdrop-filter: blur(16px);
+  cursor: pointer;
+  animation: pulse-glow 4s ease-in-out infinite;
+  box-shadow: 0 0 40px rgba(182, 196, 255, 0.1);
+  transition: transform 0.3s ease;
+}
+
+.central-hub:active {
+  transform: scale(0.95);
+}
+
+.hub-icon {
+  color: #b6c4ff;
+  font-size: 44px;
+  margin-bottom: 4px;
+}
+
+.hub-number {
+  font-family: 'Geist', sans-serif;
+  font-size: 48px;
+  line-height: 56px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: linear-gradient(to right, #b6c4ff, #d8b9ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hub-label {
+  margin-top: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: 0.02em;
+  color: rgba(196, 197, 215, 0.6);
+  text-transform: uppercase;
+  font-style: normal;
+}
+
+/* ═══════ Glowing Orb ═══════ */
+.orbit-orb {
+  position: absolute;
+  z-index: 15;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(182, 196, 255, 0.9), rgba(162, 89, 255, 0.6));
+  box-shadow:
+    0 0 20px rgba(182, 196, 255, 0.6),
+    0 0 60px rgba(162, 89, 255, 0.3);
+  animation: orb-travel 8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* ═══════ Pipeline Footer ═══════ */
+.pipeline-footer {
+  position: relative;
+  z-index: 20;
+  padding: 16px 48px 48px;
+  background: linear-gradient(to top, #0b0e14, #0b0e14 60%, transparent);
+}
+
+.pipeline-inner {
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.pipeline-steps {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 0 2px 10px;
 }
 
-.card-title {
-  font-size: 14px;
-  line-height: 20px;
-  font-weight: 600;
-  color: var(--tp-text-primary, var(--el-text-color-primary));
-}
-
-.card-subtitle {
-  margin-top: 2px;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--tp-text-muted, var(--el-text-color-secondary));
-}
-
-.card-stats {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  color: var(--tp-text-secondary, var(--el-text-color-secondary));
-  font-size: 12px;
-}
-
-/* 流程导航条 - 超扁平流线设计 (SaaS Timeline Track) */
-.flow-strip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-  padding: 10px 16px;
-  border: 1px solid var(--tp-border-subtle);
-  border-radius: var(--tp-radius-md, 8px);
-  background: linear-gradient(180deg, var(--tp-surface-header) 0%, var(--tp-surface-muted) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-}
-
-.flow-step {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--tp-text-subtle, var(--el-text-color-secondary));
-  font-size: 12px;
-  line-height: 20px;
-  white-space: nowrap;
-  transition: all 0.25s ease;
-  user-select: none;
-}
-
-.flow-step .flow-text {
-  font-weight: 500;
-}
-
-/* 状态：已完成 (Completed) */
-.flow-step.completed {
-  color: var(--tp-success, var(--el-color-success));
-}
-
-.flow-step.completed .flow-index {
-  border-color: var(--tp-success, var(--el-color-success));
-  background: var(--tp-success-light, rgba(34, 197, 94, 0.1));
-  color: var(--tp-success);
-}
-
-/* 状态：进行中/激活 (Active) */
-.flow-step.active {
-  color: var(--tp-primary, var(--el-color-primary));
-  text-shadow: 0 0 12px var(--tp-primary-lighter);
-}
-
-.flow-index {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 1.5px solid var(--tp-border-subtle);
-  background: var(--tp-surface-card);
-  color: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  transition: all 0.25s ease;
-}
-
-.flow-step.active .flow-index {
-  border-color: var(--tp-primary, var(--el-color-primary));
-  background: var(--tp-primary, var(--el-color-primary));
-  color: var(--tp-btn-text, #ffffff);
-  box-shadow: 0 0 8px var(--tp-primary-shadow);
-}
-
-/* 流程统计微气泡 */
-.flow-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 16px;
-  min-width: 16px;
-  padding: 0 4px;
-  border-radius: 99px;
-  background: var(--tp-border-strong, var(--tp-primary-lighter));
-  color: var(--tp-primary);
-  font-size: 10px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.flow-divider {
+.pipeline-step {
   flex: 1;
-  height: 1px;
-  min-width: 16px;
-  background: repeating-linear-gradient(
-    90deg,
-    var(--tp-border-subtle) 0,
-    var(--tp-border-subtle) 4px,
-    transparent 4px,
-    transparent 8px
-  );
-}
-
-/* 展开行内容 - 深度嵌套的 IDE 风格 */
-.expand-content {
-  position: relative;
-  padding: 12px 14px 14px;
-  min-height: 60px;
-  background: rgba(20, 24, 33, 0.45) !important;
-  border: 1px solid rgba(255, 255, 255, 0.05) !important;
-  border-radius: var(--tp-radius-sm, 6px);
-  /* IDE左侧提示线，赋予代码块般精致的嵌套感 */
-  border-left: 3px solid var(--tp-primary-light, var(--tp-primary)) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.01),
-    0 4px 20px rgba(0, 0, 0, 0.15) !important;
-}
-
-.expand-header {
-  margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.expand-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--tp-text-secondary, var(--el-text-color-secondary));
-}
-
-.expand-empty {
-  text-align: center;
-  padding: 20px 0;
-  color: var(--tp-text-muted, var(--el-text-color-secondary));
-  font-size: 11px;
-  border: 1px dashed var(--tp-border-subtle);
-  border-radius: var(--tp-radius-sm, 6px);
-  background: var(--tp-surface-card);
-}
-
-/* 让嵌套子表格（Inner Table）呈现极致轻量、流线型、无多余黑框的现代化质感 */
-.inner-table {
-  border: none !important;
-  background-color: transparent !important;
-  box-shadow: none !important;
-}
-
-:deep(.inner-table) {
-  border: none !important;
-  background-color: transparent !important;
-}
-
-:deep(.inner-table .el-table__inner-wrapper::before),
-:deep(.inner-table::before),
-:deep(.inner-table::after) {
-  display: none !important;
-}
-
-:deep(.inner-table th.el-table__cell) {
-  background-color: rgba(255, 255, 255, 0.012) !important;
-  color: var(--tp-text-secondary, #94a3b8) !important;
-  font-size: 11px !important;
-  font-weight: 600 !important;
-  height: 32px !important;
-  padding: 0 !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
-}
-
-:deep(.inner-table td.el-table__cell) {
-  background-color: transparent !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03) !important;
-  height: 36px !important;
-  padding: 0 !important;
-  color: var(--tp-text-primary) !important;
-}
-
-:deep(.inner-table .el-table__row) {
-  background-color: transparent !important;
-  transition: all 0.2s ease !important;
-}
-
-:deep(.inner-table .el-table__row:hover > td.el-table__cell) {
-  background-color: rgba(167, 139, 250, 0.045) !important;
-}
-
-/* 消除子表格首列的 VS Code 聚焦线，子表格应该保持绝对低调 */
-:deep(.inner-table .el-table__row:hover > td.el-table__cell:first-child) {
-  box-shadow: none !important;
-}
-
-/* 操作列布局 */
-.row-actions {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  white-space: nowrap;
-  width: 100%;
-}
-
-/* 明星 AI 操作按钮 */
-:deep(.ai-generate-btn) {
-  position: relative;
-  color: var(--tp-primary) !important;
-  border: 1px solid var(--tp-primary-lighter) !important;
-  background: var(--tp-primary-lighter) !important;
-  font-weight: 600 !important;
-  font-size: 11px !important;
-  padding: 2px 10px !important;
-  border-radius: 99px !important;
-  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
-}
-
-:deep(.ai-generate-btn:hover) {
-  color: var(--tp-btn-text, #ffffff) !important;
-  border-color: var(--tp-primary) !important;
-  background: var(--tp-primary) !important;
-  box-shadow: 0 0 10px rgba(167, 139, 250, 0.25) !important;
-}
-
-/* 优雅的删除按钮 */
-:deep(.delete-btn) {
-  color: var(--tp-text-muted) !important;
-  font-size: 11px !important;
-  padding: 2px 8px !important;
-  transition: all 0.2s ease !important;
-}
-
-:deep(.delete-btn:hover) {
-  color: var(--tp-danger) !important;
-  background: var(--tp-accent-danger-soft) !important;
-  border-radius: 4px !important;
-}
-
-/* 子表格状态指示灯 - 超轻盈状态芯片 (Premium Status Chips) */
-.status-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 14px;
-  padding: 2px 8px;
-  border-radius: 99px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-}
-
-.status-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-/* 状态：已完成 (Success) */
-.status-indicator.success {
-  color: var(--tp-success, #22c55e) !important;
-  background: rgba(34, 197, 94, 0.08) !important;
-  border-color: rgba(34, 197, 94, 0.16) !important;
-}
-.status-indicator.success .status-dot {
-  background-color: var(--tp-success, #22c55e);
-  box-shadow: 0 0 6px var(--tp-success);
-}
-
-/* 状态：运行中 (Running/Generating) */
-.status-indicator.running {
-  color: var(--tp-warning, #f59e0b) !important;
-  background: rgba(245, 158, 11, 0.08) !important;
-  border-color: rgba(245, 158, 11, 0.16) !important;
-}
-.status-indicator.running .status-dot {
-  background-color: var(--tp-warning, #f59e0b);
-  box-shadow: 0 0 6px var(--tp-warning);
-  animation: pulse-dot 1.5s infinite ease-in-out;
-}
-
-/* 状态：等待中 (Pending) */
-.status-indicator.pending {
-  color: var(--tp-text-subtle, #94a3b8) !important;
-  background: rgba(148, 163, 184, 0.06) !important;
-  border-color: rgba(148, 163, 184, 0.12) !important;
-}
-.status-indicator.pending .status-dot {
-  background-color: var(--tp-text-disabled, #64748b);
-}
-
-/* 状态：失败 (Failed) */
-.status-indicator.failed {
-  color: var(--tp-danger, #ef4444) !important;
-  background: rgba(239, 68, 68, 0.08) !important;
-  border-color: rgba(239, 68, 68, 0.16) !important;
-}
-.status-indicator.failed .status-dot {
-  background-color: var(--tp-danger, #ef4444);
-  box-shadow: 0 0 6px var(--tp-danger);
-}
-
-@keyframes pulse-dot {
-  0%,
-  100% {
-    opacity: 0.4;
-    transform: scale(0.9);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.15);
-  }
-}
-
-/* AI模型标签 */
-.model-badge {
-  display: inline-block;
-  font-family: var(--tp-font-family-mono), monospace;
-  font-size: 10.5px;
-  color: var(--tp-text-secondary);
-  background: var(--tp-surface-input);
-  border: 1px solid var(--tp-border-subtle);
-  border-radius: 4px;
-  padding: 1px 6px;
-  white-space: nowrap;
-}
-
-/* 用例微胶囊统计芯片组 (Metric Capsules) */
-.metrics-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.metric-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 18px;
-  min-width: 22px;
-  padding: 0 6px;
-  border-radius: 99px !important; /* 纯圆角胶囊 */
-  font-size: 10.5px;
-  font-weight: 600;
-  font-family: var(--tp-font-family-mono), monospace;
-  border: 1px solid transparent;
-}
-
-/* 已生成 (Total) */
-.metric-chip.total {
-  background: var(--tp-surface-input);
-  border-color: var(--tp-border-subtle);
-  color: var(--tp-text-secondary);
-}
-
-/* 已采纳 (Adopted) */
-.metric-chip.adopt {
-  background: var(--tp-accent-success-soft, rgba(34, 197, 94, 0.1));
-  border-color: var(--tp-accent-success-border, rgba(34, 197, 94, 0.2));
-  color: var(--tp-success, #22c55e);
-}
-
-/* 已丢弃 (Discarded) */
-.metric-chip.discard {
-  background: rgba(100, 116, 139, 0.08);
-  border-color: rgba(100, 116, 139, 0.16);
-  color: var(--tp-text-subtle);
-}
-
-/* 精准耗时徽章 */
-.duration-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  color: var(--tp-text-secondary);
-  font-family: var(--tp-font-family-mono), monospace;
-}
-
-.duration-badge.empty {
-  color: var(--tp-text-disabled);
-}
-
-.duration-badge .clock-icon {
-  font-size: 12px;
-  color: var(--tp-text-subtle);
-}
-
-.duration-badge .unit {
-  font-size: 9px;
-  opacity: 0.6;
-  margin-left: 0.5px;
-  font-family: var(--tp-font-family-sans);
-}
-
-/* 文档单元格设计 */
-.doc-title-cell {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
   min-width: 0;
-  line-height: 18px;
 }
 
-.doc-title-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--tp-text-primary, var(--el-text-color-primary));
-  font-weight: 600;
-  font-size: 13px;
-}
-
-.doc-title-hint {
-  margin-top: 1px;
-  color: var(--tp-text-subtle, var(--el-text-color-secondary));
-  font-size: 10.5px;
-}
-
-.source-badge {
-  display: inline-flex;
-  align-items: center;
-  height: 20px;
-  padding: 0 6px;
-  border: 1px solid var(--tp-border-subtle);
-  border-radius: 4px;
-  background: var(--tp-surface-muted, var(--el-fill-color-light));
-  color: var(--tp-text-secondary, var(--el-text-color-secondary));
-  font-size: 11px;
-}
-
-.num-text {
-  font-variant-numeric: tabular-nums;
-  color: var(--tp-text-primary, var(--el-text-color-primary));
-}
-
-.table-empty {
+.step-head {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.step-no {
+  display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 180px;
-  padding: 24px;
-}
-
-.table-empty-title {
-  color: var(--tp-text-primary, var(--el-text-color-primary));
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 22px;
-}
-
-.table-empty-desc {
-  margin-top: 4px;
-  color: var(--tp-text-muted, var(--el-text-color-secondary));
+  width: 32px;
+  height: 32px;
+  border-radius: 9999px;
+  border: 1px solid rgba(141, 144, 160, 0.2);
+  background: rgba(39, 42, 49, 1);
+  color: rgba(196, 197, 215, 0.6);
+  font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
-  line-height: 20px;
-}
-
-.table-empty-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-/* 分页 */
-.pagination-wrap {
-  margin-top: 10px;
-  padding: 8px 0 0;
-  display: flex;
-  justify-content: flex-end;
-  border-top: 1px solid var(--tp-border-subtle, var(--el-border-color-lighter));
-}
-
-/* 空状态 */
-.empty-state {
-  text-align: center;
-  padding: 48px 0;
-  color: var(--tp-text-muted, var(--el-text-color-secondary));
-  font-size: 13px;
-}
-
-/* 智能生成对话框 */
-.smart-doc-info {
-  padding: 8px 12px;
-  border-radius: var(--tp-radius-sm, 6px);
-  background: var(--tp-surface-muted, var(--el-fill-color-light));
-  font-size: 13px;
-}
-
-.smart-doc-label {
-  color: var(--tp-text-secondary);
   font-weight: 500;
-}
-
-.smart-doc-name {
-  color: var(--tp-text-primary);
-  font-weight: 600;
-}
-
-.form-tip {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.smart-hint {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 10px 12px;
-  border-radius: 4px;
-  background: var(--el-color-primary-light-9);
-  color: var(--el-color-primary);
-  font-size: 13px;
-  line-height: 1.5;
-  margin-top: 8px;
-}
-
-.smart-hint .el-icon {
   flex-shrink: 0;
-  margin-top: 2px;
+}
+
+.step-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: 0.02em;
+  font-weight: 500;
+  color: rgba(196, 197, 215, 0.6);
+  margin: 0;
+  white-space: nowrap;
+}
+
+.pipeline-step.active .step-no {
+  background: rgba(182, 196, 255, 0.2);
+  border-color: rgba(182, 196, 255, 0.4);
+  color: #b6c4ff;
+}
+
+.pipeline-step.active .step-title {
+  color: #b6c4ff;
+}
+
+.step-track {
+  position: relative;
+  height: 4px;
+  border-radius: 9999px;
+  background: rgba(50, 53, 60, 1);
+  overflow: hidden;
+}
+
+.step-track i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: rgba(182, 196, 255, 0.4);
+  transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.step-track b {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, rgba(182, 196, 255, 0.4), transparent);
+  background-size: 200% 100%;
+  animation: flow-progress 2s linear infinite;
+}
+
+.pipeline-step.active .step-track i {
+  background: rgba(182, 196, 255, 0.5);
+}
+
+.step-desc {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: rgba(196, 197, 215, 0.4);
+}
+
+.step-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  flex-shrink: 0;
+  opacity: 0.2;
+}
+
+.step-chevron .material-symbols-outlined {
+  font-size: 14px;
+  color: #e1e2eb;
+}
+
+/* ═══════ FAB Button ═══════ */
+.fab-btn {
+  position: absolute;
+  bottom: 48px;
+  right: 48px;
+  z-index: 50;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: all 0.5s ease;
+}
+
+.fab-btn:hover {
+  transform: scale(1.05);
+}
+
+.fab-btn:active {
+  transform: scale(0.95);
+}
+
+.fab-border {
+  padding: 1.5px;
+  border-radius: 9999px;
+  background: linear-gradient(to right, #b6c4ff, #d8b9ff);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.fab-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 24px;
+  border-radius: 9999px;
+  background: #0b0e14;
+}
+
+.fab-inner .material-symbols-outlined {
+  color: #b6c4ff;
+  font-size: 24px;
+}
+
+.fab-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  color: #e1e2eb;
+}
+
+/* ═══════ Generating State ═══════ */
+.is-generating .orbit-two {
+  animation-duration: 6s;
+}
+
+.is-generating .orbit-four {
+  animation-duration: 10s;
+}
+
+.is-generating .central-hub {
+  box-shadow: 0 0 50px rgba(162, 89, 255, 0.25);
+  border-color: rgba(162, 89, 255, 0.3);
+}
+
+/* ═══════ Dialog Styles ═══════ */
+.smart-doc-info,
+.smart-result,
+.task-detail-body {
+  color: var(--tp-text-primary);
+}
+
+.smart-doc-label,
+.form-tip,
+.rec-reason {
+  color: var(--tp-text-muted);
+}
+
+.smart-result-header,
+.smart-result-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .smart-result-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 15px;
-  font-weight: 500;
-  margin-bottom: 16px;
-  color: var(--el-text-color-primary);
+  margin-bottom: 12px;
 }
 
 .smart-result-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
-.smart-result-item {
+.smart-hint {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 4px;
-  background: var(--el-fill-color-blank);
-}
-
-.rec-reason {
-  font-size: 13px;
-  color: var(--el-text-color-regular);
-}
-
-.task-detail-body {
-  min-height: 420px;
-}
-
-.task-meta {
-  margin-bottom: 14px;
-}
-
-.task-meta-grid {
-  display: grid;
-  grid-template-columns: minmax(220px, 2fr) minmax(96px, 0.9fr) minmax(140px, 1.3fr) repeat(
-      3,
-      minmax(72px, 0.72fr)
-    );
-  gap: 8px;
-}
-
-.task-meta-item {
-  min-height: 62px;
-  padding: 10px 12px;
-  border: 1px solid var(--tp-border-subtle);
-  border-radius: var(--tp-radius-sm, 8px);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.008));
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 6px;
-  overflow: hidden;
-}
-
-.task-meta-item--full {
-  grid-column: 1 / -1;
-  min-height: auto;
   align-items: flex-start;
-}
-
-.task-meta-label {
-  font-size: 11px;
-  line-height: 14px;
-  color: var(--tp-text-subtle);
-  font-weight: 600;
-}
-
-.task-meta-value {
-  min-width: 0;
-  color: var(--tp-text-primary);
+  gap: 8px;
+  color: var(--tp-text-muted);
   font-size: 13px;
-  line-height: 18px;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.task-meta-value.mono {
-  font-family: var(--tp-font-family-mono), monospace;
-  font-size: 12px;
+/* ═══════ Responsive ═══════ */
+@media (max-width: 1280px) {
+  .floating-panel {
+    width: 220px;
+    padding: 12px;
+  }
 }
 
-.task-meta-value.num {
-  font-family: var(--tp-font-family-mono), monospace;
-  font-size: 18px;
-  line-height: 20px;
-}
-
-.task-meta-value.success {
-  color: var(--tp-success);
-}
-
-.task-meta-value.muted {
-  color: var(--tp-text-muted);
-}
-
-.results-section {
-  margin-top: 12px;
-}
-
-.results-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.results-title {
-  font-size: 13px;
-  font-weight: 600;
-  margin: 0;
-  color: var(--tp-text-primary);
-}
-
-.results-count {
-  display: inline-flex;
-  align-items: center;
-  height: 20px;
-  padding: 0 8px;
-  border-radius: 999px;
-  color: var(--tp-text-muted);
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid var(--tp-border-subtle);
-  font-size: 11px;
-}
-
-.result-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: 55vh;
-  overflow-y: auto;
-  padding-right: 6px;
-}
-
-.result-cards::-webkit-scrollbar {
-  width: 4px;
-}
-
-.result-cards::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12) !important;
-  border-radius: 99px !important;
-}
-
-.result-cards::-webkit-scrollbar-track {
-  background: transparent !important;
-}
-
-.result-card {
-  border: 1px solid rgba(255, 255, 255, 0.055);
-  background: rgba(8, 10, 16, 0.34);
-  border-radius: var(--tp-radius-md, 10px);
-  padding: 13px 15px;
-  transition: all 0.25s ease;
-}
-
-.result-card:hover {
-  border-color: var(--tp-primary-light);
-  background: rgba(167, 139, 250, 0.04);
-}
-
-.result-card.adopted {
-  border-color: var(--tp-accent-success-border);
-  background: rgba(34, 197, 94, 0.055);
-}
-
-.result-card.discarded {
-  border-color: var(--tp-border-subtle);
-  background-color: transparent;
-  opacity: 0.5;
-}
-
-.result-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-
-.result-title-row {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.result-header-tags {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 0 0 auto;
-}
-
-.result-seq {
-  font-family: var(--tp-font-family-mono), monospace;
-  font-size: 11px;
-  color: var(--tp-text-muted, var(--el-text-color-secondary));
-  font-weight: 500;
-}
-
-.result-title-text {
-  font-weight: 600;
-  color: var(--tp-text-primary, var(--el-text-color-primary));
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.result-level {
-  display: inline-flex;
-  align-items: center;
-  height: 20px;
-  padding: 0 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  font-family: var(--tp-font-family-mono), monospace;
-  color: var(--tp-primary-light);
-  background: var(--tp-p2-bg);
-  border: 1px solid var(--tp-accent-primary-border);
-}
-
-.result-level.p0 {
-  color: var(--tp-p0);
-  background: var(--tp-p0-bg);
-}
-
-.result-level.p1 {
-  color: var(--tp-p1);
-  background: var(--tp-p1-bg);
-}
-
-.result-level.p3 {
-  color: var(--tp-p3);
-  background: var(--tp-p3-bg);
-}
-
-.result-badge {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-weight: 600;
-}
-
-.result-badge.adopted {
-  background: var(--tp-accent-success-soft);
-  color: var(--tp-success);
-}
-
-.result-badge.discarded {
-  background: var(--tp-surface-input);
-  color: var(--tp-text-muted);
-}
-
-.result-field {
-  display: grid;
-  grid-template-columns: 64px minmax(0, 1fr);
-  gap: 10px;
-  font-size: 12px;
-  color: var(--tp-text-secondary, var(--el-text-color-regular));
-  margin-bottom: 8px;
-}
-
-.result-field--precondition {
-  padding: 8px 10px;
-  border-radius: var(--tp-radius-sm, 8px);
-  background: rgba(255, 255, 255, 0.018);
-}
-
-.field-content {
-  min-width: 0;
-  line-height: 20px;
-}
-
-.field-label {
-  font-weight: 700;
-  color: var(--tp-text-subtle, var(--el-text-color-secondary));
-  font-size: 11px;
-}
-
-.steps-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.steps-list li {
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
-  column-gap: 8px;
-  row-gap: 3px;
-  padding: 5px 0;
-}
-
-.step-index {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  color: var(--tp-text-muted);
-  background: rgba(255, 255, 255, 0.035);
-  font-family: var(--tp-font-family-mono), monospace;
-  font-size: 10px;
-}
-
-.step-action {
-  min-width: 0;
-  line-height: 20px;
-}
-
-.step-expected {
-  grid-column: 2;
-  position: relative;
-  padding-left: 14px;
-  color: var(--tp-success, var(--el-color-success));
-  font-weight: 500;
-  line-height: 20px;
-}
-
-.step-expected::before {
-  content: '→';
-  position: absolute;
-  left: 0;
-  color: var(--tp-success);
-  opacity: 0.75;
-}
-
-.result-actions {
-  margin-top: 12px;
-  display: flex;
-  gap: 8px;
-}
-
-.fail-reason {
-  color: var(--tp-danger);
-  line-height: 20px;
-}
-
-:deep(.result-action-adopt) {
-  height: 30px !important;
-  padding: 0 14px !important;
-  border-radius: var(--tp-radius-sm, 8px) !important;
-}
-
-:deep(.result-action-discard) {
-  height: 30px !important;
-  padding: 0 14px !important;
-  border-radius: var(--tp-radius-sm, 8px) !important;
-  color: var(--tp-text-secondary) !important;
-}
-
-/* ─── 统一组件高阶微观样式 (Premium Data Workspace) ─── */
-
-/* 1. 工具栏 */
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-  gap: 12px;
-  padding: 8px 10px;
-  background: var(--tp-surface-muted);
-  border: 1px solid var(--tp-border-subtle);
-  border-radius: var(--tp-radius-sm, 6px);
-}
-
-.toolbar-left {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.toolbar-right {
-  display: flex;
-  gap: 8px;
-}
-
-/* 2. 表单输入框 & 下拉选择 */
-:deep(.el-input__wrapper) {
-  border: 1px solid var(--tp-border-subtle) !important;
-  background-color: var(--tp-surface-input) !important;
-  box-shadow: none !important;
-  border-radius: var(--tp-radius-sm, 6px) !important;
-  padding: 0 10px !important;
-  height: 32px !important;
-  transition: all 0.2s ease !important;
-}
-
-:deep(.el-input__wrapper:hover) {
-  border-color: var(--tp-border-strong, var(--tp-primary-light)) !important;
-  background-color: var(--tp-surface-hover) !important;
-}
-
-:deep(.el-input__wrapper.is-focus) {
-  border-color: var(--tp-primary) !important;
-  box-shadow: 0 0 0 2px var(--tp-primary-lighter) !important;
-  background-color: var(--tp-surface-hover) !important;
-}
-
-:deep(.el-select__wrapper) {
-  border: 1px solid var(--tp-border-subtle) !important;
-  background-color: var(--tp-surface-input) !important;
-  box-shadow: none !important;
-  border-radius: var(--tp-radius-sm, 6px) !important;
-  height: 32px !important;
-  transition: all 0.2s ease !important;
-}
-
-:deep(.el-select__wrapper:hover) {
-  border-color: var(--tp-border-strong, var(--tp-primary-light)) !important;
-  background-color: var(--tp-surface-hover) !important;
-}
-
-:deep(.el-select__wrapper.is-focus) {
-  border-color: var(--tp-primary) !important;
-  box-shadow: 0 0 0 2px var(--tp-primary-lighter) !important;
-  background-color: var(--tp-surface-hover) !important;
-}
-
-/* 3. 按钮系列 */
-:deep(.el-button--primary) {
-  background: var(--tp-btn-bg, var(--tp-primary)) !important;
-  border: none !important;
-  border-radius: var(--tp-radius-sm, 6px) !important;
-  font-weight: 500 !important;
-  height: 32px !important;
-  padding: 0 16px !important;
-  color: var(--tp-btn-text, #ffffff) !important;
-  box-shadow: var(--tp-btn-shadow) !important;
-  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
-}
-
-:deep(.el-button--primary:hover) {
-  background: var(--tp-btn-bg-hover, var(--tp-primary-dark)) !important;
-  box-shadow: var(--tp-btn-shadow-hover) !important;
-}
-
-:deep(.el-button--primary:active) {
-  transform: none;
-}
-
-:deep(.el-button:not(.el-button--primary):not(.el-button--text):not(.el-button--danger)) {
-  background-color: var(--tp-btn-plain-bg, var(--tp-surface-card)) !important;
-  border: 1px solid var(--tp-btn-plain-border, var(--tp-border-subtle)) !important;
-  border-radius: var(--tp-radius-sm, 6px) !important;
-  color: var(--tp-btn-plain-text, var(--tp-text-primary)) !important;
-  font-weight: 500 !important;
-  height: 32px !important;
-  padding: 0 16px !important;
-  transition: all 0.2s ease !important;
-}
-
-:deep(.el-button:not(.el-button--primary):not(.el-button--text):not(.el-button--danger):hover) {
-  border-color: var(--tp-primary) !important;
-  background-color: rgba(139, 92, 246, 0.06) !important;
-  color: var(--tp-primary) !important;
-}
-
-/* 4. 精密数据表格 */
-:deep(.el-table) {
-  border: 1px solid var(--tp-border-subtle) !important;
-  border-radius: var(--tp-radius-md, 8px) !important;
-  overflow: hidden !important;
-  background-color: var(--tp-surface-card) !important;
-}
-
-.main-table {
-  flex: 0 0 auto;
-}
-
-:deep(.el-table th.el-table__cell) {
-  background-color: var(--tp-surface-header) !important;
-  color: var(--tp-text-primary) !important;
-  font-weight: 600 !important;
-  font-size: 12px !important;
-  border-bottom: 1px solid var(--tp-border-subtle) !important;
-  height: 36px !important;
-  padding: 0 !important;
-}
-
-:deep(.el-table td.el-table__cell) {
-  border-bottom: 1px solid var(--tp-border-subtle) !important;
-  font-size: 12px !important;
-  color: var(--tp-text-secondary) !important;
-  height: 40px !important;
-  padding: 0 !important;
-}
-
-:deep(.el-table__expanded-cell) {
-  padding: 8px 12px !important;
-  background: var(--tp-surface-card) !important;
-}
-
-:deep(.el-table__expand-icon) {
-  color: var(--tp-text-muted, var(--el-text-color-secondary));
-}
-
-:deep(.el-table .cell) {
-  line-height: 20px !important;
-}
-
-:deep(.el-table .el-table__cell:last-child .cell) {
-  padding-right: 10px !important;
-}
-
-:deep(.el-table .el-table__cell:first-child .cell) {
-  padding-left: 10px !important;
-}
-
-:deep(.el-table__row) {
-  transition: background-color 0.25s ease !important;
-}
-
-:deep(.el-table__row:hover > td.el-table__cell) {
-  background-color: var(--tp-surface-row-hover, rgba(139, 92, 246, 0.04)) !important;
-}
-
-:deep(.el-table__row:hover > td.el-table__cell:first-child) {
-  box-shadow: inset 3px 0 0 0 var(--tp-primary) !important;
-}
-
-:deep(.el-button--text),
-:deep(.el-button--danger.is-link) {
-  font-weight: 500 !important;
-  font-size: 12px !important;
-  padding: 4px 6px !important;
-  border-radius: 4px !important;
-  transition: all 0.2s ease !important;
-}
-
-:deep(.el-button--text) {
-  color: var(--tp-primary) !important;
-}
-
-:deep(.el-button--text:hover) {
-  background-color: var(--tp-primary-lighter) !important;
-}
-
-:deep(.el-button--danger.is-link) {
-  color: var(--tp-danger) !important;
-}
-
-:deep(.el-button--danger.is-link:hover) {
-  background-color: var(--tp-accent-danger-soft) !important;
-}
-
-/* 6. 对话框 & 表单 */
-:deep(.el-dialog) {
-  background-color: var(--tp-surface-elevated, var(--tp-surface-card)) !important;
-  border: 1px solid var(--tp-border-subtle) !important;
-  border-radius: var(--tp-radius-md, 12px) !important;
-  box-shadow: var(--tp-shadow-md) !important;
-}
-
-:deep(.el-dialog__title) {
-  font-size: 15px !important;
-  font-weight: 600 !important;
-  color: var(--tp-text-primary) !important;
-}
-
-:deep(.el-dialog__body) {
-  padding: 16px 20px !important;
-}
-
-:deep(.el-dialog__footer) {
-  border-top: 1px solid var(--tp-border-subtle) !important;
-  padding: 10px 20px !important;
-}
-
-:deep(.el-form-item__label) {
-  color: var(--tp-text-primary) !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
-}
-
-:deep(.el-textarea__inner) {
-  background-color: var(--tp-surface-input) !important;
-  border: 1px solid var(--tp-border-subtle) !important;
-  border-radius: var(--tp-radius-sm, 6px) !important;
-  color: var(--tp-text-primary) !important;
-  box-shadow: none !important;
-  font-size: 13px !important;
-  padding: 8px 10px !important;
-}
-
-:deep(.el-textarea__inner:hover) {
-  border-color: var(--tp-border-strong) !important;
-}
-
-:deep(.el-textarea__inner:focus) {
-  border-color: var(--tp-primary) !important;
-  box-shadow: 0 0 0 2px var(--tp-primary-lighter) !important;
-}
-
-/* 底部统计聚合卡片 (Consistent with "测试智编" / ai-script style) */
-.ai-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-top: 14px;
-}
-
-.ai-stat-card,
-.ai-quickstart-card {
-  padding: 16px;
-  border-radius: var(--tp-radius-lg, 12px);
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--tp-border-subtle);
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  transition: all var(--tp-transition, 0.25s);
-}
-
-.ai-stat-card:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: var(--tp-primary-light);
-}
-
-.ai-stat-label {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 10px;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  color: var(--tp-text-secondary);
-}
-
-.ai-stat-label .material-symbols-outlined {
-  font-size: 15px;
-  opacity: 0.8;
-}
-
-.ai-stat-value {
-  font-size: 24px;
-  font-weight: 700;
-  margin-bottom: 2px;
-  color: var(--tp-text-primary);
-  font-family: var(--tp-font-family-mono), monospace;
-}
-
-.ai-stat-desc {
-  font-size: 11px;
-  color: var(--tp-text-muted);
-}
-
-.ai-stat-bar {
-  height: 4px;
-  background: var(--tp-surface-input);
-  border-radius: 4px;
-  overflow: hidden;
-  margin-top: 12px;
-}
-
-.ai-stat-bar-fill {
-  height: 100%;
-  border-radius: 4px;
-  background: var(--tp-primary);
-  transition: width 0.6s ease;
-}
-
-.ai-stat-segments {
-  display: flex;
-  gap: 4px;
-  margin-top: 12px;
-}
-
-.ai-stat-segment {
-  flex: 1;
-  height: 4px;
-  background: var(--tp-surface-input);
-  border-radius: 2px;
-  transition: all 0.3s ease;
-}
-
-.ai-stat-segment.is-active {
-  background: var(--tp-primary);
-  box-shadow: 0 0 6px var(--tp-primary);
-}
-
-/* 快速入口卡片 */
-.ai-quickstart-card {
-  background: linear-gradient(135deg, rgba(167, 139, 250, 0.05) 0%, rgba(214, 179, 106, 0.02) 100%);
-  border-color: rgba(167, 139, 250, 0.15);
-  cursor: pointer;
-}
-
-.ai-quickstart-card:hover {
-  border-color: var(--tp-primary);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-  transform: translateY(-1px);
-}
-
-.ai-quickstart-content h4 {
-  margin: 0 0 4px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--tp-text-primary);
-}
-
-.ai-quickstart-content p {
-  margin: 0;
-  font-size: 11.5px;
-  color: var(--tp-text-muted);
-  line-height: 1.5;
-}
-
-@media (max-width: 960px) {
-  .card-head {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 8px;
+@media (max-width: 900px) {
+  .top-bar {
+    height: auto;
+    padding: 12px 16px;
   }
 
-  .card-stats {
-    justify-content: flex-start;
-  }
-
-  .flow-strip {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .flow-divider {
+  .global-search {
     display: none;
   }
 
-  .toolbar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .toolbar-left,
-  .toolbar-right {
-    width: 100%;
+  .pipeline-steps {
     flex-wrap: wrap;
   }
 
-  .ai-stats-grid {
-    grid-template-columns: 1fr;
+  .step-chevron {
+    display: none;
+  }
+
+  .fab-btn {
+    bottom: 24px;
+    right: 24px;
+  }
+}
+</style>
+
+<style>
+/* Keyframes - non-scoped for Vue compatibility */
+@keyframes rotate-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes rotate-reverse {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(77, 119, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  50% {
+    box-shadow: 0 0 50px rgba(162, 89, 255, 0.25);
+    border-color: rgba(162, 89, 255, 0.3);
+  }
+}
+
+@keyframes float-node {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes flow-progress {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes line-glow {
+  0% {
+    stroke-dashoffset: 1000;
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0.2;
+  }
+}
+
+@keyframes blink-tag {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 8px rgba(0, 220, 229, 0.5);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.6);
+    box-shadow: 0 0 3px rgba(0, 220, 229, 0.2);
+  }
+}
+
+@keyframes orb-travel {
+  0% {
+    top: 10%;
+    left: 50%;
+  }
+  25% {
+    top: 50%;
+    left: 90%;
+  }
+  50% {
+    top: 90%;
+    left: 50%;
+  }
+  75% {
+    top: 50%;
+    left: 10%;
+  }
+  100% {
+    top: 10%;
+    left: 50%;
   }
 }
 </style>
