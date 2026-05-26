@@ -175,6 +175,16 @@ const router = createRouter({
     },
 
     {
+      path: '/requirement-gen/tasks',
+
+      name: 'RequirementGenTasks',
+
+      component: () => import('../views/requirement-gen/GenTaskList.vue'),
+
+      meta: { requiresAuth: true },
+    },
+
+    {
       path: '/requirement-gen/results',
 
       name: 'RequirementGenResults',

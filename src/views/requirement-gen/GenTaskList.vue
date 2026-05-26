@@ -322,9 +322,9 @@ function parseSteps(stepsJson: string): Array<{ action: string; expected: string
           </el-descriptions>
         </div>
 
-        <!-- 产物列表 -->
+        <!-- 用例列表 -->
         <div v-if="currentResults.length > 0" class="results-section">
-          <h4 class="section-title">生成产物（{{ currentResults.length }} 条）</h4>
+          <h4 class="section-title">用例列表（{{ currentResults.length }} 条）</h4>
           <div class="result-cards">
             <div
               v-for="result in currentResults"
@@ -363,7 +363,7 @@ function parseSteps(stepsJson: string): Array<{ action: string; expected: string
         </div>
 
         <div v-else-if="!detailLoading" class="empty-state">
-          <p>暂无产物数据</p>
+          <p>暂无用例数据</p>
         </div>
       </div>
     </el-dialog>

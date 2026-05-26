@@ -8,6 +8,7 @@ import type { UploadFile } from 'element-plus'
 import { InfoFilled, SuccessFilled } from '@element-plus/icons-vue'
 import { useGenTasks, useRequirementDocs } from '@/composables/useRequirementGen'
 
+import { getActiveAIModel, type AIModelConfig } from '@/api/aiModelConfig'
 import type { RequirementDoc } from '@/api/requirementDoc'
 import type { SmartGeneratePayload, SmartGenerateResult } from '@/api/requirementGen'
 
@@ -74,6 +75,19 @@ const diagnosticsSkillMatch = computed(() => {
   }
   return `${parseSuccessRate.value}%`
 })
+const activeAIModel = ref<AIModelConfig | null>(null)
+const diagnosticsModelName = computed(() => {
+  return activeAIModel.value?.name || activeAIModel.value?.model_id || '--'
+})
+
+async function loadActiveAIModel() {
+  try {
+    activeAIModel.value = await getActiveAIModel()
+  } catch {
+    activeAIModel.value = null
+  }
+}
+
 // ── Pipeline：体现当前任务流各步骤状态 ──
 const latestDocParsed = computed(() => latestDoc.value?.parse_status === 'parsed')
 const latestDocParsing = computed(
@@ -275,6 +289,7 @@ function onMouseMove(e: MouseEvent) {
 }
 
 onMounted(() => {
+  void loadActiveAIModel()
   // 挂载后如果有待解析文档立即开始轮询
   if (docs.value.some((d) => d.parse_status === 'parsing' || d.parse_status === 'not_parsed')) {
     startPollIfNeeded()
@@ -408,9 +423,10 @@ function onSmartDialogClose() {
   showSmartDialog.value = false
 }
 
-function goToDocs() {
-  router.push({ name: 'RequirementGenDocs' })
+function goToTaskRecords() {
+  router.push({ name: 'RequirementGenTasks' })
 }
+
 function goToResults() {
   router.push({
     name: 'RequirementGenResults',
@@ -424,26 +440,6 @@ function goToResults() {
     <div ref="mouseGlowEl" class="mouse-glow"></div>
     <div class="grid-overlay"></div>
     <div class="ambient-glow"></div>
-
-    <header class="top-bar">
-      <div class="top-bar-left">
-        <span class="brand-title">Aisight</span>
-        <div class="global-search">
-          <span class="material-symbols-outlined">search</span>
-          <input class="search-input" placeholder="全局搜索..." readonly />
-        </div>
-      </div>
-      <div class="top-bar-right">
-        <button class="nav-btn" type="button" @click="goToDocs">
-          <span class="material-symbols-outlined">description</span>
-          需求文档
-        </button>
-        <button class="nav-btn" type="button" @click="goToResults">
-          <span class="material-symbols-outlined">assignment_turned_in</span>
-          生成用例
-        </button>
-      </div>
-    </header>
 
     <main class="intel-canvas">
       <canvas ref="particlesCanvas" class="particles-canvas"></canvas>
@@ -485,7 +481,7 @@ function goToResults() {
         <div class="panel-lines">
           <div class="panel-row">
             <span>Model:</span>
-            <strong class="primary-text">GPT-4o-COGNITIVE</strong>
+            <strong class="primary-text">{{ diagnosticsModelName }}</strong>
           </div>
           <div class="panel-row">
             <span>Skill Match:</span>
@@ -514,26 +510,30 @@ function goToResults() {
               stroke-width="0.1"
               class="ring-outer"
             />
-            <circle
-              cx="50"
-              cy="50"
-              r="42"
-              fill="none"
-              stroke="currentColor"
-              stroke-dasharray="1,4"
-              stroke-width="0.3"
-              class="ring-mid"
-            />
-            <circle
-              cx="50"
-              cy="50"
-              r="35"
-              fill="none"
-              stroke="currentColor"
-              stroke-dasharray="5,10"
-              stroke-width="0.2"
-              class="ring-inner"
-            />
+            <g class="ring-group ring-group-mid">
+              <circle
+                cx="50"
+                cy="50"
+                r="42"
+                fill="none"
+                stroke="currentColor"
+                stroke-dasharray="1,4"
+                stroke-width="0.3"
+                class="ring-mid"
+              />
+            </g>
+            <g class="ring-group ring-group-inner">
+              <circle
+                cx="50"
+                cy="50"
+                r="35"
+                fill="none"
+                stroke="currentColor"
+                stroke-dasharray="5,10"
+                stroke-width="0.2"
+                class="ring-inner"
+              />
+            </g>
           </svg>
         </div>
 
@@ -542,14 +542,11 @@ function goToResults() {
         <div class="orbit orbit-two"></div>
         <div class="orbit orbit-three"></div>
         <div class="orbit orbit-four"></div>
-        <div class="orbit-orb"></div>
-
         <!-- Active 态几何多边形（对标设计图，仅 active 时可见） -->
         <div class="polygon polygon-1"></div>
         <div class="polygon polygon-2"></div>
         <div class="polygon polygon-3"></div>
         <div class="polygon polygon-4"></div>
-        <div class="polygon polygon-5"></div>
 
         <!-- SVG 连接线 -->
         <div class="data-lines-wrap">
@@ -630,7 +627,20 @@ function goToResults() {
         </div>
       </transition>
 
-      <button class="fab-btn" type="button" @click="showUploadDialog = true">
+      <button class="fab-btn records-fab-btn" type="button" @click="goToTaskRecords">
+        <div class="fab-border">
+          <div class="fab-inner">
+            <span class="material-symbols-outlined">history</span>
+            <span class="fab-label">TASK RECORDS</span>
+          </div>
+        </div>
+      </button>
+
+      <button
+        class="fab-btn new-requirement-fab-btn"
+        type="button"
+        @click="showUploadDialog = true"
+      >
         <div class="fab-border">
           <div class="fab-inner">
             <span class="material-symbols-outlined">add_task</span>
@@ -838,92 +848,6 @@ function goToResults() {
   animation: pulse-glow 8s ease-in-out infinite;
 }
 
-/* ═══════ Top Bar ═══════ */
-.top-bar {
-  position: relative;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 64px;
-  padding: 0 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(16, 19, 26, 0.6);
-  backdrop-filter: blur(16px);
-}
-
-.top-bar-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.brand-title {
-  font-family: 'Geist', sans-serif;
-  font-size: 24px;
-  font-weight: 700;
-  color: #e1e2eb;
-}
-
-.top-bar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.nav-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border: 1px solid rgba(182, 196, 255, 0.15);
-  border-radius: 8px;
-  background: rgba(182, 196, 255, 0.06);
-  color: rgba(196, 197, 215, 0.8);
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.nav-btn .material-symbols-outlined {
-  font-size: 16px;
-}
-
-.nav-btn:hover {
-  background: rgba(182, 196, 255, 0.15);
-  border-color: rgba(182, 196, 255, 0.3);
-  color: #b6c4ff;
-}
-
-.global-search {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 9999px;
-  background: rgba(39, 42, 49, 0.4);
-}
-
-.global-search .material-symbols-outlined {
-  color: rgba(196, 197, 215, 0.6);
-  font-size: 18px;
-}
-
-.search-input {
-  width: 192px;
-  border: none;
-  outline: none;
-  background: transparent;
-  color: rgba(196, 197, 215, 0.6);
-  font-size: 14px;
-  line-height: 20px;
-}
-
-.search-input::placeholder {
-  color: rgba(196, 197, 215, 0.4);
-}
-
 /* ═══════ Canvas ═══════ */
 .intel-canvas {
   position: relative;
@@ -1054,35 +978,35 @@ function goToResults() {
   position: absolute;
   border-radius: 50%;
   pointer-events: none;
-  transition: border-color 0.8s ease;
+  display: none;
 }
 
 .orbit-one {
   width: 600px;
   height: 600px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  animation: rotate-slow 25s linear infinite;
+  animation: orbit-drift-cw 22s ease-in-out infinite;
 }
 
 .orbit-two {
   width: 520px;
   height: 520px;
   border: 1.5px dashed rgba(182, 196, 255, 0.15);
-  animation: rotate-slow 15s linear infinite;
+  animation: orbit-drift-ccw 14s ease-in-out infinite;
 }
 
 .orbit-three {
   width: 440px;
   height: 440px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  animation: rotate-reverse 35s linear infinite;
+  animation: orbit-drift-cw 30s ease-in-out infinite reverse;
 }
 
 .orbit-four {
   width: 380px;
   height: 380px;
   border: 1.5px dotted rgba(216, 185, 255, 0.25);
-  animation: rotate-slow 25s linear infinite;
+  animation: orbit-drift-ccw 18s ease-in-out infinite;
 }
 
 .data-lines-wrap {
@@ -1125,14 +1049,17 @@ function goToResults() {
   justify-content: center;
   width: 208px;
   height: 208px;
-  border: 1px solid rgba(182, 196, 255, 0.3);
-  border-radius: 50%;
+  border: 1px solid rgba(162, 89, 255, 0.5);
+  border-radius: 16px;
   color: #e1e2eb;
-  background: rgba(16, 19, 26, 0.6);
+  background: rgba(20, 14, 32, 0.85);
   backdrop-filter: blur(16px);
   cursor: pointer;
   animation: pulse-glow 4s ease-in-out infinite;
-  box-shadow: 0 0 40px rgba(182, 196, 255, 0.1);
+  box-shadow:
+    0 0 60px rgba(162, 89, 255, 0.45),
+    0 0 120px rgba(162, 89, 255, 0.2),
+    inset 0 0 40px rgba(162, 89, 255, 0.08);
   transition:
     transform 0.3s ease,
     border-radius 0.6s ease,
@@ -1174,51 +1101,48 @@ function goToResults() {
   font-style: normal;
 }
 
-/* ═══════ Active Polygons (设计图方形) ═══════ */
+/* ═══════ Active Polygons (严格对标 code.html 的 4 个旋转环) ═══════ */
+/* code.html 的 tailwind config 里 borderRadius.full = 0.75rem = 12px，所以所有 rounded-full 实际是圆角方形 */
 .polygon {
   position: absolute;
   z-index: 12;
-  width: 560px;
-  height: 560px;
-  border: 1.2px solid rgba(216, 185, 255, 0.2);
   pointer-events: none;
-  opacity: 0;
-  border-radius: 4px;
-  transition: opacity 0.6s ease;
+  opacity: 1;
+  border-radius: 12px;
 }
 
+/* 100% 还原 code.html 第 281-284 行的 4 个 rounded-full 方形：
+   <div class="absolute w-[600px] h-[600px] rounded-full border border-white/5 animate-rotate"></div>
+   <div class="absolute w-[520px] h-[520px] rounded-full border border-dashed border-primary/10 animate-rotate-fast"></div>
+   <div class="absolute w-[440px] h-[440px] rounded-full border border-white/5 animate-rotate-rev"></div>
+   <div class="absolute w-[380px] h-[380px] rounded-full border border-dotted border-secondary/20 animate-rotate"></div>
+*/
 .polygon-1 {
-  animation: rotate-slow 12s linear infinite;
+  width: 600px;
+  height: 600px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  animation: rotate-slow 25s linear infinite;
 }
+
 .polygon-2 {
-  animation: rotate-reverse 16s linear infinite;
-  border-color: rgba(216, 185, 255, 0.25);
+  width: 520px;
+  height: 520px;
+  border: 1px dashed rgba(182, 196, 255, 0.1);
+  animation: rotate-slow 15s linear infinite;
 }
+
 .polygon-3 {
-  animation: rotate-slow 20s linear infinite;
-  border-color: rgba(182, 196, 255, 0.2);
+  width: 440px;
+  height: 440px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  animation: rotate-reverse 35s linear infinite;
 }
+
 .polygon-4 {
-  animation: rotate-reverse 24s linear infinite;
-  border-color: rgba(216, 185, 255, 0.18);
-}
-.polygon-5 {
-  animation: rotate-slow 28s linear infinite;
-  border-color: rgba(182, 196, 255, 0.15);
-}
-/* ═══════ Glowing Orb ═══════ */
-.orbit-orb {
-  position: absolute;
-  z-index: 15;
-  width: 18px;
-  height: 18px;
-  border-radius: 9999px;
-  background: radial-gradient(circle, rgba(182, 196, 255, 0.9), rgba(162, 89, 255, 0.6));
-  box-shadow:
-    0 0 20px rgba(182, 196, 255, 0.6),
-    0 0 60px rgba(162, 89, 255, 0.3);
-  animation: orb-travel 8s ease-in-out infinite;
-  pointer-events: none;
+  width: 380px;
+  height: 380px;
+  border: 1px dotted rgba(216, 185, 255, 0.2);
+  animation: rotate-slow 25s linear infinite;
 }
 
 /* ═══════ Pipeline Footer Transition ═══════ */
@@ -1383,6 +1307,7 @@ function goToResults() {
   bottom: 48px;
   right: 48px;
   z-index: 50;
+  width: 252px;
   border: none;
   background: none;
   cursor: pointer;
@@ -1397,7 +1322,16 @@ function goToResults() {
   transform: scale(0.95);
 }
 
+.new-requirement-fab-btn {
+  bottom: 48px;
+}
+
+.records-fab-btn {
+  bottom: 118px;
+}
+
 .fab-border {
+  width: 100%;
   padding: 1.5px;
   border-radius: 9999px;
   background: linear-gradient(to right, #b6c4ff, #d8b9ff);
@@ -1407,6 +1341,7 @@ function goToResults() {
 .fab-inner {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 16px;
   padding: 16px 24px;
   border-radius: 9999px;
@@ -1428,45 +1363,24 @@ function goToResults() {
 }
 
 /* ═══════ Active State (parsing / running / generating) ═══════ */
-/* 对标设计图：隐藏圆环/节点，显示旋转方形多边形，Hub 变圆角方形 */
-.is-active .orbit,
-.is-active .orbit-orb,
-.is-active .svg-rings-wrap,
-.is-active .data-lines-wrap,
+/* 对标设计图：圆环+方形+SVG线始终同时显示，Active 态仅隐藏浮动节点 */
 .is-active .float-node {
   opacity: 0;
   transition: opacity 0.6s ease;
 }
 
-.is-active .polygon {
-  opacity: 1;
-}
-
-.is-active .central-hub {
-  border-radius: 16px;
-  border-color: rgba(162, 89, 255, 0.5);
-  background: rgba(20, 14, 32, 0.85);
-  box-shadow:
-    0 0 60px rgba(162, 89, 255, 0.45),
-    0 0 120px rgba(162, 89, 255, 0.2),
-    inset 0 0 40px rgba(162, 89, 255, 0.08);
-}
-
-/* ═══════ Generating State (smart generate) ═══════ */
+/* ═══════ Generating State (smart generate) - 加速漂移 ═══════ */
 .is-generating .polygon-1 {
-  animation-duration: 8s;
+  animation-duration: 10s;
 }
 .is-generating .polygon-2 {
-  animation-duration: 10s;
+  animation-duration: 8s;
 }
 .is-generating .polygon-3 {
   animation-duration: 12s;
 }
 .is-generating .polygon-4 {
-  animation-duration: 14s;
-}
-.is-generating .polygon-5 {
-  animation-duration: 16s;
+  animation-duration: 9s;
 }
 
 .is-generating .central-hub {
@@ -1487,7 +1401,8 @@ function goToResults() {
 .svg-rings {
   width: 100%;
   height: 100%;
-  opacity: 0.3;
+  opacity: 0.35;
+  overflow: hidden;
 }
 
 .ring-outer {
@@ -1496,21 +1411,37 @@ function goToResults() {
 
 .ring-mid {
   color: #b6c4ff;
-  animation: rotate-slow 25s linear infinite;
-  transform-origin: 50% 50%;
 }
 
 .ring-inner {
   color: #d8b9ff;
-  animation: rotate-reverse 35s linear infinite;
-  transform-origin: 50% 50%;
+}
+
+/* 两个虚线圆形漂移：translate 在 SVG user units 空间生效，1 unit ≈ 7px
+   两个圈共用 30s cycle，但有 3 段节奏：
+   0-33%   大圈（mid）独走（小圈隐藏）
+   33-66%  小圈（inner）独走（大圈隐藏）
+   66-100% 两圈同时出来交叉
+   每个圈的两次出现走不同方向，避免重复 */
+.ring-group {
+  transform-origin: 50px 50px;
+  transform-box: view-box;
+  will-change: transform, opacity;
+}
+
+.ring-group-mid {
+  animation: ring-mid-cycle 30s linear infinite;
+}
+
+.ring-group-inner {
+  animation: ring-inner-cycle 30s linear infinite;
 }
 
 /* ═══════ Floating Data Nodes ═══════ */
 .float-node {
   position: absolute;
   z-index: 25;
-  display: flex;
+  display: none;
   align-items: center;
   gap: 8px;
   padding: 6px 16px;
@@ -1660,15 +1591,6 @@ function goToResults() {
 }
 
 @media (max-width: 900px) {
-  .top-bar {
-    height: auto;
-    padding: 12px 16px;
-  }
-
-  .global-search {
-    display: none;
-  }
-
   .pipeline-steps {
     flex-wrap: wrap;
   }
@@ -1677,14 +1599,196 @@ function goToResults() {
     display: none;
   }
 
-  .fab-btn {
+  .new-requirement-fab-btn {
     bottom: 24px;
     right: 24px;
+  }
+
+  .records-fab-btn {
+    bottom: 94px;
+    right: 24px;
+  }
+
+  .fab-btn {
+    width: 252px;
+    max-width: calc(100vw - 48px);
+  }
+}
+
+/* 覆盖全局 reduced-motion 规则，确保 HUD 动画始终运行 */
+@media (prefers-reduced-motion: reduce) {
+  .requirement-gen-page .polygon-1 {
+    animation: rotate-slow 25s linear infinite !important;
+  }
+  .requirement-gen-page .polygon-2 {
+    animation: rotate-slow 15s linear infinite !important;
+  }
+  .requirement-gen-page .polygon-3 {
+    animation: rotate-reverse 35s linear infinite !important;
+  }
+  .requirement-gen-page .polygon-4 {
+    animation: rotate-slow 25s linear infinite !important;
+  }
+  .requirement-gen-page .ring-group-mid {
+    animation: ring-mid-cycle 30s linear infinite !important;
+  }
+  .requirement-gen-page .ring-group-inner {
+    animation: ring-inner-cycle 30s linear infinite !important;
+  }
+  .requirement-gen-page .central-hub {
+    animation: pulse-glow 4s ease-in-out infinite !important;
+  }
+  .requirement-gen-page .float-node {
+    animation: float-node 6s ease-in-out infinite !important;
+  }
+  .requirement-gen-page .ambient-glow {
+    animation: pulse-glow 8s ease-in-out infinite !important;
+  }
+  .requirement-gen-page .data-line {
+    animation: line-glow 10s linear infinite !important;
+  }
+  .requirement-gen-page .flow-bar {
+    animation: flow-progress 2s linear infinite !important;
+  }
+  .requirement-gen-page .streaming-tag {
+    animation: blink-tag 2s ease-in-out infinite !important;
+  }
+  .requirement-gen-page .panel-dot {
+    animation: dot-pulse 2s ease-in-out infinite !important;
+  }
+  .requirement-gen-page .panel-icon {
+    animation: pulse-glow 2s ease-in-out infinite !important;
+  }
+  .requirement-gen-page .beam-1 {
+    animation: beam-in 3s linear infinite !important;
+  }
+  .requirement-gen-page .beam-2 {
+    animation: beam-in 5s linear infinite 1s !important;
+  }
+  .requirement-gen-page .step-track b {
+    animation: flow-progress 2s linear infinite !important;
+  }
+
+  .requirement-gen-page,
+  .requirement-gen-page *,
+  .requirement-gen-page *::before,
+  .requirement-gen-page *::after {
+    transition-duration: 0.4s !important;
   }
 }
 </style>
 
 <style>
+/* 两个虚线圆形 30s 同步 cycle，3 段节奏 + 4 条不同路径
+   translate 单位为 SVG user units（viewBox 0..100, 1 unit ≈ 7 CSS px）
+   translate3d 强制 GPU 合成；linear timing 保证匀速 */
+
+/* 大圈：path A 对角线（左上→右下）独走，path B 垂直（下→上）与小圈同时交叉 */
+@keyframes ring-mid-cycle {
+  /* Phase A 0-33%: 独走 - 左上 → 右下 */
+  0% {
+    opacity: 0;
+    transform: translate3d(-55px, -50px, 0) rotate(0deg);
+  }
+  4% {
+    opacity: 0.85;
+    transform: translate3d(-38px, -34px, 0) rotate(15deg);
+  }
+  16% {
+    opacity: 0.85;
+    transform: translate3d(0px, 0px, 0) rotate(60deg);
+  }
+  28% {
+    opacity: 0.85;
+    transform: translate3d(38px, 34px, 0) rotate(105deg);
+  }
+  33% {
+    opacity: 0;
+    transform: translate3d(55px, 50px, 0) rotate(120deg);
+  }
+
+  /* Phase B 33-66%: 隐藏（小圈独走） */
+  65% {
+    opacity: 0;
+    transform: translate3d(55px, 50px, 0) rotate(234deg);
+  }
+
+  /* Phase C 66-100%: 交叉 - 下 → 上（垂直路径） */
+  66% {
+    opacity: 0;
+    transform: translate3d(-5px, 60px, 0) rotate(238deg);
+  }
+  70% {
+    opacity: 0.85;
+    transform: translate3d(-3px, 35px, 0) rotate(252deg);
+  }
+  82% {
+    opacity: 0.85;
+    transform: translate3d(2px, 0px, 0) rotate(296deg);
+  }
+  95% {
+    opacity: 0.85;
+    transform: translate3d(8px, -42px, 0) rotate(343deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(10px, -55px, 0) rotate(360deg);
+  }
+}
+
+/* 小圈：path A 水平（右→左）独走，path B 对角线（左上→右下）与大圈同时交叉 */
+@keyframes ring-inner-cycle {
+  /* Phase A 0-33%: 隐藏（大圈独走） */
+  0% {
+    opacity: 0;
+    transform: translate3d(60px, 5px, 0) rotate(0deg);
+  }
+  33% {
+    opacity: 0;
+    transform: translate3d(60px, 5px, 0) rotate(-120deg);
+  }
+
+  /* Phase B 33-66%: 独走 - 右 → 左（水平路径） */
+  37% {
+    opacity: 0.85;
+    transform: translate3d(38px, 8px, 0) rotate(-135deg);
+  }
+  49% {
+    opacity: 0.85;
+    transform: translate3d(0px, 2px, 0) rotate(-180deg);
+  }
+  61% {
+    opacity: 0.85;
+    transform: translate3d(-38px, -3px, 0) rotate(-225deg);
+  }
+  65% {
+    opacity: 0;
+    transform: translate3d(-60px, -6px, 0) rotate(-238deg);
+  }
+
+  /* Phase C 66-100%: 交叉 - 左上 → 右下（对角线，与大圈方向不同） */
+  66% {
+    opacity: 0;
+    transform: translate3d(-50px, -45px, 0) rotate(-238deg);
+  }
+  70% {
+    opacity: 0.85;
+    transform: translate3d(-32px, -28px, 0) rotate(-252deg);
+  }
+  82% {
+    opacity: 0.85;
+    transform: translate3d(0px, 2px, 0) rotate(-296deg);
+  }
+  95% {
+    opacity: 0.85;
+    transform: translate3d(35px, 38px, 0) rotate(-343deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(55px, 50px, 0) rotate(-360deg);
+  }
+}
+
 /* Keyframes - non-scoped for Vue compatibility */
 @keyframes rotate-slow {
   from {
@@ -1701,6 +1805,103 @@ function goToResults() {
   }
   to {
     transform: rotate(0deg);
+  }
+}
+
+/* 方形大幅度漂移旋转：先 translate（屏幕坐标偏移）再 rotate，确保位移可见 */
+@keyframes poly-drift-1 {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  20% {
+    transform: translate(50px, -40px) rotate(72deg);
+  }
+  40% {
+    transform: translate(-45px, 55px) rotate(144deg);
+  }
+  60% {
+    transform: translate(60px, 35px) rotate(216deg);
+  }
+  80% {
+    transform: translate(-50px, -45px) rotate(288deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(360deg);
+  }
+}
+
+@keyframes poly-drift-2 {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  16% {
+    transform: translate(-55px, 40px) rotate(-58deg);
+  }
+  33% {
+    transform: translate(60px, -25px) rotate(-120deg);
+  }
+  50% {
+    transform: translate(-35px, -55px) rotate(-180deg);
+  }
+  66% {
+    transform: translate(50px, 50px) rotate(-240deg);
+  }
+  83% {
+    transform: translate(-60px, 20px) rotate(-300deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(-360deg);
+  }
+}
+
+@keyframes poly-drift-3 {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  14% {
+    transform: translate(40px, 45px) rotate(50deg);
+  }
+  28% {
+    transform: translate(-55px, -30px) rotate(100deg);
+  }
+  42% {
+    transform: translate(50px, -45px) rotate(152deg);
+  }
+  57% {
+    transform: translate(-40px, 55px) rotate(205deg);
+  }
+  71% {
+    transform: translate(60px, 25px) rotate(256deg);
+  }
+  85% {
+    transform: translate(-45px, -35px) rotate(308deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(360deg);
+  }
+}
+
+@keyframes poly-drift-4 {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  18% {
+    transform: translate(55px, -45px) rotate(-65deg);
+  }
+  36% {
+    transform: translate(-45px, 55px) rotate(-130deg);
+  }
+  54% {
+    transform: translate(50px, 35px) rotate(-194deg);
+  }
+  72% {
+    transform: translate(-60px, -40px) rotate(-260deg);
+  }
+  90% {
+    transform: translate(35px, 50px) rotate(-324deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(-360deg);
   }
 }
 
@@ -1812,29 +2013,6 @@ function goToResults() {
   100% {
     transform: translateX(0) scaleX(1);
     opacity: 0;
-  }
-}
-
-@keyframes orb-travel {
-  0% {
-    top: 10%;
-    left: 50%;
-  }
-  25% {
-    top: 50%;
-    left: 90%;
-  }
-  50% {
-    top: 90%;
-    left: 50%;
-  }
-  75% {
-    top: 50%;
-    left: 10%;
-  }
-  100% {
-    top: 10%;
-    left: 50%;
   }
 }
 </style>
