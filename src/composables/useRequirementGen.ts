@@ -20,6 +20,7 @@ import {
   listGenTasks,
   createGenTask,
   getGenTask,
+  deleteGenTask,
   listGenResults,
   adoptResult,
   discardResult,
@@ -33,6 +34,19 @@ import {
   type SmartGenerateResult,
 } from '@/api/requirementGen'
 import { listAISkills, type AISkill } from '@/api/aiSkill'
+
+interface ApiErrorLike {
+  response?: {
+    data?: {
+      message?: string
+    }
+  }
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  const apiError = error as ApiErrorLike
+  return apiError.response?.data?.message || fallback
+}
 
 /** 需求文档管理逻辑 */
 export function useRequirementDocs() {
@@ -61,8 +75,8 @@ export function useRequirementDocs() {
       const result = await listRequirementDocs(projectId.value, params)
       docs.value = result.items || []
       total.value = result.total
-    } catch (e: any) {
-      ElMessage.error(e?.response?.data?.message || '加载文档列表失败')
+    } catch (e: unknown) {
+      ElMessage.error(getErrorMessage(e, '加载文档列表失败'))
     } finally {
       loading.value = false
     }
@@ -74,8 +88,8 @@ export function useRequirementDocs() {
       await uploadRequirementDoc(projectId.value, file, title, remark)
       ElMessage.success('文档上传成功，正在解析中...')
       await fetchDocs()
-    } catch (e: any) {
-      ElMessage.error(e?.response?.data?.message || '上传失败')
+    } catch (e: unknown) {
+      ElMessage.error(getErrorMessage(e, '上传失败'))
     }
   }
 
@@ -85,8 +99,8 @@ export function useRequirementDocs() {
       await pasteRequirementDoc(projectId.value, { title, raw_content: content, remark })
       ElMessage.success('文档创建成功')
       await fetchDocs()
-    } catch (e: any) {
-      ElMessage.error(e?.response?.data?.message || '创建失败')
+    } catch (e: unknown) {
+      ElMessage.error(getErrorMessage(e, '创建失败'))
     }
   }
 
@@ -108,8 +122,8 @@ export function useRequirementDocs() {
     if (!projectId.value) return null
     try {
       return await getRequirementDoc(projectId.value, docId)
-    } catch (e: any) {
-      ElMessage.error(e?.response?.data?.message || '获取文档详情失败')
+    } catch (e: unknown) {
+      ElMessage.error(getErrorMessage(e, '获取文档详情失败'))
       return null
     }
   }
@@ -174,8 +188,8 @@ export function useGenTasks() {
       const result = await listGenTasks(projectId.value, params)
       tasks.value = result.items || []
       total.value = result.total
-    } catch (e: any) {
-      ElMessage.error(e?.response?.data?.message || '加载任务列表失败')
+    } catch (e: unknown) {
+      ElMessage.error(getErrorMessage(e, '加载任务列表失败'))
     } finally {
       loading.value = false
     }
@@ -191,8 +205,8 @@ export function useGenTasks() {
         page_size: 100,
       })
       return result.items || []
-    } catch (e: any) {
-      ElMessage.error(e?.response?.data?.message || '加载文档任务失败')
+    } catch (e: unknown) {
+      ElMessage.error(getErrorMessage(e, '加载文档任务失败'))
       return []
     }
   }
@@ -202,8 +216,8 @@ export function useGenTasks() {
     skillsLoading.value = true
     try {
       skills.value = await listAISkills(projectId.value)
-    } catch (e: any) {
-      ElMessage.error(e?.response?.data?.message || '加载 Skill 列表失败')
+    } catch (e: unknown) {
+      ElMessage.error(getErrorMessage(e, '加载 Skill 列表失败'))
     } finally {
       skillsLoading.value = false
     }
@@ -215,8 +229,8 @@ export function useGenTasks() {
       await createGenTask(projectId.value, payload)
       ElMessage.success('生成任务已创建，正在处理中...')
       await fetchTasks()
-    } catch (e: any) {
-      ElMessage.error(e?.response?.data?.message || '创建任务失败')
+    } catch (e: unknown) {
+      ElMessage.error(getErrorMessage(e, '创建任务失败'))
     }
   }
 
@@ -226,8 +240,8 @@ export function useGenTasks() {
     try {
       currentTask.value = await getGenTask(projectId.value, taskId)
       currentResults.value = await listGenResults(projectId.value, taskId)
-    } catch (e: any) {
-      ElMessage.error(e?.response?.data?.message || '加载任务详情失败')
+    } catch (e: unknown) {
+      ElMessage.error(getErrorMessage(e, '加载任务详情失败'))
     } finally {
       detailLoading.value = false
     }
@@ -239,8 +253,8 @@ export function useGenTasks() {
       await adoptResult(projectId.value, resultId)
       ElMessage.success('产物已采纳')
       await fetchTaskDetail(currentTask.value.id)
-    } catch (e: any) {
-      ElMessage.error(e?.response?.data?.message || '采纳失败')
+    } catch (e: unknown) {
+      ElMessage.error(getErrorMessage(e, '采纳失败'))
     }
   }
 
@@ -250,8 +264,8 @@ export function useGenTasks() {
       await discardResult(projectId.value, resultId)
       ElMessage.success('产物已丢弃')
       await fetchTaskDetail(currentTask.value.id)
-    } catch (e: any) {
-      ElMessage.error(e?.response?.data?.message || '丢弃失败')
+    } catch (e: unknown) {
+      ElMessage.error(getErrorMessage(e, '丢弃失败'))
     }
   }
 
@@ -268,6 +282,26 @@ export function useGenTasks() {
       await fetchTasks()
     } catch {
       // 用户取消
+    }
+  }
+
+  async function handleDeleteTask(taskId: number, taskName: string) {
+    if (!projectId.value) return
+    try {
+      await ElMessageBox.confirm(
+        `确定删除生成任务「${taskName}」？若任务仍在等待或生成中，删除将同时终止该任务；任务记录和未入库产物将被删除，已采纳生成的测试用例不会被删除。`,
+        '删除任务',
+        { type: 'warning' },
+      )
+      await deleteGenTask(projectId.value, taskId)
+      ElMessage.success('任务已删除')
+      if (tasks.value.length === 1 && page.value > 1) {
+        page.value -= 1
+      }
+      await fetchTasks()
+    } catch (e: unknown) {
+      if (e === 'cancel' || e === 'close') return
+      ElMessage.error(getErrorMessage(e, '删除任务失败'))
     }
   }
 
@@ -290,8 +324,8 @@ export function useGenTasks() {
       )
       await fetchTasks()
       return result
-    } catch (e: any) {
-      ElMessage.error(e?.response?.data?.message || '智能生成失败')
+    } catch (e: unknown) {
+      ElMessage.error(getErrorMessage(e, '智能生成失败'))
       return null
     } finally {
       smartGenerating.value = false
@@ -332,5 +366,6 @@ export function useGenTasks() {
     handleAdopt,
     handleDiscard,
     handleClose,
+    handleDeleteTask,
   }
 }

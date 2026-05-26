@@ -63,6 +63,7 @@ const mouseGlowEl = ref<HTMLDivElement | null>(null)
 let animFrameId = 0
 let latencyTimer: ReturnType<typeof setInterval> | null = null
 let glitchTimer: ReturnType<typeof setInterval> | null = null
+let particlesResizeHandler: (() => void) | null = null
 const glitchDisplay = ref<string | number>('')
 const centralNumber = computed(() => {
   if (smartGenerating.value) return parsedDocCount.value || docs.value.length || 'AI'
@@ -230,50 +231,108 @@ async function autoTriggerSmartGenerate() {
 interface PData {
   x: number
   y: number
-  size: number
-  speedX: number
-  speedY: number
-  life: number
-  opacity: number
-  growth: number
+  vx: number
+  vy: number
+  r: number
+  a: number
+  color: number
 }
+
+function getParticleColor(color: number, opacity: number): string {
+  if (color < 0.33) return `rgba(100,140,255,${opacity})`
+  if (color < 0.66) return `rgba(160,100,255,${opacity * 0.8})`
+  return `rgba(80,220,255,${opacity * 0.7})`
+}
+
 function initParticles() {
-  const canvas = particlesCanvas.value
-  if (!canvas) return
+  const canvasEl = particlesCanvas.value
+  if (!canvasEl) return
+  const canvas = canvasEl
   const ctx = canvas.getContext('2d')
   if (!ctx) return
+  const context = ctx
   const particles: PData[] = []
+  let width = 0
+  let height = 0
   function resize() {
-    canvas!.width = canvas!.parentElement?.clientWidth ?? window.innerWidth
-    canvas!.height = canvas!.parentElement?.clientHeight ?? window.innerHeight
+    width = canvas.parentElement?.clientWidth ?? window.innerWidth
+    height = canvas.parentElement?.clientHeight ?? window.innerHeight
+    canvas.width = width
+    canvas.height = height
   }
-  window.addEventListener('resize', resize)
+  if (particlesResizeHandler) {
+    window.removeEventListener('resize', particlesResizeHandler)
+  }
+  particlesResizeHandler = resize
+  window.addEventListener('resize', particlesResizeHandler)
   resize()
   function makeP(): PData {
     return {
-      x: Math.random() * canvas!.width,
-      y: Math.random() * canvas!.height,
-      size: Math.random() * 1.5 + 0.5,
-      speedX: Math.random() * 0.2 - 0.1,
-      speedY: Math.random() * 0.2 - 0.1,
-      life: Math.random(),
-      opacity: 0,
-      growth: Math.random() * 0.005 + 0.002,
+      x: Math.random() * width,
+      y: Math.random() * height,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: (Math.random() - 0.5) * 0.4,
+      r: Math.random() * 1.8 + 0.4,
+      a: Math.random() * 0.5 + 0.15,
+      color: Math.random(),
     }
   }
-  for (let i = 0; i < 80; i++) particles.push(makeP())
+  for (let i = 0; i < 120; i++) particles.push(makeP())
   function tick() {
-    ctx!.clearRect(0, 0, canvas!.width, canvas!.height)
-    for (const p of particles) {
-      p.x += p.speedX
-      p.y += p.speedY
-      p.life += p.growth
-      p.opacity = Math.sin(p.life * Math.PI) * 0.3
-      if (p.life > 1) Object.assign(p, makeP())
-      ctx!.fillStyle = `rgba(182,196,255,${p.opacity})`
-      ctx!.beginPath()
-      ctx!.arc(p.x, p.y, p.size, 0, Math.PI * 2)
-      ctx!.fill()
+    context.clearRect(0, 0, width, height)
+    const glowOne = context.createRadialGradient(
+      width * 0.3,
+      height * 0.5,
+      0,
+      width * 0.3,
+      height * 0.5,
+      width * 0.4,
+    )
+    glowOne.addColorStop(0, 'rgba(100,60,200,0.04)')
+    glowOne.addColorStop(1, 'transparent')
+    context.fillStyle = glowOne
+    context.fillRect(0, 0, width, height)
+    const glowTwo = context.createRadialGradient(
+      width * 0.7,
+      height * 0.4,
+      0,
+      width * 0.7,
+      height * 0.4,
+      width * 0.35,
+    )
+    glowTwo.addColorStop(0, 'rgba(60,100,200,0.03)')
+    glowTwo.addColorStop(1, 'transparent')
+    context.fillStyle = glowTwo
+    context.fillRect(0, 0, width, height)
+    context.lineWidth = 0.5
+    for (let i = 0; i < particles.length; i += 1) {
+      const p = particles[i]
+      if (!p) continue
+      p.x += p.vx
+      p.y += p.vy
+      if (p.x < 0 || p.x > width) p.vx *= -1
+      if (p.y < 0 || p.y > height) p.vy *= -1
+      context.beginPath()
+      context.arc(p.x, p.y, p.r, 0, Math.PI * 2)
+      context.fillStyle = getParticleColor(p.color, p.a)
+      context.shadowBlur = 8
+      context.shadowColor = getParticleColor(p.color, Math.min(p.a + 0.2, 0.75))
+      context.fill()
+      context.shadowBlur = 0
+      for (let j = i + 1; j < particles.length; j += 1) {
+        const q = particles[j]
+        if (!q) continue
+        const dx = p.x - q.x
+        const dy = p.y - q.y
+        const distance = Math.sqrt(dx * dx + dy * dy)
+        if (distance < 140) {
+          context.beginPath()
+          context.moveTo(p.x, p.y)
+          context.lineTo(q.x, q.y)
+          context.strokeStyle = `rgba(140,160,255,${0.12 * (1 - distance / 140)})`
+          context.stroke()
+        }
+      }
     }
     animFrameId = requestAnimationFrame(tick)
   }
@@ -322,6 +381,10 @@ onUnmounted(() => {
   stopPoll()
   stopTaskPoll()
   window.removeEventListener('mousemove', onMouseMove)
+  if (particlesResizeHandler) {
+    window.removeEventListener('resize', particlesResizeHandler)
+    particlesResizeHandler = null
+  }
   cancelAnimationFrame(animFrameId)
   if (latencyTimer) clearInterval(latencyTimer)
   if (glitchTimer) clearInterval(glitchTimer)
@@ -802,7 +865,7 @@ function goToResults() {
   overflow: hidden;
   color: #e1e2eb;
   font-family: 'Inter', sans-serif;
-  background: #0b0e14;
+  background: #000;
 }
 
 /* ═══════ Mouse Glow ═══════ */
@@ -834,11 +897,13 @@ function goToResults() {
 }
 
 .grid-overlay {
+  display: none;
   background-image: radial-gradient(rgba(182, 196, 255, 0.04) 1px, transparent 1px);
   background-size: 32px 32px;
 }
 
 .ambient-glow {
+  display: none;
   background: linear-gradient(
     135deg,
     rgba(182, 196, 255, 0.08),
@@ -974,6 +1039,39 @@ function goToResults() {
   justify-content: center;
 }
 
+.central-zone::before {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  width: 760px;
+  height: 760px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(16, 10, 28, 0.52) 0%,
+    rgba(7, 5, 14, 0.34) 38%,
+    rgba(0, 0, 0, 0) 70%
+  );
+  pointer-events: none;
+}
+
+.central-zone::after {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  width: 360px;
+  height: 360px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(162, 89, 255, 0.14) 0%,
+    rgba(100, 116, 255, 0.06) 42%,
+    rgba(0, 0, 0, 0) 72%
+  );
+  filter: blur(18px);
+  pointer-events: none;
+}
+
 .orbit {
   position: absolute;
   border-radius: 50%;
@@ -1011,6 +1109,7 @@ function goToResults() {
 
 .data-lines-wrap {
   position: absolute;
+  z-index: 10;
   width: 700px;
   height: 700px;
   pointer-events: none;
@@ -1120,28 +1219,28 @@ function goToResults() {
 .polygon-1 {
   width: 600px;
   height: 600px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(108, 122, 220, 0.11);
   animation: rotate-slow 25s linear infinite;
 }
 
 .polygon-2 {
   width: 520px;
   height: 520px;
-  border: 1px dashed rgba(182, 196, 255, 0.1);
+  border: 1px dashed rgba(126, 146, 255, 0.22);
   animation: rotate-slow 15s linear infinite;
 }
 
 .polygon-3 {
   width: 440px;
   height: 440px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(88, 102, 190, 0.14);
   animation: rotate-reverse 35s linear infinite;
 }
 
 .polygon-4 {
   width: 380px;
   height: 380px;
-  border: 1px dotted rgba(216, 185, 255, 0.2);
+  border: 1px dotted rgba(174, 134, 255, 0.34);
   animation: rotate-slow 25s linear infinite;
 }
 
@@ -1393,6 +1492,7 @@ function goToResults() {
 /* ═══════ SVG Energy Rings ═══════ */
 .svg-rings-wrap {
   position: absolute;
+  z-index: 8;
   width: 700px;
   height: 700px;
   pointer-events: none;
@@ -1401,7 +1501,7 @@ function goToResults() {
 .svg-rings {
   width: 100%;
   height: 100%;
-  opacity: 0.35;
+  opacity: 0.58;
   overflow: hidden;
 }
 

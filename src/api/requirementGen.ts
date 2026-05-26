@@ -196,6 +196,11 @@ export async function getGenTask(projectId: number, taskId: number): Promise<Gen
   return data
 }
 
+/** 删除生成任务 */
+export async function deleteGenTask(projectId: number, taskId: number): Promise<void> {
+  await apiClient.delete(`/projects/${projectId}/requirement-gen/tasks/${taskId}`)
+}
+
 /** 获取任务产物列表 */
 
 export async function listGenResults(projectId: number, taskId: number): Promise<GenResult[]> {
