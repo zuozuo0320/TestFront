@@ -2098,15 +2098,13 @@
 .layout {
   position: relative;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 88% 12%, rgba(139, 92, 246, 0.12), transparent 34%),
-    radial-gradient(circle at 4% 88%, rgba(236, 72, 153, 0.1), transparent 30%),
-    var(--tp-surface-base) !important;
+  background: var(--tp-surface-base) !important;
 }
 
 .layout::before,
 .layout::after {
   content: '';
+  display: none;
   position: fixed;
   z-index: 0;
   border-radius: 999px;
@@ -3107,17 +3105,7 @@ html[data-theme='genart'] .top-header {
 }
 
 html[data-theme='genart'] .layout > .main {
-  background:
-    radial-gradient(circle at 16% 12%, rgba(139, 92, 246, 0.16), transparent 24%),
-    radial-gradient(circle at 84% 8%, rgba(34, 211, 238, 0.11), transparent 26%),
-    linear-gradient(rgba(56, 189, 248, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(139, 92, 246, 0.025) 1px, transparent 1px), #020617 !important;
-  background-size:
-    auto,
-    auto,
-    42px 42px,
-    42px 42px,
-    auto !important;
+  background: var(--tp-surface-base) !important;
 }
 
 html[data-theme='genart'] .content-wrap,
@@ -3149,10 +3137,7 @@ html[data-theme='genart'] .top-header .brand .logo {
 }
 
 html[data-theme='genart'] .workbench-container {
-  background:
-    radial-gradient(ellipse 720px 320px at 14% 0%, rgba(139, 92, 246, 0.12), transparent 60%),
-    radial-gradient(ellipse 620px 280px at 90% 2%, rgba(34, 211, 238, 0.1), transparent 58%),
-    radial-gradient(ellipse 520px 260px at 50% 98%, rgba(59, 130, 246, 0.08), transparent 60%) !important;
+  background: var(--tp-surface-base) !important;
 }
 
 html[data-theme='genart'] .top-header .brand .name,
@@ -3514,10 +3499,7 @@ html[data-theme='genart'] .rte-dialog-title.rte-dialog-title {
 }
 
 html[data-theme='genart'] .layout > .main {
-  background:
-    radial-gradient(circle at 18% 4%, rgba(167, 139, 250, 0.1), transparent 26%),
-    radial-gradient(circle at 88% 2%, rgba(214, 179, 106, 0.08), transparent 24%),
-    linear-gradient(180deg, #07080d 0%, #0a0c12 52%, #07080d 100%) !important;
+  background: var(--tp-surface-base) !important;
 }
 
 html[data-theme='genart'] .layout > .top-header,
@@ -3547,9 +3529,7 @@ html[data-theme='genart'] .main-nav::before {
 }
 
 html[data-theme='genart'] .workbench-container {
-  background:
-    radial-gradient(ellipse 720px 320px at 14% 0%, rgba(167, 139, 250, 0.08), transparent 60%),
-    radial-gradient(ellipse 560px 240px at 92% 2%, rgba(214, 179, 106, 0.06), transparent 58%) !important;
+  background: var(--tp-surface-base) !important;
 }
 
 html[data-theme='genart']

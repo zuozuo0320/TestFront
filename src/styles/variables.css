@@ -216,11 +216,7 @@ html[data-theme='genart'] {
   --tp-nav-border: rgba(255, 255, 255, 0.1);
   --tp-nav-text: rgba(148, 163, 184, 0.9);
   --tp-nav-text-bright: #f8fafc;
-  --tp-surface-base:
-    radial-gradient(circle at 16% 10%, rgba(232, 121, 249, 0.2), transparent 28%),
-    radial-gradient(circle at 88% 18%, rgba(45, 212, 191, 0.16), transparent 30%),
-    radial-gradient(circle at 42% 100%, rgba(129, 140, 248, 0.12), transparent 34%),
-    linear-gradient(135deg, #06070b 0%, #101018 46%, #071311 100%);
+  --tp-surface-base: #000;
   --tp-surface-card: rgba(18, 20, 30, 0.76);
   --tp-surface-elevated: rgba(23, 25, 38, 0.9);
   --tp-surface-input: rgba(255, 255, 255, 0.055);
@@ -231,8 +227,8 @@ html[data-theme='genart'] {
   --tp-surface-row-hover: rgba(45, 212, 191, 0.075);
   --tp-surface-header: rgba(12, 13, 20, 0.92);
   --tp-overlay-scrim: rgba(0, 0, 0, 0.72);
-  --tp-ambient-primary: rgba(232, 121, 249, 0.24);
-  --tp-ambient-info: rgba(45, 212, 191, 0.2);
+  --tp-ambient-primary: transparent;
+  --tp-ambient-info: transparent;
   --tp-glass-bg: rgba(18, 20, 30, 0.68);
   --tp-glass-bg-strong: rgba(24, 27, 40, 0.82);
   --tp-glass-border: rgba(255, 255, 255, 0.085);
@@ -274,7 +270,7 @@ html[data-theme='genart'] {
     0 24px 64px rgba(0, 0, 0, 0.42), 0 0 28px rgba(232, 121, 249, 0.14),
     0 0 22px rgba(45, 212, 191, 0.1);
   --el-bg-color: var(--tp-surface-card);
-  --el-bg-color-page: #06070b;
+  --el-bg-color-page: #000;
   --el-bg-color-overlay: var(--tp-surface-elevated);
   --el-text-color-primary: var(--tp-gray-900);
   --el-text-color-regular: var(--tp-gray-700);
@@ -344,10 +340,7 @@ html[data-theme='genart'] {
   --tp-nav-border: rgba(246, 241, 232, 0.1);
   --tp-nav-text: rgba(153, 160, 174, 0.9);
   --tp-nav-text-bright: #f6f1e8;
-  --tp-surface-base:
-    radial-gradient(circle at 18% 8%, rgba(167, 139, 250, 0.1), transparent 26%),
-    radial-gradient(circle at 88% 0%, rgba(214, 179, 106, 0.08), transparent 24%),
-    linear-gradient(180deg, #07080d 0%, #0a0c12 52%, #07080d 100%);
+  --tp-surface-base: #000;
   --tp-surface-card: rgba(16, 19, 28, 0.92);
   --tp-surface-elevated: rgba(21, 25, 36, 0.96);
   --tp-surface-input: rgba(7, 8, 13, 0.82);
@@ -358,8 +351,8 @@ html[data-theme='genart'] {
   --tp-surface-row-hover: rgba(214, 179, 106, 0.045);
   --tp-surface-header: rgba(13, 16, 23, 0.94);
   --tp-overlay-scrim: rgba(0, 0, 0, 0.72);
-  --tp-ambient-primary: rgba(167, 139, 250, 0.14);
-  --tp-ambient-info: rgba(214, 179, 106, 0.1);
+  --tp-ambient-primary: transparent;
+  --tp-ambient-info: transparent;
   --tp-glass-bg: rgba(16, 19, 28, 0.78);
   --tp-glass-bg-strong: rgba(21, 25, 36, 0.9);
   --tp-glass-border: rgba(246, 241, 232, 0.1);
@@ -400,7 +393,7 @@ html[data-theme='genart'] {
     0 24px 64px rgba(0, 0, 0, 0.4), 0 0 24px rgba(167, 139, 250, 0.1),
     0 0 18px rgba(214, 179, 106, 0.08);
   --el-bg-color: var(--tp-surface-card);
-  --el-bg-color-page: #07080d;
+  --el-bg-color-page: #000;
   --el-bg-color-overlay: var(--tp-surface-elevated);
   --el-mask-color: rgba(7, 8, 13, 0.72);
   --el-mask-color-extra-light: rgba(7, 8, 13, 0.5);

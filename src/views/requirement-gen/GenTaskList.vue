@@ -4,6 +4,7 @@
  */
 import { computed, ref } from 'vue'
 import { useGenTasks } from '@/composables/useRequirementGen'
+import type { GenTask } from '@/api/requirementGen'
 
 const {
   tasks,
@@ -14,17 +15,21 @@ const {
   currentTask,
   currentResults,
   detailLoading,
+  batchDeleting,
   fetchTasks,
   fetchTaskDetail,
   handleAdopt,
   handleDiscard,
   handleDeleteTask,
+  handleBatchDeleteTasks,
 } = useGenTasks()
 
-// 详情对话框
 const showDetailDialog = ref(false)
+const selectedTasks = ref<GenTask[]>([])
+const taskTableRef = ref<{ clearSelection: () => void } | null>(null)
 const pageStart = computed(() => (total.value === 0 ? 0 : (page.value - 1) * pageSize.value + 1))
 const pageEnd = computed(() => Math.min(page.value * pageSize.value, total.value))
+const selectedCount = computed(() => selectedTasks.value.length)
 
 function openDetail(taskId: number) {
   fetchTaskDetail(taskId)
@@ -38,6 +43,22 @@ function handlePageChange(p: number) {
 
 function handleRowClick(row: { id: number }) {
   openDetail(row.id)
+}
+
+function handleSelectionChange(selection: GenTask[]) {
+  selectedTasks.value = selection
+}
+
+async function handleBatchDelete() {
+  const deleted = await handleBatchDeleteTasks(selectedTasks.value)
+  if (deleted) {
+    clearBatchSelection()
+  }
+}
+
+function clearBatchSelection() {
+  taskTableRef.value?.clearSelection()
+  selectedTasks.value = []
 }
 
 function normalizeStatus(status: string) {
@@ -90,12 +111,17 @@ function parseSteps(stepsJson: string): Array<{ action: string; expected: string
       <!-- 任务列表 -->
       <div class="task-table-wrap">
         <el-table
+          ref="taskTableRef"
           v-loading="loading"
+          class="task-table"
           :data="tasks"
+          height="100%"
           row-key="id"
           style="width: 100%"
           @row-click="handleRowClick"
+          @selection-change="handleSelectionChange"
         >
+          <el-table-column type="selection" width="44" fixed="left" />
           <el-table-column prop="task_name" label="任务名称" min-width="360" show-overflow-tooltip>
             <template #default="{ row }">
               <div class="task-cell">
@@ -159,7 +185,7 @@ function parseSteps(stepsJson: string): Array<{ action: string; expected: string
                   class="action-btn action-btn--danger"
                   title="删除任务"
                   :aria-label="`删除任务：${row.task_name}`"
-                  @click.stop="handleDeleteTask(row.id, row.task_name)"
+                  @click.stop="handleDeleteTask(row.id)"
                 >
                   <span class="material-symbols-outlined">delete</span>
                 </button>
@@ -167,7 +193,16 @@ function parseSteps(stepsJson: string): Array<{ action: string; expected: string
             </template>
           </el-table-column>
           <template #empty>
-            <div class="table-empty">暂无任务记录</div>
+            <div class="table-empty" role="status">
+              <div class="table-empty-visual" aria-hidden="true">
+                <div class="table-empty-card table-empty-card--back"></div>
+                <div class="table-empty-card table-empty-card--front">
+                  <span class="material-symbols-outlined">auto_awesome_motion</span>
+                </div>
+              </div>
+              <div class="table-empty-title">暂无生成任务</div>
+              <div class="table-empty-desc">上传并解析需求文档后，生成任务会显示在这里。</div>
+            </div>
           </template>
         </el-table>
 
@@ -188,6 +223,42 @@ function parseSteps(stepsJson: string): Array<{ action: string; expected: string
           />
         </div>
       </div>
+
+      <Teleport to="body">
+        <Transition name="task-batch-slide">
+          <div v-if="selectedCount > 0" class="task-batch-float-overlay">
+            <div class="task-batch-float-bar">
+              <div class="task-batch-left">
+                <div class="task-batch-count-badge">{{ selectedCount }}</div>
+                <div class="task-batch-text">
+                  <div class="task-batch-text-title">已选 {{ selectedCount }} 个任务</div>
+                  <div class="task-batch-text-sub">批量操作模式已启用</div>
+                </div>
+              </div>
+              <div class="task-batch-actions">
+                <button
+                  type="button"
+                  class="task-batch-action-item task-batch-action-danger"
+                  :disabled="batchDeleting"
+                  @click="handleBatchDelete"
+                >
+                  <span class="material-symbols-outlined">delete</span>
+                  <span>{{ batchDeleting ? '删除中...' : '批量删除' }}</span>
+                </button>
+                <div class="task-batch-divider"></div>
+                <button
+                  type="button"
+                  class="task-batch-close"
+                  aria-label="退出批量操作"
+                  @click="clearBatchSelection"
+                >
+                  <span class="material-symbols-outlined">close</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
 
       <!-- 产出用例对话框 -->
       <el-dialog v-model="showDetailDialog" title="产出用例" width="900px" top="5vh">
@@ -273,9 +344,11 @@ function parseSteps(stepsJson: string): Array<{ action: string; expected: string
 
 <style scoped>
 .task-list-page {
+  display: flex;
+  flex-direction: column;
   height: 100%;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 4px 0 0;
   box-sizing: border-box;
 }
@@ -283,16 +356,202 @@ function parseSteps(stepsJson: string): Array<{ action: string; expected: string
 .task-list-container {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-height: 0;
   padding: 0;
 }
 
 .task-table-wrap {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
   overflow: hidden;
   background: var(--tp-surface-card);
   border: 1px solid color-mix(in srgb, var(--tp-border-subtle) 86%, transparent);
   border-radius: var(--tp-radius-lg);
   box-shadow: 0 10px 24px -22px color-mix(in srgb, var(--tp-text-primary) 32%, transparent);
+}
+
+.task-table {
+  flex: 1;
+  min-height: 0;
+}
+
+.task-batch-float-overlay {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  z-index: 9000;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.task-batch-float-bar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  gap: 18px;
+  pointer-events: auto;
+  background: var(--tp-surface-card);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 18px;
+  box-shadow:
+    0 18px 48px color-mix(in srgb, var(--tp-text-primary) 18%, transparent),
+    0 8px 20px color-mix(in srgb, var(--tp-primary) 10%, transparent);
+}
+
+.task-batch-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.task-batch-count-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: var(--tp-btn-text);
+  background: var(--tp-btn-bg);
+  box-shadow: var(--tp-btn-shadow);
+  font-size: 16px;
+  font-weight: var(--tp-font-bold);
+}
+
+.task-batch-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.task-batch-text-title {
+  color: var(--tp-text-primary);
+  font-size: 13px;
+  font-weight: var(--tp-font-bold);
+  line-height: 1.2;
+}
+
+.task-batch-text-sub {
+  color: var(--tp-text-muted);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.task-batch-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.task-batch-action-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 10px;
+  gap: 4px;
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: var(--tp-btn-radius);
+  background: var(--tp-surface-input);
+  color: var(--tp-text-secondary);
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    opacity 0.18s ease;
+}
+
+.task-batch-action-item:hover:not(:disabled) {
+  background: var(--tp-surface-hover);
+  border-color: var(--tp-accent-primary-border);
+  color: var(--tp-primary);
+}
+
+.task-batch-action-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.task-batch-action-item:focus-visible,
+.task-batch-close:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--tp-primary) 46%, transparent);
+  outline-offset: 2px;
+}
+
+.task-batch-action-item .material-symbols-outlined {
+  font-size: 17px;
+}
+
+.task-batch-action-item span:not(.material-symbols-outlined) {
+  font-size: 12px;
+  font-weight: var(--tp-font-bold);
+}
+
+.task-batch-action-danger {
+  color: var(--tp-danger);
+  background: var(--tp-accent-danger-soft);
+  border-color: var(--tp-accent-danger-border);
+}
+
+.task-batch-action-danger .material-symbols-outlined {
+  color: var(--tp-danger);
+}
+
+.task-batch-action-danger:hover:not(:disabled) {
+  color: var(--tp-danger);
+  background: var(--tp-accent-danger-soft);
+  border-color: var(--tp-danger);
+}
+
+.task-batch-divider {
+  width: 1px;
+  height: 28px;
+  margin: 0 2px;
+  background: var(--tp-border-subtle);
+}
+
+.task-batch-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--tp-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease;
+}
+
+.task-batch-close:hover {
+  background: var(--tp-surface-hover);
+  color: var(--tp-text-primary);
+}
+
+.task-batch-close .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.task-batch-slide-enter-active,
+.task-batch-slide-leave-active {
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+.task-batch-slide-enter-from,
+.task-batch-slide-leave-to {
+  opacity: 0;
+  transform: translate(-50%, 8px);
 }
 
 .pagination-wrap {
@@ -327,10 +586,72 @@ function parseSteps(stepsJson: string): Array<{ action: string; expected: string
 }
 
 .table-empty {
-  padding: 42px 0;
-  color: var(--tp-text-subtle);
-  font-size: 12px;
-  letter-spacing: 0.2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 280px;
+  padding: 48px 20px 56px;
+  color: var(--tp-text-muted);
+  text-align: center;
+}
+
+.table-empty-visual {
+  position: relative;
+  width: 86px;
+  height: 68px;
+  margin-bottom: 18px;
+}
+
+.table-empty-card {
+  position: absolute;
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 14px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--tp-surface-elevated) 92%, transparent),
+    color-mix(in srgb, var(--tp-surface-card) 96%, transparent)
+  );
+  box-shadow: 0 14px 34px -26px color-mix(in srgb, var(--tp-primary) 42%, transparent);
+}
+
+.table-empty-card--back {
+  inset: 8px 4px 0 18px;
+  opacity: 0.72;
+  transform: rotate(7deg);
+}
+
+.table-empty-card--front {
+  inset: 0 14px 8px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tp-primary);
+  background:
+    radial-gradient(circle at 70% 18%, var(--tp-accent-primary-soft), transparent 36%),
+    var(--tp-surface-elevated);
+  transform: rotate(-5deg);
+}
+
+.table-empty-card--front .material-symbols-outlined {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.table-empty-title {
+  color: var(--tp-text-primary);
+  font-size: var(--tp-text-base);
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-ui);
+}
+
+.table-empty-desc {
+  max-width: 360px;
+  margin-top: 8px;
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  line-height: 1.7;
 }
 
 .form-tip {
@@ -586,6 +907,16 @@ function parseSteps(stepsJson: string): Array<{ action: string; expected: string
   background: var(--tp-surface-row-hover) !important;
 }
 
+:deep(.el-table__empty-block) {
+  min-height: calc(100% - 48px);
+}
+
+:deep(.el-table__empty-text) {
+  width: 100%;
+  height: 100%;
+  line-height: normal;
+}
+
 :deep(.el-table__fixed-right td.el-table__cell),
 :deep(.el-table__fixed-right th.el-table__cell) {
   background: var(--tp-surface-card);
@@ -593,6 +924,26 @@ function parseSteps(stepsJson: string): Array<{ action: string; expected: string
 
 :deep(.el-table__fixed-right) {
   box-shadow: -10px 0 18px -18px color-mix(in srgb, var(--tp-text-primary) 24%, transparent);
+}
+
+:deep(.el-table__fixed td.el-table__cell),
+:deep(.el-table__fixed th.el-table__cell) {
+  background: var(--tp-surface-card);
+}
+
+:deep(.el-table__fixed) {
+  box-shadow: 10px 0 18px -18px color-mix(in srgb, var(--tp-text-primary) 24%, transparent);
+}
+
+:deep(.el-table-column--selection .cell) {
+  display: flex;
+  justify-content: center;
+}
+
+:deep(.el-checkbox__input.is-checked .el-checkbox__inner),
+:deep(.el-checkbox__input.is-indeterminate .el-checkbox__inner) {
+  background-color: var(--tp-primary);
+  border-color: var(--tp-primary);
 }
 
 :deep(.el-table__row:hover .task-name-text) {

@@ -75,6 +75,7 @@ const routeToSystemMenu: Record<string, SystemMenu> = {
 
 function resolveTopMenu(path: string): TopMenu | undefined {
   if (routeToMenu[path]) return routeToMenu[path]
+  if (path.startsWith('/requirement-gen/')) return 'reqgen'
   if (path.startsWith('/case-reviews/')) return 'plan'
   if (path.startsWith('/ai-script/')) return 'e2e'
   if (path.startsWith('/system/')) return 'system'

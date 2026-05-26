@@ -162,6 +162,7 @@ export function useGenTasks() {
   const tasks = ref<GenTask[]>([])
   const total = ref(0)
   const loading = ref(false)
+  const batchDeleting = ref(false)
   const page = ref(1)
   const pageSize = ref(20)
   const statusFilter = ref('')
@@ -285,14 +286,12 @@ export function useGenTasks() {
     }
   }
 
-  async function handleDeleteTask(taskId: number, taskName: string) {
+  async function handleDeleteTask(taskId: number) {
     if (!projectId.value) return
     try {
-      await ElMessageBox.confirm(
-        `确定删除生成任务「${taskName}」？若任务仍在等待或生成中，删除将同时终止该任务；任务记录和未入库产物将被删除，已采纳生成的测试用例不会被删除。`,
-        '删除任务',
-        { type: 'warning' },
-      )
+      await ElMessageBox.confirm('删除后任务记录不可恢复，已生成的测试用例不受影响。', '删除任务', {
+        type: 'warning',
+      })
       await deleteGenTask(projectId.value, taskId)
       ElMessage.success('任务已删除')
       if (tasks.value.length === 1 && page.value > 1) {
@@ -302,6 +301,35 @@ export function useGenTasks() {
     } catch (e: unknown) {
       if (e === 'cancel' || e === 'close') return
       ElMessage.error(getErrorMessage(e, '删除任务失败'))
+    }
+  }
+
+  async function handleBatchDeleteTasks(selectedTasks: GenTask[]): Promise<boolean> {
+    if (!projectId.value || selectedTasks.length === 0) return false
+    try {
+      await ElMessageBox.confirm(
+        '删除后任务记录不可恢复，已生成的测试用例不受影响。',
+        '批量删除任务',
+        { type: 'warning' },
+      )
+      batchDeleting.value = true
+      const currentProjectId = projectId.value
+      for (const task of selectedTasks) {
+        await deleteGenTask(currentProjectId, task.id)
+      }
+      ElMessage.success(`已删除 ${selectedTasks.length} 个任务`)
+      if (selectedTasks.length >= tasks.value.length && page.value > 1) {
+        page.value -= 1
+      }
+      await fetchTasks()
+      return true
+    } catch (e: unknown) {
+      if (e === 'cancel' || e === 'close') return false
+      ElMessage.error(getErrorMessage(e, '批量删除任务失败'))
+      await fetchTasks()
+      return false
+    } finally {
+      batchDeleting.value = false
     }
   }
 
@@ -347,6 +375,7 @@ export function useGenTasks() {
     tasks,
     total,
     loading,
+    batchDeleting,
     page,
     pageSize,
     statusFilter,
@@ -367,5 +396,6 @@ export function useGenTasks() {
     handleDiscard,
     handleClose,
     handleDeleteTask,
+    handleBatchDeleteTasks,
   }
 }
