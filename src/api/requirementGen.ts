@@ -276,6 +276,8 @@ export async function smartGenerate(
     `/projects/${projectId}/requirement-gen/smart-generate`,
 
     payload,
+
+    { timeout: 60000 },
   )
 
   return data
