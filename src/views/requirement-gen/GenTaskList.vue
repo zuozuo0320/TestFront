@@ -4,7 +4,7 @@
  */
 import { computed, ref } from 'vue'
 import { useGenTasks } from '@/composables/useRequirementGen'
-import type { GenTask } from '@/api/requirementGen'
+import type { GenResult, GenTask } from '@/api/requirementGen'
 
 const {
   tasks,
@@ -30,6 +30,15 @@ const taskTableRef = ref<{ clearSelection: () => void } | null>(null)
 const pageStart = computed(() => (total.value === 0 ? 0 : (page.value - 1) * pageSize.value + 1))
 const pageEnd = computed(() => Math.min(page.value * pageSize.value, total.value))
 const selectedCount = computed(() => selectedTasks.value.length)
+const adoptedResultCount = computed(
+  () => currentResults.value.filter((result) => result.adopted).length,
+)
+const discardedResultCount = computed(
+  () => currentResults.value.filter((result) => result.discarded).length,
+)
+const pendingResultCount = computed(
+  () => currentResults.value.length - adoptedResultCount.value - discardedResultCount.value,
+)
 
 function openDetail(taskId: number) {
   fetchTaskDetail(taskId)
@@ -102,6 +111,44 @@ function parseSteps(stepsJson: string): Array<{ action: string; expected: string
   } catch {
     return []
   }
+}
+
+function parseSuggestedTags(tags: string): string[] {
+  if (!tags) return []
+  try {
+    const parsed = JSON.parse(tags)
+    if (Array.isArray(parsed)) {
+      return parsed.map((tag) => String(tag).trim()).filter(Boolean)
+    }
+  } catch {
+    return tags
+      .split(/[，,;\s]+/)
+      .map((tag) => tag.trim())
+      .filter(Boolean)
+  }
+  return []
+}
+
+function formatDuration(durationMs: number) {
+  if (!durationMs) return '—'
+  return `${(durationMs / 1000).toFixed(1)}s`
+}
+
+function formatDateTime(dateTime: string) {
+  if (!dateTime) return '—'
+  return dateTime.slice(0, 16).replace('T', ' ')
+}
+
+function formatConfidence(confidence: number) {
+  if (!confidence) return '—'
+  const percent = confidence <= 1 ? confidence * 100 : confidence
+  return `${Math.round(percent)}%`
+}
+
+function resultStateLabel(result: GenResult) {
+  if (result.adopted) return '已采纳'
+  if (result.discarded) return '已丢弃'
+  return '待处理'
 }
 </script>
 
@@ -261,77 +308,172 @@ function parseSteps(stepsJson: string): Array<{ action: string; expected: string
       </Teleport>
 
       <!-- 产出用例对话框 -->
-      <el-dialog v-model="showDetailDialog" title="产出用例" width="900px" top="5vh">
-        <div v-loading="detailLoading">
+      <el-dialog
+        v-model="showDetailDialog"
+        class="task-detail-dialog"
+        title="产出用例"
+        width="960px"
+        top="4vh"
+      >
+        <div v-loading="detailLoading" class="task-detail-body">
           <!-- 任务信息 -->
-          <div v-if="currentTask" class="task-meta">
-            <el-descriptions :column="3" border size="small">
-              <el-descriptions-item label="任务名称">
-                {{ currentTask.task_name }}
-              </el-descriptions-item>
-              <el-descriptions-item label="状态">
+          <section v-if="currentTask" class="task-detail-summary" aria-label="任务摘要">
+            <div class="task-summary-main">
+              <div class="task-summary-title-row">
+                <span class="task-summary-id">TASK-{{ currentTask.id }}</span>
                 <span class="status-pill" :class="statusClass(currentTask.status)">
                   <i class="status-dot" />
                   {{ statusLabel(currentTask.status) }}
                 </span>
-              </el-descriptions-item>
-              <el-descriptions-item label="模型">
-                {{ currentTask.ai_model_snapshot }}
-              </el-descriptions-item>
-              <el-descriptions-item label="生成数">
-                {{ currentTask.generated_count }}
-              </el-descriptions-item>
-              <el-descriptions-item label="已采纳">
-                {{ currentTask.adopted_count }}
-              </el-descriptions-item>
-              <el-descriptions-item label="已丢弃">
-                {{ currentTask.discarded_count }}
-              </el-descriptions-item>
-              <el-descriptions-item v-if="currentTask.fail_reason" label="失败原因" :span="3">
-                <span class="fail-reason">{{ currentTask.fail_reason }}</span>
-              </el-descriptions-item>
-            </el-descriptions>
-          </div>
+              </div>
+              <h3 class="task-summary-title">{{ currentTask.task_name }}</h3>
+              <div class="task-summary-meta">
+                <span class="task-summary-meta-item">
+                  <span class="meta-label">模型</span>
+                  <span class="meta-value">{{ currentTask.ai_model_snapshot || '—' }}</span>
+                </span>
+                <span class="task-summary-meta-item">
+                  <span class="meta-label">耗时</span>
+                  <span class="meta-value mono-text">
+                    {{ formatDuration(currentTask.duration_ms) }}
+                  </span>
+                </span>
+                <span class="task-summary-meta-item">
+                  <span class="meta-label">创建</span>
+                  <span class="meta-value mono-text">
+                    {{ formatDateTime(currentTask.created_at) }}
+                  </span>
+                </span>
+              </div>
+            </div>
+            <div class="task-summary-stats">
+              <div class="summary-stat">
+                <span class="summary-stat-value">{{ currentTask.generated_count }}</span>
+                <span class="summary-stat-label">生成</span>
+              </div>
+              <div class="summary-stat summary-stat--success">
+                <span class="summary-stat-value">{{ adoptedResultCount }}</span>
+                <span class="summary-stat-label">采纳</span>
+              </div>
+              <div class="summary-stat summary-stat--muted">
+                <span class="summary-stat-value">{{ discardedResultCount }}</span>
+                <span class="summary-stat-label">丢弃</span>
+              </div>
+              <div class="summary-stat summary-stat--pending">
+                <span class="summary-stat-value">{{ pendingResultCount }}</span>
+                <span class="summary-stat-label">待处理</span>
+              </div>
+            </div>
+            <div v-if="currentTask.fail_reason" class="task-fail-banner" role="alert">
+              <span class="material-symbols-outlined">error</span>
+              <span>{{ currentTask.fail_reason }}</span>
+            </div>
+          </section>
 
           <!-- 用例列表 -->
-          <div v-if="currentResults.length > 0" class="results-section">
-            <h4 class="section-title">用例列表（{{ currentResults.length }} 条）</h4>
+          <section
+            v-if="currentResults.length > 0"
+            class="results-section"
+            aria-label="生成用例列表"
+          >
+            <div class="section-head">
+              <div>
+                <h4 class="section-title">用例列表</h4>
+                <p class="section-subtitle">
+                  共 {{ currentResults.length }} 条生成结果，可逐条采纳或丢弃。
+                </p>
+              </div>
+            </div>
             <div class="result-cards">
-              <div
+              <article
                 v-for="result in currentResults"
                 :key="result.id"
                 class="result-card"
                 :class="{ adopted: result.adopted, discarded: result.discarded }"
               >
-                <div class="result-header">
-                  <span class="result-seq">#{{ result.seq_no }}</span>
-                  <span class="result-title">{{ result.title }}</span>
-                  <el-tag size="small" class="result-level">{{ result.level }}</el-tag>
-                  <span v-if="result.adopted" class="result-badge adopted">已采纳</span>
-                  <span v-if="result.discarded" class="result-badge discarded">已丢弃</span>
+                <header class="result-header">
+                  <div class="result-title-block">
+                    <div class="result-kicker">
+                      <span class="result-seq">#{{ result.seq_no }}</span>
+                      <span
+                        class="result-state"
+                        :class="{ adopted: result.adopted, discarded: result.discarded }"
+                      >
+                        {{ resultStateLabel(result) }}
+                      </span>
+                    </div>
+                    <h5 class="result-title">{{ result.title }}</h5>
+                  </div>
+                  <div class="result-badges">
+                    <span class="result-level">{{ result.level }}</span>
+                    <span class="result-confidence">
+                      置信度 {{ formatConfidence(result.ai_confidence) }}
+                    </span>
+                  </div>
+                </header>
+
+                <div class="result-content-grid">
+                  <div v-if="result.precondition" class="result-field result-field--full">
+                    <span class="field-label">前置条件</span>
+                    <p class="field-text">{{ result.precondition }}</p>
+                  </div>
+                  <div
+                    v-if="parseSuggestedTags(result.tags_suggested).length"
+                    class="result-field result-field--full"
+                  >
+                    <span class="field-label">建议标签</span>
+                    <div class="result-tags">
+                      <span
+                        v-for="tag in parseSuggestedTags(result.tags_suggested)"
+                        :key="tag"
+                        class="result-tag"
+                      >
+                        {{ tag }}
+                      </span>
+                    </div>
+                  </div>
+                  <div
+                    v-if="parseSteps(result.steps).length"
+                    class="result-field result-field--full"
+                  >
+                    <span class="field-label">测试步骤</span>
+                    <ol class="steps-list">
+                      <li
+                        v-for="(step, idx) in parseSteps(result.steps)"
+                        :key="idx"
+                        class="step-item"
+                      >
+                        <span class="step-index">{{ idx + 1 }}</span>
+                        <span class="step-body">
+                          <span class="step-action">{{ step.action }}</span>
+                          <span v-if="step.expected" class="step-expected">
+                            {{ step.expected }}
+                          </span>
+                        </span>
+                      </li>
+                    </ol>
+                  </div>
+                  <div v-if="result.postcondition" class="result-field result-field--full">
+                    <span class="field-label">后置条件</span>
+                    <p class="field-text">{{ result.postcondition }}</p>
+                  </div>
                 </div>
-                <div v-if="result.precondition" class="result-field">
-                  <span class="field-label">前置条件：</span>
-                  {{ result.precondition }}
-                </div>
-                <div v-if="parseSteps(result.steps).length" class="result-field">
-                  <span class="field-label">测试步骤：</span>
-                  <ol class="steps-list">
-                    <li v-for="(step, idx) in parseSteps(result.steps)" :key="idx">
-                      <span>{{ step.action }}</span>
-                      <span v-if="step.expected" class="step-expected">→ {{ step.expected }}</span>
-                    </li>
-                  </ol>
-                </div>
-                <div v-if="!result.adopted && !result.discarded" class="result-actions">
-                  <el-button type="primary" size="small" @click="handleAdopt(result.id)">
-                    采纳
-                  </el-button>
-                  <el-button size="small" @click="handleDiscard(result.id)">丢弃</el-button>
-                </div>
-              </div>
+
+                <footer class="result-actions">
+                  <span v-if="result.remark" class="result-remark">{{ result.remark }}</span>
+                  <span v-else class="result-remark result-remark--empty">
+                    AI 生成结果，请确认后采纳。
+                  </span>
+                  <div v-if="!result.adopted && !result.discarded" class="result-action-buttons">
+                    <el-button type="primary" size="small" @click="handleAdopt(result.id)">
+                      采纳
+                    </el-button>
+                    <el-button size="small" @click="handleDiscard(result.id)">丢弃</el-button>
+                  </div>
+                </footer>
+              </article>
             </div>
-          </div>
+          </section>
 
           <div v-else-if="!detailLoading" class="empty-state">
             <p>暂无用例数据</p>
@@ -660,121 +802,531 @@ function parseSteps(stepsJson: string): Array<{ action: string; expected: string
   margin-top: 4px;
 }
 
-.task-meta {
-  margin-bottom: 20px;
+.task-detail-body {
+  max-height: calc(92vh - 108px);
+  overflow: hidden;
+}
+
+:global(.task-detail-dialog.el-dialog) {
+  --el-dialog-bg-color: var(--tp-surface-card);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 14px;
+  box-shadow: 0 18px 44px -34px color-mix(in srgb, var(--tp-text-primary) 36%, transparent);
+}
+
+:global(html[data-theme='genart'] .task-detail-dialog.el-dialog) {
+  backdrop-filter: blur(20px);
+  background: rgba(18, 20, 30, 0.85);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+:global(.task-detail-dialog .el-dialog__header) {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 18px;
+  margin: 0;
+  border-bottom: 1px solid var(--tp-border-subtle);
+}
+
+:global(.task-detail-dialog .el-dialog__title) {
+  color: var(--tp-text-primary);
+  font-size: var(--tp-text-base);
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-ui);
+}
+
+:global(.task-detail-dialog .el-dialog__headerbtn) {
+  top: 0;
+  width: 48px;
+  height: 48px;
+}
+
+:global(.task-detail-dialog .el-dialog__body) {
+  padding: 14px 18px 18px;
+  background: var(--tp-surface-muted, #f6f7fb);
+}
+
+.task-detail-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  padding: 14px;
+  background: var(--tp-surface-card);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: var(--tp-radius-lg);
+}
+
+.task-summary-main {
+  min-width: 0;
+}
+
+.task-summary-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.task-summary-id {
+  color: var(--tp-text-muted);
+  font-family: var(--tp-font-family-mono);
+  font-size: 11px;
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-ui);
+}
+
+.task-summary-title {
+  margin: 0;
+  color: var(--tp-text-primary);
+  font-size: 15px;
+  font-weight: var(--tp-font-bold);
+  line-height: 1.45;
+}
+
+.task-summary-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 12px;
+}
+
+.task-summary-meta-item {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  gap: 6px;
+}
+
+.meta-label {
+  flex: none;
+  color: var(--tp-text-muted);
+  font-size: 11px;
+  font-weight: var(--tp-font-semibold);
+}
+
+.meta-value {
+  min-width: 0;
+  color: var(--tp-text-secondary);
+  font-size: 12px;
+  line-height: var(--tp-line-ui);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-summary-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 64px);
+  gap: 8px;
+}
+
+.summary-stat {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 58px;
+  padding: 8px;
+  background: var(--tp-surface-input);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+.summary-stat-value {
+  color: var(--tp-text-primary);
+  font-family: var(--tp-font-family-mono);
+  font-size: 18px;
+  font-weight: var(--tp-font-bold);
+  line-height: 1.1;
+}
+
+.summary-stat-label {
+  margin-top: 5px;
+  color: var(--tp-text-muted);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.summary-stat--success {
+  background: var(--tp-accent-success-soft);
+  border-color: var(--tp-accent-success-border);
+}
+.summary-stat--success .summary-stat-value {
+  color: var(--tp-success);
+}
+
+.summary-stat--muted {
+  opacity: 0.85;
+}
+.summary-stat--muted .summary-stat-value {
+  color: var(--tp-text-muted);
+}
+
+.summary-stat--pending {
+  background: var(--tp-accent-primary-soft);
+  border-color: var(--tp-accent-primary-border);
+}
+.summary-stat--pending .summary-stat-value {
+  color: var(--tp-primary);
+}
+
+.task-fail-banner {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 10px;
+  color: var(--tp-danger);
+  background: var(--tp-accent-danger-soft);
+  border: 1px solid var(--tp-accent-danger-border);
+  border-radius: var(--tp-radius-sm);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.task-fail-banner .material-symbols-outlined {
+  flex: none;
+  margin-top: 1px;
+  font-size: 16px;
 }
 
 .results-section {
-  margin-top: 16px;
+  margin-top: 14px;
+}
+
+.section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 10px;
 }
 
 .section-title {
+  margin: 0;
+  color: var(--tp-text-primary);
   font-size: 14px;
-  font-weight: 600;
-  margin: 0 0 12px;
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-ui);
+}
+
+.section-subtitle {
+  margin: 3px 0 0;
+  color: var(--tp-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .result-cards {
   display: flex;
   flex-direction: column;
+  max-height: calc(92vh - 310px);
+  min-height: 220px;
+  padding-right: 8px;
   gap: 12px;
-  max-height: 60vh;
   overflow-y: auto;
 }
 
+/* 滚动条高保真美化 */
+.result-cards::-webkit-scrollbar {
+  width: 6px;
+}
+
+.result-cards::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.result-cards::-webkit-scrollbar-thumb {
+  background: var(--tp-border-subtle);
+  border-radius: 999px;
+}
+
+.result-cards::-webkit-scrollbar-thumb:hover {
+  background: var(--tp-text-subtle);
+}
+
 .result-card {
+  position: relative;
+  padding: 16px 20px;
+  background: var(--tp-surface-card);
   border: 1px solid var(--tp-border-subtle);
-  background-color: var(--tp-surface-muted, #f9fafb);
-  border-radius: var(--tp-radius-sm, 6px);
-  padding: 12px 16px;
-  transition: all 0.25s ease;
+  border-radius: 12px;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.result-card::before {
+  content: '';
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 0;
+  width: 3px;
+  background: var(--tp-primary);
+  border-radius: 0 999px 999px 0;
+  opacity: 0.22;
 }
 
 .result-card:hover {
-  border-color: var(--tp-primary-light);
-  box-shadow: var(--tp-shadow-sm);
+  border-color: var(--tp-accent-primary-border);
 }
 
 .result-card.adopted {
-  border-color: var(--tp-success);
-  background: var(--tp-accent-success-soft, var(--el-color-success-light-9));
+  border-color: var(--tp-accent-success-border);
+  background: color-mix(in srgb, var(--tp-accent-success-soft) 32%, var(--tp-surface-card));
+}
+
+.result-card.adopted::before {
+  background: var(--tp-success);
+  opacity: 0.52;
 }
 
 .result-card.discarded {
-  border-color: var(--tp-border-subtle);
-  background-color: transparent;
-  opacity: 0.5;
+  background: var(--tp-surface-muted);
+  opacity: 0.72;
+}
+
+.result-card.discarded::before {
+  background: var(--tp-text-muted);
 }
 
 .result-header {
   display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-left: 6px;
+}
+
+.result-title-block {
+  min-width: 0;
+}
+
+.result-kicker {
+  display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.result-seq {
-  font-size: 12px;
-  color: var(--tp-text-muted, var(--el-text-color-secondary));
-  font-weight: 500;
-}
-
-.result-title {
-  font-weight: 600;
-  color: var(--tp-text-primary, var(--el-text-color-primary));
-  flex: 1;
-}
-
-.result-badge {
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-weight: 500;
-}
-
-.result-badge.adopted {
-  background: var(--tp-accent-success-soft);
-  color: var(--tp-success);
-}
-
-.result-badge.discarded {
-  background: var(--tp-surface-input);
-  color: var(--tp-text-muted);
-}
-
-.result-field {
-  font-size: 13px;
-  color: var(--tp-text-secondary, var(--el-text-color-regular));
+  gap: 7px;
   margin-bottom: 6px;
 }
 
+.result-seq {
+  color: var(--tp-text-muted);
+  font-family: var(--tp-font-family-mono);
+  font-size: 11px;
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-ui);
+}
+
+.result-state {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  color: var(--tp-primary);
+  background: var(--tp-accent-primary-soft);
+  border: 1px solid var(--tp-accent-primary-border);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: var(--tp-font-semibold);
+  line-height: 1;
+}
+
+.result-state.adopted {
+  color: var(--tp-success);
+  background: var(--tp-accent-success-soft);
+  border-color: var(--tp-accent-success-border);
+}
+
+.result-state.discarded {
+  color: var(--tp-text-muted);
+  background: var(--tp-surface-input);
+  border-color: var(--tp-border-subtle);
+}
+
+.result-title {
+  margin: 0;
+  color: var(--tp-text-primary);
+  font-size: 14px;
+  font-weight: var(--tp-font-bold);
+  line-height: 1.55;
+}
+
+.result-badges {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 6px;
+}
+
+.result-level,
+.result-confidence {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: var(--tp-font-semibold);
+  line-height: 1;
+}
+
+.result-level {
+  color: var(--tp-primary);
+  background: var(--tp-accent-primary-soft);
+  border: 1px solid var(--tp-accent-primary-border);
+}
+
+.result-confidence {
+  color: var(--tp-text-muted);
+  background: var(--tp-surface-elevated);
+  border: 1px solid var(--tp-border-subtle);
+}
+
+.result-content-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  margin-top: 12px;
+  padding-left: 6px;
+  gap: 10px;
+}
+
+.result-field {
+  min-width: 0;
+}
+
+.result-field--full {
+  grid-column: 1 / -1;
+}
+
 .field-label {
-  font-weight: 500;
-  color: var(--tp-text-primary, var(--el-text-color-primary));
+  display: block;
+  margin-bottom: 5px;
+  color: var(--tp-text-muted);
+  font-size: 11px;
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-ui);
+}
+
+.field-text {
+  margin: 0;
+  padding: 8px 12px;
+  background: var(--tp-surface-input);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 8px;
+  color: var(--tp-text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.result-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.result-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  color: var(--tp-text-secondary);
+  background: var(--tp-surface-elevated);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: var(--tp-font-medium);
 }
 
 .steps-list {
-  margin: 4px 0 0 16px;
-  padding: 0;
-}
-
-.steps-list li {
-  margin-bottom: 2px;
-}
-
-.step-expected {
-  color: var(--tp-success, var(--el-color-success));
-  font-weight: 500;
-}
-
-.result-actions {
-  margin-top: 10px;
   display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  gap: 8px;
+  list-style: none;
+}
+
+.step-item {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
   gap: 8px;
 }
 
-.fail-reason {
-  color: var(--el-color-danger);
+.step-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--tp-primary);
+  background: var(--tp-accent-primary-soft);
+  border: 1px solid var(--tp-accent-primary-border);
+  border-radius: 999px;
+  font-family: var(--tp-font-family-mono);
+  font-size: 11px;
+  font-weight: var(--tp-font-bold);
+  line-height: 1;
+}
+
+.step-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 1px 0 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--tp-border-subtle) 70%, transparent);
+  gap: 4px;
+}
+
+.step-item:last-child .step-body {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.step-action {
+  color: var(--tp-text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.step-expected {
+  color: var(--tp-success);
+  font-size: 12px;
+  font-weight: var(--tp-font-semibold);
+  line-height: 1.65;
+}
+
+.step-expected::before {
+  content: '预期：';
+  color: var(--tp-text-muted);
+  font-weight: var(--tp-font-medium);
+}
+
+.result-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding: 10px 0 0 6px;
+  gap: 12px;
+  border-top: 1px solid var(--tp-border-subtle);
+}
+
+.result-remark {
+  min-width: 0;
+  color: var(--tp-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.result-remark--empty {
+  color: var(--tp-text-subtle);
+}
+
+.result-action-buttons {
+  display: inline-flex;
+  flex: none;
+  gap: 8px;
 }
 
 /* ── 状态 Pill 徽标 ─────────────────────────────────────── */
@@ -1111,10 +1663,60 @@ function parseSteps(stepsJson: string): Array<{ action: string; expected: string
 }
 
 /* ── 对话框内按钮 ─────────────────────────────────────────── */
-:deep(.el-button--primary) {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  border: none;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
+:global(.task-detail-dialog .el-button--primary) {
+  background: var(--tp-btn-bg);
+  color: var(--tp-btn-text, #ffffff);
+  border: 1px solid var(--tp-btn-border, transparent);
+  box-shadow: none;
+  transition: all 0.2s ease;
+}
+
+:global(.task-detail-dialog .el-button--primary:hover) {
+  background: var(--tp-btn-bg-hover);
+  border-color: var(--tp-primary-light);
+}
+
+:global(.task-detail-dialog .el-button:not(.el-button--primary)) {
+  background: var(--tp-surface-input, #f3f4f6);
+  color: var(--tp-text-secondary, #4b5563);
+  border: 1px solid var(--tp-border-subtle, #e5e7eb);
+  transition: all 0.2s ease;
+}
+
+:global(.task-detail-dialog .el-button:not(.el-button--primary):hover) {
+  background: var(--tp-surface-hover, #e5e7eb);
+  color: var(--tp-text-primary, #111827);
+  border-color: var(--tp-border-strong, #d1d5db);
+}
+
+:global(.task-detail-dialog .el-button:focus-visible) {
+  outline: 2px solid color-mix(in srgb, var(--tp-primary) 42%, transparent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 980px) {
+  :global(.task-detail-dialog.el-dialog) {
+    width: calc(100vw - 24px) !important;
+  }
+
+  .task-detail-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .task-summary-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .result-header,
+  .result-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .result-badges,
+  .result-action-buttons {
+    justify-content: flex-start;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

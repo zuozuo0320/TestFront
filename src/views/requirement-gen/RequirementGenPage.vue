@@ -17,7 +17,7 @@ const { docs, fetchDocs, handleUpload, handlePaste } = useRequirementDocs()
 const { tasks, smartGenerating, handleSmartGenerate, fetchTasks } = useGenTasks()
 
 const parsedDocCount = computed(
-  () => docs.value.filter((doc) => doc.parse_status === 'parsed').length,
+  () => docs.value.filter((doc) => isParsedDocStatus(doc.parse_status)).length,
 )
 const parseSuccessRate = computed(() => {
   if (!docs.value.length) return 0
@@ -27,6 +27,13 @@ const activeTaskStatuses = new Set(['pending', 'running'])
 function isActiveTaskStatus(status: string) {
   return activeTaskStatuses.has(status.toLowerCase())
 }
+function isParsingDocStatus(status: string | undefined) {
+  const normalized = status?.toLowerCase()
+  return normalized === 'parsing' || normalized === 'not_parsed'
+}
+function isParsedDocStatus(status: string | undefined) {
+  return status?.toLowerCase() === 'parsed'
+}
 const runningTaskCount = computed(
   () => tasks.value.filter((task) => isActiveTaskStatus(task.status)).length,
 )
@@ -35,15 +42,14 @@ const latestDoc = computed(() => docs.value[0] || null)
 const latestDocTasks = computed(() =>
   latestDoc.value ? tasks.value.filter((t) => t.requirement_doc_id === latestDoc.value!.id) : [],
 )
-const latestDocGenerating = computed(() =>
-  latestDocTasks.value.some((task) => isActiveTaskStatus(task.status)),
+const latestDocRunningTask = computed(
+  () => latestDocTasks.value.find((task) => isActiveTaskStatus(task.status)) || null,
 )
+const latestDocGenerating = computed(() => latestDocRunningTask.value !== null)
 const latestDocCaseTotal = computed(() =>
   latestDocTasks.value.reduce((sum, t) => sum + (t.generated_count || 0), 0),
 )
-const hasPendingDocs = computed(() =>
-  docs.value.some((d) => d.parse_status === 'parsing' || d.parse_status === 'not_parsed'),
-)
+const hasPendingDocs = computed(() => docs.value.some((d) => isParsingDocStatus(d.parse_status)))
 const activeEngineStatus = computed(() => {
   if (smartGenerating.value) return '流式处理中'
   if (runningTaskCount.value) return '生成中'
@@ -62,10 +68,12 @@ function triggerActiveCooldown(durationMs = 8000) {
 }
 const isSystemActive = computed(() => activeEngineStatus.value !== '待机' || activeCooldown.value)
 const latencyVal = ref(14)
+const progressNow = ref(Date.now())
 const particlesCanvas = ref<HTMLCanvasElement | null>(null)
 const mouseGlowEl = ref<HTMLDivElement | null>(null)
 let animFrameId = 0
 let latencyTimer: ReturnType<typeof setInterval> | null = null
+let progressTimer: ReturnType<typeof setInterval> | null = null
 let particlesResizeHandler: (() => void) | null = null
 const diagnosticsSkillMatch = computed(() => {
   if (smartResultData.value?.recommended_skills.length) {
@@ -87,41 +95,85 @@ async function loadActiveAIModel() {
 }
 
 // ── Pipeline：体现当前任务流各步骤状态 ──
-const latestDocParsed = computed(() => latestDoc.value?.parse_status === 'parsed')
-const latestDocParsing = computed(
-  () =>
-    latestDoc.value?.parse_status === 'parsing' || latestDoc.value?.parse_status === 'not_parsed',
-)
+const latestDocParsed = computed(() => isParsedDocStatus(latestDoc.value?.parse_status))
+const latestDocParsing = computed(() => isParsingDocStatus(latestDoc.value?.parse_status))
 const matchedSkillCount = computed(() => smartResultData.value?.recommended_skills?.length || 0)
+const uploading = ref(false)
+const pasting = ref(false)
+const intakeStageStartedAt = ref<number | null>(null)
+const smartStageStartedAt = ref<number | null>(null)
+
+function clampPercentage(value: number) {
+  return Math.min(100, Math.max(0, Math.round(value)))
+}
+
+function parseTimestamp(value: string | null | undefined) {
+  if (!value) return null
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) ? timestamp : null
+}
+
+function getTimedProgress(
+  start: number,
+  end: number,
+  durationMs: number,
+  startedAt: number | null,
+) {
+  if (!startedAt) return start
+  const elapsed = Math.max(0, progressNow.value - startedAt)
+  const ratio = Math.min(1, elapsed / durationMs)
+  const easedRatio = 1 - Math.pow(1 - ratio, 2)
+  return clampPercentage(start + (end - start) * easedRatio)
+}
 
 const pipelineSteps = computed(() => {
-  // 步骤1: 需求读取 — 有文档就完成
   const step1Done = docs.value.length > 0
-  // 步骤2: 需求解析 — 最新文档解析完成
+  const step1Active = uploading.value || pasting.value
+  const step1Progress = step1Done
+    ? 100
+    : step1Active
+      ? getTimedProgress(8, 90, 12000, intakeStageStartedAt.value)
+      : 0
+
   const step2Active = latestDocParsing.value
   const step2Done = latestDocParsed.value
-  // 步骤3: 策略匹配 — 只看当前最新文档的任务
+  const step2Progress = step2Done
+    ? 100
+    : step2Active
+      ? getTimedProgress(18, 88, 45000, parseTimestamp(latestDoc.value?.created_at))
+      : 0
+
   const step3Active = smartGenerating.value
   const step3Done = matchedSkillCount.value > 0 || latestDocTasks.value.length > 0
   const step3Count = matchedSkillCount.value || latestDocTasks.value.length
-  // 步骤4: 用例生成 — 只看当前最新文档的任务
+  const step3Progress = step3Done
+    ? 100
+    : step3Active
+      ? getTimedProgress(12, 90, 45000, smartStageStartedAt.value)
+      : 0
+
   const step4Active = latestDocGenerating.value
   const step4Done = latestDocCaseTotal.value > 0
+  const step4Progress = step4Done
+    ? 100
+    : step4Active
+      ? getTimedProgress(6, 96, 180000, parseTimestamp(latestDocRunningTask.value?.created_at))
+      : 0
 
   return [
     {
       no: '01',
       title: '需求读取',
       desc: step1Done ? '文档已就绪' : '等待上传...',
-      progress: step1Done ? 100 : 0,
-      active: step1Done && !step2Done,
+      progress: step1Progress,
+      active: step1Active || (step1Done && !step2Done),
       completed: step1Done,
     },
     {
       no: '02',
       title: '需求解析',
       desc: step2Done ? '解析完成' : step2Active ? '解析中...' : '等待解析...',
-      progress: step2Done ? 100 : step2Active ? 50 : 0,
+      progress: step2Progress,
       active: step2Active,
       completed: step2Done,
     },
@@ -129,7 +181,7 @@ const pipelineSteps = computed(() => {
       no: '03',
       title: '策略匹配',
       desc: step3Done ? `${step3Count} 个策略已匹配` : step3Active ? '匹配中...' : '等待匹配...',
-      progress: step3Done ? 100 : step3Active ? 60 : 0,
+      progress: step3Progress,
       active: step3Active,
       completed: step3Done,
     },
@@ -141,15 +193,13 @@ const pipelineSteps = computed(() => {
         : step4Active
           ? '生成中...'
           : '等待生成...',
-      progress: step4Done ? 100 : step4Active ? 64 : 0,
+      progress: step4Progress,
       active: step4Active,
       completed: step4Done,
     },
   ]
 })
 
-const uploading = ref(false)
-const pasting = ref(false)
 const isPipelineInProgress = computed(
   () =>
     uploading.value ||
@@ -160,12 +210,23 @@ const isPipelineInProgress = computed(
 )
 const centralNumber = computed(() => {
   if (!isPipelineInProgress.value) return 0
-  if (uploading.value || pasting.value) return 1
-
-  const totalProgress = pipelineSteps.value.reduce((sum, step) => sum + step.progress, 0)
-  const rawProgress = Math.round(totalProgress / pipelineSteps.value.length)
-  if (rawProgress <= 0) return 0
-  return Math.min(99, Math.max(1, rawProgress))
+  const [readStep, parseStep, matchStep, generateStep] = pipelineSteps.value
+  const weightedProgress =
+    (readStep?.progress || 0) * 0.1 +
+    (parseStep?.progress || 0) * 0.25 +
+    (matchStep?.progress || 0) * 0.25 +
+    (generateStep?.progress || 0) * 0.4
+  return Math.min(99, Math.max(1, clampPercentage(weightedProgress)))
+})
+const centralIdleTitle = computed(() => {
+  if (latestDoc.value && latestDocParsed.value) return 'READY'
+  return 'IDLE'
+})
+const centralHubAriaLabel = computed(() => {
+  if (isPipelineInProgress.value) return `需求智生进度 ${centralNumber.value}%`
+  if (latestDoc.value && latestDocParsed.value) return '开始智能生成'
+  if (latestDoc.value) return '等待需求解析完成'
+  return '上传需求'
 })
 const showPipelineFooter = computed(() => isPipelineInProgress.value)
 let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -196,16 +257,19 @@ function stopTaskPoll() {
 function startPollIfNeeded() {
   if (pollTimer) return
   pollTimer = setInterval(async () => {
-    const hasParsing = docs.value.some(
-      (d) => d.parse_status === 'parsing' || d.parse_status === 'not_parsed',
-    )
+    const hasParsing = docs.value.some((d) => isParsingDocStatus(d.parse_status))
     if (!hasParsing) {
       stopPoll()
       // 解析全部完成后，自动触发智能生成
-      autoTriggerSmartGenerate()
+      await autoTriggerSmartGenerate()
       return
     }
     await fetchDocs()
+    const stillParsing = docs.value.some((d) => isParsingDocStatus(d.parse_status))
+    if (!stillParsing) {
+      stopPoll()
+      await autoTriggerSmartGenerate()
+    }
   }, 3000)
 }
 
@@ -219,12 +283,13 @@ function stopPoll() {
 // 解析完成后自动触发智能生成（无需弹窗）
 async function autoTriggerSmartGenerate() {
   const doc = latestDoc.value
-  if (!doc || doc.parse_status !== 'parsed') return
+  if (!doc || !isParsedDocStatus(doc.parse_status)) return
   // 防止对同一文档重复触发
   if (autoGenTriggeredDocId.value === doc.id) return
   // 已有该文档的任务则跳过
   if (latestDocTasks.value.length > 0) return
   autoGenTriggeredDocId.value = doc.id
+  smartStageStartedAt.value = Date.now()
   triggerActiveCooldown(15000)
   const payload: SmartGeneratePayload = {
     requirement_doc_id: doc.id,
@@ -365,7 +430,7 @@ function onMouseMove(e: MouseEvent) {
 onMounted(() => {
   void loadActiveAIModel()
   // 挂载后如果有待解析文档立即开始轮询
-  if (docs.value.some((d) => d.parse_status === 'parsing' || d.parse_status === 'not_parsed')) {
+  if (docs.value.some((d) => isParsingDocStatus(d.parse_status))) {
     startPollIfNeeded()
   }
   // 如果有正在运行的任务，启动任务轮询
@@ -380,6 +445,9 @@ onMounted(() => {
   latencyTimer = setInterval(() => {
     latencyVal.value = Math.floor(Math.random() * 6) + 12
   }, 2000)
+  progressTimer = setInterval(() => {
+    progressNow.value = Date.now()
+  }, 1000)
 })
 
 onUnmounted(() => {
@@ -392,6 +460,7 @@ onUnmounted(() => {
   }
   cancelAnimationFrame(animFrameId)
   if (latencyTimer) clearInterval(latencyTimer)
+  if (progressTimer) clearInterval(progressTimer)
   if (cooldownTimer) clearTimeout(cooldownTimer)
 })
 
@@ -422,6 +491,7 @@ function onFileChange(file: UploadFile) {
 
 async function submitUpload() {
   if (!uploadFile.value || !uploadTitle.value.trim()) return
+  intakeStageStartedAt.value = Date.now()
   uploading.value = true
   try {
     await handleUpload(uploadFile.value, uploadTitle.value.trim(), uploadRemark.value.trim())
@@ -432,7 +502,7 @@ async function submitUpload() {
     triggerActiveCooldown()
     // 短暂等待后检查：解析可能已瞬间完成
     await nextTick()
-    if (latestDoc.value?.parse_status === 'parsed') {
+    if (isParsedDocStatus(latestDoc.value?.parse_status)) {
       autoTriggerSmartGenerate()
     } else {
       startPollIfNeeded()
@@ -444,6 +514,7 @@ async function submitUpload() {
 
 async function submitPaste() {
   if (!pasteTitle.value.trim() || !pasteContent.value.trim()) return
+  intakeStageStartedAt.value = Date.now()
   pasting.value = true
   try {
     await handlePaste(pasteTitle.value.trim(), pasteContent.value.trim(), pasteRemark.value.trim())
@@ -453,7 +524,7 @@ async function submitPaste() {
     pasteRemark.value = ''
     triggerActiveCooldown()
     await nextTick()
-    if (latestDoc.value?.parse_status === 'parsed') {
+    if (isParsedDocStatus(latestDoc.value?.parse_status)) {
       autoTriggerSmartGenerate()
     } else {
       startPollIfNeeded()
@@ -477,7 +548,19 @@ function openSmartGenerate(doc: RequirementDoc) {
   showSmartDialog.value = true
 }
 
+function handleCentralHubClick() {
+  if (isPipelineInProgress.value) return
+  if (latestDoc.value && latestDocParsed.value) {
+    openSmartGenerate(latestDoc.value)
+    return
+  }
+  if (!latestDoc.value) {
+    showUploadDialog.value = true
+  }
+}
+
 async function submitSmartGenerate() {
+  smartStageStartedAt.value = Date.now()
   triggerActiveCooldown(15000)
   const result = await handleSmartGenerate(smartForm.value)
   if (!result) return
@@ -634,14 +717,21 @@ function goToResults() {
         <!-- 中央 Hub（圆形） -->
         <button
           class="central-hub"
+          :class="{ 'is-idle': !isPipelineInProgress }"
           type="button"
-          @click="latestDoc && openSmartGenerate(latestDoc)"
+          :aria-label="centralHubAriaLabel"
+          @click="handleCentralHubClick"
         >
           <span class="material-symbols-outlined hub-icon">psychology</span>
-          <strong v-if="isPipelineInProgress" class="hub-number glitch-effect">
-            {{ centralNumber }}
-          </strong>
-          <em v-if="isPipelineInProgress" class="hub-label">PROGRESS</em>
+          <template v-if="isPipelineInProgress">
+            <strong class="hub-number glitch-effect">
+              {{ centralNumber }}
+            </strong>
+            <em class="hub-label">PROGRESS</em>
+          </template>
+          <template v-else>
+            <strong class="hub-idle-title">{{ centralIdleTitle }}</strong>
+          </template>
         </button>
 
         <!-- 浮动数据节点 -->
@@ -1206,10 +1296,32 @@ function goToResults() {
   transform: scale(0.95);
 }
 
+.central-hub:focus-visible {
+  outline: 2px solid rgba(182, 196, 255, 0.82);
+  outline-offset: 4px;
+}
+
+.central-hub.is-idle {
+  background:
+    radial-gradient(circle at 50% 30%, rgba(182, 196, 255, 0.08), transparent 42%),
+    rgba(18, 13, 29, 0.86);
+  border-color: rgba(182, 196, 255, 0.28);
+  animation: none;
+  box-shadow:
+    0 0 0 1px rgba(182, 196, 255, 0.05),
+    inset 0 0 34px rgba(162, 89, 255, 0.05);
+}
+
 .hub-icon {
   color: #b6c4ff;
   font-size: 44px;
   margin-bottom: 4px;
+}
+
+.central-hub.is-idle .hub-icon {
+  margin-bottom: 12px;
+  color: rgba(182, 196, 255, 0.86);
+  font-size: 42px;
 }
 
 .hub-number {
@@ -1233,6 +1345,15 @@ function goToResults() {
   color: rgba(196, 197, 215, 0.6);
   text-transform: uppercase;
   font-style: normal;
+}
+
+.hub-idle-title {
+  font-family: 'Geist', sans-serif;
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(226, 232, 255, 0.92);
 }
 
 /* ═══════ Active Polygons (严格对标 code.html 的 4 个旋转环) ═══════ */
