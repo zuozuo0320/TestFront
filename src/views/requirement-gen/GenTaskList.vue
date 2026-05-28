@@ -1,10 +1,13 @@
 <script setup lang="ts">
 /**
- * 生成任务列表 + 详情子组件
+ * 生成任务列表子组件
  */
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useGenTasks } from '@/composables/useRequirementGen'
-import type { GenResult, GenTask } from '@/api/requirementGen'
+import type { GenTask } from '@/api/requirementGen'
+
+const router = useRouter()
 
 const {
   tasks,
@@ -12,37 +15,20 @@ const {
   loading,
   page,
   pageSize,
-  currentTask,
-  currentResults,
-  detailLoading,
   batchDeleting,
   fetchTasks,
-  fetchTaskDetail,
-  handleAdopt,
-  handleDiscard,
   handleDeleteTask,
   handleBatchDeleteTasks,
 } = useGenTasks()
 
-const showDetailDialog = ref(false)
 const selectedTasks = ref<GenTask[]>([])
 const taskTableRef = ref<{ clearSelection: () => void } | null>(null)
 const pageStart = computed(() => (total.value === 0 ? 0 : (page.value - 1) * pageSize.value + 1))
 const pageEnd = computed(() => Math.min(page.value * pageSize.value, total.value))
 const selectedCount = computed(() => selectedTasks.value.length)
-const adoptedResultCount = computed(
-  () => currentResults.value.filter((result) => result.adopted).length,
-)
-const discardedResultCount = computed(
-  () => currentResults.value.filter((result) => result.discarded).length,
-)
-const pendingResultCount = computed(
-  () => currentResults.value.length - adoptedResultCount.value - discardedResultCount.value,
-)
 
 function openDetail(taskId: number) {
-  fetchTaskDetail(taskId)
-  showDetailDialog.value = true
+  router.push({ name: 'GenTaskResultDetail', params: { taskId } })
 }
 
 function handlePageChange(p: number) {
@@ -102,53 +88,6 @@ function statusClass(status: string) {
     fully_closed: 'pill-closed',
   }
   return map[normalizedStatus] || 'pill-closed'
-}
-
-/** 解析步骤 JSON */
-function parseSteps(stepsJson: string): Array<{ action: string; expected: string }> {
-  try {
-    return JSON.parse(stepsJson)
-  } catch {
-    return []
-  }
-}
-
-function parseSuggestedTags(tags: string): string[] {
-  if (!tags) return []
-  try {
-    const parsed = JSON.parse(tags)
-    if (Array.isArray(parsed)) {
-      return parsed.map((tag) => String(tag).trim()).filter(Boolean)
-    }
-  } catch {
-    return tags
-      .split(/[，,;\s]+/)
-      .map((tag) => tag.trim())
-      .filter(Boolean)
-  }
-  return []
-}
-
-function formatDuration(durationMs: number) {
-  if (!durationMs) return '—'
-  return `${(durationMs / 1000).toFixed(1)}s`
-}
-
-function formatDateTime(dateTime: string) {
-  if (!dateTime) return '—'
-  return dateTime.slice(0, 16).replace('T', ' ')
-}
-
-function formatConfidence(confidence: number) {
-  if (!confidence) return '—'
-  const percent = confidence <= 1 ? confidence * 100 : confidence
-  return `${Math.round(percent)}%`
-}
-
-function resultStateLabel(result: GenResult) {
-  if (result.adopted) return '已采纳'
-  if (result.discarded) return '已丢弃'
-  return '待处理'
 }
 </script>
 
@@ -307,179 +246,7 @@ function resultStateLabel(result: GenResult) {
         </Transition>
       </Teleport>
 
-      <!-- 产出用例对话框 -->
-      <el-dialog
-        v-model="showDetailDialog"
-        class="task-detail-dialog"
-        title="产出用例"
-        width="960px"
-        top="4vh"
-      >
-        <div v-loading="detailLoading" class="task-detail-body">
-          <!-- 任务信息 -->
-          <section v-if="currentTask" class="task-detail-summary" aria-label="任务摘要">
-            <div class="task-summary-main">
-              <div class="task-summary-title-row">
-                <span class="task-summary-id">TASK-{{ currentTask.id }}</span>
-                <span class="status-pill" :class="statusClass(currentTask.status)">
-                  <i class="status-dot" />
-                  {{ statusLabel(currentTask.status) }}
-                </span>
-              </div>
-              <h3 class="task-summary-title">{{ currentTask.task_name }}</h3>
-              <div class="task-summary-meta">
-                <span class="task-summary-meta-item">
-                  <span class="meta-label">模型</span>
-                  <span class="meta-value">{{ currentTask.ai_model_snapshot || '—' }}</span>
-                </span>
-                <span class="task-summary-meta-item">
-                  <span class="meta-label">耗时</span>
-                  <span class="meta-value mono-text">
-                    {{ formatDuration(currentTask.duration_ms) }}
-                  </span>
-                </span>
-                <span class="task-summary-meta-item">
-                  <span class="meta-label">创建</span>
-                  <span class="meta-value mono-text">
-                    {{ formatDateTime(currentTask.created_at) }}
-                  </span>
-                </span>
-              </div>
-            </div>
-            <div class="task-summary-stats">
-              <div class="summary-stat">
-                <span class="summary-stat-value">{{ currentTask.generated_count }}</span>
-                <span class="summary-stat-label">生成</span>
-              </div>
-              <div class="summary-stat summary-stat--success">
-                <span class="summary-stat-value">{{ adoptedResultCount }}</span>
-                <span class="summary-stat-label">采纳</span>
-              </div>
-              <div class="summary-stat summary-stat--muted">
-                <span class="summary-stat-value">{{ discardedResultCount }}</span>
-                <span class="summary-stat-label">丢弃</span>
-              </div>
-              <div class="summary-stat summary-stat--pending">
-                <span class="summary-stat-value">{{ pendingResultCount }}</span>
-                <span class="summary-stat-label">待处理</span>
-              </div>
-            </div>
-            <div v-if="currentTask.fail_reason" class="task-fail-banner" role="alert">
-              <span class="material-symbols-outlined">error</span>
-              <span>{{ currentTask.fail_reason }}</span>
-            </div>
-          </section>
-
-          <!-- 用例列表 -->
-          <section
-            v-if="currentResults.length > 0"
-            class="results-section"
-            aria-label="生成用例列表"
-          >
-            <div class="section-head">
-              <div>
-                <h4 class="section-title">用例列表</h4>
-                <p class="section-subtitle">
-                  共 {{ currentResults.length }} 条生成结果，可逐条采纳或丢弃。
-                </p>
-              </div>
-            </div>
-            <div class="result-cards">
-              <article
-                v-for="result in currentResults"
-                :key="result.id"
-                class="result-card"
-                :class="{ adopted: result.adopted, discarded: result.discarded }"
-              >
-                <header class="result-header">
-                  <div class="result-title-block">
-                    <div class="result-kicker">
-                      <span class="result-seq">#{{ result.seq_no }}</span>
-                      <span
-                        class="result-state"
-                        :class="{ adopted: result.adopted, discarded: result.discarded }"
-                      >
-                        {{ resultStateLabel(result) }}
-                      </span>
-                    </div>
-                    <h5 class="result-title">{{ result.title }}</h5>
-                  </div>
-                  <div class="result-badges">
-                    <span class="result-level">{{ result.level }}</span>
-                    <span class="result-confidence">
-                      置信度 {{ formatConfidence(result.ai_confidence) }}
-                    </span>
-                  </div>
-                </header>
-
-                <div class="result-content-grid">
-                  <div v-if="result.precondition" class="result-field result-field--full">
-                    <span class="field-label">前置条件</span>
-                    <p class="field-text">{{ result.precondition }}</p>
-                  </div>
-                  <div
-                    v-if="parseSuggestedTags(result.tags_suggested).length"
-                    class="result-field result-field--full"
-                  >
-                    <span class="field-label">建议标签</span>
-                    <div class="result-tags">
-                      <span
-                        v-for="tag in parseSuggestedTags(result.tags_suggested)"
-                        :key="tag"
-                        class="result-tag"
-                      >
-                        {{ tag }}
-                      </span>
-                    </div>
-                  </div>
-                  <div
-                    v-if="parseSteps(result.steps).length"
-                    class="result-field result-field--full"
-                  >
-                    <span class="field-label">测试步骤</span>
-                    <ol class="steps-list">
-                      <li
-                        v-for="(step, idx) in parseSteps(result.steps)"
-                        :key="idx"
-                        class="step-item"
-                      >
-                        <span class="step-index">{{ idx + 1 }}</span>
-                        <span class="step-body">
-                          <span class="step-action">{{ step.action }}</span>
-                          <span v-if="step.expected" class="step-expected">
-                            {{ step.expected }}
-                          </span>
-                        </span>
-                      </li>
-                    </ol>
-                  </div>
-                  <div v-if="result.postcondition" class="result-field result-field--full">
-                    <span class="field-label">后置条件</span>
-                    <p class="field-text">{{ result.postcondition }}</p>
-                  </div>
-                </div>
-
-                <footer class="result-actions">
-                  <span v-if="result.remark" class="result-remark">{{ result.remark }}</span>
-                  <span v-else class="result-remark result-remark--empty">
-                    AI 生成结果，请确认后采纳。
-                  </span>
-                  <div v-if="!result.adopted && !result.discarded" class="result-action-buttons">
-                    <el-button type="primary" size="small" @click="handleAdopt(result.id)">
-                      采纳
-                    </el-button>
-                    <el-button size="small" @click="handleDiscard(result.id)">丢弃</el-button>
-                  </div>
-                </footer>
-              </article>
-            </div>
-          </section>
-
-          <div v-else-if="!detailLoading" class="empty-state">
-            <p>暂无用例数据</p>
-          </div>
-        </div>
-      </el-dialog>
+      <!-- 详情已迁移至独立路由页面 GenTaskResultDetailPage.vue -->
     </div>
   </div>
 </template>
@@ -803,12 +570,19 @@ function resultStateLabel(result: GenResult) {
 }
 
 .task-detail-body {
-  max-height: calc(92vh - 108px);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
 }
 
 :global(.task-detail-dialog.el-dialog) {
   --el-dialog-bg-color: var(--tp-surface-card);
+  display: flex;
+  flex-direction: column;
+  height: min(920px, calc(100vh - 32px));
+  max-width: calc(100vw - 32px);
   border: 1px solid var(--tp-border-subtle);
   border-radius: 14px;
   box-shadow: 0 18px 44px -34px color-mix(in srgb, var(--tp-text-primary) 36%, transparent);
@@ -823,8 +597,8 @@ function resultStateLabel(result: GenResult) {
 :global(.task-detail-dialog .el-dialog__header) {
   display: flex;
   align-items: center;
-  min-height: 48px;
-  padding: 0 18px;
+  min-height: 56px;
+  padding: 0 22px;
   margin: 0;
   border-bottom: 1px solid var(--tp-border-subtle);
 }
@@ -838,20 +612,24 @@ function resultStateLabel(result: GenResult) {
 
 :global(.task-detail-dialog .el-dialog__headerbtn) {
   top: 0;
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
 }
 
 :global(.task-detail-dialog .el-dialog__body) {
-  padding: 14px 18px 18px;
+  flex: 1;
+  min-height: 0;
+  padding: 16px 20px 20px;
+  overflow: hidden;
   background: var(--tp-surface-muted, #f6f7fb);
 }
 
 .task-detail-summary {
+  flex: none;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 14px;
-  padding: 14px;
+  gap: 18px;
+  padding: 18px;
   background: var(--tp-surface-card);
   border: 1px solid var(--tp-border-subtle);
   border-radius: var(--tp-radius-lg);
@@ -879,7 +657,7 @@ function resultStateLabel(result: GenResult) {
 .task-summary-title {
   margin: 0;
   color: var(--tp-text-primary);
-  font-size: 15px;
+  font-size: 18px;
   font-weight: var(--tp-font-bold);
   line-height: 1.45;
 }
@@ -896,6 +674,11 @@ function resultStateLabel(result: GenResult) {
   align-items: center;
   max-width: 100%;
   gap: 6px;
+  padding: 4px 10px;
+  background: color-mix(in srgb, var(--tp-surface-elevated) 45%, transparent);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 6px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
 
 .meta-label {
@@ -908,7 +691,7 @@ function resultStateLabel(result: GenResult) {
 .meta-value {
   min-width: 0;
   color: var(--tp-text-secondary);
-  font-size: 12px;
+  font-size: 13px;
   line-height: var(--tp-line-ui);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -917,26 +700,35 @@ function resultStateLabel(result: GenResult) {
 
 .task-summary-stats {
   display: grid;
-  grid-template-columns: repeat(4, 64px);
-  gap: 8px;
+  grid-template-columns: repeat(4, 82px);
+  gap: 10px;
 }
 
 .summary-stat {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 58px;
-  padding: 8px;
-  background: var(--tp-surface-input);
+  min-height: 72px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--tp-surface-elevated) 60%, transparent);
   border: 1px solid var(--tp-border-subtle);
-  border-radius: 10px;
-  transition: all 0.2s ease;
+  border-radius: 12px;
+  transition:
+    transform 0.22s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease;
+}
+
+.summary-stat:hover {
+  transform: translateY(-2px);
+  border-color: var(--tp-primary-light);
+  box-shadow: 0 8px 24px -12px rgba(167, 139, 250, 0.22);
 }
 
 .summary-stat-value {
   color: var(--tp-text-primary);
   font-family: var(--tp-font-family-mono);
-  font-size: 18px;
+  font-size: 22px;
   font-weight: var(--tp-font-bold);
   line-height: 1.1;
 }
@@ -944,16 +736,20 @@ function resultStateLabel(result: GenResult) {
 .summary-stat-label {
   margin-top: 5px;
   color: var(--tp-text-muted);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1;
 }
 
 .summary-stat--success {
-  background: var(--tp-accent-success-soft);
+  background: color-mix(in srgb, var(--tp-accent-success-soft) 45%, transparent);
   border-color: var(--tp-accent-success-border);
 }
 .summary-stat--success .summary-stat-value {
   color: var(--tp-success);
+}
+.summary-stat--success:hover {
+  border-color: var(--tp-success);
+  box-shadow: 0 8px 24px -12px rgba(34, 197, 94, 0.24);
 }
 
 .summary-stat--muted {
@@ -962,13 +758,21 @@ function resultStateLabel(result: GenResult) {
 .summary-stat--muted .summary-stat-value {
   color: var(--tp-text-muted);
 }
+.summary-stat--muted:hover {
+  border-color: var(--tp-text-subtle);
+  box-shadow: 0 8px 24px -12px rgba(100, 116, 139, 0.16);
+}
 
 .summary-stat--pending {
-  background: var(--tp-accent-primary-soft);
+  background: color-mix(in srgb, var(--tp-accent-primary-soft) 45%, transparent);
   border-color: var(--tp-accent-primary-border);
 }
 .summary-stat--pending .summary-stat-value {
   color: var(--tp-primary);
+}
+.summary-stat--pending:hover {
+  border-color: var(--tp-primary-light);
+  box-shadow: 0 8px 24px -12px rgba(139, 92, 246, 0.24);
 }
 
 .task-fail-banner {
@@ -989,6 +793,392 @@ function resultStateLabel(result: GenResult) {
   flex: none;
   margin-top: 1px;
   font-size: 16px;
+}
+
+.results-workbench {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 360px minmax(0, 1fr);
+  min-height: 0;
+  margin-top: 16px;
+  overflow: hidden;
+  background: var(--tp-surface-card);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: var(--tp-radius-lg);
+}
+
+.result-nav-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: color-mix(in srgb, var(--tp-surface-elevated) 70%, var(--tp-surface-card));
+  border-right: 1px solid var(--tp-border-subtle);
+}
+
+.result-nav-header {
+  flex: none;
+  padding: 14px;
+  border-bottom: 1px solid var(--tp-border-subtle);
+}
+
+.result-nav-title-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.result-nav-title-row .material-symbols-outlined {
+  color: var(--tp-primary);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.result-nav-title {
+  min-width: 0;
+  color: var(--tp-text-primary);
+  font-size: 14px;
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-ui);
+}
+
+.result-nav-counter {
+  margin-left: auto;
+  color: var(--tp-text-muted);
+  font-family: var(--tp-font-family-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: var(--tp-line-ui);
+}
+
+.result-filter-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.result-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 34px;
+  padding: 0 12px;
+  color: var(--tp-text-muted);
+  background: var(--tp-surface-input);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: var(--tp-radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: var(--tp-font-semibold);
+  line-height: 1;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.result-filter-btn .filter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+  font-family: var(--tp-font-family-mono);
+  font-size: 10px;
+  font-weight: var(--tp-font-bold);
+  color: var(--tp-text-muted);
+}
+
+.result-filter-btn:hover,
+.result-filter-btn.active {
+  color: var(--tp-primary);
+  background: var(--tp-accent-primary-soft);
+  border-color: var(--tp-accent-primary-border);
+}
+
+.result-filter-btn.active .filter-badge {
+  background: var(--tp-primary);
+  border-color: var(--tp-primary-light);
+  color: var(--tp-btn-text, #ffffff);
+}
+
+.result-filter-btn:focus-visible,
+.result-nav-row:focus-visible,
+.result-switch-btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--tp-primary) 42%, transparent);
+  outline-offset: 2px;
+}
+
+.result-bulk-adopt {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.result-nav-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 10px;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.result-nav-list::-webkit-scrollbar,
+.result-detail-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.result-nav-list::-webkit-scrollbar-track,
+.result-detail-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.result-nav-list::-webkit-scrollbar-thumb,
+.result-detail-scroll::-webkit-scrollbar-thumb {
+  background: var(--tp-border-subtle);
+  border-radius: 999px;
+}
+
+.result-nav-row {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  width: 100%;
+  min-height: 82px;
+  padding: 12px;
+  gap: 12px;
+  text-align: left;
+  background: color-mix(in srgb, var(--tp-surface-elevated) 40%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tp-border-subtle) 40%, transparent);
+  border-radius: 10px;
+  cursor: pointer;
+  margin-bottom: 6px;
+  transition:
+    background 0.22s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease,
+    transform 0.22s ease;
+}
+
+.result-nav-row:hover {
+  background: color-mix(in srgb, var(--tp-surface-hover) 85%, transparent);
+  border-color: color-mix(in srgb, var(--tp-border-subtle) 90%, transparent);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.result-nav-row.active {
+  background: var(--tp-accent-primary-soft);
+  border-color: var(--tp-accent-primary-border);
+  box-shadow:
+    0 0 0 1px var(--tp-accent-primary-border),
+    0 4px 16px -4px var(--tp-primary-shadow);
+}
+
+.result-nav-row.adopted {
+  background: color-mix(in srgb, var(--tp-accent-success-soft) 30%, transparent);
+  border-color: color-mix(in srgb, var(--tp-success) 35%, transparent);
+}
+
+.result-nav-row.adopted.active {
+  background: color-mix(in srgb, var(--tp-accent-success-soft) 55%, transparent);
+  border-color: var(--tp-success);
+}
+
+.result-nav-row.discarded {
+  opacity: 0.62;
+}
+
+.result-nav-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: start;
+  width: 30px;
+  height: 30px;
+  margin-top: 2px;
+  color: var(--tp-primary);
+  background: var(--tp-accent-primary-soft);
+  border: 1px solid var(--tp-accent-primary-border);
+  border-radius: 999px;
+  font-family: var(--tp-font-family-mono);
+  font-size: 11px;
+  font-weight: var(--tp-font-bold);
+  line-height: 1;
+  transition: all 0.2s ease;
+}
+
+.result-nav-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 6px;
+}
+
+.result-nav-name {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--tp-text-primary);
+  font-size: 13px;
+  font-weight: var(--tp-font-semibold);
+  line-height: 1.5;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.result-nav-meta {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+}
+
+.result-nav-level {
+  color: var(--tp-text-muted);
+  font-size: 11px;
+  font-weight: var(--tp-font-medium);
+  line-height: var(--tp-line-ui);
+}
+
+.result-nav-empty {
+  padding: 24px 8px;
+  color: var(--tp-text-muted);
+  text-align: center;
+  font-size: 12px;
+}
+
+.result-detail-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--tp-surface-card);
+}
+
+.result-detail-header {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  justify-content: space-between;
+  min-height: 92px;
+  padding: 18px 22px 16px;
+  gap: 20px;
+  border-bottom: 1px solid var(--tp-border-subtle);
+}
+
+.result-detail-title-block {
+  min-width: 0;
+}
+
+.result-detail-title {
+  margin: 0;
+  color: var(--tp-text-primary);
+  font-size: 19px;
+  font-weight: var(--tp-font-bold);
+  line-height: 1.5;
+}
+
+.result-detail-tools {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+}
+
+.result-nav-buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 2px;
+}
+
+.result-switch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: var(--tp-text-muted);
+  background: var(--tp-surface-input);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: var(--tp-radius-sm);
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    opacity 0.18s ease;
+}
+
+.result-switch-btn:hover:not(:disabled) {
+  color: var(--tp-primary);
+  background: var(--tp-accent-primary-soft);
+  border-color: var(--tp-accent-primary-border);
+}
+
+.result-switch-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.result-switch-btn .material-symbols-outlined {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.result-detail-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 20px 22px 24px;
+  overflow-y: auto;
+}
+
+.result-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.result-field-card {
+  min-width: 0;
+  padding: 16px;
+  background: var(--tp-surface-elevated);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 14px;
+  transition:
+    transform var(--tp-transition),
+    border-color var(--tp-transition),
+    box-shadow var(--tp-transition);
+}
+
+.result-field-card:hover {
+  transform: translateY(-1.5px);
+  border-color: color-mix(in srgb, var(--tp-primary-light) 40%, var(--tp-border-subtle));
+  box-shadow: 0 8px 24px -10px rgba(167, 139, 250, 0.12);
+}
+
+.result-field-card--steps {
+  padding-bottom: 14px;
+}
+
+.result-detail-footer {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 64px;
+  padding: 12px 22px;
+  gap: 16px;
+  border-top: 1px solid var(--tp-border-subtle);
+  background: color-mix(in srgb, var(--tp-surface-elevated) 72%, var(--tp-surface-card));
 }
 
 .results-section {
@@ -1121,13 +1311,13 @@ function resultStateLabel(result: GenResult) {
 .result-state {
   display: inline-flex;
   align-items: center;
-  height: 20px;
-  padding: 0 7px;
+  height: 22px;
+  padding: 0 8px;
   color: var(--tp-primary);
   background: var(--tp-accent-primary-soft);
   border: 1px solid var(--tp-accent-primary-border);
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: var(--tp-font-semibold);
   line-height: 1;
 }
@@ -1163,18 +1353,56 @@ function resultStateLabel(result: GenResult) {
 .result-confidence {
   display: inline-flex;
   align-items: center;
-  height: 22px;
-  padding: 0 8px;
+  height: 26px;
+  padding: 0 10px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: var(--tp-font-semibold);
   line-height: 1;
 }
 
+.result-level,
+.result-nav-level {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--tp-radius-sm);
+  font-size: 11px;
+  font-weight: var(--tp-font-bold);
+  line-height: 1;
+  transition: all 0.2s ease;
+}
+
 .result-level {
-  color: var(--tp-primary);
-  background: var(--tp-accent-primary-soft);
-  border: 1px solid var(--tp-accent-primary-border);
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+/* Priority Levels Styles */
+.level--p0 {
+  color: var(--tp-p0) !important;
+  background: var(--tp-p0-bg) !important;
+  border: 1px solid rgba(220, 38, 38, 0.25) !important;
+}
+
+.level--p1 {
+  color: var(--tp-p1) !important;
+  background: var(--tp-p1-bg) !important;
+  border: 1px solid rgba(249, 115, 22, 0.25) !important;
+}
+
+.level--p2 {
+  color: var(--tp-p2) !important;
+  background: var(--tp-p2-bg) !important;
+  border: 1px solid rgba(139, 92, 246, 0.25) !important;
+}
+
+.level--p3 {
+  color: var(--tp-p3) !important;
+  background: var(--tp-p3-bg) !important;
+  border: 1px solid rgba(100, 116, 139, 0.25) !important;
 }
 
 .result-confidence {
@@ -1200,23 +1428,41 @@ function resultStateLabel(result: GenResult) {
 }
 
 .field-label {
-  display: block;
-  margin-bottom: 5px;
-  color: var(--tp-text-muted);
-  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: var(--tp-text-primary);
+  font-size: 12px;
   font-weight: var(--tp-font-bold);
   line-height: var(--tp-line-ui);
 }
 
+.field-icon {
+  font-size: 16px;
+  color: var(--tp-primary-light);
+  line-height: 1;
+}
+
+.field-label::before {
+  content: '';
+  display: inline-block;
+  width: 3px;
+  height: 12px;
+  background: var(--tp-primary);
+  border-radius: 99px;
+  opacity: 0.82;
+}
+
 .field-text {
   margin: 0;
-  padding: 8px 12px;
+  padding: 12px 14px;
   background: var(--tp-surface-input);
   border: 1px solid var(--tp-border-subtle);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--tp-text-secondary);
-  font-size: 13px;
-  line-height: 1.7;
+  font-size: 14px;
+  line-height: 1.75;
 }
 
 .result-tags {
@@ -1228,14 +1474,22 @@ function resultStateLabel(result: GenResult) {
 .result-tag {
   display: inline-flex;
   align-items: center;
-  min-height: 22px;
-  padding: 0 8px;
+  min-height: 26px;
+  padding: 0 10px;
   color: var(--tp-text-secondary);
   background: var(--tp-surface-elevated);
   border: 1px solid var(--tp-border-subtle);
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: var(--tp-font-medium);
+  transition: all 0.2s ease;
+}
+
+.result-tag.tag--none {
+  color: var(--tp-text-subtle) !important;
+  background: transparent !important;
+  border: 1px dashed var(--tp-border-subtle) !important;
+  opacity: 0.65;
 }
 
 .steps-list {
@@ -1243,22 +1497,23 @@ function resultStateLabel(result: GenResult) {
   flex-direction: column;
   margin: 0;
   padding: 0;
-  gap: 8px;
+  gap: 16px;
   list-style: none;
 }
 
 .step-item {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 14px;
 }
 
 .step-index {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
+  margin-top: 2px;
   color: var(--tp-primary);
   background: var(--tp-accent-primary-soft);
   border: 1px solid var(--tp-accent-primary-border);
@@ -1273,9 +1528,8 @@ function resultStateLabel(result: GenResult) {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 1px 0 8px;
+  padding-bottom: 14px;
   border-bottom: 1px solid color-mix(in srgb, var(--tp-border-subtle) 70%, transparent);
-  gap: 4px;
 }
 
 .step-item:last-child .step-body {
@@ -1284,22 +1538,52 @@ function resultStateLabel(result: GenResult) {
 }
 
 .step-action {
-  color: var(--tp-text-secondary);
-  font-size: 13px;
-  line-height: 1.7;
+  color: var(--tp-text-primary);
+  font-size: 14px;
+  line-height: 1.75;
 }
 
 .step-expected {
-  color: var(--tp-success);
-  font-size: 12px;
-  font-weight: var(--tp-font-semibold);
-  line-height: 1.65;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--tp-accent-success-soft) 82%, transparent);
+  border-left: 3.5px solid var(--tp-success);
+  border-radius: 0 var(--tp-radius-sm) var(--tp-radius-sm) 0;
+  transition:
+    border-color var(--tp-transition),
+    background var(--tp-transition);
 }
 
-.step-expected::before {
-  content: '预期：';
-  color: var(--tp-text-muted);
-  font-weight: var(--tp-font-medium);
+.step-expected:hover {
+  background: color-mix(in srgb, var(--tp-accent-success-soft) 94%, transparent);
+}
+
+.step-expected-prefix {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: var(--tp-font-bold);
+  color: var(--tp-success);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1;
+}
+
+.expected-icon {
+  font-size: 14px;
+  color: var(--tp-success);
+  line-height: 1;
+}
+
+.step-expected-body {
+  margin: 0;
+  color: var(--tp-text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .result-actions {
@@ -1694,17 +1978,57 @@ function resultStateLabel(result: GenResult) {
   outline-offset: 2px;
 }
 
+@media (max-width: 1280px) {
+  :global(.task-detail-dialog.el-dialog) {
+    width: calc(100vw - 32px) !important;
+  }
+
+  .results-workbench {
+    grid-template-columns: 320px minmax(0, 1fr);
+  }
+
+  .task-summary-stats {
+    grid-template-columns: repeat(4, 72px);
+  }
+}
+
 @media (max-width: 980px) {
   :global(.task-detail-dialog.el-dialog) {
     width: calc(100vw - 24px) !important;
+    height: calc(100vh - 24px);
   }
 
   .task-detail-summary {
     grid-template-columns: 1fr;
+    padding: 14px;
   }
 
   .task-summary-stats {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .results-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .result-nav-panel {
+    border-right: 0;
+    border-bottom: 1px solid var(--tp-border-subtle);
+  }
+
+  .result-nav-list {
+    max-height: 220px;
+  }
+
+  .result-detail-header,
+  .result-detail-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .result-detail-tools,
+  .result-action-buttons {
+    justify-content: flex-start;
   }
 
   .result-header,
@@ -1725,6 +2049,9 @@ function resultStateLabel(result: GenResult) {
   }
 
   .action-btn,
+  .result-filter-btn,
+  .result-nav-row,
+  .result-switch-btn,
   .task-name-text,
   :deep(.el-table td.el-table__cell) {
     transition: none;

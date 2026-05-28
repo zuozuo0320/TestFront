@@ -163,6 +163,7 @@ export function useGenTasks() {
   const total = ref(0)
   const loading = ref(false)
   const batchDeleting = ref(false)
+  const batchAdopting = ref(false)
   const page = ref(1)
   const pageSize = ref(20)
   const statusFilter = ref('')
@@ -267,6 +268,37 @@ export function useGenTasks() {
       await fetchTaskDetail(currentTask.value.id)
     } catch (e: unknown) {
       ElMessage.error(getErrorMessage(e, '丢弃失败'))
+    }
+  }
+
+  async function handleBatchAdoptResults(results: GenResult[]) {
+    if (!projectId.value || !currentTask.value || results.length === 0) return false
+    const currentProjectId = projectId.value
+    const currentTaskId = currentTask.value.id
+    try {
+      await ElMessageBox.confirm(
+        `将采纳 ${results.length} 条待处理产物并生成测试用例，确定继续？`,
+        '批量采纳',
+        {
+          type: 'warning',
+          confirmButtonText: '采纳全部',
+          cancelButtonText: '取消',
+        },
+      )
+      batchAdopting.value = true
+      for (const result of results) {
+        await adoptResult(currentProjectId, result.id)
+      }
+      ElMessage.success(`已采纳 ${results.length} 条产物`)
+      await fetchTaskDetail(currentTaskId)
+      return true
+    } catch (e: unknown) {
+      if (e === 'cancel' || e === 'close') return false
+      ElMessage.error(getErrorMessage(e, '批量采纳失败'))
+      await fetchTaskDetail(currentTaskId)
+      return false
+    } finally {
+      batchAdopting.value = false
     }
   }
 
@@ -376,6 +408,7 @@ export function useGenTasks() {
     total,
     loading,
     batchDeleting,
+    batchAdopting,
     page,
     pageSize,
     statusFilter,
@@ -394,6 +427,7 @@ export function useGenTasks() {
     fetchTaskDetail,
     handleAdopt,
     handleDiscard,
+    handleBatchAdoptResults,
     handleClose,
     handleDeleteTask,
     handleBatchDeleteTasks,
