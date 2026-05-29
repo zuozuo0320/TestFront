@@ -7,12 +7,14 @@ import { useRouter } from 'vue-router'
 import type { UploadFile } from 'element-plus'
 import { InfoFilled, SuccessFilled } from '@element-plus/icons-vue'
 import { useGenTasks, useRequirementDocs } from '@/composables/useRequirementGen'
+import { useTheme } from '@/composables/useTheme'
 
 import { getActiveAIModel, type AIModelConfig } from '@/api/aiModelConfig'
 import type { RequirementDoc } from '@/api/requirementDoc'
 import type { SmartGeneratePayload, SmartGenerateResult } from '@/api/requirementGen'
 
 const router = useRouter()
+const { isGenArtTheme } = useTheme()
 const { docs, fetchDocs, handleUpload, handlePaste } = useRequirementDocs()
 const { tasks, smartGenerating, handleSmartGenerate, fetchTasks } = useGenTasks()
 
@@ -319,9 +321,15 @@ interface PData {
 }
 
 function getParticleColor(color: number, opacity: number): string {
-  if (color < 0.33) return `rgba(100,140,255,${opacity})`
-  if (color < 0.66) return `rgba(160,100,255,${opacity * 0.8})`
-  return `rgba(80,220,255,${opacity * 0.7})`
+  if (isGenArtTheme.value) {
+    if (color < 0.33) return `rgba(100,140,255,${opacity})`
+    if (color < 0.66) return `rgba(160,100,255,${opacity * 0.8})`
+    return `rgba(80,220,255,${opacity * 0.7})`
+  }
+  // 浅色主题：使用更柔和的紫蓝色调
+  if (color < 0.33) return `rgba(139,92,246,${opacity * 0.5})`
+  if (color < 0.66) return `rgba(99,102,241,${opacity * 0.4})`
+  return `rgba(168,85,247,${opacity * 0.35})`
 }
 
 function initParticles() {
@@ -360,6 +368,7 @@ function initParticles() {
   for (let i = 0; i < 120; i++) particles.push(makeP())
   function tick() {
     context.clearRect(0, 0, width, height)
+    const isDark = isGenArtTheme.value
     const glowOne = context.createRadialGradient(
       width * 0.3,
       height * 0.5,
@@ -368,7 +377,7 @@ function initParticles() {
       height * 0.5,
       width * 0.4,
     )
-    glowOne.addColorStop(0, 'rgba(100,60,200,0.04)')
+    glowOne.addColorStop(0, isDark ? 'rgba(100,60,200,0.04)' : 'rgba(139,92,246,0.03)')
     glowOne.addColorStop(1, 'transparent')
     context.fillStyle = glowOne
     context.fillRect(0, 0, width, height)
@@ -380,7 +389,7 @@ function initParticles() {
       height * 0.4,
       width * 0.35,
     )
-    glowTwo.addColorStop(0, 'rgba(60,100,200,0.03)')
+    glowTwo.addColorStop(0, isDark ? 'rgba(60,100,200,0.03)' : 'rgba(99,102,241,0.025)')
     glowTwo.addColorStop(1, 'transparent')
     context.fillStyle = glowTwo
     context.fillRect(0, 0, width, height)
@@ -409,7 +418,10 @@ function initParticles() {
           context.beginPath()
           context.moveTo(p.x, p.y)
           context.lineTo(q.x, q.y)
-          context.strokeStyle = `rgba(140,160,255,${0.12 * (1 - distance / 140)})`
+          const lineAlpha = isDark ? 0.12 : 0.06
+          context.strokeStyle = isDark
+            ? `rgba(140,160,255,${lineAlpha * (1 - distance / 140)})`
+            : `rgba(139,92,246,${lineAlpha * (1 - distance / 140)})`
           context.stroke()
         }
       }
@@ -586,7 +598,7 @@ function goToResults() {
 </script>
 
 <template>
-  <div class="requirement-gen-page">
+  <div class="requirement-gen-page" :class="{ 'is-dark': isGenArtTheme }">
     <div ref="mouseGlowEl" class="mouse-glow"></div>
     <div class="grid-overlay"></div>
     <div class="ambient-glow"></div>
@@ -2321,6 +2333,315 @@ function goToResults() {
   box-shadow: none !important;
 }
 
+/* ═══════ Light Mode Overrides ═══════ */
+.requirement-gen-page:not(.is-dark) {
+  background: linear-gradient(145deg, #f5f3ff 0%, #eef2ff 40%, #faf5ff 100%);
+  color: #1f2937;
+}
+
+.requirement-gen-page:not(.is-dark) .mouse-glow {
+  background: radial-gradient(
+    600px circle at var(--x) var(--y),
+    rgba(139, 92, 246, 0.04),
+    transparent 40%
+  );
+}
+
+.requirement-gen-page:not(.is-dark) .floating-panel {
+  border: 1px solid rgba(139, 92, 246, 0.12);
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 4px 24px rgba(139, 92, 246, 0.06);
+}
+
+.requirement-gen-page:not(.is-dark) .floating-panel:hover {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(139, 92, 246, 0.24);
+  box-shadow:
+    0 8px 32px rgba(139, 92, 246, 0.1),
+    0 0 0 1px rgba(139, 92, 246, 0.06);
+}
+
+.requirement-gen-page:not(.is-dark) .panel-title {
+  border-bottom-color: rgba(139, 92, 246, 0.08);
+  color: rgba(107, 114, 128, 0.8);
+}
+
+.requirement-gen-page:not(.is-dark) .panel-dot {
+  background: #8b5cf6;
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.4);
+}
+
+.requirement-gen-page:not(.is-dark) .streaming-tag {
+  color: rgba(139, 92, 246, 0.7);
+}
+
+.requirement-gen-page:not(.is-dark) .panel-icon {
+  color: #8b5cf6;
+}
+
+.requirement-gen-page:not(.is-dark) .panel-row span {
+  color: rgba(107, 114, 128, 0.8);
+}
+
+.requirement-gen-page:not(.is-dark) .panel-row strong {
+  color: #1f2937;
+}
+
+.requirement-gen-page:not(.is-dark) .panel-row .cyan {
+  color: #7c3aed;
+}
+
+.requirement-gen-page:not(.is-dark) .panel-row .primary-text {
+  color: #8b5cf6;
+}
+
+.requirement-gen-page:not(.is-dark) .central-zone::before {
+  background: radial-gradient(
+    circle,
+    rgba(245, 243, 255, 0.6) 0%,
+    rgba(238, 242, 255, 0.3) 38%,
+    rgba(255, 255, 255, 0) 70%
+  );
+}
+
+.requirement-gen-page:not(.is-dark) .central-zone::after {
+  background: radial-gradient(
+    circle,
+    rgba(139, 92, 246, 0.1) 0%,
+    rgba(99, 102, 241, 0.05) 42%,
+    rgba(255, 255, 255, 0) 72%
+  );
+}
+
+.requirement-gen-page:not(.is-dark) .polygon-1 {
+  border-color: rgba(139, 92, 246, 0.1);
+}
+
+.requirement-gen-page:not(.is-dark) .polygon-2 {
+  border-color: rgba(99, 102, 241, 0.15);
+}
+
+.requirement-gen-page:not(.is-dark) .polygon-3 {
+  border-color: rgba(139, 92, 246, 0.08);
+}
+
+.requirement-gen-page:not(.is-dark) .polygon-4 {
+  border-color: rgba(168, 85, 247, 0.18);
+}
+
+.requirement-gen-page:not(.is-dark) .ring-outer {
+  color: rgba(209, 213, 219, 0.8);
+}
+
+.requirement-gen-page:not(.is-dark) .ring-mid {
+  color: rgba(139, 92, 246, 0.5);
+}
+
+.requirement-gen-page:not(.is-dark) .ring-inner {
+  color: rgba(168, 85, 247, 0.4);
+}
+
+.requirement-gen-page:not(.is-dark) .data-line {
+  stroke: rgba(139, 92, 246, 0.25);
+}
+
+.requirement-gen-page:not(.is-dark) .data-lines-wrap {
+  opacity: 0.3;
+}
+
+.requirement-gen-page:not(.is-dark) .central-hub {
+  border-color: rgba(139, 92, 246, 0.35);
+  color: #1f2937;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow:
+    0 0 40px rgba(139, 92, 246, 0.15),
+    0 0 80px rgba(139, 92, 246, 0.08),
+    0 8px 32px rgba(139, 92, 246, 0.1);
+}
+
+.requirement-gen-page:not(.is-dark) .central-hub.is-idle {
+  background:
+    radial-gradient(circle at 50% 30%, rgba(139, 92, 246, 0.06), transparent 42%),
+    rgba(255, 255, 255, 0.92);
+  border-color: rgba(139, 92, 246, 0.2);
+  box-shadow:
+    0 0 0 1px rgba(139, 92, 246, 0.06),
+    0 4px 24px rgba(139, 92, 246, 0.08);
+}
+
+.requirement-gen-page:not(.is-dark) .hub-icon {
+  color: #8b5cf6;
+}
+
+.requirement-gen-page:not(.is-dark) .central-hub.is-idle .hub-icon {
+  color: rgba(139, 92, 246, 0.7);
+}
+
+.requirement-gen-page:not(.is-dark) .hub-number {
+  background: linear-gradient(to right, #7c3aed, #a855f7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.requirement-gen-page:not(.is-dark) .hub-label {
+  color: rgba(107, 114, 128, 0.7);
+}
+
+.requirement-gen-page:not(.is-dark) .hub-idle-title {
+  color: rgba(31, 41, 55, 0.88);
+}
+
+.requirement-gen-page:not(.is-dark) .central-hub:focus-visible {
+  outline-color: rgba(139, 92, 246, 0.6);
+}
+
+.requirement-gen-page:not(.is-dark) .float-node {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(139, 92, 246, 0.1);
+}
+
+.requirement-gen-page:not(.is-dark) .float-node:hover {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(139, 92, 246, 0.22);
+}
+
+.requirement-gen-page:not(.is-dark) .node-text {
+  color: #374151;
+}
+
+.requirement-gen-page:not(.is-dark) .dot-tertiary {
+  background: #7c3aed;
+  box-shadow: 0 0 8px rgba(124, 58, 237, 0.3);
+}
+
+.requirement-gen-page:not(.is-dark) .dot-secondary {
+  background: #a855f7;
+  box-shadow: 0 0 8px rgba(168, 85, 247, 0.3);
+}
+
+.requirement-gen-page:not(.is-dark) .dot-error {
+  background: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+}
+
+.requirement-gen-page:not(.is-dark) .dot-primary {
+  background: #8b5cf6;
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.3);
+}
+
+.requirement-gen-page:not(.is-dark) .beam {
+  background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.4), transparent);
+}
+
+.requirement-gen-page:not(.is-dark) .beam-overlay {
+  opacity: 0.06;
+}
+
+/* ── Light: Pipeline Footer ── */
+.requirement-gen-page:not(.is-dark) .pipeline-footer {
+  background: linear-gradient(
+    to top,
+    rgba(245, 243, 255, 0.98),
+    rgba(245, 243, 255, 0.8) 58%,
+    transparent
+  );
+}
+
+.requirement-gen-page:not(.is-dark) .step-no {
+  border-color: rgba(139, 92, 246, 0.18);
+  background: rgba(255, 255, 255, 0.92);
+  color: rgba(107, 114, 128, 0.8);
+}
+
+.requirement-gen-page:not(.is-dark) .step-title {
+  color: rgba(75, 85, 99, 0.8);
+}
+
+.requirement-gen-page:not(.is-dark) .step-desc {
+  color: rgba(107, 114, 128, 0.7);
+}
+
+.requirement-gen-page:not(.is-dark) .step-track {
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.requirement-gen-page:not(.is-dark) .step-track i {
+  background: rgba(139, 92, 246, 0.35);
+}
+
+.requirement-gen-page:not(.is-dark) .step-track b {
+  background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.3), transparent);
+  background-size: 200% 100%;
+}
+
+.requirement-gen-page:not(.is-dark) .pipeline-step.active .step-no {
+  background: rgba(139, 92, 246, 0.15);
+  border-color: rgba(139, 92, 246, 0.5);
+  color: #7c3aed;
+}
+
+.requirement-gen-page:not(.is-dark) .pipeline-step.active .step-title {
+  color: #7c3aed;
+}
+
+.requirement-gen-page:not(.is-dark) .pipeline-step.active .step-desc {
+  color: rgba(124, 58, 237, 0.8);
+}
+
+.requirement-gen-page:not(.is-dark) .pipeline-step.active .step-track i {
+  background: #8b5cf6;
+}
+
+.requirement-gen-page:not(.is-dark) .pipeline-step.completed .step-no {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.35);
+  color: #16a34a;
+}
+
+.requirement-gen-page:not(.is-dark) .pipeline-step.completed .step-title {
+  color: #16a34a;
+}
+
+.requirement-gen-page:not(.is-dark) .pipeline-step.completed .step-track i {
+  background: rgba(34, 197, 94, 0.45);
+}
+
+.requirement-gen-page:not(.is-dark) .pipeline-step.completed .step-desc {
+  color: rgba(22, 163, 106, 0.75);
+}
+
+.requirement-gen-page:not(.is-dark) .step-chevron .material-symbols-outlined {
+  color: #9ca3af;
+}
+
+/* ── Light: FAB Buttons ── */
+.requirement-gen-page:not(.is-dark) .fab-border {
+  background: linear-gradient(to right, #8b5cf6, #a855f7);
+}
+
+.requirement-gen-page:not(.is-dark) .fab-inner {
+  background: #ffffff;
+}
+
+.requirement-gen-page:not(.is-dark) .fab-inner .material-symbols-outlined {
+  color: #8b5cf6;
+}
+
+.requirement-gen-page:not(.is-dark) .fab-label {
+  color: #1f2937;
+}
+
+/* ── Light: Generating state ── */
+.requirement-gen-page:not(.is-dark).is-generating .central-hub,
+.requirement-gen-page:not(.is-dark) .is-generating .central-hub {
+  box-shadow:
+    0 0 50px rgba(139, 92, 246, 0.2),
+    0 0 100px rgba(139, 92, 246, 0.1),
+    0 8px 40px rgba(139, 92, 246, 0.12);
+}
+
 /* ═══════ Responsive ═══════ */
 @media (max-width: 1280px) {
   .floating-panel {
@@ -2753,5 +3074,122 @@ function goToResults() {
     transform: translateX(0) scaleX(1);
     opacity: 0;
   }
+}
+
+/* ═══════ Light Mode: Dialog Overrides (teleported to body) ═══════ */
+html:not([data-theme]) .requirement-upload-dialog .el-dialog {
+  border-color: rgba(139, 92, 246, 0.14) !important;
+  background: #ffffff !important;
+  box-shadow:
+    0 20px 60px rgba(139, 92, 246, 0.1),
+    0 0 0 1px rgba(139, 92, 246, 0.04) inset !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .el-dialog__header {
+  border-bottom-color: rgba(139, 92, 246, 0.08) !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .el-dialog__title {
+  color: #1f2937 !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .el-dialog__close {
+  color: rgba(107, 114, 128, 0.7) !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .el-dialog__footer {
+  background: rgba(245, 243, 255, 0.5) !important;
+  border-top: 1px solid rgba(139, 92, 246, 0.06) !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .el-form-item__label {
+  color: #4b5563 !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .el-input__wrapper {
+  border-color: rgba(139, 92, 246, 0.14) !important;
+  background: #fafafa !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .el-input__wrapper:hover {
+  border-color: rgba(139, 92, 246, 0.28) !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .el-input__wrapper.is-focus {
+  border-color: rgba(139, 92, 246, 0.5) !important;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.08) !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .el-input__inner {
+  color: #1f2937 !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .el-input__inner::placeholder {
+  color: rgba(107, 114, 128, 0.5) !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .upload-select-card {
+  border-color: rgba(139, 92, 246, 0.18) !important;
+  background:
+    linear-gradient(135deg, rgba(139, 92, 246, 0.04), rgba(255, 255, 255, 0.6) 54%), #fafafa !important;
+  box-shadow: 0 2px 12px rgba(139, 92, 246, 0.04) !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .upload-select-card:hover {
+  border-color: rgba(139, 92, 246, 0.35) !important;
+  background:
+    linear-gradient(135deg, rgba(139, 92, 246, 0.07), rgba(255, 255, 255, 0.8) 54%), #f5f3ff !important;
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.08) !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .upload-select-icon {
+  border-color: rgba(139, 92, 246, 0.18) !important;
+  background: rgba(139, 92, 246, 0.08) !important;
+  color: #8b5cf6 !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .upload-select-title {
+  color: #1f2937 !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .upload-select-desc {
+  color: rgba(107, 114, 128, 0.7) !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .upload-select-action {
+  border-color: rgba(139, 92, 246, 0.2) !important;
+  background: rgba(139, 92, 246, 0.06) !important;
+  color: #8b5cf6 !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .el-button:not(.el-button--primary) {
+  border-color: rgba(139, 92, 246, 0.14) !important;
+  background: rgba(139, 92, 246, 0.04) !important;
+  color: #374151 !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .el-button:not(.el-button--primary):hover {
+  border-color: rgba(139, 92, 246, 0.25) !important;
+  background: rgba(139, 92, 246, 0.08) !important;
+  color: #1f2937 !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .el-button--primary {
+  border-color: rgba(139, 92, 246, 0.6) !important;
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 20px rgba(139, 92, 246, 0.2) !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .el-button--primary:hover {
+  background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%) !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .el-button.is-disabled,
+html:not([data-theme]) .requirement-upload-dialog .el-button.is-disabled:hover {
+  border-color: rgba(209, 213, 219, 0.5) !important;
+  background: rgba(243, 244, 246, 0.8) !important;
+  color: rgba(156, 163, 175, 0.6) !important;
+  box-shadow: none !important;
 }
 </style>
