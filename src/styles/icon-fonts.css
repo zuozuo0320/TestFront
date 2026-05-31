@@ -1,0 +1,33 @@
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: block;
+  src: url('/fonts/material-symbols-outlined.ttf') format('truetype');
+}
+
+.material-symbols-outlined {
+  display: inline-block;
+  width: 1em;
+  min-width: 1em;
+  max-width: 1em;
+  overflow: hidden;
+  flex-shrink: 0;
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: normal;
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-feature-settings: 'liga';
+  -webkit-font-feature-settings: 'liga';
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
+  text-rendering: optimizeLegibility;
+}
