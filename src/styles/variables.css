@@ -420,6 +420,127 @@ html[data-theme='genart'] {
   --el-color-primary-light-9: var(--tp-primary-lighter);
 }
 
+/* 黑曜主题最终收口：统一到登录页星网黑底，避免各业务页出现蓝黑/暖黑/灰黑混用。 */
+html[data-theme='genart'] {
+  color: #ffffff;
+  --tp-text-primary: #ffffff;
+  --tp-text-secondary: rgba(255, 255, 255, 0.78);
+  --tp-text-muted: rgba(255, 255, 255, 0.52);
+  --tp-text-subtle: rgba(255, 255, 255, 0.36);
+  --tp-text-disabled: rgba(255, 255, 255, 0.22);
+
+  --tp-primary: #a855f7;
+  --tp-primary-light: #c4b5fd;
+  --tp-primary-lighter: rgba(168, 85, 247, 0.12);
+  --tp-primary-dark: #8b5cf6;
+  --tp-primary-shadow: rgba(140, 100, 255, 0.18);
+  --tp-secondary: #6366f1;
+  --tp-secondary-dark: #4f46e5;
+  --tp-secondary-soft: rgba(99, 102, 241, 0.1);
+  --tp-secondary-border: rgba(99, 102, 241, 0.22);
+
+  --tp-gray-50: #000000;
+  --tp-gray-100: #0a0a0c;
+  --tp-gray-200: #141418;
+  --tp-gray-300: #25252b;
+  --tp-gray-400: rgba(255, 255, 255, 0.32);
+  --tp-gray-500: rgba(255, 255, 255, 0.48);
+  --tp-gray-600: rgba(255, 255, 255, 0.68);
+  --tp-gray-700: rgba(255, 255, 255, 0.78);
+  --tp-gray-800: rgba(255, 255, 255, 0.88);
+  --tp-gray-900: #ffffff;
+
+  --tp-shell-bg: #000000;
+  --tp-shell-panel-bg: rgba(0, 0, 0, 0.42);
+  --tp-shell-panel-bg-strong: rgba(3, 4, 9, 0.64);
+  --tp-shell-border: rgba(118, 142, 255, 0.13);
+  --tp-shell-border-strong: rgba(118, 142, 255, 0.28);
+  --tp-shell-focus: rgba(140, 100, 255, 0.6);
+
+  --tp-nav-bg: var(--tp-shell-panel-bg);
+  --tp-nav-bg-light: var(--tp-shell-panel-bg-strong);
+  --tp-nav-border: var(--tp-shell-border);
+  --tp-nav-text: var(--tp-text-muted);
+  --tp-nav-text-bright: var(--tp-text-primary);
+  --tp-surface-base: var(--tp-shell-bg);
+  --tp-surface-card: var(--tp-shell-panel-bg);
+  --tp-surface-elevated: var(--tp-shell-panel-bg-strong);
+  --tp-surface-input: rgba(255, 255, 255, 0.032);
+  --tp-surface-hover: rgba(90, 120, 255, 0.075);
+  --tp-surface-sheen: rgba(105, 132, 255, 0.035);
+  --tp-surface-sheen-strong: rgba(140, 100, 255, 0.075);
+  --tp-surface-muted: rgba(255, 255, 255, 0.018);
+  --tp-surface-row-hover: rgba(90, 120, 255, 0.055);
+  --tp-surface-header: rgba(0, 0, 0, 0.38);
+  --tp-overlay-scrim: rgba(0, 0, 0, 0.72);
+  --tp-ambient-primary: transparent;
+  --tp-ambient-info: transparent;
+  --tp-glass-bg: var(--tp-shell-panel-bg);
+  --tp-glass-bg-strong: var(--tp-shell-panel-bg-strong);
+  --tp-glass-border: var(--tp-shell-border);
+  --tp-workhub-card-bg: linear-gradient(180deg, rgba(6, 8, 18, 0.6), rgba(0, 0, 0, 0.42)), #000000;
+
+  --tp-shadow-sm: 0 18px 46px rgba(0, 0, 0, 0.58), inset 0 1px 0 rgba(130, 150, 255, 0.035);
+  --tp-shadow-md: 0 28px 72px rgba(0, 0, 0, 0.66), 0 0 22px rgba(90, 120, 255, 0.07);
+  --tp-shadow-glow: 0 0 0 3px rgba(140, 100, 255, 0.12), 0 0 28px rgba(140, 100, 255, 0.12);
+  --tp-btn-bg: linear-gradient(135deg, #a78bfa 0%, #d6b36a 100%);
+  --tp-btn-bg-hover: linear-gradient(135deg, #c4b5fd 0%, #e7c982 100%);
+  --tp-btn-text: #08090f;
+  --tp-btn-border: transparent;
+  --tp-btn-plain-bg: var(--tp-shell-panel-bg);
+  --tp-btn-plain-text: var(--tp-primary-light);
+  --tp-btn-plain-border: var(--tp-shell-border);
+  --tp-btn-shadow: 0 12px 28px rgba(140, 100, 255, 0.12);
+  --tp-btn-shadow-hover: 0 16px 34px rgba(140, 100, 255, 0.18);
+
+  --tp-accent-primary: var(--tp-primary);
+  --tp-accent-primary-soft: rgba(120, 140, 255, 0.095);
+  --tp-accent-primary-border: rgba(120, 140, 255, 0.24);
+  --tp-accent-success: #22c55e;
+  --tp-accent-success-soft: rgba(34, 197, 94, 0.14);
+  --tp-accent-success-border: rgba(34, 197, 94, 0.28);
+  --tp-accent-danger: #fb7185;
+  --tp-accent-danger-soft: rgba(251, 113, 133, 0.14);
+  --tp-accent-danger-border: rgba(251, 113, 133, 0.28);
+  --tp-accent-info: #60a5fa;
+  --tp-accent-info-soft: rgba(96, 165, 250, 0.12);
+  --tp-accent-info-border: rgba(96, 165, 250, 0.24);
+  --tp-accent-warning: #f0c36a;
+  --tp-accent-warning-soft: rgba(240, 195, 106, 0.14);
+  --tp-accent-warning-border: rgba(240, 195, 106, 0.26);
+  --tp-border-subtle: var(--tp-shell-border);
+  --tp-border-strong: var(--tp-shell-border-strong);
+  --tp-shadow-card: var(--tp-shadow-sm);
+  --tp-shadow-card-hover: var(--tp-shadow-md);
+
+  --el-bg-color: var(--tp-surface-card);
+  --el-bg-color-page: var(--tp-surface-base);
+  --el-bg-color-overlay: var(--tp-surface-elevated);
+  --el-mask-color: rgba(0, 0, 0, 0.72);
+  --el-mask-color-extra-light: rgba(0, 0, 0, 0.5);
+  --el-skeleton-color: var(--tp-surface-muted);
+  --el-skeleton-to-color: var(--tp-surface-hover);
+  --el-text-color-primary: var(--tp-text-primary);
+  --el-text-color-regular: var(--tp-text-secondary);
+  --el-text-color-secondary: var(--tp-text-muted);
+  --el-text-color-placeholder: var(--tp-text-subtle);
+  --el-border-color-darker: var(--tp-border-strong);
+  --el-border-color-dark: var(--tp-border-strong);
+  --el-border-color: var(--tp-border-subtle);
+  --el-border-color-light: var(--tp-border-subtle);
+  --el-border-color-lighter: rgba(118, 142, 255, 0.08);
+  --el-border-color-extra-light: rgba(118, 142, 255, 0.055);
+  --el-fill-color: var(--tp-surface-input);
+  --el-fill-color-light: var(--tp-surface-muted);
+  --el-fill-color-lighter: rgba(255, 255, 255, 0.022);
+  --el-color-primary: var(--tp-primary);
+  --el-color-primary-light-3: var(--tp-primary-light);
+  --el-color-primary-light-5: rgba(140, 100, 255, 0.38);
+  --el-color-primary-light-7: rgba(140, 100, 255, 0.24);
+  --el-color-primary-light-8: rgba(140, 100, 255, 0.17);
+  --el-color-primary-light-9: var(--tp-primary-lighter);
+}
+
 /* ========== Element Plus Dark Theme Overrides for Style B ========== */
 html.dark {
   --el-bg-color: var(--tp-surface-card);

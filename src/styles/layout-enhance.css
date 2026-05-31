@@ -4987,3 +4987,165 @@ html[data-theme='genart'] .amc-page.amc-page .amc-header.amc-header {
   border-bottom: 0 !important;
   margin-bottom: 12px !important;
 }
+
+/* ───────────────────────────────
+   黑曜主题最终色彩收口：对齐登录页星网纯黑背景
+   ─────────────────────────────── */
+html[data-theme='genart'],
+html[data-theme='genart'] body {
+  background: var(--tp-shell-bg) !important;
+}
+
+html[data-theme='genart'] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 1.5% 7%, rgba(88, 160, 255, 0.52) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 8% 46%, rgba(118, 142, 255, 0.38) 0 1px, transparent 1.7px),
+    radial-gradient(circle at 18% 56%, rgba(72, 178, 205, 0.32) 0 1.2px, transparent 1.9px),
+    radial-gradient(circle at 32% 68%, rgba(100, 142, 255, 0.46) 0 1.6px, transparent 2.4px),
+    radial-gradient(circle at 43% 37%, rgba(92, 128, 255, 0.62) 0 1.9px, transparent 2.8px),
+    radial-gradient(circle at 46% 65%, rgba(168, 85, 247, 0.5) 0 1.2px, transparent 2px),
+    radial-gradient(circle at 63% 61%, rgba(93, 144, 255, 0.5) 0 1.2px, transparent 2px),
+    radial-gradient(circle at 68% 76%, rgba(72, 178, 205, 0.28) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 78% 73%, rgba(88, 124, 255, 0.46) 0 1.4px, transparent 2.2px),
+    radial-gradient(circle at 92% 9%, rgba(98, 116, 255, 0.46) 0 1.2px, transparent 2px),
+    linear-gradient(
+      132deg,
+      transparent 0 45.7%,
+      rgba(70, 94, 180, 0.045) 45.75% 46%,
+      transparent 46.25%
+    ),
+    linear-gradient(
+      26deg,
+      transparent 0 59.2%,
+      rgba(58, 88, 170, 0.04) 59.25% 59.45%,
+      transparent 59.7%
+    ),
+    linear-gradient(
+      154deg,
+      transparent 0 65%,
+      rgba(86, 108, 210, 0.036) 65.06% 65.24%,
+      transparent 65.5%
+    ),
+    #000000;
+  opacity: 0.72;
+}
+
+html[data-theme='genart'] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 28% 34%, rgba(80, 120, 255, 0.03), transparent 24%),
+    radial-gradient(circle at 76% 72%, rgba(105, 80, 255, 0.025), transparent 24%);
+}
+
+html[data-theme='genart'] #app,
+html[data-theme='genart'] .page,
+html[data-theme='genart'] .layout,
+html[data-theme='genart'] .layout > .main {
+  position: relative;
+  z-index: 1;
+  background: transparent !important;
+}
+
+html[data-theme='genart'] .layout > .top-header,
+html[data-theme='genart'] .top-header {
+  background: rgba(0, 0, 0, 0.82) !important;
+  border-bottom-color: var(--tp-shell-border) !important;
+  box-shadow:
+    0 1px 0 rgba(118, 142, 255, 0.08),
+    0 14px 40px rgba(0, 0, 0, 0.58) !important;
+  backdrop-filter: blur(16px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(118%) !important;
+}
+
+html[data-theme='genart'] .content-wrap,
+html[data-theme='genart'] .main-nav,
+html[data-theme='genart'] .nav-header-card,
+html[data-theme='genart'] .nav-project-dropdown,
+html[data-theme='genart'] .user-popover-card {
+  background: var(--tp-shell-panel-bg) !important;
+  border-color: var(--tp-shell-border) !important;
+  box-shadow: var(--tp-shadow-sm) !important;
+  backdrop-filter: blur(16px) saturate(112%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(112%) !important;
+}
+
+html[data-theme='genart'] .content-wrap::before,
+html[data-theme='genart'] .main-nav::before {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(98, 126, 255, 0.13),
+    rgba(70, 178, 205, 0.08),
+    transparent
+  ) !important;
+}
+
+html[data-theme='genart']
+  :is(
+    .page-header,
+    .pipeline-header,
+    .wizard-header,
+    .rv2-summary,
+    .um-top-header,
+    .rm-header,
+    .pm-header,
+    .tm-topnav,
+    .ai-page-header,
+    .insights-header,
+    .amc-header
+  ) {
+  background: var(--tp-shell-panel-bg) !important;
+  border-color: var(--tp-shell-border) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='genart']
+  :is(
+    .stat-card-pl,
+    .rv2-card,
+    .um-table-card,
+    .rm-content-card,
+    .pm-table-card,
+    .tm-card,
+    .ai-stat-card,
+    .ai-quickstart-card,
+    .amc-panel,
+    .amc-form-section,
+    .amc-model-panel,
+    .ai-table-wrap
+  ) {
+  background: var(--tp-shell-panel-bg) !important;
+  border-color: var(--tp-shell-border) !important;
+  box-shadow: var(--tp-shadow-sm) !important;
+}
+
+html[data-theme='genart']
+  :is(
+    .empty-state-pl,
+    .rv2-empty-state,
+    .rm-empty-state,
+    .um-empty,
+    .pm-empty-row,
+    .activity-empty,
+    .chart-empty,
+    .testcase-empty-wrap
+  ) {
+  background: var(--tp-shell-panel-bg) !important;
+  border-color: var(--tp-shell-border) !important;
+}
+
+html[data-theme='genart'] .el-table,
+html[data-theme='genart']
+  :is(.cases-table, .pipeline-table, .um-table, .pm-table, .ai-table, .wz-table) {
+  --el-table-header-bg-color: var(--tp-surface-header);
+  --el-table-row-hover-bg-color: var(--tp-surface-row-hover);
+}

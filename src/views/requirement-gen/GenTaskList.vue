@@ -6,6 +6,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGenTasks } from '@/composables/useRequirementGen'
 import type { GenTask } from '@/api/requirementGen'
+import { formatBeijingDateTime } from '@/utils/time'
 
 const router = useRouter()
 
@@ -149,8 +150,11 @@ function statusClass(status: string) {
           </el-table-column>
           <el-table-column label="创建时间" width="152">
             <template #default="{ row }">
-              <span class="mono-text dim-text">
-                {{ row.created_at?.slice(0, 16).replace('T', ' ') }}
+              <span
+                class="mono-text dim-text"
+                :title="`${formatBeijingDateTime(row.created_at, { includeSeconds: true })} 北京时间`"
+              >
+                {{ formatBeijingDateTime(row.created_at) }}
               </span>
             </template>
           </el-table-column>
@@ -253,19 +257,71 @@ function statusClass(status: string) {
 
 <style scoped>
 .task-list-page {
+  --task-list-bg: var(--tp-surface-base, #ffffff);
+  --task-list-wash: rgba(0, 0, 0, 0);
+  --task-list-panel: var(--tp-surface-card, #ffffff);
+  --task-list-header: var(--tp-surface-header, #fafafa);
+  --task-list-footer: var(--tp-surface-elevated, #ffffff);
+  --task-list-border: var(--tp-border-subtle, rgba(229, 231, 235, 0.82));
+  --task-list-row-border: var(--tp-border-subtle, rgba(229, 231, 235, 0.82));
+  --task-list-check-border: var(--tp-text-subtle, #6b7280);
+  --task-list-hover: var(--tp-surface-row-hover, #f5f3ff);
+  --task-list-action-bg: var(--tp-surface-input, #f8f9fa);
+  --task-list-action-border: var(--tp-border-subtle, rgba(229, 231, 235, 0.82));
+  --task-list-action-hover-bg: var(--tp-surface-hover, #f5f3ff);
+  --task-list-danger-bg: var(--tp-accent-danger-soft, rgba(220, 38, 38, 0.1));
+  --task-list-danger-border: var(--tp-accent-danger-border, rgba(220, 38, 38, 0.2));
+  --task-list-text-primary: var(--tp-text-primary, #111827);
+  --task-list-text-secondary: var(--tp-text-secondary, #374151);
+  --task-list-text-muted: var(--tp-text-muted, #6b7280);
+  --task-list-text-subtle: var(--tp-text-subtle, #9ca3af);
+  --task-list-success: var(--tp-success, #22c55e);
+  --task-list-success-bg: var(--tp-accent-success-soft, rgba(34, 197, 94, 0.11));
+  --task-list-success-border: var(--tp-accent-success-border, rgba(34, 197, 94, 0.22));
+  --task-list-danger: var(--tp-danger, #ef4444);
+
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
+  width: 100%;
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  padding: 4px 0 0;
+  padding: 0;
   box-sizing: border-box;
+  background: linear-gradient(var(--task-list-wash), var(--task-list-wash)), transparent;
+}
+
+html[data-theme='genart'] .task-list-page {
+  --task-list-bg: var(--tp-shell-bg, #000);
+  --task-list-panel: var(--tp-shell-panel-bg, rgba(0, 0, 0, 0.42));
+  --task-list-header: var(--tp-surface-header, rgba(0, 0, 0, 0.38));
+  --task-list-footer: var(--tp-shell-bg, #000);
+  --task-list-border: var(--tp-shell-border, rgba(118, 142, 255, 0.13));
+  --task-list-row-border: var(--tp-shell-border, rgba(118, 142, 255, 0.13));
+  --task-list-check-border: var(--tp-text-subtle, rgba(255, 255, 255, 0.36));
+  --task-list-hover: var(--tp-surface-row-hover, rgba(90, 120, 255, 0.055));
+  --task-list-action-bg: var(--tp-shell-panel-bg, rgba(0, 0, 0, 0.42));
+  --task-list-action-border: var(--tp-shell-border, rgba(118, 142, 255, 0.13));
+  --task-list-action-hover-bg: var(--tp-surface-hover, rgba(90, 120, 255, 0.075));
+  --task-list-danger-bg: rgba(248, 113, 113, 0.1);
+  --task-list-danger-border: rgba(248, 113, 113, 0.35);
+  --task-list-text-primary: #eaf0fa;
+  --task-list-text-secondary: #a7b3c8;
+  --task-list-text-muted: #7d8aa3;
+  --task-list-text-subtle: #6f7c94;
+  --task-list-success: #22c55e;
+  --task-list-success-bg: #0b2a1b;
+  --task-list-success-border: #1d6b3a;
+  --task-list-danger: #f87171;
 }
 
 .task-list-container {
   display: flex;
   flex-direction: column;
   flex: 1;
+  width: 100%;
+  min-width: 0;
   min-height: 0;
   padding: 0;
 }
@@ -274,16 +330,20 @@ function statusClass(status: string) {
   display: flex;
   flex: 1;
   flex-direction: column;
+  width: 100%;
+  height: 100%;
   min-height: 0;
   overflow: hidden;
-  background: var(--tp-surface-card);
-  border: 1px solid color-mix(in srgb, var(--tp-border-subtle) 86%, transparent);
-  border-radius: var(--tp-radius-lg);
-  box-shadow: 0 10px 24px -22px color-mix(in srgb, var(--tp-text-primary) 32%, transparent);
+  background: var(--task-list-panel);
+  border: 1px solid var(--task-list-border);
+  border-radius: 12px;
+  box-shadow: none;
 }
 
 .task-table {
   flex: 1;
+  width: 100%;
+  height: 100%;
   min-height: 0;
 }
 
@@ -467,24 +527,25 @@ function statusClass(status: string) {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  min-height: 40px;
-  padding: 7px 14px;
-  border-top: 1px solid color-mix(in srgb, var(--tp-border-subtle) 86%, transparent);
-  background: var(--tp-surface-elevated);
+  min-height: 42px;
+  padding: 0 16px;
+  border-top: 1px solid var(--task-list-border);
+  background: var(--task-list-footer);
   gap: 12px;
 }
 
 .pagination-info {
   margin-right: auto;
-  color: var(--tp-text-muted);
-  font-size: var(--tp-text-xs);
+  color: var(--task-list-text-muted);
+  font-size: 12px;
+  font-weight: var(--tp-font-medium);
   font-variant-numeric: tabular-nums;
-  line-height: var(--tp-line-ui);
+  line-height: 18px;
 }
 
 .pagination-info strong {
-  color: var(--tp-text-primary);
-  font-weight: var(--tp-font-semibold);
+  color: var(--task-list-text-muted);
+  font-weight: var(--tp-font-medium);
 }
 
 .empty-state {
@@ -1618,13 +1679,16 @@ function statusClass(status: string) {
   display: inline-flex;
   align-items: center;
   width: fit-content;
-  gap: 5px;
-  padding: 3px 10px;
+  min-width: 66px;
+  min-height: 24px;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
   border-radius: 999px;
-  font-size: 0.6rem;
+  font-size: 11px;
   font-weight: var(--tp-font-bold);
-  line-height: var(--tp-line-ui);
-  letter-spacing: 0.05em;
+  line-height: 16px;
+  letter-spacing: 0;
   border: 1px solid transparent;
   white-space: nowrap;
   color: var(--status-color);
@@ -1634,17 +1698,17 @@ function statusClass(status: string) {
 
 .status-dot {
   display: inline-block;
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
   background: var(--status-color);
 }
 
 .pill-success {
-  --status-bg: var(--tp-accent-success-soft);
-  --status-border: var(--tp-accent-success-border);
-  --status-color: var(--tp-success);
+  --status-bg: var(--task-list-success-bg);
+  --status-border: var(--task-list-success-border);
+  --status-color: var(--task-list-success);
 }
 
 .pill-failed {
@@ -1692,11 +1756,11 @@ function statusClass(status: string) {
 :deep(.el-table) {
   --el-table-bg-color: transparent;
   --el-table-tr-bg-color: transparent;
-  --el-table-header-bg-color: var(--tp-surface-header);
-  --el-table-row-hover-bg-color: var(--tp-surface-row-hover);
-  --el-table-border-color: var(--tp-border-subtle);
-  --el-table-text-color: var(--tp-text-secondary);
-  --el-table-header-text-color: var(--tp-text-subtle);
+  --el-table-header-bg-color: var(--task-list-header);
+  --el-table-row-hover-bg-color: var(--task-list-hover);
+  --el-table-border-color: var(--task-list-row-border);
+  --el-table-text-color: var(--task-list-text-secondary);
+  --el-table-header-text-color: var(--task-list-text-muted);
   background: transparent;
   border: 0;
   border-radius: 0;
@@ -1707,24 +1771,27 @@ function statusClass(status: string) {
   position: sticky;
   top: 0;
   z-index: 10;
+  height: 42px;
 }
 
 :deep(.el-table th.el-table__cell) {
-  padding: 12px 14px;
-  color: var(--tp-text-muted);
-  font-size: 0.6rem;
+  height: 42px;
+  padding: 0 14px;
+  color: var(--task-list-text-muted);
+  font-size: 11px;
   font-weight: var(--tp-font-bold);
-  line-height: var(--tp-line-ui);
+  line-height: 16px;
   letter-spacing: 0;
-  background: var(--tp-surface-header) !important;
+  background: var(--task-list-header) !important;
 }
 
 :deep(.el-table td.el-table__cell) {
-  padding: 11px 14px;
-  color: var(--tp-text-secondary);
-  font-size: var(--tp-text-sm);
+  height: 48px;
+  padding: 0 14px;
+  color: var(--task-list-text-secondary);
+  font-size: 12px;
   font-weight: var(--tp-font-medium);
-  line-height: var(--tp-line-ui);
+  line-height: 18px;
   cursor: pointer;
   transition:
     background 0.18s ease,
@@ -1732,15 +1799,23 @@ function statusClass(status: string) {
 }
 
 :deep(.el-table .el-table__cell) {
-  border-bottom: 1px solid var(--tp-border-subtle);
+  border-bottom: 1px solid var(--task-list-row-border);
 }
 
 :deep(.el-table__inner-wrapper::before) {
-  background-color: color-mix(in srgb, var(--tp-border-subtle) 86%, transparent);
+  background-color: var(--task-list-border);
+}
+
+:deep(.el-table__inner-wrapper) {
+  height: 100%;
+}
+
+:deep(.el-table__body-wrapper) {
+  min-height: 0;
 }
 
 :deep(.el-table__body tr:hover td.el-table__cell) {
-  background: var(--tp-surface-row-hover) !important;
+  background: var(--task-list-hover) !important;
 }
 
 :deep(.el-table__empty-block) {
@@ -1755,25 +1830,47 @@ function statusClass(status: string) {
 
 :deep(.el-table__fixed-right td.el-table__cell),
 :deep(.el-table__fixed-right th.el-table__cell) {
-  background: var(--tp-surface-card);
+  background: var(--task-list-panel);
 }
 
 :deep(.el-table__fixed-right) {
-  box-shadow: -10px 0 18px -18px color-mix(in srgb, var(--tp-text-primary) 24%, transparent);
+  box-shadow: none;
 }
 
 :deep(.el-table__fixed td.el-table__cell),
 :deep(.el-table__fixed th.el-table__cell) {
-  background: var(--tp-surface-card);
+  background: var(--task-list-panel);
 }
 
 :deep(.el-table__fixed) {
-  box-shadow: 10px 0 18px -18px color-mix(in srgb, var(--tp-text-primary) 24%, transparent);
+  box-shadow: none;
+}
+
+:deep(.el-table__fixed-right th.el-table__cell),
+:deep(.el-table__fixed th.el-table__cell) {
+  background: var(--task-list-header);
 }
 
 :deep(.el-table-column--selection .cell) {
   display: flex;
   justify-content: center;
+}
+
+:deep(.el-table .cell) {
+  padding: 0;
+  line-height: inherit;
+}
+
+:deep(.el-table__row) {
+  height: 48px;
+}
+
+:deep(.el-checkbox__inner) {
+  width: 14px;
+  height: 14px;
+  background: var(--task-list-footer);
+  border-color: var(--task-list-check-border);
+  border-radius: 3px;
 }
 
 :deep(.el-checkbox__input.is-checked .el-checkbox__inner),
@@ -1790,72 +1887,74 @@ function statusClass(status: string) {
 .task-cell {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
 }
 
 .task-name-text {
-  color: var(--tp-text-primary);
-  font-size: var(--tp-text-sm);
-  font-weight: var(--tp-font-semibold);
-  line-height: var(--tp-line-ui);
+  color: var(--task-list-text-primary);
+  font-size: 14px;
+  font-weight: var(--tp-font-bold);
+  line-height: 20px;
   transition: color 0.18s ease;
 }
 
 .task-id-text {
-  color: var(--tp-text-muted);
+  color: var(--task-list-text-subtle);
   font-family: var(--tp-font-family-mono);
-  font-size: 0.6rem;
-  line-height: var(--tp-line-ui);
+  font-size: 10px;
+  font-weight: var(--tp-font-medium);
+  line-height: 14px;
 }
 
 /* ── 等宽数字/日期 ────────────────────────────────────────── */
 .mono-text {
   font-family: var(--tp-font-family-mono);
   font-variant-numeric: tabular-nums;
-  font-size: var(--tp-text-xs);
+  font-size: 12px;
   letter-spacing: 0;
 }
 
 .model-text {
-  color: var(--tp-text-secondary);
-  font-size: 11px;
+  color: var(--task-list-text-secondary);
+  font-size: 12px;
   font-weight: var(--tp-font-medium);
 }
 
 .dim-text {
-  color: var(--tp-text-subtle);
+  color: var(--task-list-text-secondary);
 }
 
 /* ── 统计数字（生成/采纳/丢弃） ──────────────────────────── */
 .stat-text {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   font-family: var(--tp-font-family-mono);
   font-variant-numeric: tabular-nums;
-  font-size: var(--tp-text-xs);
-  line-height: var(--tp-line-ui);
+  font-size: 13px;
+  font-weight: var(--tp-font-bold);
+  line-height: 18px;
 }
 
 .stat-gen {
-  color: var(--tp-text-secondary);
+  color: var(--task-list-text-primary);
 }
 .stat-adopt {
-  color: var(--tp-success);
+  color: var(--task-list-success);
 }
 .stat-discard {
-  color: var(--tp-text-subtle);
+  color: var(--task-list-text-muted);
 }
 .stat-sep {
-  color: color-mix(in srgb, var(--tp-text-subtle) 48%, transparent);
+  color: rgba(182, 196, 255, 0.28);
 }
 
 /* ── 操作按钮 ────────────────────────────────────────────── */
 .row-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 2px;
-  opacity: 0.65;
+  gap: 6px;
+  opacity: 1;
   transition: opacity var(--tp-transition);
 }
 
@@ -1867,13 +1966,13 @@ function statusClass(status: string) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border-radius: 7px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--tp-text-muted);
+  border: 1px solid var(--task-list-action-border);
+  background: var(--task-list-action-bg);
+  color: #94a3b8;
   cursor: pointer;
   transition:
     background 0.18s ease,
@@ -1887,9 +1986,9 @@ function statusClass(status: string) {
 }
 
 .action-btn:hover {
-  background: var(--tp-accent-primary-soft);
-  border-color: var(--tp-accent-primary-border);
-  color: var(--tp-primary);
+  background: var(--task-list-action-hover-bg);
+  border-color: rgba(182, 196, 255, 0.28);
+  color: var(--task-list-text-primary);
 }
 
 .action-btn:focus-visible {
@@ -1898,13 +1997,13 @@ function statusClass(status: string) {
 }
 
 .action-btn--danger {
-  color: var(--tp-text-muted);
+  color: var(--task-list-danger);
 }
 
 .action-btn--danger:hover {
-  background: var(--tp-accent-danger-soft);
-  border-color: var(--tp-accent-danger-border);
-  color: var(--tp-danger);
+  background: var(--task-list-danger-bg);
+  border-color: var(--task-list-danger-border);
+  color: var(--task-list-danger);
 }
 
 /* ── 分页 ────────────────────────────────────────────────── */

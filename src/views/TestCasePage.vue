@@ -4501,9 +4501,67 @@ watch(selectedProject, (newId) => {
 }
 
 .case-page .table-shell input[type='checkbox'] {
-  width: 15px;
-  height: 15px;
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-grid;
+  place-content: center;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--tp-text-subtle) 68%, transparent);
+  border-radius: 3px;
+  background: transparent;
   cursor: pointer;
+  vertical-align: middle;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.case-page .table-shell input[type='checkbox']:hover {
+  border-color: color-mix(in srgb, var(--tp-text-muted) 82%, transparent);
+  background: var(--tp-surface-muted);
+}
+
+.case-page .table-shell input[type='checkbox']:focus-visible {
+  outline: none;
+  border-color: var(--tp-primary);
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
+}
+
+.case-page .table-shell input[type='checkbox']:checked {
+  border-color: var(--tp-primary) !important;
+  background-color: var(--tp-primary) !important;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='8' viewBox='0 0 10 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 4L3.5 6.5L9 1' stroke='white' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 10px 8px;
+}
+
+.case-page .table-shell input[type='checkbox']:indeterminate {
+  border-color: var(--tp-primary) !important;
+  background-color: var(--tp-primary) !important;
+  background-image: linear-gradient(#fff, #fff);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 8px 2px;
+}
+
+html[data-theme='genart'] .case-page .table-shell input[type='checkbox'] {
+  border-color: rgba(255, 255, 255, 0.36);
+  background-color: rgba(0, 0, 0, 0.18);
+}
+
+html[data-theme='genart'] .case-page .table-shell input[type='checkbox']:hover {
+  border-color: rgba(255, 255, 255, 0.56);
+  background-color: rgba(255, 255, 255, 0.035);
+}
+
+html[data-theme='genart'] .case-page .table-shell input[type='checkbox']:checked,
+html[data-theme='genart'] .case-page .table-shell input[type='checkbox']:indeterminate {
+  border-color: var(--tp-primary) !important;
+  background-color: var(--tp-primary) !important;
 }
 
 .case-page .copy-id-cell {

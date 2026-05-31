@@ -34,6 +34,7 @@ import {
   type RecordingSession,
 } from '../../api/aiScript'
 import CodeEditor from '../../components/CodeEditor.vue'
+import { extractErrorMessage } from '../../utils/error'
 
 const route = useRoute()
 const router = useRouter()
@@ -332,7 +333,7 @@ async function handleStartRecording() {
     startPolling(session_id)
   } catch (e: unknown) {
     console.error('启动录制失败:', e)
-    const msg = e?.response?.data?.message || e?.message || '录制浏览器启动失败'
+    const msg = extractErrorMessage(e, '录制浏览器启动失败')
     await markRecordingFailed(msg)
     recordingStatusText.value = `录制启动失败: ${msg}`
     showToast(`录制启动失败: ${msg}`, 'error')

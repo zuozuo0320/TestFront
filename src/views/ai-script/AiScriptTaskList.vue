@@ -1961,14 +1961,66 @@ async function handleTokenInvalidate() {
 }
 
 .ai-row-checkbox {
-  width: 16px;
-  height: 16px;
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-grid;
+  place-content: center;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--tp-text-subtle) 68%, transparent);
+  border-radius: 3px;
+  background: transparent;
   cursor: pointer;
-  accent-color: var(--tp-primary, #4f8cff);
+  vertical-align: middle;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.ai-row-checkbox:hover {
+  border-color: color-mix(in srgb, var(--tp-text-muted) 82%, transparent);
+  background: var(--tp-surface-muted);
+}
+
+.ai-row-checkbox:focus-visible {
+  outline: none;
+  border-color: var(--tp-primary);
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
+}
+
+.ai-row-checkbox:checked {
+  border-color: var(--tp-primary) !important;
+  background-color: var(--tp-primary) !important;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='8' viewBox='0 0 10 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 4L3.5 6.5L9 1' stroke='white' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 10px 8px;
 }
 
 .ai-row-checkbox[data-partial='true'] {
-  outline: 2px solid rgba(79, 140, 255, 0.4);
-  outline-offset: 1px;
+  border-color: var(--tp-primary) !important;
+  background-color: var(--tp-primary) !important;
+  background-image: linear-gradient(#fff, #fff);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 8px 2px;
+}
+
+:global(html[data-theme='genart'] .ai-row-checkbox) {
+  border-color: rgba(255, 255, 255, 0.36);
+  background-color: rgba(0, 0, 0, 0.18);
+}
+
+:global(html[data-theme='genart'] .ai-row-checkbox:hover) {
+  border-color: rgba(255, 255, 255, 0.56);
+  background-color: rgba(255, 255, 255, 0.035);
+}
+
+:global(html[data-theme='genart'] .ai-row-checkbox:checked),
+:global(html[data-theme='genart'] .ai-row-checkbox[data-partial='true']) {
+  border-color: var(--tp-primary) !important;
+  background-color: var(--tp-primary) !important;
 }
 </style>

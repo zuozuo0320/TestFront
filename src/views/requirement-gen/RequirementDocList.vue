@@ -6,6 +6,7 @@
  */
 import { ref } from 'vue'
 import { useRequirementDocs } from '@/composables/useRequirementGen'
+import { formatBeijingDateTime } from '@/utils/time'
 
 const {
   docs,
@@ -152,7 +153,11 @@ function sourceLabel(type: string) {
       </el-table-column>
       <el-table-column label="创建时间" width="160" prop="created_at">
         <template #default="{ row }">
-          {{ row.created_at?.slice(0, 16).replace('T', ' ') }}
+          <span
+            :title="`${formatBeijingDateTime(row.created_at, { includeSeconds: true })} 北京时间`"
+          >
+            {{ formatBeijingDateTime(row.created_at) }}
+          </span>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="80" fixed="right">

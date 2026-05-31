@@ -748,6 +748,68 @@
   display: none !important;
 }
 
+/* 执行状态下拉：scoped import 会加组件作用域，teleported 浮层必须全局命中。 */
+:global(html[data-theme='genart'] .case-exec-dropdown.el-popper),
+:global(html[data-theme='genart'] .case-exec-dropdown.el-select__popper) {
+  border: 1px solid var(--tp-border-strong) !important;
+  border-radius: 10px !important;
+  background:
+    linear-gradient(180deg, var(--tp-surface-elevated), var(--tp-surface-card)),
+    var(--tp-surface-base) !important;
+  box-shadow:
+    var(--tp-shadow-md),
+    0 0 0 1px var(--tp-border-subtle) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  overflow: hidden !important;
+}
+
+:global(html[data-theme='genart'] .case-exec-dropdown .el-select-dropdown) {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+:global(html[data-theme='genart'] .case-exec-dropdown .el-select-dropdown__list) {
+  padding: 5px !important;
+  background: transparent !important;
+}
+
+:global(html[data-theme='genart'] .case-exec-dropdown .el-select-dropdown__item) {
+  min-height: 34px !important;
+  height: 34px !important;
+  margin-bottom: 2px !important;
+  padding: 0 12px !important;
+  border-radius: 7px !important;
+  color: var(--tp-text-secondary) !important;
+  font-size: var(--tp-text-sm) !important;
+  font-weight: var(--tp-font-medium) !important;
+  line-height: 34px !important;
+}
+
+:global(html[data-theme='genart'] .case-exec-dropdown .el-select-dropdown__item:last-child) {
+  margin-bottom: 0 !important;
+}
+
+:global(html[data-theme='genart'] .case-exec-dropdown .el-select-dropdown__item.hover),
+:global(html[data-theme='genart'] .case-exec-dropdown .el-select-dropdown__item.is-hovering),
+:global(html[data-theme='genart'] .case-exec-dropdown .el-select-dropdown__item:hover) {
+  background: var(--tp-surface-hover) !important;
+  color: var(--tp-text-primary) !important;
+}
+
+:global(html[data-theme='genart'] .case-exec-dropdown .el-select-dropdown__item.selected),
+:global(html[data-theme='genart'] .case-exec-dropdown .el-select-dropdown__item.is-selected) {
+  background: var(--tp-accent-primary-soft) !important;
+  color: var(--tp-text-primary) !important;
+}
+
+:global(html[data-theme='genart'] .case-exec-dropdown .el-select-dropdown__item::after),
+:global(html[data-theme='genart'] .case-exec-dropdown .el-popper__arrow),
+:global(html[data-theme='genart'] .case-exec-dropdown .el-popper__arrow::before) {
+  display: none !important;
+}
+
 /* Assets */
 .stitch-assets-grid {
   display: grid;
@@ -3853,13 +3915,102 @@
   color: var(--tp-accent-danger) !important;
 }
 
+/* 用例详情输入面：默认态保持低噪声，聚焦态再使用品牌强调色。 */
+.stitch-drawer-wrapper {
+  --case-editor-field-bg: color-mix(in srgb, var(--tp-surface-input) 78%, var(--tp-surface-card));
+  --case-editor-field-bg-hover: color-mix(
+    in srgb,
+    var(--tp-surface-input) 64%,
+    var(--tp-surface-elevated)
+  );
+  --case-editor-field-bg-focus: color-mix(
+    in srgb,
+    var(--tp-surface-input) 46%,
+    var(--tp-surface-elevated)
+  );
+  --case-editor-field-border: color-mix(
+    in srgb,
+    var(--tp-border-subtle) 72%,
+    var(--tp-text-disabled)
+  );
+  --case-editor-field-border-hover: color-mix(
+    in srgb,
+    var(--tp-border-subtle) 54%,
+    var(--tp-text-subtle)
+  );
+  --case-editor-popover-bg:
+    linear-gradient(180deg, var(--tp-surface-elevated), var(--tp-surface-card)),
+    var(--tp-surface-base);
+  --case-editor-popover-shadow: var(--tp-shadow-md), 0 0 0 1px var(--tp-border-subtle);
+  --case-editor-popover-z: 120;
+}
+
+.stitch-drawer-wrapper .stitch-input,
+.stitch-drawer-wrapper .stitch-select,
+.stitch-drawer-wrapper .stitch-textarea,
+.stitch-drawer-wrapper .stitch-textarea-wrap,
+.stitch-drawer-wrapper .stitch-level-picker,
+.stitch-drawer-wrapper .module-picker-trigger,
+.stitch-drawer-wrapper .stitch-table-input,
+.stitch-drawer-wrapper .review-readonly-card,
+.stitch-drawer-wrapper .exec-status-select :deep(.el-select__wrapper),
+.stitch-drawer-wrapper .tag-selector :deep(.el-select__wrapper) {
+  background: var(--case-editor-field-bg) !important;
+  border-color: var(--case-editor-field-border) !important;
+}
+
+.stitch-drawer-wrapper .stitch-input:hover,
+.stitch-drawer-wrapper .stitch-select:hover,
+.stitch-drawer-wrapper .stitch-textarea:hover,
+.stitch-drawer-wrapper .stitch-textarea-wrap:hover,
+.stitch-drawer-wrapper .stitch-level-picker:hover,
+.stitch-drawer-wrapper .module-picker-trigger:hover,
+.stitch-drawer-wrapper .stitch-table-input:hover,
+.stitch-drawer-wrapper .review-readonly-card:hover,
+.stitch-drawer-wrapper .exec-status-select :deep(.el-select__wrapper:hover),
+.stitch-drawer-wrapper .tag-selector :deep(.el-select__wrapper:hover) {
+  background: var(--case-editor-field-bg-hover) !important;
+  border-color: var(--case-editor-field-border-hover) !important;
+}
+
+.stitch-drawer-wrapper .stitch-input:focus,
+.stitch-drawer-wrapper .stitch-select:focus,
+.stitch-drawer-wrapper .stitch-textarea:focus,
+.stitch-drawer-wrapper .stitch-textarea-wrap:focus-within,
+.stitch-drawer-wrapper .stitch-level-picker:focus-visible,
+.stitch-drawer-wrapper .module-picker-trigger:focus-visible,
+.stitch-drawer-wrapper .module-picker-trigger:focus,
+.stitch-drawer-wrapper .module-picker-trigger:focus-within,
+.stitch-drawer-wrapper .stitch-table-input:focus,
+.stitch-drawer-wrapper .exec-status-select :deep(.el-select__wrapper.is-focused),
+.stitch-drawer-wrapper .tag-selector :deep(.el-select__wrapper.is-focused) {
+  background: var(--case-editor-field-bg-focus) !important;
+  border-color: var(--tp-accent-primary-border) !important;
+  box-shadow: 0 0 0 2px var(--tp-accent-primary-soft) !important;
+}
+
+/* 聚焦反馈只落在控件本体，字段名称保持稳定，避免编辑时整屏标签变成强调色。 */
+.stitch-drawer-wrapper .stitch-form-item:focus-within label {
+  color: var(--tp-text-primary) !important;
+}
+
 .case-basic-panel .level-dropdown-panel {
+  z-index: var(--case-editor-popover-z) !important;
   top: calc(100% + 6px) !important;
   padding: 6px !important;
-  border-color: var(--tp-border-subtle) !important;
+  border-color: var(--tp-border-strong) !important;
   border-radius: 10px !important;
-  background: var(--tp-surface-card) !important;
-  box-shadow: var(--tp-shadow-card) !important;
+  background: var(--case-editor-popover-bg) !important;
+  box-shadow: var(--case-editor-popover-shadow) !important;
+  backdrop-filter: none !important;
+}
+
+.case-basic-panel .module-picker-panel {
+  z-index: var(--case-editor-popover-z) !important;
+  border-color: var(--tp-border-strong) !important;
+  background: var(--case-editor-popover-bg) !important;
+  box-shadow: var(--case-editor-popover-shadow) !important;
+  backdrop-filter: none !important;
 }
 
 .case-basic-panel .level-dropdown-item {
