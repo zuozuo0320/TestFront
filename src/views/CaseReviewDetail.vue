@@ -277,10 +277,10 @@ async function fetchReview() {
   }
 }
 
-// ── v0.2 单条规则检查（计划级批量已移到列表页） ──
+// ── v0.2 规则检查（计划级批量已移到列表页） ──
 const aiReviewRunning = ref(false)
 
-/** 点击"规则检查本条"按钮：对当前评审项跑规则引擎；
+/** 点击"规则检查"按钮：对当前评审项跑规则引擎；
  *  计划级批量规则检查入口已挪到列表页每行操作区，避免详情页误伤他人正在处理的条目。 */
 async function handleRunAIReview() {
   if (!projectId.value || !reviewId.value || !currentItem.value) return
@@ -292,13 +292,9 @@ async function handleRunAIReview() {
     await fetchItems()
     await fetchAIDefects(projectId.value, reviewId.value, itemId)
     if (report.passed) {
-      ElMessage.success('规则检查本条通过')
+      ElMessage.success('检查通过')
     } else {
-      const parts: string[] = []
-      if (report.critical_count) parts.push(`${report.critical_count} 项严重`)
-      if (report.major_count) parts.push(`${report.major_count} 项主要`)
-      if (report.minor_count) parts.push(`${report.minor_count} 项提示`)
-      ElMessage.warning(`规则检查未通过：${parts.join(' · ')}`)
+      ElMessage.warning('检查未通过，查看规则门禁')
     }
   } catch (e) {
     ElMessage.error(extractErrorMessage(e, '规则检查失败'))
@@ -823,9 +819,6 @@ const {
   defects: aiDefects,
   loading: aiDefectsLoading,
   fetchDefects: fetchAIDefects,
-  resolve: resolveDefect,
-  dispute: disputeDefect,
-  reopen: reopenDefect,
   cancel: cancelAIDefects,
 } = useReviewDefects()
 
@@ -949,16 +942,13 @@ const aiGateCards = computed<AIGateCard[]>(() => {
   }
 
   function deriveDesc(findings: CardFinding[], fallback: string): string {
-    if (findings.length === 0) return fallback
-    // 统计概述：按严重度聚合，与下方 finding 清单形成"摘要 / 详情"分层
-    const c = findings.filter((f) => f.severity === 'critical').length
-    const m = findings.filter((f) => f.severity === 'major').length
-    const n = findings.filter((f) => f.severity === 'minor').length
-    const parts: string[] = []
-    if (c) parts.push(`${c} 项严重`)
-    if (m) parts.push(`${m} 项主要`)
-    if (n) parts.push(`${n} 项提示`)
-    return parts.join(' · ')
+    const activeFindings = findings.filter(isActiveFinding)
+    if (activeFindings.length === 0) return fallback
+    const labels = Array.from(new Set(activeFindings.map((f) => f.fieldLabel))).filter(Boolean)
+    if (labels.length === 0) return `${activeFindings.length} 项待完善`
+    if (labels.length === 1) return `${labels[0]}待完善`
+    if (labels.length <= 2) return `${labels.join('、')}待完善`
+    return `${labels.slice(0, 2).join('、')}等 ${labels.length} 项待完善`
   }
 
   return [
@@ -1007,7 +997,7 @@ const aiGateEmptyTitle = computed(() => {
 
 const aiGateEmptyDesc = computed(() => {
   const gate = currentItem.value?.ai_gate_status
-  if (gate === 'timeout') return '请重新运行本条规则检查，确认基础信息、执行条件和执行步骤。'
+  if (gate === 'timeout') return '请重新运行规则检查，确认基础信息、执行条件和执行步骤。'
   if (!gate || gate === 'not_started') return '规则门禁尚未运行，页面仅展示当前字段的即时检查结果。'
   return '基础信息、执行条件、执行步骤均无待处理问题。'
 })
@@ -1137,13 +1127,6 @@ function selectDecision(decision: ReviewDecision) {
   reviewDecision.value = decision
 }
 
-/** severity → 中文短文案 + 色调 class */
-const SEVERITY_LABEL: Record<ReviewSeverity, string> = {
-  critical: '严重',
-  major: '主要',
-  minor: '提示',
-}
-
 /** defect.status → 中文短文案 */
 const DEFECT_STATUS_LABEL: Record<string, string> = {
   open: '待处理',
@@ -1151,77 +1134,27 @@ const DEFECT_STATUS_LABEL: Record<string, string> = {
   disputed: '有异议',
 }
 
-const FINDING_SHORT_MESSAGE: Record<string, string> = {
-  标题必填: '未填写标题',
-  标题过长: '标题超过 120 字',
-  前置条件必填: '未填写前置条件',
-  步骤必填: '未填写执行步骤',
-  步骤过于简略: '执行步骤过短',
-  后置条件建议补充: '未填写后置条件',
-  等级必填: '未选择等级',
-  模块目录必填: '未绑定模块目录',
+const FINDING_ACTION_TEXT: Record<string, string> = {
+  标题必填: '请补充标题',
+  标题过长: '请精简到 120 字以内',
+  前置条件必填: '请补充执行前必须满足的条件',
+  步骤必填: '请补充可执行步骤',
+  步骤过于简略: '请补充操作和预期结果',
+  后置条件建议补充: '建议补充清理或回滚要求',
+  等级必填: '请选择用例等级',
+  模块目录必填: '请绑定所属模块',
 }
 
 function findingDisplayText(finding: CardFinding) {
-  return FINDING_SHORT_MESSAGE[finding.rule] || finding.title
+  return FINDING_ACTION_TEXT[finding.rule] || finding.title
 }
 
-function findingSeverityText(finding: CardFinding) {
-  return finding.severity === 'minor'
-    ? SEVERITY_LABEL[finding.severity]
-    : `${SEVERITY_LABEL[finding.severity]}问题`
+function shouldShowFindingStatus(finding: CardFinding) {
+  return finding.kind === 'defect' && finding.status !== 'open'
 }
 
-/** 标记已处理：弹 prompt 输入可选备注 */
-async function handleResolveDefect(d: CaseReviewDefect) {
-  try {
-    const { value } = await ElMessageBox.prompt('请填写处理说明（可选）', '标记为已处理', {
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-      inputType: 'textarea',
-      inputValue: '',
-    })
-    const ok = await resolveDefect(projectId.value, d.id, value ?? '')
-    if (ok && currentItem.value) {
-      await fetchAIDefects(projectId.value, reviewId.value, currentItem.value.id)
-    }
-  } catch {
-    /* 用户取消 */
-  }
-}
-
-/** 提异议：理由必填 */
-async function handleDisputeDefect(d: CaseReviewDefect) {
-  try {
-    const { value } = await ElMessageBox.prompt('请填写异议理由', '提出异议', {
-      confirmButtonText: '提交',
-      cancelButtonText: '取消',
-      inputType: 'textarea',
-      inputValidator: (v) => (v && v.trim() ? true : '请填写异议理由'),
-    })
-    const ok = await disputeDefect(projectId.value, d.id, value ?? '')
-    if (ok && currentItem.value) {
-      await fetchAIDefects(projectId.value, reviewId.value, currentItem.value.id)
-    }
-  } catch {
-    /* 用户取消 */
-  }
-}
-
-/** Moderator 重开已处理的缺陷（Phase 1 简化：任何用户都能触发） */
-async function handleReopenDefect(d: CaseReviewDefect) {
-  try {
-    await ElMessageBox.confirm('确定要重新开启该 Action Item 吗？', '重开', {
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-    })
-    const ok = await reopenDefect(projectId.value, d.id)
-    if (ok && currentItem.value) {
-      await fetchAIDefects(projectId.value, reviewId.value, currentItem.value.id)
-    }
-  } catch {
-    /* 用户取消 */
-  }
+function findingStatusText(finding: CardFinding) {
+  return DEFECT_STATUS_LABEL[finding.status] || finding.status
 }
 
 /** 上一条 / 下一条切换 */
@@ -1520,9 +1453,7 @@ watch(
                   <button
                     class="rv2-panel-btn rv2-panel-btn-primary"
                     :disabled="aiReviewRunning || !currentItem"
-                    :title="
-                      aiReviewRunning ? '规则检查中…' : '对当前评审项运行规则检查（批量请到列表页）'
-                    "
+                    :title="aiReviewRunning ? '规则检查中…' : '运行当前评审项规则检查'"
                     @click="handleRunAIReview"
                   >
                     <span
@@ -1531,7 +1462,7 @@ watch(
                     >
                       auto_awesome
                     </span>
-                    {{ aiReviewRunning ? '检查中…' : '规则检查本条' }}
+                    {{ aiReviewRunning ? '检查中…' : '规则检查' }}
                   </button>
                 </div>
               </h2>
@@ -1566,48 +1497,14 @@ watch(
                         @click="focusReviewField(f.fieldKey)"
                       >
                         <span class="rv2-finding-field-name">{{ f.fieldLabel }}</span>
-                        <span aria-hidden="true">：</span>
                         <span class="rv2-finding-text">{{ findingDisplayText(f) }}</span>
                       </button>
-                      <div class="rv2-finding-meta">
-                        <span class="rv2-finding-meta-item">{{ findingSeverityText(f) }}</span>
-                        <span v-if="f.kind === 'defect'" class="rv2-finding-meta-item">
-                          {{ DEFECT_STATUS_LABEL[f.status] || f.status }}
-                        </span>
+                      <div v-if="shouldShowFindingStatus(f)" class="rv2-finding-meta">
+                        <span class="rv2-finding-status-pill">{{ findingStatusText(f) }}</span>
                       </div>
                       <p v-if="f.dispute_reason" class="rv2-finding-note">
                         异议：{{ f.dispute_reason }}
                       </p>
-                      <div v-if="f.kind === 'defect' && f.defect" class="rv2-finding-actions">
-                        <template v-if="f.status === 'open'">
-                          <button
-                            type="button"
-                            class="rv2-finding-btn rv2-finding-btn-ok"
-                            title="标记为已处理"
-                            @click="handleResolveDefect(f.defect)"
-                          >
-                            标记已处理
-                          </button>
-                          <button
-                            type="button"
-                            class="rv2-finding-btn"
-                            title="提出异议"
-                            @click="handleDisputeDefect(f.defect)"
-                          >
-                            提异议
-                          </button>
-                        </template>
-                        <template v-else-if="f.status === 'disputed' || f.status === 'resolved'">
-                          <button
-                            type="button"
-                            class="rv2-finding-btn"
-                            title="重新开启"
-                            @click="handleReopenDefect(f.defect)"
-                          >
-                            重开
-                          </button>
-                        </template>
-                      </div>
                     </li>
                   </ul>
                 </div>
@@ -1654,9 +1551,6 @@ watch(
                   <div class="rv2-field-head">
                     <span class="material-symbols-outlined">signal_cellular_alt</span>
                     <strong>等级</strong>
-                    <span v-if="fieldIssueCount('level')" class="rv2-field-issue">
-                      问题 {{ fieldIssueCount('level') }}
-                    </span>
                   </div>
                   <p class="rv2-field-value">
                     <span class="rv2-value-tag rv2-level-tag">{{ caseLevelText }}</span>
@@ -1684,9 +1578,6 @@ watch(
                   <div class="rv2-field-head">
                     <span class="material-symbols-outlined">account_tree</span>
                     <strong>模块</strong>
-                    <span v-if="fieldIssueCount('module')" class="rv2-field-issue">
-                      问题 {{ fieldIssueCount('module') }}
-                    </span>
                   </div>
                   <div
                     v-if="caseModuleSegments.length"
@@ -1729,9 +1620,6 @@ watch(
                       login
                     </span>
                     前置条件
-                    <span v-if="fieldIssueCount('precondition')" class="rv2-field-issue">
-                      问题 {{ fieldIssueCount('precondition') }}
-                    </span>
                   </h3>
                   <ul class="rv2-cond-list">
                     <li v-for="(c, i) in preconditionItems" :key="`pre-${i}`" class="rv2-cond-item">
@@ -1757,9 +1645,6 @@ watch(
                       logout
                     </span>
                     后置条件
-                    <span v-if="fieldIssueCount('postcondition')" class="rv2-field-issue">
-                      问题 {{ fieldIssueCount('postcondition') }}
-                    </span>
                   </h3>
                   <ul class="rv2-cond-list">
                     <li
@@ -1792,10 +1677,6 @@ watch(
                 <h2 class="rv2-panel-title">
                   <span class="material-symbols-outlined">list_alt</span>
                   执行步骤
-                  <span class="rv2-panel-count">{{ realSteps.length }}</span>
-                  <span v-if="fieldIssueCount('steps')" class="rv2-field-issue">
-                    问题 {{ fieldIssueCount('steps') }}
-                  </span>
                 </h2>
                 <div v-if="realSteps.length === 0" class="rv2-empty-steps">
                   用例尚未填写执行步骤
@@ -2102,6 +1983,7 @@ watch(
       size="440px"
       class="rv2-record-drawer"
       :with-header="false"
+      append-to-body
     >
       <div v-loading="recordsLoading" class="rv2-record-drawer-shell">
         <header class="rv2-record-drawer-header">
@@ -3225,20 +3107,6 @@ watch(
   letter-spacing: normal;
   text-transform: none;
   color: rgba(204, 195, 216, 0.82);
-}
-.rv2-field-issue {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 7px;
-  border-radius: 4px;
-  background: rgba(245, 158, 11, 0.12);
-  color: var(--rv2-warning);
-  border: 1px solid rgba(245, 158, 11, 0.22);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: normal;
-  text-transform: none;
 }
 .rv2-cond-title-icon {
   font-size: 16px;
@@ -4869,7 +4737,6 @@ watch(
 }
 
 .rv2-gate-status.st-warn,
-.rv2-field-issue,
 .rv2-priority-tag.is-medium,
 .rv2-case-status.needs-update,
 .rv2-case-ai.failed,
@@ -5058,13 +4925,14 @@ watch(
 }
 
 .rv2-main {
-  gap: 8px;
+  gap: 4px;
   padding: 8px;
 }
 
 .rv2-summary {
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 8px !important;
+  margin-bottom: 0 !important;
+  padding: 8px 10px !important;
   border-radius: 12px;
   box-shadow: var(--tp-shadow-sm);
 }
@@ -5119,7 +4987,7 @@ watch(
 }
 
 .rv2-body {
-  gap: 10px;
+  gap: 8px;
 }
 
 @media (min-width: 1100px) {
@@ -5210,6 +5078,12 @@ watch(
 
 .rv2-panel {
   padding: 12px;
+}
+
+.rv2-grid,
+.rv2-left,
+.rv2-right {
+  gap: 8px;
 }
 
 .rv2-panel-title {
@@ -5721,16 +5595,19 @@ watch(
 }
 
 .rv2-gate-card .rv2-finding {
-  padding: var(--tp-space-2) var(--tp-space-3);
+  padding: var(--tp-space-2) 10px;
   background: var(--tp-surface-card);
   border-color: var(--tp-border-subtle);
-  gap: 3px;
+  gap: 5px;
 }
 
 .rv2-finding-main {
-  display: block;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tp-space-2);
   width: 100%;
-  padding: 2px 0;
+  min-height: 28px;
+  padding: 0;
   border: 0;
   border-radius: var(--tp-radius-sm);
   background: transparent;
@@ -5755,11 +5632,26 @@ watch(
 }
 
 .rv2-finding-field-name {
+  flex: 0 0 auto;
+  max-width: 96px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--tp-primary) 10%, transparent);
+  color: var(--tp-text-secondary);
+  font-size: var(--tp-text-xs);
   font-weight: var(--tp-font-semibold);
+  line-height: var(--tp-line-ui);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .rv2-finding-text {
+  flex: 1;
+  min-width: 0;
+  color: var(--tp-text-primary);
   font-weight: var(--tp-font-medium);
+  word-break: break-word;
 }
 
 .rv2-finding-meta {
@@ -5771,10 +5663,16 @@ watch(
   line-height: 1.45;
 }
 
-.rv2-finding-meta-item + .rv2-finding-meta-item::before {
-  content: '·';
-  margin: 0 var(--tp-space-1);
-  color: var(--tp-text-subtle);
+.rv2-finding-status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--tp-surface-input);
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-medium);
 }
 
 .rv2-finding-note {
@@ -5887,10 +5785,6 @@ watch(
   white-space: nowrap;
 }
 
-.rv2-basic-fields .rv2-field-issue {
-  margin-left: 2px;
-}
-
 .rv2-field-value {
   min-height: 0;
 }
@@ -5942,6 +5836,222 @@ watch(
 
 .rv2-step-col-num {
   width: 48px;
+}
+
+.rv2,
+:global(.rv2-record-drawer) {
+  --rv2-audit-surface: var(--tp-surface-card);
+  --rv2-audit-surface-card: color-mix(
+    in srgb,
+    var(--tp-surface-muted) 78%,
+    var(--tp-surface-card) 22%
+  );
+  --rv2-audit-surface-strong: var(--tp-surface-card);
+  --rv2-audit-surface-muted: color-mix(
+    in srgb,
+    var(--tp-surface-input) 88%,
+    var(--tp-surface-card) 12%
+  );
+  --rv2-audit-line: color-mix(in srgb, var(--tp-border-subtle) 92%, transparent);
+  --rv2-audit-shadow: none;
+}
+
+:global(html[data-theme='genart'] .rv2),
+:global(html[data-theme='genart'] .rv2-record-drawer) {
+  --rv2-audit-surface: color-mix(in srgb, var(--tp-surface-base) 97%, var(--tp-text-primary) 3%);
+  --rv2-audit-surface-card: color-mix(
+    in srgb,
+    var(--tp-surface-base) 93%,
+    var(--tp-text-primary) 7%
+  );
+  --rv2-audit-surface-strong: color-mix(
+    in srgb,
+    var(--tp-surface-base) 90%,
+    var(--tp-text-primary) 10%
+  );
+  --rv2-audit-surface-muted: color-mix(
+    in srgb,
+    var(--tp-surface-base) 91%,
+    var(--tp-text-primary) 9%
+  );
+  --rv2-audit-line: color-mix(in srgb, var(--tp-border-subtle) 76%, transparent);
+  --rv2-audit-shadow: none;
+}
+
+.rv2-audit-summary,
+.rv2-audit-card,
+.rv2-audit-empty,
+.rv2-audit-more,
+.rv2-record-drawer-meta,
+.rv2-drawer-empty,
+.rv2-drawer-card {
+  background: var(--rv2-audit-surface-card) !important;
+  border-color: var(--rv2-audit-line) !important;
+  color: var(--tp-text-primary);
+}
+
+.rv2-audit-summary {
+  background: color-mix(in srgb, var(--rv2-audit-surface-card) 72%, transparent) !important;
+}
+
+.rv2-audit-empty,
+.rv2-drawer-empty {
+  border-style: solid !important;
+  background: var(--rv2-audit-surface-muted) !important;
+  box-shadow: none !important;
+}
+
+.rv2-audit-empty {
+  min-height: 82px;
+  padding: 14px 12px;
+}
+
+.rv2-drawer-empty {
+  min-height: 180px;
+}
+
+.rv2-audit-empty .material-symbols-outlined,
+.rv2-drawer-empty .material-symbols-outlined {
+  background: var(--rv2-audit-surface-strong) !important;
+  border: 1px solid var(--rv2-audit-line);
+  color: var(--tp-text-muted) !important;
+}
+
+.rv2-audit-node,
+.rv2-drawer-node,
+.rv2-audit-avatar {
+  background: var(--rv2-audit-surface-strong);
+  border-color: var(--tp-border-subtle);
+}
+
+.rv2-audit-list::before,
+.rv2-drawer-list::before {
+  background: var(--rv2-audit-line);
+}
+
+.rv2-audit-time,
+.rv2-drawer-time,
+.rv2-record-drawer-meta,
+.rv2-audit-empty span:not(.material-symbols-outlined),
+.rv2-drawer-empty p,
+.rv2-record-drawer-title span:not(.material-symbols-outlined) {
+  color: var(--tp-text-muted) !important;
+  opacity: 1;
+}
+
+.rv2-audit-reviewer-line,
+.rv2-record-drawer-title strong,
+.rv2-drawer-empty strong,
+.rv2-audit-empty strong,
+.rv2-audit-summary-main strong {
+  color: var(--tp-text-primary) !important;
+}
+
+.rv2-tl-desc,
+.rv2-drawer-comment {
+  color: var(--tp-text-secondary) !important;
+  opacity: 1;
+}
+
+.rv2-audit-summary,
+.rv2-audit-card,
+.rv2-audit-empty,
+.rv2-audit-more,
+.rv2-record-drawer-meta,
+.rv2-drawer-empty,
+.rv2-drawer-card {
+  box-shadow: var(--rv2-audit-shadow) !important;
+}
+
+.rv2-record-drawer-meta {
+  gap: 12px;
+  margin: 0 -18px 14px;
+  padding: 10px 18px;
+  border: 0 !important;
+  border-bottom: 1px solid var(--rv2-audit-line) !important;
+  border-radius: 0;
+  background: var(--rv2-audit-surface-muted) !important;
+  box-shadow: none !important;
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+  line-height: var(--tp-line-ui);
+}
+
+.rv2-drawer-comment {
+  padding: 0;
+  border: 0;
+  background: transparent !important;
+  color: var(--tp-text-muted) !important;
+}
+
+:global(.rv2-record-drawer) {
+  background: var(--rv2-audit-surface) !important;
+  border-left: 1px solid var(--tp-border-subtle);
+  color: var(--tp-text-primary) !important;
+}
+
+:global(.rv2-record-drawer .el-drawer__body),
+.rv2-record-drawer-shell {
+  background: var(--rv2-audit-surface) !important;
+  color: var(--tp-text-primary) !important;
+}
+
+.rv2-record-drawer-shell {
+  padding: 0 18px 24px !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.rv2-record-drawer-header {
+  margin: 0 -18px;
+  padding: 18px;
+  background: var(--rv2-audit-surface) !important;
+  border-bottom: 1px solid var(--rv2-audit-line) !important;
+  box-shadow: none !important;
+}
+
+.rv2-record-drawer-title {
+  align-items: center;
+}
+
+.rv2-record-drawer-title > .material-symbols-outlined {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  margin-top: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--rv2-audit-line);
+  border-radius: 999px;
+  background: var(--tp-accent-primary-soft);
+  color: var(--tp-primary);
+  font-size: 18px;
+}
+
+.rv2-record-drawer-title div {
+  gap: 3px;
+}
+
+.rv2-record-drawer-title strong {
+  font-size: var(--tp-text-md);
+  line-height: var(--tp-line-ui);
+}
+
+.rv2-record-drawer-close {
+  width: 34px;
+  height: 34px;
+  background: color-mix(in srgb, var(--tp-text-primary) 7%, transparent);
+  border-color: var(--rv2-audit-line);
+  color: var(--tp-text-secondary);
+}
+
+.rv2-record-drawer-close:hover,
+.rv2-record-drawer-close:focus-visible {
+  background: var(--tp-surface-hover);
+  border-color: var(--tp-border-strong);
+  color: var(--tp-text-primary);
 }
 
 @media (max-width: 720px) {
