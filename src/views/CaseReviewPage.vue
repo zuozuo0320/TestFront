@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 
 import { useRoute, useRouter } from 'vue-router'
 import { useProjectStore } from '../stores/project'
@@ -24,7 +24,6 @@ import {
   type ReviewSummary,
 } from '../api/caseReview'
 import { runPlanAIGate, type PlanRunReport } from '../api/caseReviewV02'
-import ReviewAIReportDialog from '../components/ReviewAIReportDialog.vue'
 import { listTestCases } from '../api/testcase'
 import { extractErrorMessage, isElMessageBoxCancel } from '../utils/error'
 
@@ -329,49 +328,143 @@ async function handleClose(review: CaseReview) {
   }
 }
 
-// ── 计划级 AI 评审：对该任务下所有用例批量跑规则引擎 ──
-/** 每个 review 的 AI 评审 running 状态（按 id 追踪，互不影响，支持多行并行） */
+// ── 计划级规则检查：对该任务下所有用例批量跑规则引擎 ──
+/** 每个 review 的规则检查 running 状态（按 id 追踪，互不影响，支持多行并行） */
 const aiRunningSet = ref<Set<number>>(new Set())
-/** 最近一次 AI 评审报告（由 ReviewAIReportDialog 展示聚合结果） */
-const aiReport = ref<PlanRunReport | null>(null)
-const aiReportVisible = ref(false)
-/** 报告弹窗点"查看详情"时跳转对应的评审详情页，并带上 itemId 便于高亮 */
-function handleJumpFromReport(itemId: number) {
-  const reviewId = aiReport.value?.review_id
-  if (!reviewId) return
-  aiReportVisible.value = false
-  router.push({ path: `/case-reviews/${reviewId}`, query: { itemId: String(itemId) } })
+
+type RuleCheckFeedbackType = 'success' | 'warning' | 'error'
+
+interface RuleCheckFeedback {
+  type: RuleCheckFeedbackType
+  icon: string
+  title: string
+  message: string
 }
 
-/** 对列表行触发计划级 AI 评审 */
+/** 短暂保留最近一次检查结果，让行内按钮也能反馈"已完成"而不是闪一下就结束。 */
+const ruleCheckFeedbacks = ref<Record<number, RuleCheckFeedback>>({})
+const ruleCheckFeedbackTimers = new Map<number, ReturnType<typeof setTimeout>>()
+
+function buildRuleCheckFeedback(report: PlanRunReport): RuleCheckFeedback {
+  const summary = `${report.passed_count}/${report.total_count} 通过`
+  if (report.error_count > 0) {
+    return {
+      type: 'error',
+      icon: 'error',
+      title: '规则检查完成，有执行异常',
+      message: `${summary}，${report.failed_count} 未通过，${report.error_count} 异常`,
+    }
+  }
+  if (report.failed_count > 0) {
+    return {
+      type: 'warning',
+      icon: 'report_problem',
+      title: '规则检查完成，发现需关注项',
+      message: `${summary}，${report.failed_count} 条未通过`,
+    }
+  }
+  return {
+    type: 'success',
+    icon: 'check_circle',
+    title: '规则检查完成',
+    message: `${summary}，未发现阻断项`,
+  }
+}
+
+function setRuleCheckFeedback(reviewID: number, feedback: RuleCheckFeedback) {
+  const next = { ...ruleCheckFeedbacks.value, [reviewID]: feedback }
+  ruleCheckFeedbacks.value = next
+  const oldTimer = ruleCheckFeedbackTimers.get(reviewID)
+  if (oldTimer) window.clearTimeout(oldTimer)
+  const timer = window.setTimeout(() => {
+    const rest = { ...ruleCheckFeedbacks.value }
+    delete rest[reviewID]
+    ruleCheckFeedbacks.value = rest
+    ruleCheckFeedbackTimers.delete(reviewID)
+  }, 8000)
+  ruleCheckFeedbackTimers.set(reviewID, timer)
+}
+
+function notifyRuleCheckDone(review: CaseReview, feedback: RuleCheckFeedback) {
+  ElNotification({
+    title: feedback.title,
+    message: `${review.name}：${feedback.message}`,
+    type: feedback.type,
+    duration: 4500,
+    position: 'top-right',
+    offset: 72,
+    showClose: true,
+    customClass: `rule-check-notification rule-check-notification--${feedback.type}`,
+  })
+}
+
+function ruleCheckButtonTitle(review: CaseReview) {
+  const feedback = ruleCheckFeedbacks.value[review.id]
+  if (aiRunningSet.value.has(review.id)) return '规则检查中…'
+  if (feedback) return `${feedback.title}：${feedback.message}`
+  if (review.status === 'closed' || review.status === 'completed') {
+    return '计划已关闭/完成，无法再运行规则检查'
+  }
+  return '对该任务下所有用例运行规则检查'
+}
+
+function ruleCheckButtonAriaLabel(review: CaseReview) {
+  const feedback = ruleCheckFeedbacks.value[review.id]
+  if (aiRunningSet.value.has(review.id)) return '规则检查中'
+  if (feedback) return feedback.title
+  if (review.status === 'closed' || review.status === 'completed') {
+    return '当前计划无法运行规则检查'
+  }
+  return '运行规则检查'
+}
+
+function ruleCheckButtonIcon(review: CaseReview) {
+  if (aiRunningSet.value.has(review.id)) return 'progress_activity'
+  return ruleCheckFeedbacks.value[review.id]?.icon || 'rule'
+}
+
+function ruleCheckButtonClass(review: CaseReview) {
+  const feedback = ruleCheckFeedbacks.value[review.id]
+  return {
+    'is-running': aiRunningSet.value.has(review.id),
+    'is-success': feedback?.type === 'success',
+    'is-warning': feedback?.type === 'warning',
+    'is-error': feedback?.type === 'error',
+  }
+}
+
+/** 对列表行触发计划级规则检查 */
 async function handleRunAI(review: CaseReview) {
   const projectId = selectedProjectId.value
   if (!projectId) return
   if (aiRunningSet.value.has(review.id)) return
   // 非终态才允许批量评审：closed / completed 禁止，避免把冻结的计划数据搅乱
   if (review.status === 'closed' || review.status === 'completed') {
-    ElMessage.warning('计划已关闭或完成，无法再运行 AI 评审')
+    ElMessage.warning('计划已关闭或完成，无法再运行规则检查')
     return
   }
   aiRunningSet.value = new Set(aiRunningSet.value).add(review.id)
   try {
     const report = await runPlanAIGate(projectId, review.id)
-    aiReport.value = report
-    aiReportVisible.value = true
+    const feedback = buildRuleCheckFeedback(report)
+    setRuleCheckFeedback(review.id, feedback)
+    notifyRuleCheckDone(review, feedback)
     // 刷新列表，让行上的 passed/failed 统计跟上
     fetchReviews()
     fetchSummary()
-    const tip = `AI 评审完成：${report.passed_count}/${report.total_count} 通过`
-    if (report.failed_count === 0 && report.error_count === 0) ElMessage.success(tip)
-    else ElMessage.warning(tip)
   } catch (e) {
-    ElMessage.error(extractErrorMessage(e, 'AI 评审失败'))
+    ElMessage.error(extractErrorMessage(e, '规则检查失败'))
   } finally {
     const next = new Set(aiRunningSet.value)
     next.delete(review.id)
     aiRunningSet.value = next
   }
 }
+
+onBeforeUnmount(() => {
+  ruleCheckFeedbackTimers.forEach((timer) => window.clearTimeout(timer))
+  ruleCheckFeedbackTimers.clear()
+})
 
 // ── 格式辅助 ──
 function statusLabel(status: string) {
@@ -650,18 +743,11 @@ function reviewStatusLabel(review: CaseReview) {
 
 <template>
   <div class="case-review-page">
-    <!-- AI 评审报告弹窗（计划级批量评审完成后展示聚合结果） -->
-    <ReviewAIReportDialog
-      v-model="aiReportVisible"
-      :report="aiReport"
-      @jump="handleJumpFromReport"
-    />
-
     <!-- ─── 页面标题 ─── -->
     <div class="pipeline-header">
       <div class="pipeline-header-top">
         <div>
-          <h1 class="pipeline-title">智能评审中心</h1>
+          <h1 class="pipeline-title">用例评审中心</h1>
         </div>
         <div class="pipeline-actions">
           <div class="pipeline-search-box">
@@ -883,7 +969,14 @@ function reviewStatusLabel(review: CaseReview) {
                 </span>
               </td>
               <td class="td-right">
-                <div class="row-actions" @click.stop>
+                <div
+                  class="row-actions"
+                  :class="{
+                    'has-rule-check-feedback':
+                      aiRunningSet.has(review.id) || Boolean(ruleCheckFeedbacks[review.id]),
+                  }"
+                  @click.stop
+                >
                   <button
                     type="button"
                     class="action-btn action-edit icon-only"
@@ -898,32 +991,23 @@ function reviewStatusLabel(review: CaseReview) {
                   <button
                     type="button"
                     class="action-btn action-ai icon-only"
+                    :class="ruleCheckButtonClass(review)"
                     :disabled="
                       aiRunningSet.has(review.id) ||
                       review.status === 'closed' ||
                       review.status === 'completed'
                     "
-                    :title="
-                      aiRunningSet.has(review.id)
-                        ? 'AI 评审中…'
-                        : review.status === 'closed' || review.status === 'completed'
-                          ? '计划已关闭/完成，无法再运行 AI 评审'
-                          : '对该任务下所有用例运行 AI 评审'
-                    "
-                    :aria-label="
-                      aiRunningSet.has(review.id)
-                        ? 'AI 评审中'
-                        : review.status === 'closed' || review.status === 'completed'
-                          ? '当前计划无法运行 AI 评审'
-                          : '运行 AI 评审'
-                    "
+                    :title="ruleCheckButtonTitle(review)"
+                    :aria-label="ruleCheckButtonAriaLabel(review)"
                     @click="handleRunAI(review)"
                   >
                     <span
-                      class="material-symbols-outlined"
-                      :class="{ 'spin-anim': aiRunningSet.has(review.id) }"
-                    >
-                      auto_awesome
+                      v-if="aiRunningSet.has(review.id)"
+                      class="rule-check-spinner"
+                      aria-hidden="true"
+                    ></span>
+                    <span v-else class="material-symbols-outlined">
+                      {{ ruleCheckButtonIcon(review) }}
                     </span>
                   </button>
                   <button
@@ -3283,6 +3367,10 @@ function reviewStatusLabel(review: CaseReview) {
   opacity: 1;
 }
 
+.case-review-page .row-actions.has-rule-check-feedback {
+  opacity: 1;
+}
+
 .case-review-page .action-btn.icon-only {
   width: 28px;
   height: 28px;
@@ -3298,10 +3386,17 @@ function reviewStatusLabel(review: CaseReview) {
   color: var(--tp-primary);
 }
 
-.case-review-page .action-btn.action-ai:hover:not(:disabled) {
-  border-color: var(--tp-accent-info-border);
-  background: var(--tp-accent-info-soft);
-  color: var(--tp-accent-info);
+.case-review-page .action-btn.action-ai.icon-only {
+  border-color: var(--tp-accent-info-border) !important;
+  background: var(--tp-accent-info-soft) !important;
+  color: var(--tp-accent-info) !important;
+  opacity: 1;
+}
+
+.case-review-page .action-btn.action-ai.icon-only:hover:not(:disabled) {
+  border-color: var(--tp-accent-info-border) !important;
+  background: var(--tp-accent-info-soft) !important;
+  color: var(--tp-accent-info) !important;
 }
 
 .case-review-page .action-btn.action-delete:hover:not(:disabled) {
@@ -3313,6 +3408,142 @@ function reviewStatusLabel(review: CaseReview) {
 .case-review-page .action-btn.icon-only:disabled {
   cursor: not-allowed;
   opacity: 0.38;
+}
+
+.case-review-page .action-btn.action-ai.icon-only.is-running {
+  border-color: var(--tp-accent-info-border) !important;
+  background: var(--tp-accent-info-soft) !important;
+  color: var(--tp-accent-info) !important;
+  cursor: progress;
+  opacity: 1;
+}
+
+.case-review-page .rule-check-spinner {
+  display: inline-block !important;
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border: 2px solid color-mix(in srgb, currentColor 24%, transparent);
+  border-top-color: currentColor;
+  border-radius: 999px;
+  animation: rule-check-spinner-rotate 0.72s linear infinite;
+  transform: translateZ(0);
+  transform-origin: center;
+  will-change: transform;
+}
+
+@keyframes rule-check-spinner-rotate {
+  to {
+    transform: rotate(1turn) translateZ(0);
+  }
+}
+
+.case-review-page .action-btn.action-ai.icon-only.is-success {
+  border-color: var(--tp-accent-info-border) !important;
+  background: var(--tp-accent-info-soft) !important;
+  color: var(--tp-accent-info) !important;
+  opacity: 1;
+}
+
+.case-review-page .action-btn.action-ai.icon-only.is-warning {
+  border-color: var(--tp-accent-warning-border) !important;
+  background: var(--tp-accent-warning-soft) !important;
+  color: var(--tp-accent-warning) !important;
+  opacity: 1;
+}
+
+.case-review-page .action-btn.action-ai.icon-only.is-error {
+  border-color: var(--tp-accent-danger-border) !important;
+  background: var(--tp-accent-danger-soft) !important;
+  color: var(--tp-accent-danger) !important;
+  opacity: 1;
+}
+
+:global(.rule-check-notification.el-notification) {
+  --rule-check-notice-accent: var(--tp-accent-info);
+  --rule-check-notice-accent-soft: var(--tp-accent-info-soft);
+  --rule-check-notice-border: var(--tp-accent-info-border);
+  width: min(340px, calc(100vw - 32px));
+  padding: 13px 40px 13px 14px;
+  border: 1px solid var(--rule-check-notice-border) !important;
+  border-left: 3px solid var(--rule-check-notice-accent) !important;
+  border-radius: 13px;
+  background: linear-gradient(180deg, var(--tp-surface-card), var(--tp-surface-muted)) !important;
+  background-color: var(--tp-surface-muted) !important;
+  box-shadow: var(--tp-shadow-sm) !important;
+  backdrop-filter: none !important;
+}
+
+:global(.rule-check-notification--success.el-notification) {
+  --rule-check-notice-accent: var(--tp-accent-info);
+  --rule-check-notice-accent-soft: var(--tp-accent-info-soft);
+  --rule-check-notice-border: var(--tp-accent-info-border);
+}
+
+:global(.rule-check-notification--warning.el-notification) {
+  --rule-check-notice-accent: var(--tp-accent-warning);
+  --rule-check-notice-accent-soft: var(--tp-accent-warning-soft);
+  --rule-check-notice-border: var(--tp-accent-warning-border);
+}
+
+:global(.rule-check-notification--error.el-notification) {
+  --rule-check-notice-accent: var(--tp-accent-danger);
+  --rule-check-notice-accent-soft: var(--tp-accent-danger-soft);
+  --rule-check-notice-border: var(--tp-accent-danger-border);
+}
+
+:global(html[data-theme='genart'] .rule-check-notification.el-notification) {
+  background: linear-gradient(180deg, var(--tp-gray-100), var(--tp-gray-50)) !important;
+  background-color: var(--tp-gray-100) !important;
+  box-shadow: var(--tp-shadow-sm) !important;
+}
+
+:global(.rule-check-notification .el-notification__icon) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: 999px;
+  background: var(--rule-check-notice-accent-soft);
+  color: var(--rule-check-notice-accent);
+  font-size: 14px;
+}
+
+:global(.rule-check-notification .el-notification__group) {
+  margin-left: 10px;
+}
+
+:global(.rule-check-notification .el-notification__title) {
+  color: var(--tp-text-primary);
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: var(--tp-font-bold);
+}
+
+:global(.rule-check-notification .el-notification__content) {
+  margin: 5px 0 0;
+  color: var(--tp-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+:global(.rule-check-notification .el-notification__closeBtn) {
+  top: 15px;
+  right: 14px;
+  color: var(--tp-text-muted);
+}
+
+:global(.rule-check-notification .el-notification__closeBtn:hover) {
+  color: var(--tp-text-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .case-review-page .rule-check-spinner {
+    animation: none;
+    border-style: dotted;
+  }
 }
 
 .case-review-page .pagination-bar-pl {

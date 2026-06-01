@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * ReviewAIReportDialog：计划级 AI 评审报告弹窗
+ * ReviewAIReportDialog：计划级规则检查报告弹窗
  *
  * 职责：
  *   - 承载 run-all 之后返回的聚合报告展示
@@ -84,7 +84,7 @@ function rowClass({ row }: { row: PlanItemSummary }) {
     <template #header>
       <div class="ai-report-header">
         <div>
-          <h3>AI 评审报告</h3>
+          <h3>规则检查报告</h3>
           <p v-if="report">
             {{ report.total_count }} 个用例 ·
             {{ report.failed_count + report.error_count }} 项需关注

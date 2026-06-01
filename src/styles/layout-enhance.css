@@ -3786,6 +3786,12 @@ html[data-theme='genart'] .el-overlay:has(.el-dialog) {
   background: var(--tp-overlay-scrim) !important;
 }
 
+html[data-theme='genart'] .el-overlay-message-box {
+  background: rgba(0, 0, 0, 0.46) !important;
+  backdrop-filter: blur(1px) saturate(108%);
+  -webkit-backdrop-filter: blur(1px) saturate(108%);
+}
+
 html[data-theme='genart'] * {
   scrollbar-color: var(--tp-accent-primary-border) var(--tp-glass-bg);
 }
@@ -4879,12 +4885,196 @@ html[data-theme='genart'] .case-review-page .status-badge-pl.badge-secondary {
    全局 ElMessageBox (确认框 / 提示框) 黑曜高定重塑
    ─────────────────────────────── */
 
+/* 白色主题 Toast 使用品牌浅紫浮层，成功态不再大面积使用系统绿。 */
+html:not([data-theme='genart']) .el-message {
+  min-height: 38px !important;
+  padding: 9px 14px !important;
+  background:
+    radial-gradient(circle at 12% 0%, var(--tp-primary-lighter), transparent 44%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(250, 245, 255, 0.96)) !important;
+  border: 1px solid var(--tp-accent-primary-border) !important;
+  border-radius: 12px !important;
+  box-shadow:
+    0 16px 36px rgba(17, 24, 39, 0.12),
+    0 0 0 1px rgba(255, 255, 255, 0.78),
+    var(--tp-shadow-sm) !important;
+}
+
+html:not([data-theme='genart']) .el-message .el-message__content {
+  color: var(--tp-text-primary) !important;
+  font-weight: var(--tp-font-semibold) !important;
+}
+
+html:not([data-theme='genart']) .el-message .el-message__icon {
+  color: var(--tp-primary) !important;
+}
+
+html:not([data-theme='genart']) .el-message .el-message__closeBtn {
+  color: var(--tp-text-muted) !important;
+}
+
+html:not([data-theme='genart']) .el-message .el-message__closeBtn:hover {
+  color: var(--tp-text-primary) !important;
+}
+
+html:not([data-theme='genart']) .el-message.el-message--success {
+  background:
+    radial-gradient(circle at 12% 0%, var(--tp-primary-lighter), transparent 44%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(250, 245, 255, 0.96)) !important;
+  border-color: var(--tp-accent-primary-border) !important;
+}
+
+html:not([data-theme='genart']) .el-message.el-message--success .el-message__content,
+html:not([data-theme='genart']) .el-message.el-message--success .el-message__icon {
+  color: var(--tp-primary) !important;
+}
+
+html:not([data-theme='genart']) .el-message.el-message--warning {
+  background:
+    radial-gradient(circle at 12% 0%, var(--tp-accent-warning-soft), transparent 44%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(255, 251, 235, 0.96)) !important;
+  border-color: var(--tp-accent-warning-border) !important;
+}
+
+html:not([data-theme='genart']) .el-message.el-message--warning .el-message__content,
+html:not([data-theme='genart']) .el-message.el-message--warning .el-message__icon {
+  color: var(--tp-accent-warning) !important;
+}
+
+html:not([data-theme='genart']) .el-message.el-message--error {
+  background:
+    radial-gradient(circle at 12% 0%, var(--tp-accent-danger-soft), transparent 44%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(255, 241, 242, 0.96)) !important;
+  border-color: var(--tp-accent-danger-border) !important;
+}
+
+html:not([data-theme='genart']) .el-message.el-message--error .el-message__content,
+html:not([data-theme='genart']) .el-message.el-message--error .el-message__icon {
+  color: var(--tp-accent-danger) !important;
+}
+
+html:not([data-theme='genart']) .el-message.el-message--info {
+  background:
+    radial-gradient(circle at 12% 0%, var(--tp-accent-info-soft), transparent 44%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.96)) !important;
+  border-color: var(--tp-accent-info-border) !important;
+}
+
+html:not([data-theme='genart']) .el-message.el-message--info .el-message__content,
+html:not([data-theme='genart']) .el-message.el-message--info .el-message__icon {
+  color: var(--tp-accent-info) !important;
+}
+
+/* 操作结果 Toast 统一暗色浮层，避免成功提示在黑色主题下出现浅底高饱和绿色。 */
+html[data-theme='genart'] .el-message {
+  min-height: 38px !important;
+  padding: 9px 14px !important;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(240, 195, 106, 0.1), transparent 42%),
+    linear-gradient(145deg, rgba(18, 16, 13, 0.96), rgba(7, 8, 13, 0.96)) !important;
+  border: 1px solid color-mix(in srgb, var(--tp-accent-warning-border) 36%, var(--tp-border-subtle)) !important;
+  border-radius: 12px !important;
+  box-shadow:
+    0 18px 46px rgba(0, 0, 0, 0.68),
+    0 0 0 1px rgba(240, 195, 106, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-theme='genart'] .el-message .el-message__content {
+  color: var(--tp-text-primary) !important;
+  font-weight: var(--tp-font-semibold) !important;
+}
+
+html[data-theme='genart'] .el-message .el-message__icon {
+  color: var(--tp-accent-warning) !important;
+}
+
+html[data-theme='genart'] .el-message .el-message__closeBtn {
+  color: var(--tp-text-muted) !important;
+}
+
+html[data-theme='genart'] .el-message .el-message__closeBtn:hover {
+  color: var(--tp-text-primary) !important;
+}
+
+html[data-theme='genart'] .el-message.el-message--success {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(240, 195, 106, 0.12), transparent 42%),
+    linear-gradient(145deg, rgba(20, 17, 10, 0.96), rgba(7, 8, 13, 0.96)) !important;
+  border-color: color-mix(
+    in srgb,
+    var(--tp-accent-warning-border) 56%,
+    var(--tp-border-subtle)
+  ) !important;
+}
+
+html[data-theme='genart'] .el-message.el-message--success .el-message__content,
+html[data-theme='genart'] .el-message.el-message--success .el-message__icon {
+  color: var(--tp-accent-warning) !important;
+}
+
+html[data-theme='genart'] .el-message.el-message--warning {
+  border-color: color-mix(
+    in srgb,
+    var(--tp-accent-warning-border) 64%,
+    var(--tp-border-subtle)
+  ) !important;
+}
+
+html[data-theme='genart'] .el-message.el-message--warning .el-message__content,
+html[data-theme='genart'] .el-message.el-message--warning .el-message__icon {
+  color: var(--tp-accent-warning) !important;
+}
+
+html[data-theme='genart'] .el-message.el-message--error {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(251, 113, 133, 0.13), transparent 42%),
+    linear-gradient(145deg, rgba(22, 10, 13, 0.96), rgba(7, 8, 13, 0.96)) !important;
+  border-color: color-mix(
+    in srgb,
+    var(--tp-accent-danger-border) 58%,
+    var(--tp-border-subtle)
+  ) !important;
+}
+
+html[data-theme='genart'] .el-message.el-message--error .el-message__content,
+html[data-theme='genart'] .el-message.el-message--error .el-message__icon {
+  color: var(--tp-accent-danger) !important;
+}
+
+html[data-theme='genart'] .el-message.el-message--info {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(167, 139, 250, 0.12), transparent 42%),
+    linear-gradient(145deg, rgba(13, 12, 22, 0.96), rgba(7, 8, 13, 0.96)) !important;
+  border-color: color-mix(
+    in srgb,
+    var(--tp-accent-primary-border) 56%,
+    var(--tp-border-subtle)
+  ) !important;
+}
+
+html[data-theme='genart'] .el-message.el-message--info .el-message__content,
+html[data-theme='genart'] .el-message.el-message--info .el-message__icon {
+  color: var(--tp-primary-light) !important;
+}
+
 /* 1. 外层容器石墨暗化及细微虚边框 */
 html[data-theme='genart'] .el-message-box {
-  background: var(--tp-surface-elevated) !important;
-  border: 1px solid var(--tp-border-subtle) !important;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(240, 195, 106, 0.13), transparent 38%),
+    radial-gradient(circle at 100% 8%, rgba(167, 139, 250, 0.1), transparent 34%),
+    linear-gradient(145deg, rgba(18, 16, 13, 0.98), rgba(9, 10, 16, 0.98) 58%, rgba(4, 5, 9, 0.98)) !important;
+  border: 1px solid color-mix(in srgb, var(--tp-accent-warning-border) 46%, var(--tp-border-subtle)) !important;
   border-radius: 14px !important;
-  box-shadow: var(--tp-shadow-md) !important;
+  box-shadow:
+    0 28px 86px rgba(0, 0, 0, 0.82),
+    0 0 0 1px rgba(240, 195, 106, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    var(--tp-shadow-md) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 /* 2. 标题 & 关闭图标 */
@@ -5148,4 +5338,119 @@ html[data-theme='genart']
   :is(.cases-table, .pipeline-table, .um-table, .pm-table, .ai-table, .wz-table) {
   --el-table-header-bg-color: var(--tp-surface-header);
   --el-table-row-hover-bg-color: var(--tp-surface-row-hover);
+}
+
+/* 黑色主题下项目下拉是可操作浮层，需要比页面卡片更实，避免透出主内容干扰识别。 */
+html[data-theme='genart'] .main-nav .nav-project-dropdown {
+  background:
+    linear-gradient(180deg, var(--tp-surface-elevated), var(--tp-surface-card)),
+    var(--tp-surface-base) !important;
+  border-color: var(--tp-border-strong) !important;
+  box-shadow: var(--tp-shadow-md) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-theme='genart'] .nav-project-dropdown-label {
+  color: var(--tp-text-muted) !important;
+}
+
+html[data-theme='genart'] .nav-project-dropdown-item {
+  color: var(--tp-text-secondary) !important;
+}
+
+html[data-theme='genart'] .nav-project-name {
+  color: var(--tp-text-secondary) !important;
+}
+
+html[data-theme='genart'] .nav-project-dropdown-item:hover {
+  background: var(--tp-surface-hover) !important;
+  border-color: var(--tp-border-subtle) !important;
+}
+
+html[data-theme='genart'] .nav-project-dropdown-item.selected {
+  background:
+    linear-gradient(90deg, var(--tp-accent-primary-soft), var(--tp-surface-hover)),
+    var(--tp-surface-base) !important;
+  border-color: var(--tp-accent-primary-border) !important;
+}
+
+html[data-theme='genart'] .nav-project-dropdown-item.selected .nav-project-name,
+html[data-theme='genart'] .nav-project-dropdown-item.selected .nav-project-check {
+  color: var(--tp-text-primary) !important;
+}
+
+/* 黑色主题主操作按钮统一使用用例中心的柔和双色 CTA，避免页面之间出现亮紫色断层。 */
+html[data-theme='genart']
+  :is(
+    .el-button--primary:not(.is-link),
+    .btn-primary,
+    .btn-primary-md,
+    .insights-btn-primary,
+    .pipeline-btn-create,
+    .footer-btn.primary,
+    .rm-add-btn,
+    .pm-add-btn,
+    .um-add-btn,
+    .tm-btn-filter,
+    .ai-btn-primary,
+    .ai-primary-btn,
+    .create-btn-pl,
+    .stitch-btn-save,
+    .btn-query,
+    .rv2-link-btn,
+    .rv2-panel-btn-primary,
+    .amc-btn--primary,
+    .amc-btn--fetch,
+    .amc-btn--test
+  ) {
+  background: var(--tp-btn-bg) !important;
+  border-color: var(--tp-btn-border) !important;
+  color: var(--tp-btn-text) !important;
+  box-shadow: var(--tp-btn-shadow) !important;
+  -webkit-text-fill-color: currentcolor !important;
+}
+
+html[data-theme='genart']
+  :is(
+    .el-button--primary:not(.is-link),
+    .btn-primary,
+    .btn-primary-md,
+    .insights-btn-primary,
+    .pipeline-btn-create,
+    .footer-btn.primary,
+    .rm-add-btn,
+    .pm-add-btn,
+    .um-add-btn,
+    .tm-btn-filter,
+    .ai-btn-primary,
+    .ai-primary-btn,
+    .create-btn-pl,
+    .stitch-btn-save,
+    .btn-query,
+    .rv2-link-btn,
+    .rv2-panel-btn-primary,
+    .amc-btn--primary,
+    .amc-btn--fetch,
+    .amc-btn--test
+  ):hover {
+  background: var(--tp-btn-bg-hover) !important;
+  border-color: var(--tp-btn-border) !important;
+  color: var(--tp-btn-text) !important;
+  box-shadow: var(--tp-btn-shadow-hover) !important;
+  filter: none !important;
+}
+
+html[data-theme='genart'] .stitch-steps-header .stitch-btn-text {
+  background: var(--tp-btn-bg) !important;
+  border-color: var(--tp-btn-border) !important;
+  color: var(--tp-btn-text) !important;
+  box-shadow: var(--tp-btn-shadow) !important;
+  -webkit-text-fill-color: currentcolor !important;
+}
+
+html[data-theme='genart'] .stitch-steps-header .stitch-btn-text:hover {
+  background: var(--tp-btn-bg-hover) !important;
+  color: var(--tp-btn-text) !important;
+  box-shadow: var(--tp-btn-shadow-hover) !important;
 }

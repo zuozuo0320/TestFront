@@ -2,7 +2,7 @@
  * useReviewDefects：单评审项下的 Action Items（缺陷）加载与状态变更
  *
  * 为什么独立成 composable：
- *   - CaseReviewDetail 左栏的 AI 门禁面板、Action Items 清单、未来的批量操作都需要复用
+ *   - CaseReviewDetail 左栏的规则门禁面板、Action Items 清单、未来的批量操作都需要复用
  *   - 按前端规范 §3 严禁在 api/ 层出现 UI 提示，这里统一消化 try/catch 与 ElMessage
  */
 
@@ -76,8 +76,8 @@ export function useReviewDefects() {
       const report = await apiRerunAIGate(projectId, reviewId, itemId)
       await fetchDefects(projectId, reviewId, itemId)
       const tip = report.passed
-        ? 'AI 门禁通过'
-        : `AI 门禁未通过：critical ${report.critical_count}，major ${report.major_count}`
+        ? '规则门禁通过'
+        : `规则门禁未通过：critical ${report.critical_count}，major ${report.major_count}`
       if (report.passed) ElMessage.success(tip)
       else ElMessage.warning(tip)
       return report

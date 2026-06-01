@@ -3428,7 +3428,7 @@
   background: var(--tp-accent-primary-soft);
 }
 
-/* AI 评审按钮：用主紫色突出，与"复制/关闭/删除"等灰色 icon 形成层级对比 */
+/* 规则检查按钮：用主紫色突出，与"复制/关闭/删除"等灰色 icon 形成层级对比 */
 .action-ai {
   color: var(--tp-primary);
 }
@@ -3439,7 +3439,7 @@
   border-color: var(--tp-btn-border);
 }
 
-/* 通用旋转动画：用例评审 AI 评审按钮 / 其它 loading 图标共用 */
+/* 通用旋转动画：用例评审规则检查按钮 / 其它 loading 图标共用 */
 .spin-anim {
   animation: spin-rotate 0.8s linear infinite;
 }

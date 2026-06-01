@@ -6,6 +6,7 @@ import { computed, ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGenTasks } from '@/composables/useRequirementGen'
 import type { GenResult } from '@/api/requirementGen'
+import { parseTestCaseStepsToRows, type TestCaseStepRow } from '@/utils/testCaseSteps'
 
 const route = useRoute()
 const router = useRouter()
@@ -87,13 +88,9 @@ async function adoptPendingResults() {
   await handleBatchAdoptResults(pendingActionableResults.value)
 }
 
-/** 解析步骤 JSON */
-function parseSteps(stepsJson: string): Array<{ action: string; expected: string }> {
-  try {
-    return JSON.parse(stepsJson)
-  } catch {
-    return []
-  }
+/** 解析步骤内容，兼容 JSON 数组与采纳后的多行文本。 */
+function parseSteps(stepsText: string): TestCaseStepRow[] {
+  return parseTestCaseStepsToRows(stepsText).filter((step) => step.action || step.expected)
 }
 
 function formatStepIndex(index: number) {
@@ -547,7 +544,8 @@ watch(
 }
 
 .topbar-metric-pill.is-success .metric-val {
-  color: var(--tp-success);
+  color: var(--tp-accent-warning);
+  text-shadow: 0 0 14px color-mix(in srgb, var(--tp-accent-warning) 16%, transparent);
 }
 
 .topbar-metric-pill.is-muted {
@@ -752,13 +750,34 @@ watch(
 }
 
 .result-nav-row.adopted {
-  background: color-mix(in srgb, var(--tp-accent-success-soft) 30%, transparent);
-  border-color: color-mix(in srgb, var(--tp-success) 35%, transparent);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--tp-accent-warning-soft) 24%, transparent),
+      color-mix(in srgb, var(--tp-accent-warning-border) 10%, transparent)
+    ),
+    color-mix(in srgb, var(--tp-surface-elevated) 42%, transparent);
+  border-color: color-mix(in srgb, var(--tp-accent-warning-border) 58%, var(--tp-border-subtle));
 }
 
 .result-nav-row.adopted.active {
-  background: color-mix(in srgb, var(--tp-accent-success-soft) 55%, transparent);
-  border-color: var(--tp-success);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--tp-accent-warning-soft) 38%, transparent),
+      color-mix(in srgb, var(--tp-accent-warning-border) 18%, transparent)
+    ),
+    color-mix(in srgb, var(--tp-surface-elevated) 62%, transparent);
+  border-color: color-mix(in srgb, var(--tp-accent-warning) 74%, var(--tp-accent-warning-border));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--tp-accent-warning) 24%, transparent),
+    0 8px 18px color-mix(in srgb, var(--tp-accent-warning) 12%, transparent);
+}
+
+.result-nav-row.adopted .result-nav-index {
+  color: var(--tp-accent-warning);
+  background: color-mix(in srgb, var(--tp-accent-warning-soft) 46%, transparent);
+  border-color: color-mix(in srgb, var(--tp-accent-warning-border) 72%, transparent);
 }
 
 .result-nav-row.discarded {

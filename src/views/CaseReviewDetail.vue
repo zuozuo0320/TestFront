@@ -33,6 +33,7 @@ import { apiClient } from '@/api/client'
 import { useProjectStore } from '@/stores/project'
 import { useAuthStore } from '@/stores/auth'
 import { extractErrorMessage, isElMessageBoxCancel } from '@/utils/error'
+import { parseTestCaseStepsToRows } from '@/utils/testCaseSteps'
 
 const route = useRoute()
 const router = useRouter()
@@ -276,11 +277,11 @@ async function fetchReview() {
   }
 }
 
-// ── v0.2 单条 AI 评审（计划级批量已移到列表页） ──
+// ── v0.2 单条规则检查（计划级批量已移到列表页） ──
 const aiReviewRunning = ref(false)
 
-/** 点击"AI 评审本条"按钮：对当前评审项跑规则引擎；
- *  计划级批量 AI 评审入口已挪到列表页每行操作区，避免详情页误伤他人正在处理的条目。 */
+/** 点击"规则检查本条"按钮：对当前评审项跑规则引擎；
+ *  计划级批量规则检查入口已挪到列表页每行操作区，避免详情页误伤他人正在处理的条目。 */
 async function handleRunAIReview() {
   if (!projectId.value || !reviewId.value || !currentItem.value) return
   const itemId = currentItem.value.id
@@ -291,16 +292,16 @@ async function handleRunAIReview() {
     await fetchItems()
     await fetchAIDefects(projectId.value, reviewId.value, itemId)
     if (report.passed) {
-      ElMessage.success('AI 评审本条通过')
+      ElMessage.success('规则检查本条通过')
     } else {
       const parts: string[] = []
       if (report.critical_count) parts.push(`${report.critical_count} 项严重`)
       if (report.major_count) parts.push(`${report.major_count} 项主要`)
       if (report.minor_count) parts.push(`${report.minor_count} 项提示`)
-      ElMessage.warning(`AI 评审未通过：${parts.join(' · ')}`)
+      ElMessage.warning(`规则检查未通过：${parts.join(' · ')}`)
     }
   } catch (e) {
-    ElMessage.error(extractErrorMessage(e, 'AI 评审失败'))
+    ElMessage.error(extractErrorMessage(e, '规则检查失败'))
   } finally {
     aiReviewRunning.value = false
   }
@@ -405,6 +406,15 @@ function resultLabel(result: string) {
   }
   return map[result] || result
 }
+function sidebarResultLabel(result: string) {
+  const map: Record<string, string> = {
+    pending: '待审',
+    approved: '通过',
+    rejected: '拒绝',
+    needs_update: '返修',
+  }
+  return map[result] || resultLabel(result)
+}
 function resultIcon(result: string) {
   const map: Record<string, string> = {
     approved: 'check_circle',
@@ -441,14 +451,25 @@ function aiGateClass(status?: string) {
 }
 function aiGateLabel(status?: string) {
   const map: Record<string, string> = {
-    not_started: 'AI 未运行',
-    running: 'AI 运行中',
-    passed: 'AI 通过',
-    failed: 'AI 未过',
-    timeout: 'AI 超时',
-    bypassed: 'AI 放行',
+    not_started: '未检查',
+    running: '检查中',
+    passed: '检查通过',
+    failed: '检查未过',
+    timeout: '检查超时',
+    bypassed: '规则放行',
   }
-  return map[status || 'not_started'] || 'AI 未运行'
+  return map[status || 'not_started'] || '未检查'
+}
+function sidebarAIGateLabel(status?: string) {
+  const map: Record<string, string> = {
+    not_started: '未检',
+    running: '检查中',
+    passed: '通过',
+    failed: '异常',
+    timeout: '超时',
+    bypassed: '放行',
+  }
+  return map[status || 'not_started'] || '未检'
 }
 function formatDate(d: string) {
   if (!d) return '—'
@@ -572,36 +593,24 @@ async function loadCurrentTestCase() {
   }
 }
 
-/** 把 steps 字符串切成结构化行：优先按换行切，其次按 `；` 或 `;`，最后兜底整段。 */
+/** 把 steps 字符串切成结构化行，兼容生成链路遗留的 JSON 数组。 */
 function parseSteps(raw?: string): Array<{ no: string; action: string; expected: string }> {
-  const text = (raw ?? '').trim()
-  if (!text) return []
-  // 先按换行切；若只有一行再用中英文分号切分
-  let parts = text
-    .split(/\r?\n+/)
-    .map((p) => p.trim())
-    .filter(Boolean)
-  if (parts.length <= 1) {
-    parts = text
-      .split(/[;；]+/)
-      .map((p) => p.trim())
-      .filter(Boolean)
-  }
-  return parts.map((line, i) => {
-    const [action = '', ...expectedParts] = line.split('|')
-    return {
-      no: String(i + 1).padStart(2, '0'),
-      action: action.trim(),
-      expected: expectedParts.join('|').trim(),
-    }
-  })
+  return parseTestCaseStepsToRows(raw ?? '')
+    .filter((row) => row.action || row.expected)
+    .map((row, i) => {
+      return {
+        no: String(i + 1).padStart(2, '0'),
+        action: row.action,
+        expected: row.expected,
+      }
+    })
 }
 
 const realSteps = computed(() => parseSteps(currentTestCase.value?.steps))
 const realPrecondition = computed(() => currentTestCase.value?.precondition?.trim() ?? '')
 const realPostcondition = computed(() => currentTestCase.value?.postcondition?.trim() ?? '')
 
-// ── 设计稿派生数据：AI 校验网关卡、条件 checklist ──
+// ── 设计稿派生数据：规则门禁卡、条件 checklist ──
 
 /** 把多行文本切成单行 checklist；同时支持换行 / 中英文分号。 */
 function parseConditionLines(raw?: string): string[] {
@@ -623,17 +632,17 @@ function parseConditionLines(raw?: string): string[] {
 const preconditionItems = computed(() => parseConditionLines(realPrecondition.value))
 const postconditionItems = computed(() => parseConditionLines(realPostcondition.value))
 
-/** 设计稿 3 张 AI 校验网关卡：基础信息 / 执行条件 / 执行步骤 */
+/** 设计稿 3 张规则门禁卡：基础信息 / 执行条件 / 执行步骤 */
 type AIGateCardStatus = 'PASS' | 'WARN' | 'FAIL' | 'IDLE'
 type DimensionKey = 'basic' | 'conditions' | 'steps'
-type ReviewFieldKey = 'title' | 'level' | 'precondition' | 'postcondition' | 'steps' | 'case'
-
-const AI_GATE_CARD_STATUS_LABEL: Record<AIGateCardStatus, string> = {
-  PASS: '正常',
-  WARN: '关注',
-  FAIL: '未通过',
-  IDLE: '未运行',
-}
+type ReviewFieldKey =
+  | 'title'
+  | 'level'
+  | 'module'
+  | 'precondition'
+  | 'postcondition'
+  | 'steps'
+  | 'case'
 
 /** 统一的卡内展示项（来源可能是后端 defect 或前端静态校验） */
 type CardFindingStatus = 'open' | 'resolved' | 'disputed' | 'pending'
@@ -668,13 +677,14 @@ interface AIGateCard {
 }
 
 /**
- * Layer 1 规则引擎产出的 7 条规则到 3 个维度的映射。
+ * Layer 1 规则引擎产出的 8 条规则到 3 个维度的映射。
  * 规则名与后端 `reviewrule/engine.go` 的 Rule 字段严格对齐（defect.title 形如 "<规则名>：<message>"）。
  * 若后端扩展新规则尚未同步到前端，兜底到 basic，避免落入不存在的维度。
  */
 const RULE_DIMENSION_MAP: Record<string, DimensionKey> = {
   标题必填: 'basic',
   标题过长: 'basic',
+  模块目录必填: 'basic',
   前置条件必填: 'conditions',
   步骤必填: 'steps',
   步骤过于简略: 'steps',
@@ -685,6 +695,7 @@ const RULE_DIMENSION_MAP: Record<string, DimensionKey> = {
 const RULE_FIELD_MAP: Record<string, ReviewFieldKey> = {
   标题必填: 'title',
   标题过长: 'title',
+  模块目录必填: 'module',
   前置条件必填: 'precondition',
   步骤必填: 'steps',
   步骤过于简略: 'steps',
@@ -695,6 +706,7 @@ const RULE_FIELD_MAP: Record<string, ReviewFieldKey> = {
 const REVIEW_FIELD_LABEL: Record<ReviewFieldKey, string> = {
   title: '标题',
   level: '等级',
+  module: '模块',
   precondition: '前置条件',
   postcondition: '后置条件',
   steps: '执行步骤',
@@ -705,13 +717,19 @@ function ruleFieldKey(rule: string): ReviewFieldKey {
   return RULE_FIELD_MAP[rule] ?? 'case'
 }
 
+/** 历史数据会把未绑定目录存成 /未分类，规则层统一视为未归属。 */
+function isModuleUnbound(tc: TestCase | null) {
+  const modulePath = (tc?.module_path ?? '').trim().replace(/^\/+|\/+$/g, '')
+  return !tc || !tc.module_id || !modulePath || modulePath === '未分类'
+}
+
 /**
- * 前端静态规则表：mirror 后端 `reviewrule.Evaluate`，用于在 AI 门禁**未运行**或
+ * 前端静态规则表：mirror 后端 `reviewrule.Evaluate`，用于在规则门禁**未运行**或
  * **已处理但字段仍空**的情况下，立即把用例的合规问题反馈到维度卡上，避免出现
  * "用例字段空但维度卡显示 PASS" 的误导。
  *
  * 与后端保持同步的规则：
- *   - title 必填 / 过长、precondition 必填、steps 必填 / 过短、postcondition 建议、level 必填
+ *   - title 必填 / 过长、module 必填、precondition 必填、steps 必填 / 过短、postcondition 建议、level 必填
  * 该表变更时必须同步 `engine.go`。
  */
 const STATIC_RULES: Array<{
@@ -737,6 +755,16 @@ const STATIC_RULES: Array<{
       const t = tc?.title?.trim() ?? ''
       return { fail: [...t].length > 120, message: '标题字符数超过 120，建议精简' }
     },
+  },
+  {
+    key: 'RULE_MODULE_REQUIRED',
+    rule: '模块目录必填',
+    severity: 'major',
+    dimension: 'basic',
+    predicate: (tc) => ({
+      fail: isModuleUnbound(tc),
+      message: '用例未绑定模块目录，请在用例库中归属到具体目录',
+    }),
   },
   {
     key: 'RULE_PRECONDITION_REQUIRED',
@@ -790,7 +818,7 @@ const STATIC_RULES: Array<{
   },
 ]
 
-/** 接入 AI 门禁 defects（按 item 切换自动刷新） */
+/** 接入规则门禁 defects（按 item 切换自动刷新） */
 const {
   defects: aiDefects,
   loading: aiDefectsLoading,
@@ -859,7 +887,7 @@ const aiGateCards = computed<AIGateCard[]>(() => {
         defect: backend,
       })
     } else {
-      // 无后端 defect，或 defect 已 resolved 但字段仍空 → 用静态展示（提示用户重新运行 AI）
+      // 无后端 defect，或 defect 已 resolved 但字段仍空 → 用静态展示（提示用户重新运行规则检查）
       const fieldKey = ruleFieldKey(r.rule)
       byDim[r.dimension].push({
         kind: 'static',
@@ -909,7 +937,7 @@ const aiGateCards = computed<AIGateCard[]>(() => {
   const gate = currentItem.value?.ai_gate_status
   function deriveStatus(findings: CardFinding[]): AIGateCardStatus {
     if (findings.length === 0) {
-      // 无问题：未跑过 AI 且用例合规 → IDLE；跑过通过 → PASS
+      // 无问题：未跑过规则检查且用例合规 → IDLE；跑过通过 → PASS
       if (gate === 'passed' || gate === 'bypassed') return 'PASS'
       if (gate === 'timeout') return 'FAIL'
       if (!gate || gate === 'not_started') return 'IDLE'
@@ -969,33 +997,18 @@ function cardHasActiveFinding(card: AIGateCard) {
 }
 
 const aiProblemCards = computed(() => aiGateCards.value.filter(cardHasActiveFinding))
-const aiNormalCards = computed(() =>
-  aiGateCards.value.filter((card) => !cardHasActiveFinding(card)),
-)
-
-const aiNormalSummaryText = computed(() => {
-  const count = aiNormalCards.value.length
-  return count > 0 ? `其余 ${count} 项正常` : ''
-})
-
-const showAIGateNormalStrip = computed(
-  () =>
-    aiProblemCards.value.length > 0 &&
-    aiNormalCards.value.length > 0 &&
-    currentItem.value?.ai_gate_status !== 'timeout',
-)
 
 const aiGateEmptyTitle = computed(() => {
   const gate = currentItem.value?.ai_gate_status
-  if (gate === 'timeout') return 'AI 门禁运行超时'
+  if (gate === 'timeout') return '规则门禁运行超时'
   if (!gate || gate === 'not_started') return '当前字段未发现静态问题'
   return '当前无待处理问题'
 })
 
 const aiGateEmptyDesc = computed(() => {
   const gate = currentItem.value?.ai_gate_status
-  if (gate === 'timeout') return '请重新运行本条 AI 评审，确认基础信息、执行条件和执行步骤。'
-  if (!gate || gate === 'not_started') return 'AI 门禁尚未运行，页面仅展示当前字段的即时检查结果。'
+  if (gate === 'timeout') return '请重新运行本条规则检查，确认基础信息、执行条件和执行步骤。'
+  if (!gate || gate === 'not_started') return '规则门禁尚未运行，页面仅展示当前字段的即时检查结果。'
   return '基础信息、执行条件、执行步骤均无待处理问题。'
 })
 
@@ -1003,6 +1016,7 @@ const activeFindingsByField = computed<Record<ReviewFieldKey, CardFinding[]>>(()
   const acc: Record<ReviewFieldKey, CardFinding[]> = {
     title: [],
     level: [],
+    module: [],
     precondition: [],
     postcondition: [],
     steps: [],
@@ -1027,6 +1041,7 @@ function fieldHasIssue(field: ReviewFieldKey) {
 const REVIEW_FIELD_TARGET_ID: Record<ReviewFieldKey, string> = {
   title: 'case-summary-title',
   level: 'case-field-level',
+  module: 'case-field-module',
   precondition: 'case-field-precondition',
   postcondition: 'case-field-postcondition',
   steps: 'case-field-steps',
@@ -1144,10 +1159,17 @@ const FINDING_SHORT_MESSAGE: Record<string, string> = {
   步骤过于简略: '执行步骤过短',
   后置条件建议补充: '未填写后置条件',
   等级必填: '未选择等级',
+  模块目录必填: '未绑定模块目录',
 }
 
 function findingDisplayText(finding: CardFinding) {
   return FINDING_SHORT_MESSAGE[finding.rule] || finding.title
+}
+
+function findingSeverityText(finding: CardFinding) {
+  return finding.severity === 'minor'
+    ? SEVERITY_LABEL[finding.severity]
+    : `${SEVERITY_LABEL[finding.severity]}问题`
 }
 
 /** 标记已处理：弹 prompt 输入可选备注 */
@@ -1341,7 +1363,7 @@ watch(
   },
 )
 
-// 切换当前评审项时，自动拉取其历史记录、附件和 AI 门禁 defects
+// 切换当前评审项时，自动拉取其历史记录、附件和规则门禁 defects
 watch(
   () => currentItem.value?.id,
   (id) => {
@@ -1395,6 +1417,7 @@ watch(
               class="rv2-nav-btn"
               :disabled="!canGoPrev"
               title="上一条 (↑)"
+              aria-label="上一条评审用例"
               @click="goPrev"
             >
               <span class="material-symbols-outlined">arrow_back</span>
@@ -1405,6 +1428,7 @@ watch(
               class="rv2-nav-btn"
               :disabled="!canGoNext"
               title="下一条 (↓)"
+              aria-label="下一条评审用例"
               @click="goNext"
             >
               <span class="material-symbols-outlined">arrow_forward</span>
@@ -1446,7 +1470,7 @@ watch(
                 :class="{ active: sidebarFilter === 'ai_failed' }"
                 @click="sidebarFilter = 'ai_failed'"
               >
-                AI 异常 {{ sidebarAIFailedCount }}
+                规则异常 {{ sidebarAIFailedCount }}
               </button>
             </div>
           </div>
@@ -1466,10 +1490,15 @@ watch(
                 </span>
                 <span class="rv2-case-meta">
                   <span class="rv2-case-status" :class="resultClass(item.final_result)">
-                    {{ resultLabel(item.final_result) }}
+                    {{ sidebarResultLabel(item.final_result) }}
                   </span>
-                  <span class="rv2-case-ai" :class="aiGateClass(item.ai_gate_status)">
-                    {{ aiGateLabel(item.ai_gate_status) }}
+                  <span
+                    class="rv2-case-ai"
+                    :class="aiGateClass(item.ai_gate_status)"
+                    :title="aiGateLabel(item.ai_gate_status)"
+                    :aria-label="aiGateLabel(item.ai_gate_status)"
+                  >
+                    {{ sidebarAIGateLabel(item.ai_gate_status) }}
                   </span>
                 </span>
               </span>
@@ -1482,17 +1511,17 @@ watch(
         <div class="rv2-grid">
           <!-- 左栏 70% -->
           <div class="rv2-left">
-            <!-- AI 校验网关 -->
-            <section class="rv2-panel">
+            <!-- 规则门禁 -->
+            <section class="rv2-panel rv2-gate-panel">
               <h2 class="rv2-panel-title">
                 <span class="material-symbols-outlined">security</span>
-                AI 校验网关
+                规则门禁
                 <div class="rv2-panel-actions">
                   <button
                     class="rv2-panel-btn rv2-panel-btn-primary"
                     :disabled="aiReviewRunning || !currentItem"
                     :title="
-                      aiReviewRunning ? 'AI 评审中…' : '对当前评审项运行 AI 评审（批量请到列表页）'
+                      aiReviewRunning ? '规则检查中…' : '对当前评审项运行规则检查（批量请到列表页）'
                     "
                     @click="handleRunAIReview"
                   >
@@ -1502,7 +1531,7 @@ watch(
                     >
                       auto_awesome
                     </span>
-                    {{ aiReviewRunning ? '评审中…' : 'AI 评审本条' }}
+                    {{ aiReviewRunning ? '检查中…' : '规则检查本条' }}
                   </button>
                 </div>
               </h2>
@@ -1517,9 +1546,6 @@ watch(
                   <div class="rv2-gate-blob"></div>
                   <div class="rv2-gate-head">
                     <span class="material-symbols-outlined rv2-gate-icon">{{ g.icon }}</span>
-                    <span class="rv2-gate-status" :class="`st-${g.status.toLowerCase()}`">
-                      {{ AI_GATE_CARD_STATUS_LABEL[g.status] }}
-                    </span>
                   </div>
                   <div class="rv2-gate-card-title">{{ g.title }}</div>
                   <p class="rv2-gate-card-desc">{{ g.desc }}</p>
@@ -1532,57 +1558,52 @@ watch(
                       class="rv2-finding"
                       :class="[`sev-${f.severity}`, `kind-${f.kind}`]"
                     >
-                      <div class="rv2-finding-head">
-                        <span class="rv2-finding-sev" :class="`sev-${f.severity}`">
-                          {{ SEVERITY_LABEL[f.severity] }}
-                        </span>
-                        <button
-                          type="button"
-                          class="rv2-finding-field"
-                          title="定位到对应字段"
-                          @click="focusReviewField(f.fieldKey)"
-                        >
-                          <span class="material-symbols-outlined">location_on</span>
-                          {{ f.fieldLabel }}
-                        </button>
-                        <span
-                          v-if="f.kind === 'defect'"
-                          class="rv2-finding-status"
-                          :class="`st-${f.status}`"
-                        >
+                      <button
+                        type="button"
+                        class="rv2-finding-main"
+                        :title="`定位到${f.fieldLabel}`"
+                        :aria-label="`定位到${f.fieldLabel}字段：${findingDisplayText(f)}`"
+                        @click="focusReviewField(f.fieldKey)"
+                      >
+                        <span class="rv2-finding-field-name">{{ f.fieldLabel }}</span>
+                        <span aria-hidden="true">：</span>
+                        <span class="rv2-finding-text">{{ findingDisplayText(f) }}</span>
+                      </button>
+                      <div class="rv2-finding-meta">
+                        <span class="rv2-finding-meta-item">{{ findingSeverityText(f) }}</span>
+                        <span v-if="f.kind === 'defect'" class="rv2-finding-meta-item">
                           {{ DEFECT_STATUS_LABEL[f.status] || f.status }}
                         </span>
                       </div>
-                      <div class="rv2-finding-msg">{{ findingDisplayText(f) }}</div>
                       <p v-if="f.dispute_reason" class="rv2-finding-note">
                         异议：{{ f.dispute_reason }}
                       </p>
                       <div v-if="f.kind === 'defect' && f.defect" class="rv2-finding-actions">
                         <template v-if="f.status === 'open'">
                           <button
+                            type="button"
                             class="rv2-finding-btn rv2-finding-btn-ok"
                             title="标记为已处理"
                             @click="handleResolveDefect(f.defect)"
                           >
-                            <span class="material-symbols-outlined">check</span>
                             标记已处理
                           </button>
                           <button
+                            type="button"
                             class="rv2-finding-btn"
                             title="提出异议"
                             @click="handleDisputeDefect(f.defect)"
                           >
-                            <span class="material-symbols-outlined">gavel</span>
                             提异议
                           </button>
                         </template>
                         <template v-else-if="f.status === 'disputed' || f.status === 'resolved'">
                           <button
+                            type="button"
                             class="rv2-finding-btn"
                             title="重新开启"
                             @click="handleReopenDefect(f.defect)"
                           >
-                            <span class="material-symbols-outlined">undo</span>
                             重开
                           </button>
                         </template>
@@ -1591,7 +1612,15 @@ watch(
                   </ul>
                 </div>
               </div>
-              <div v-else class="rv2-gate-empty-state">
+              <div
+                v-else
+                class="rv2-gate-empty-state"
+                :class="{
+                  'is-idle':
+                    !currentItem.ai_gate_status || currentItem.ai_gate_status === 'not_started',
+                  'is-timeout': currentItem.ai_gate_status === 'timeout',
+                }"
+              >
                 <span class="material-symbols-outlined">
                   {{ currentItem.ai_gate_status === 'timeout' ? 'error' : 'verified' }}
                 </span>
@@ -1600,11 +1629,7 @@ watch(
                   <p>{{ aiGateEmptyDesc }}</p>
                 </div>
               </div>
-              <div v-if="showAIGateNormalStrip" class="rv2-gate-normal-strip">
-                <span class="material-symbols-outlined">check_circle</span>
-                <span>{{ aiNormalSummaryText }}</span>
-              </div>
-              <div v-if="aiDefectsLoading" class="rv2-findings-loading">AI 问题加载中…</div>
+              <div v-if="aiDefectsLoading" class="rv2-findings-loading">规则问题加载中…</div>
             </section>
 
             <!-- 用例字段审阅 -->
@@ -1648,10 +1673,20 @@ watch(
                     </span>
                   </p>
                 </article>
-                <article class="rv2-basic-field rv2-basic-module">
+                <article
+                  id="case-field-module"
+                  class="rv2-basic-field rv2-basic-module"
+                  :class="{
+                    'has-issue': fieldHasIssue('module'),
+                    'is-field-focused': activeReviewField === 'module',
+                  }"
+                >
                   <div class="rv2-field-head">
                     <span class="material-symbols-outlined">account_tree</span>
                     <strong>模块</strong>
+                    <span v-if="fieldIssueCount('module')" class="rv2-field-issue">
+                      问题 {{ fieldIssueCount('module') }}
+                    </span>
                   </div>
                   <div
                     v-if="caseModuleSegments.length"
@@ -2689,7 +2724,7 @@ watch(
   text-transform: none;
 }
 
-/* ── AI 校验网关 三卡 ── */
+/* ── 规则门禁 三卡 ── */
 .rv2-gate-grid {
   display: grid;
   gap: 16px;
@@ -2855,7 +2890,7 @@ watch(
   color: rgba(52, 211, 153, 0.72);
 }
 
-/* ── 维度卡内嵌 AI 问题 ── */
+/* ── 维度卡内嵌规则问题 ── */
 .rv2-findings {
   list-style: none;
   padding: 0;
@@ -5446,6 +5481,490 @@ watch(
 .rv2-attachments,
 .rv2-record-drawer-shell {
   box-shadow: var(--tp-shadow-sm);
+}
+
+/* 详情页首轮收敛：左侧列表必须可读，中等宽度下右侧决策下移，避免三栏互相挤压。 */
+@media (min-width: 1100px) {
+  .rv2-body {
+    grid-template-columns: clamp(280px, 20vw, 340px) minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1180px) {
+  .rv2-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rv2-right {
+    position: static;
+    align-self: start;
+    height: auto;
+    max-height: none;
+  }
+
+  .rv2-audit {
+    flex: 0 0 auto;
+    min-height: 0;
+  }
+}
+
+@media (min-width: 1440px) {
+  .rv2-body {
+    grid-template-columns: clamp(292px, 18vw, 340px) minmax(0, 1fr);
+  }
+
+  .rv2-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 20vw);
+  }
+
+  .rv2-right {
+    position: sticky;
+    top: 88px;
+  }
+}
+
+.rv2-case-row {
+  min-height: 56px;
+}
+
+.rv2-case-name {
+  display: -webkit-box;
+  overflow: hidden;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.rv2-gate-empty-state {
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--tp-accent-success-soft);
+  border-color: var(--tp-accent-success-border);
+}
+
+.rv2-gate-empty-state.is-idle {
+  background: var(--tp-accent-info-soft);
+  border-color: var(--tp-accent-info-border);
+}
+
+.rv2-gate-empty-state.is-timeout {
+  background: var(--tp-accent-danger-soft);
+  border-color: var(--tp-accent-danger-border);
+}
+
+.rv2-gate-empty-state > .material-symbols-outlined {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  font-size: 16px;
+}
+
+.rv2-gate-empty-state.is-idle > .material-symbols-outlined {
+  color: var(--tp-accent-info);
+}
+
+.rv2-gate-empty-state.is-timeout > .material-symbols-outlined {
+  color: var(--tp-accent-danger);
+}
+
+.rv2-gate-empty-state > div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.rv2-gate-empty-state strong {
+  margin: 0;
+  font-size: 12px;
+}
+
+.rv2-gate-empty-state p {
+  margin: 0;
+  font-size: 11px;
+  line-height: var(--tp-line-ui);
+}
+
+.rv2-audit-empty {
+  min-height: 96px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 2px;
+  padding: 14px;
+  text-align: left;
+}
+
+.rv2-audit-empty .material-symbols-outlined {
+  grid-row: 1 / span 2;
+  width: 30px;
+  height: 30px;
+  font-size: 17px;
+}
+
+.rv2-audit-empty span:not(.material-symbols-outlined) {
+  max-width: none;
+}
+
+/* 详情页二次收敛：把检查结果与基础信息降为轻量信息条，减少卡片套卡片。 */
+.rv2-panel {
+  background: var(--tp-surface-card);
+  border-color: var(--tp-border-subtle);
+  box-shadow: none;
+}
+
+.rv2-panel:hover {
+  border-color: var(--tp-border-strong);
+  box-shadow: none;
+}
+
+.rv2 .rv2-panel,
+.rv2 .rv2-gate-card,
+.rv2 .rv2-cond-col,
+.rv2 .rv2-step-table-wrap {
+  box-shadow: none !important;
+}
+
+.rv2 .rv2-panel {
+  background: var(--tp-surface-card) !important;
+}
+
+.rv2 .rv2-gate-card {
+  background: var(--tp-surface-input) !important;
+}
+
+.rv2 .rv2-gate-card:hover {
+  background: var(--tp-surface-hover) !important;
+}
+
+.rv2-panel-title {
+  min-height: 28px;
+  margin-bottom: var(--tp-space-3);
+}
+
+.rv2-gate-panel {
+  padding: var(--tp-space-3) var(--tp-space-4) var(--tp-space-4);
+}
+
+.rv2-gate-panel .rv2-panel-title {
+  margin-bottom: var(--tp-space-2);
+}
+
+.rv2-gate-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  gap: var(--tp-space-2);
+}
+
+.rv2-gate-card {
+  min-height: 0;
+  padding: var(--tp-space-3) var(--tp-space-3) var(--tp-space-3) var(--tp-space-4);
+  background: var(--tp-surface-input);
+  border-color: var(--tp-border-subtle);
+  border-radius: var(--tp-radius-md);
+  box-shadow: none;
+}
+
+.rv2-gate-card:hover {
+  background: var(--tp-surface-hover);
+}
+
+.rv2-gate-stripe {
+  width: 2px;
+  opacity: 0.78;
+}
+
+.rv2-gate-blob {
+  display: none;
+}
+
+.rv2-gate-head {
+  align-items: center;
+  margin-bottom: var(--tp-space-2);
+}
+
+.rv2-gate-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-color) 14%, transparent);
+  font-size: 16px;
+}
+
+.rv2-gate-status {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+}
+
+.rv2-gate-card-title {
+  margin-bottom: 2px;
+  font-size: var(--tp-text-sm);
+  font-weight: var(--tp-font-semibold);
+}
+
+.rv2-gate-card-desc {
+  line-height: var(--tp-line-body);
+}
+
+.rv2-gate-card .rv2-findings {
+  margin-top: var(--tp-space-2);
+  gap: 6px;
+}
+
+.rv2-gate-card .rv2-finding {
+  padding: var(--tp-space-2) var(--tp-space-3);
+  background: var(--tp-surface-card);
+  border-color: var(--tp-border-subtle);
+  gap: 3px;
+}
+
+.rv2-finding-main {
+  display: block;
+  width: 100%;
+  padding: 2px 0;
+  border: 0;
+  border-radius: var(--tp-radius-sm);
+  background: transparent;
+  color: var(--tp-text-primary);
+  font-family: inherit;
+  font-size: var(--tp-text-sm);
+  line-height: var(--tp-line-body);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.rv2-finding-main:hover {
+  color: var(--tp-primary);
+}
+
+.rv2-finding-main:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tp-primary) 28%, transparent);
+}
+
+.rv2-finding-field-name {
+  font-weight: var(--tp-font-semibold);
+}
+
+.rv2-finding-text {
+  font-weight: var(--tp-font-medium);
+}
+
+.rv2-finding-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  line-height: 1.45;
+}
+
+.rv2-finding-meta-item + .rv2-finding-meta-item::before {
+  content: '·';
+  margin: 0 var(--tp-space-1);
+  color: var(--tp-text-subtle);
+}
+
+.rv2-finding-note {
+  margin-top: 2px;
+  padding: 4px var(--tp-space-2);
+  font-family: inherit;
+  background: var(--tp-surface-input);
+  border-left-color: var(--tp-primary);
+}
+
+.rv2-finding-actions {
+  margin-top: 2px;
+  gap: var(--tp-space-3);
+}
+
+.rv2-finding-btn,
+.rv2-finding-btn-ok {
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-medium);
+}
+
+.rv2-finding-btn:hover,
+.rv2-finding-btn-ok:hover {
+  color: var(--tp-primary);
+  background: transparent;
+  border-color: transparent;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.rv2-finding-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tp-primary) 28%, transparent);
+}
+
+.rv2-gate-normal-strip {
+  margin-top: var(--tp-space-2);
+  padding: 4px var(--tp-space-2);
+  border-radius: 999px;
+  background: var(--tp-surface-input);
+  border-color: var(--tp-border-subtle);
+  color: var(--tp-text-muted);
+}
+
+.rv2-case-fields {
+  padding: var(--tp-space-4);
+  gap: var(--tp-space-3);
+}
+
+.rv2-basic-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tp-space-2) var(--tp-space-3);
+  padding: var(--tp-space-2) var(--tp-space-3);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: var(--tp-radius-md);
+  background: var(--tp-surface-input);
+}
+
+.rv2-basic-field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tp-space-2);
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 var(--tp-space-3) 0 0;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--tp-border-subtle);
+  border-radius: 0;
+}
+
+.rv2-basic-field:last-child {
+  padding-right: 0;
+  border-right: 0;
+}
+
+.rv2-basic-module {
+  flex: 1 1 260px;
+}
+
+.rv2-basic-field.has-issue {
+  padding-left: var(--tp-space-2);
+  background: var(--tp-accent-warning-soft);
+  border: 1px solid var(--tp-accent-warning-border);
+  border-radius: 999px;
+}
+
+.rv2-field-head {
+  flex-shrink: 0;
+  gap: 5px;
+  margin: 0;
+  color: var(--tp-text-muted);
+}
+
+.rv2-field-head .material-symbols-outlined {
+  color: var(--tp-text-subtle);
+  font-size: 14px;
+}
+
+.rv2-field-head strong {
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+  white-space: nowrap;
+}
+
+.rv2-basic-fields .rv2-field-issue {
+  margin-left: 2px;
+}
+
+.rv2-field-value {
+  min-height: 0;
+}
+
+.rv2-value-tag {
+  min-height: 22px;
+  padding: 2px var(--tp-space-2);
+  background: var(--tp-surface-card);
+  font-size: var(--tp-text-xs);
+}
+
+.rv2-module-path {
+  min-height: 0;
+}
+
+.rv2-cond-col {
+  padding: var(--tp-space-3);
+  background: var(--tp-surface-input);
+  border-color: var(--tp-border-subtle);
+}
+
+.rv2-cond-title {
+  margin-bottom: var(--tp-space-2);
+}
+
+.rv2-cond-item {
+  padding: 7px var(--tp-space-2);
+  background: var(--tp-surface-card);
+  border-color: var(--tp-border-subtle);
+}
+
+.rv2-steps-sec {
+  padding-top: var(--tp-space-3);
+}
+
+.rv2-step-table-wrap {
+  background: var(--tp-surface-input);
+  border-color: var(--tp-border-subtle);
+}
+
+.rv2-step-table th {
+  padding: 10px var(--tp-space-4);
+  background: var(--tp-surface-header);
+}
+
+.rv2-step-table td {
+  padding: 10px var(--tp-space-4);
+}
+
+.rv2-step-col-num {
+  width: 48px;
+}
+
+@media (max-width: 720px) {
+  .rv2-basic-fields {
+    align-items: stretch;
+  }
+
+  .rv2-basic-field,
+  .rv2-basic-field:last-child {
+    width: 100%;
+    padding-right: 0;
+    border-right: 0;
+  }
+
+  .rv2-audit-empty {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .rv2-audit-empty .material-symbols-outlined {
+    grid-row: auto;
+  }
 }
 /* 设计稿 V2 样式结束。旧 .rd-* 类已全部迁移为 .rv2-*。 */
 </style>

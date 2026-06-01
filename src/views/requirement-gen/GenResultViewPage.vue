@@ -12,11 +12,7 @@ import {
   type GenResult,
   type GenTask,
 } from '@/api/requirementGen'
-
-interface CaseStep {
-  action: string
-  expected: string
-}
+import { parseTestCaseStepsToRows, type TestCaseStepRow } from '@/utils/testCaseSteps'
 
 const route = useRoute()
 const router = useRouter()
@@ -42,6 +38,9 @@ const filteredCases = computed(() => {
 const selectedCase = computed(() => {
   return caseResults.value.find((item) => item.id === selectedCaseId.value) || null
 })
+const selectedCaseSteps = computed(() => {
+  return selectedCase.value ? parseSteps(selectedCase.value.steps) : []
+})
 
 const adoptedCount = computed(() => caseResults.value.filter((item) => item.adopted).length)
 const discardedCount = computed(() => caseResults.value.filter((item) => item.discarded).length)
@@ -57,20 +56,8 @@ function uniqueResults(results: GenResult[]) {
   return Array.from(map.values()).sort((a, b) => a.seq_no - b.seq_no)
 }
 
-function parseSteps(stepsJson: string): CaseStep[] {
-  try {
-    const parsed: unknown = JSON.parse(stepsJson)
-    if (!Array.isArray(parsed)) return []
-    return parsed.map((item) => {
-      const step = item as Partial<CaseStep>
-      return {
-        action: String(step.action || ''),
-        expected: String(step.expected || ''),
-      }
-    })
-  } catch {
-    return []
-  }
+function parseSteps(stepsText: string): TestCaseStepRow[] {
+  return parseTestCaseStepsToRows(stepsText).filter((step) => step.action || step.expected)
 }
 
 async function resolveDocId() {
@@ -247,8 +234,8 @@ watch(projectId, () => {
 
             <section class="detail-section">
               <h3>测试步骤与预期</h3>
-              <ol v-if="parseSteps(selectedCase.steps).length" class="step-list">
-                <li v-for="(step, index) in parseSteps(selectedCase.steps)" :key="index">
+              <ol v-if="selectedCaseSteps.length" class="step-list">
+                <li v-for="(step, index) in selectedCaseSteps" :key="index">
                   <span>{{ index + 1 }}</span>
                   <div>
                     <strong>{{ step.action }}</strong>

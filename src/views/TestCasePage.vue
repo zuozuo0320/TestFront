@@ -54,6 +54,11 @@ import type {
 } from '../api/types'
 import type { ModuleTreeNodeWithPath } from '../composables/useTestCaseTree'
 import { extractErrorMessage, isElMessageBoxCancel } from '../utils/error'
+import {
+  parseTestCaseStepsToRows,
+  rowsToTestCaseStepsText,
+  type TestCaseStepRow,
+} from '../utils/testCaseSteps'
 
 // ── Types ──
 
@@ -88,7 +93,7 @@ type TableRow = {
   tagList: { id: number; name: string; color: string }[]
 }
 
-type StepRow = { action: string; expected: string }
+type StepRow = TestCaseStepRow
 
 // ── State ──
 
@@ -660,29 +665,6 @@ function toRow(tc: TestCase): TableRow {
   }
 }
 
-function parseStepsToRows(text: string): StepRow[] {
-  const raw = (text || '')
-    .split('\n')
-    .map((s) => s.trim())
-    .filter(Boolean)
-  if (raw.length === 0) return [{ action: '', expected: '' }]
-  const result = raw.map((line) => {
-    const parts = line.split('|')
-    if (parts.length >= 2)
-      return { action: (parts[0] ?? '').trim(), expected: parts.slice(1).join('|').trim() }
-    return { action: line, expected: '' }
-  })
-  return result.length > 0 ? result : [{ action: '', expected: '' }]
-}
-
-function rowsToStepsText(rows: StepRow[]): string {
-  return rows
-    .map((r) => ({ action: (r.action || '').trim(), expected: (r.expected || '').trim() }))
-    .filter((r) => r.action || r.expected)
-    .map((r) => `${r.action} | ${r.expected}`)
-    .join('\n')
-}
-
 // ── Data Loading ──
 
 /** 加载树结构数据（正式 API 驱动） */
@@ -919,7 +901,7 @@ async function openEdit(row: TableRow) {
     remark: row.remark || '',
     priority: row.priority || 'medium',
   })
-  stepRows.value = parseStepsToRows(row.steps)
+  stepRows.value = parseTestCaseStepsToRows(row.steps)
   selectedTagIds.value = row.tagList.map((t) => t.id)
   caseAttachments.value = []
   pendingAttachmentFiles.value = []
@@ -981,7 +963,7 @@ async function submitCase() {
     const projectId = selectedProject.value
     const wasEditing = Boolean(editingId.value)
     let savedCaseId = editingId.value
-    const stepsText = rowsToStepsText(stepRows.value)
+    const stepsText = rowsToTestCaseStepsText(stepRows.value)
     const payload = {
       title: caseForm.title.trim(),
       level: caseForm.level,

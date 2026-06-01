@@ -1,10 +1,10 @@
 <script setup lang="ts">
 /**
- * ReviewAIGatePanel：评审详情页的 AI 门禁 + Action Items 面板
+ * ReviewAIGatePanel：评审详情页的规则门禁 + Action Items 面板
  *
  * 职责：
  *   - 展示当前评审项的 `ai_gate_status` 徽标与语义化描述
- *   - 提供"重跑 AI 门禁"按钮（幂等，后端已保护 resolved/disputed 缺陷不被覆盖）
+ *   - 提供"重跑规则门禁"按钮（幂等，后端已保护 resolved/disputed 缺陷不被覆盖）
  *   - 展示并操作 Action Items（缺陷）：Resolve / Dispute / Reopen
  *
  * 为什么只做"基础交互"：
@@ -34,7 +34,7 @@ interface Props {
   canModerate?: boolean
   /** 当前登录用户是否是 author（决定能否 Resolve/Dispute） */
   canAuthorAct?: boolean
-  /** readOnly=true 时隐藏"重跑"按钮，仅展示状态 + Action Items（用于"AI 评审由计划级触发"的场景） */
+  /** readOnly=true 时隐藏"重跑"按钮，仅展示状态 + Action Items（用于"规则检查由计划级触发"的场景） */
   readOnly?: boolean
   /**
    * embedded=true 时不画外层 card 装饰（background / border / padding），用于嵌入到父面板中，
@@ -70,21 +70,21 @@ const {
   cancel,
 } = useReviewDefects()
 
-/** AI 门禁徽标颜色与文案映射 */
+/** 规则门禁徽标颜色与文案映射 */
 const gateBadge = computed(() => {
   switch (props.aiGateStatus) {
     case AI_GATE_STATUS.Passed:
-      return { label: 'AI 门禁通过', type: 'success' as const }
+      return { label: '规则门禁通过', type: 'success' as const }
     case AI_GATE_STATUS.Failed:
-      return { label: 'AI 门禁未通过', type: 'danger' as const }
+      return { label: '规则门禁未通过', type: 'danger' as const }
     case AI_GATE_STATUS.Running:
-      return { label: 'AI 门禁运行中', type: 'warning' as const }
+      return { label: '规则门禁运行中', type: 'warning' as const }
     case AI_GATE_STATUS.Timeout:
-      return { label: 'AI 门禁超时', type: 'warning' as const }
+      return { label: '规则门禁超时', type: 'warning' as const }
     case AI_GATE_STATUS.Bypassed:
-      return { label: 'AI 门禁已放行', type: 'info' as const }
+      return { label: '规则门禁已放行', type: 'info' as const }
     default:
-      return { label: 'AI 门禁未开始', type: 'info' as const }
+      return { label: '规则门禁未开始', type: 'info' as const }
   }
 })
 
@@ -115,7 +115,7 @@ const statusLabel: Record<string, string> = {
 }
 const sourceLabel: Record<string, string> = {
   primary_review: '主评人驳回',
-  ai_gate: 'AI 门禁',
+  ai_gate: '规则门禁',
 }
 
 /** 跟随 itemId 变化自动重拉；AbortController 保证旧请求被取消 */
@@ -200,7 +200,7 @@ async function handleReopen(d: CaseReviewDefect) {
         :loading="runningRerun"
         @click="handleRerun"
       >
-        重跑 AI 门禁
+        重跑规则门禁
       </ElButton>
     </header>
 
@@ -247,7 +247,7 @@ async function handleReopen(d: CaseReviewDefect) {
 </template>
 
 <style scoped>
-/* ── AI 门禁 Action Items 面板：对齐 "Digital Cockpit" 设计系统 ── */
+/* ── 规则门禁 Action Items 面板：对齐 "Digital Cockpit" 设计系统 ── */
 .ai-gate-panel {
   background: #191b26; /* surface-container-low */
   border: 1px solid rgba(74, 68, 85, 0.15);

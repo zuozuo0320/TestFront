@@ -148,8 +148,24 @@ const casesTotal = ref(0)
 const casesPage = ref(1)
 const casesPageSize = ref(10)
 const casesLoading = ref(false)
-const casesSearch = ref('')
 const selectedCaseIds = ref<Set<number>>(new Set())
+const currentPageSelectedCount = computed(
+  () => cases.value.filter((item) => selectedCaseIds.value.has(item.id)).length,
+)
+const isCurrentPageFullySelected = computed(
+  () => cases.value.length > 0 && currentPageSelectedCount.value === cases.value.length,
+)
+const casesRangeStart = computed(() =>
+  casesTotal.value === 0 ? 0 : (casesPage.value - 1) * casesPageSize.value + 1,
+)
+const casesRangeEnd = computed(() =>
+  Math.min(casesPage.value * casesPageSize.value, casesTotal.value),
+)
+const casesRangeText = computed(() =>
+  casesTotal.value === 0
+    ? '0 / 0'
+    : `${casesRangeStart.value}-${casesRangeEnd.value} / ${casesTotal.value}`,
+)
 
 async function fetchCases() {
   if (!projectId.value) return
@@ -158,7 +174,6 @@ async function fetchCases() {
     const resp = await listTestCases(projectId.value!, {
       page: casesPage.value,
       pageSize: casesPageSize.value,
-      keyword: casesSearch.value || undefined,
     })
     cases.value = resp?.items || []
     casesTotal.value = resp?.total || 0
@@ -176,8 +191,15 @@ function toggleCase(id: number) {
   }
   queueDraftSave()
 }
-function selectAllPage() {
-  cases.value.forEach((c) => selectedCaseIds.value.add(c.id))
+function toggleCurrentPageSelection() {
+  const shouldClearPage = isCurrentPageFullySelected.value
+  cases.value.forEach((c) => {
+    if (shouldClearPage) {
+      selectedCaseIds.value.delete(c.id)
+      return
+    }
+    selectedCaseIds.value.add(c.id)
+  })
   queueDraftSave()
 }
 function clearSelection() {
@@ -703,51 +725,48 @@ onBeforeUnmount(() => {
 
       <!-- ════ Step 2: 选择用例 ════ -->
       <div v-if="currentStep === 2" class="step-body">
-        <!-- 筛选栏 -->
-        <div class="card-glass filter-bar">
-          <div class="filter-bar-inner">
-            <div class="search-box-wz">
-              <span class="material-symbols-outlined search-icon-wz">search</span>
-              <input
-                v-model="casesSearch"
-                type="text"
-                aria-label="搜索用例 ID 或标题"
-                class="search-input-wz"
-                placeholder="搜索用例 ID 或标题..."
-                @keyup.enter="fetchCases"
-              />
+        <div class="case-picker-panel">
+          <div class="case-picker-toolbar">
+            <div class="case-picker-summary">
+              <span class="case-picker-eyebrow">评审范围</span>
+              <div class="case-picker-main">
+                <span class="case-picker-number">{{ selectedCaseIds.size }}</span>
+                <span class="case-picker-label">条已选</span>
+              </div>
+              <span class="case-picker-subtitle">
+                本页 {{ currentPageSelectedCount }} / {{ cases.length }}
+              </span>
             </div>
-            <div class="filter-btns">
-              <button type="button" class="filter-btn">所有模块</button>
-              <button type="button" class="filter-btn">所有优先级</button>
-              <button type="button" class="filter-btn">所有状态</button>
-              <button type="button" class="filter-btn icon-btn" @click="fetchCases">
-                <span class="material-symbols-outlined" style="font-size: 14px">filter_alt</span>
-                筛选
-              </button>
+            <div class="case-picker-side">
+              <span class="case-picker-range">
+                第 {{ casesPage }} / {{ casesTotalPages }} 页 · {{ casesRangeText }}
+              </span>
+              <div class="case-picker-actions">
+                <button
+                  type="button"
+                  class="case-action-btn primary"
+                  @click="toggleCurrentPageSelection"
+                >
+                  <span class="material-symbols-outlined case-action-icon">
+                    {{ isCurrentPageFullySelected ? 'remove_done' : 'done_all' }}
+                  </span>
+                  {{ isCurrentPageFullySelected ? '取消本页' : '全选本页' }}
+                </button>
+                <button
+                  type="button"
+                  class="case-action-btn subtle"
+                  :disabled="selectedCaseIds.size === 0"
+                  @click="clearSelection"
+                >
+                  <span class="material-symbols-outlined case-action-icon">backspace</span>
+                  清空已选
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-        <!-- 选中状态 -->
-        <div class="selection-bar">
-          <div class="selection-left">
-            <span class="selection-count">已选择 {{ selectedCaseIds.size }} 个测试用例</span>
-            <button type="button" class="selection-action" @click="selectAllPage">
-              全选当前页
-            </button>
-            <button type="button" class="selection-action danger" @click="clearSelection">
-              清除选择
-            </button>
-          </div>
-          <span class="selection-range">
-            显示范围: {{ (casesPage - 1) * casesPageSize + 1 }}-{{
-              Math.min(casesPage * casesPageSize, casesTotal)
-            }}
-            / {{ casesTotal }}
-          </span>
         </div>
         <!-- 表格 -->
-        <div class="card-glass table-wrap">
+        <div class="card-glass table-wrap case-table-card">
           <table class="wz-table">
             <thead>
               <tr>
@@ -766,18 +785,21 @@ onBeforeUnmount(() => {
                 :key="tc.id"
                 class="wz-row"
                 :class="{ selected: selectedCaseIds.has(tc.id) }"
+                :aria-selected="selectedCaseIds.has(tc.id)"
+                tabindex="0"
                 @click="toggleCase(tc.id)"
+                @keydown.enter.prevent="toggleCase(tc.id)"
+                @keydown.space.prevent="toggleCase(tc.id)"
               >
                 <td class="td-check">
-                  <div class="custom-check" :class="{ checked: selectedCaseIds.has(tc.id) }">
-                    <span
-                      v-if="selectedCaseIds.has(tc.id)"
-                      class="material-symbols-outlined"
-                      style="font-size: 14px"
-                    >
-                      check
-                    </span>
-                  </div>
+                  <input
+                    class="case-select-input"
+                    type="checkbox"
+                    :checked="selectedCaseIds.has(tc.id)"
+                    :aria-label="`${selectedCaseIds.has(tc.id) ? '取消选择' : '选择'}用例 TC-${tc.id}`"
+                    @click.stop
+                    @change="toggleCase(tc.id)"
+                  />
                 </td>
                 <td class="td-id">TC-{{ tc.id }}</td>
                 <td class="td-title">{{ tc.title }}</td>
@@ -830,6 +852,7 @@ onBeforeUnmount(() => {
             type="button"
             class="page-btn-wz"
             :class="{ active: p === casesPage }"
+            :aria-label="p === casesPage ? `当前第 ${p} 页` : `切换到第 ${p} 页`"
             :aria-current="p === casesPage ? 'page' : undefined"
             @click="casesGoPage(p)"
           >
@@ -1013,27 +1036,36 @@ onBeforeUnmount(() => {
               </div>
               <!-- 底部评审人 -->
               <div class="summary-footer">
-                <div class="summary-avatars">
+                <span class="summary-avatar-label">已指派评审人员</span>
+                <div class="summary-reviewer-list">
                   <div
-                    v-for="u in assignedUsers.slice(0, 5)"
+                    v-for="u in assignedUsers.slice(0, 4)"
                     :key="u.id"
-                    class="summary-avatar"
-                    :title="u.name"
+                    class="summary-reviewer-chip"
+                    :class="{ primary: primaryReviewerId === u.id }"
+                    :title="`${u.name} · ${u.email}`"
                   >
-                    <img
-                      v-if="hasUserAvatar(u)"
-                      :src="resolveAvatarUrl(u.avatar)"
-                      :alt="u.name"
-                      class="avatar-img"
-                      @error="markAvatarFailed(u.id)"
-                    />
-                    <span v-else>{{ getInitials(u.name) }}</span>
+                    <div class="summary-avatar">
+                      <img
+                        v-if="hasUserAvatar(u)"
+                        :src="resolveAvatarUrl(u.avatar)"
+                        :alt="u.name"
+                        class="avatar-img"
+                        @error="markAvatarFailed(u.id)"
+                      />
+                      <span v-else>{{ getInitials(u.name) }}</span>
+                    </div>
+                    <div class="summary-reviewer-text">
+                      <span class="summary-reviewer-name">{{ u.name }}</span>
+                      <span class="summary-reviewer-role">
+                        {{ primaryReviewerId === u.id ? '主评人' : '陪审' }}
+                      </span>
+                    </div>
                   </div>
-                  <span v-if="assignedUsers.length > 5" class="summary-avatar more">
-                    +{{ assignedUsers.length - 5 }}
+                  <span v-if="assignedUsers.length > 4" class="summary-reviewer-more">
+                    +{{ assignedUsers.length - 4 }}
                   </span>
                 </div>
-                <span class="summary-avatar-label">已指派评审人员</span>
               </div>
             </div>
           </div>
@@ -4139,33 +4171,50 @@ onBeforeUnmount(() => {
   padding: 14px 18px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.summary-avatars {
+.summary-reviewer-list {
   display: flex;
   align-items: center;
-  gap: -4px;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.summary-reviewer-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  max-width: 220px;
+  padding: 5px 10px 5px 6px;
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 999px;
+  background: var(--tp-surface-input);
+  color: var(--tp-text-primary);
+}
+
+.summary-reviewer-chip.primary {
+  background: var(--tp-accent-primary-soft);
+  border-color: var(--tp-accent-primary-border);
 }
 
 .summary-avatar {
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   background: var(--tp-accent-primary-soft);
   border: 2px solid var(--tp-surface-card);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: var(--tp-font-bold);
   color: var(--tp-primary);
   overflow: hidden;
-  margin-left: -6px;
-}
-
-.summary-avatar:first-child {
-  margin-left: 0;
+  flex-shrink: 0;
 }
 
 .summary-avatar .avatar-img {
@@ -4175,17 +4224,51 @@ onBeforeUnmount(() => {
   border-radius: 50%;
 }
 
-.summary-avatar.more {
-  background: var(--tp-surface-muted);
+.summary-reviewer-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  line-height: var(--tp-line-tight);
+}
+
+.summary-reviewer-name {
+  overflow: hidden;
+  color: var(--tp-text-primary);
+  font-size: 13px;
+  font-weight: var(--tp-font-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summary-reviewer-role {
+  margin-top: 2px;
+  color: var(--tp-text-muted);
+  font-size: 11px;
+}
+
+.summary-reviewer-chip.primary .summary-reviewer-role {
+  color: var(--tp-primary);
+}
+
+.summary-reviewer-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  min-height: 42px;
+  padding: 0 10px;
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 999px;
+  background: var(--tp-surface-input);
   color: var(--tp-text-secondary);
-  font-size: 9px;
-  border-color: var(--tp-surface-card);
+  font-size: 12px;
+  font-weight: var(--tp-font-semibold);
 }
 
 .summary-avatar-label {
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: var(--tp-font-semibold);
   color: var(--tp-text-subtle);
-  margin-left: 8px;
 }
 
 /* 质量自检面板 */
@@ -4425,5 +4508,298 @@ onBeforeUnmount(() => {
 .wizard-page .footer-btn.outline:hover {
   border-color: var(--tp-border-strong) !important;
   color: var(--tp-text-primary) !important;
+}
+
+/* Step 2：把用例选择区调整为更清晰的评审范围操作流 */
+.case-picker-panel {
+  margin-bottom: var(--tp-space-2);
+}
+
+.case-picker-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tp-space-3);
+  min-height: 44px;
+  padding: var(--tp-space-2) var(--tp-space-3);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: var(--tp-radius-md);
+  background: var(--tp-surface-card);
+  box-shadow: none;
+}
+
+.case-picker-summary,
+.case-picker-side {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.case-picker-summary {
+  flex: 1;
+  flex-wrap: wrap;
+  gap: var(--tp-space-2);
+}
+
+.case-picker-side {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--tp-space-2);
+}
+
+.case-picker-eyebrow {
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+  letter-spacing: 0;
+}
+
+.case-picker-main,
+.case-picker-actions {
+  display: flex;
+  align-items: center;
+}
+
+.case-picker-main {
+  gap: var(--tp-space-2);
+}
+
+.case-picker-number {
+  color: var(--tp-primary);
+  font-size: var(--tp-text-lg);
+  font-weight: var(--tp-font-bold);
+  line-height: var(--tp-line-tight);
+  font-variant-numeric: tabular-nums;
+}
+
+.case-picker-label {
+  color: var(--tp-text-primary);
+  font-size: var(--tp-text-sm);
+  font-weight: var(--tp-font-semibold);
+}
+
+.case-picker-subtitle,
+.case-picker-range {
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  line-height: var(--tp-line-ui);
+}
+
+.case-picker-range {
+  font-variant-numeric: tabular-nums;
+}
+
+.case-picker-actions {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: var(--tp-space-1);
+}
+
+.case-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tp-space-1);
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: var(--tp-radius-md);
+  background: var(--tp-surface-input);
+  color: var(--tp-text-secondary);
+  font-size: var(--tp-text-sm);
+  font-weight: var(--tp-font-semibold);
+  cursor: pointer;
+  transition:
+    background var(--tp-transition),
+    border-color var(--tp-transition),
+    color var(--tp-transition),
+    transform var(--tp-transition);
+}
+
+.case-action-btn:hover:not(:disabled) {
+  background: var(--tp-surface-hover);
+  border-color: var(--tp-border-strong);
+  color: var(--tp-text-primary);
+  transform: none;
+}
+
+.case-action-btn:disabled {
+  color: var(--tp-text-disabled);
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
+.case-action-btn.primary {
+  background: var(--tp-btn-bg);
+  border-color: var(--tp-btn-border);
+  color: var(--tp-btn-text);
+  box-shadow: var(--tp-btn-shadow);
+}
+
+.case-action-btn.primary:hover:not(:disabled) {
+  box-shadow: var(--tp-btn-shadow-hover);
+}
+
+.case-action-icon {
+  font-size: var(--tp-text-md);
+}
+
+.case-table-card {
+  padding: 0 !important;
+  border-radius: var(--tp-radius-lg) !important;
+  background: var(--tp-surface-card) !important;
+  overflow-x: auto;
+}
+
+.case-table-card .wz-table {
+  min-width: 920px;
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+.case-table-card .th-check,
+.case-table-card .td-check {
+  width: 40px;
+}
+
+.case-table-card .wz-table th:nth-child(2) {
+  width: 72px;
+}
+
+.case-table-card .wz-table th:nth-child(4) {
+  width: 104px;
+}
+
+.case-table-card .wz-table th:nth-child(5) {
+  width: 76px;
+}
+
+.case-table-card .wz-table th:nth-child(6) {
+  width: 84px;
+}
+
+.case-table-card .wz-table th:nth-child(7) {
+  width: 112px;
+}
+
+.case-table-card .wz-table thead tr,
+.case-table-card .wz-table th {
+  background: var(--tp-surface-header) !important;
+  border-bottom: 1px solid var(--tp-border-subtle) !important;
+}
+
+.case-table-card .wz-table th {
+  padding: 8px 12px;
+}
+
+.case-table-card .wz-table td {
+  padding: 8px 12px;
+  background: transparent;
+  border-top: 0;
+  border-bottom: 1px solid var(--tp-border-subtle);
+  transition:
+    background var(--tp-transition),
+    border-color var(--tp-transition);
+}
+
+.case-table-card .wz-row {
+  border-bottom: 0;
+  outline: none;
+}
+
+.case-table-card .wz-row:hover,
+.case-table-card .wz-row.selected {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.case-table-card .wz-row:hover td,
+.case-table-card .wz-row:focus-visible td {
+  background: var(--tp-surface-row-hover) !important;
+  border-color: var(--tp-border-subtle);
+}
+
+.case-table-card .wz-row.selected td {
+  background: var(--tp-accent-primary-soft) !important;
+  border-color: var(--tp-accent-primary-border) !important;
+}
+
+.case-table-card .wz-row td:first-child {
+  border-left: 0;
+  border-radius: 0;
+}
+
+.case-table-card .wz-row td:last-child {
+  border-right: 0;
+  border-radius: 0;
+}
+
+.case-table-card .wz-row.selected td:first-child {
+  box-shadow: inset 3px 0 0 var(--tp-primary);
+}
+
+.case-select-input {
+  inline-size: var(--tp-space-4);
+  block-size: var(--tp-space-4);
+  margin: 0;
+  accent-color: var(--tp-primary);
+  cursor: pointer;
+}
+
+.case-table-card .td-title {
+  line-height: var(--tp-line-ui);
+  white-space: nowrap;
+}
+
+.case-table-card .td-date {
+  white-space: nowrap;
+}
+
+.wizard-page .wz-pagination .page-btn-wz {
+  position: relative;
+}
+
+.wizard-page .wz-pagination .page-btn-wz.active {
+  background: var(--tp-btn-bg) !important;
+  border-color: var(--tp-btn-border) !important;
+  color: var(--tp-btn-text) !important;
+  font-weight: var(--tp-font-bold);
+  box-shadow: var(--tp-btn-shadow) !important;
+}
+
+.wizard-page .wz-pagination .page-btn-wz.active::after {
+  content: '';
+  position: absolute;
+  right: 8px;
+  bottom: 4px;
+  left: 8px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.72;
+}
+
+.wizard-page .wz-pagination .page-btn-wz:hover:not(:disabled):not(.active) {
+  border-color: var(--tp-border-strong) !important;
+  color: var(--tp-text-primary) !important;
+}
+
+@media (max-width: 768px) {
+  .case-picker-toolbar,
+  .case-picker-side {
+    align-items: stretch;
+  }
+
+  .case-picker-toolbar {
+    flex-direction: column;
+  }
+
+  .case-picker-actions {
+    justify-content: stretch;
+  }
+
+  .case-action-btn {
+    flex: 1;
+  }
 }
 </style>
