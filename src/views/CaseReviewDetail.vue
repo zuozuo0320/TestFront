@@ -1242,12 +1242,12 @@ async function submitCurrentDecision() {
   if (reviewDecision.value === 'approved' && blockingFindingTotal.value > 0) {
     try {
       await ElMessageBox.confirm(
-        `当前仍有 ${blockingFindingTotal.value} 项严重/主要问题未处理，确认要提交通过结论吗？`,
-        '确认通过存在风险的用例',
+        `还有 ${blockingFindingTotal.value} 项严重/主要问题未处理，仍要通过？`,
+        '存在未处理风险',
         {
           type: 'warning',
-          confirmButtonText: '仍然通过',
-          cancelButtonText: '返回检查',
+          confirmButtonText: '确认通过',
+          cancelButtonText: '继续检查',
         },
       )
     } catch (err: unknown) {

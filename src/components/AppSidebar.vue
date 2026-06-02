@@ -406,6 +406,12 @@ const systemNavItems = computed(() => {
                     <template #dropdown>
                       <el-dropdown-menu>
                         <el-dropdown-item command="add">新建子目录</el-dropdown-item>
+                        <el-dropdown-item
+                          command="move"
+                          :disabled="(globalModuleCaseCount[data.path] || 0) > 0"
+                        >
+                          移动目录
+                        </el-dropdown-item>
                         <el-dropdown-item command="rename">重命名</el-dropdown-item>
                         <el-dropdown-item command="delete" divided style="color: #ef4444">
                           删除

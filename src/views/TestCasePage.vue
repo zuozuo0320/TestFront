@@ -45,7 +45,7 @@ import {
 import { importTestCases, exportReport } from '../api/xlsx'
 import { listTagOptions } from '../api/tag'
 import type { TagBrief } from '../api/tag'
-import { getModuleTree, createModule, renameModule, deleteModule } from '../api/module'
+import { getModuleTree, createModule, renameModule, moveModule, deleteModule } from '../api/module'
 import type {
   TestCase,
   CaseAttachment,
@@ -177,6 +177,7 @@ const kanbanColumns = computed(() => [
 type FlatModule = { id: number; name: string; path: string }
 type CaseModuleSelectNode = {
   id: number
+  parentId: number
   label: string
   path: string
   depth: number
@@ -200,6 +201,12 @@ const flatModules = computed(() => collectModulePaths(moduleTreeRaw.value))
 const batchMoveVisible = ref(false)
 const batchMoveTargetId = ref<number>(0) // 0 表示“未规划用例”或“根目录”
 const batchMoveTargetPath = ref('/未规划用例')
+const batchMoveDirectoryKeyword = ref('')
+const directorySubmitting = ref(false)
+const moduleMoveVisible = ref(false)
+const moduleMoveSubmitting = ref(false)
+const moduleMoveSource = ref<CaseModuleSelectNode | null>(null)
+const moduleMoveTargetParentId = ref<number>(0)
 
 // Inline dropdown menu handler (Real API)
 async function onNodeMenuCommand(cmd: string, path: string, name: string, id?: number) {
@@ -235,6 +242,8 @@ async function onNodeMenuCommand(cmd: string, path: string, name: string, id?: n
       if (isElMessageBoxCancel(e)) return
       ElMessage.error(extractErrorMessage(e, '删除失败'))
     }
+  } else if (cmd === 'move' && id) {
+    openModuleMoveDialog(id)
   }
 }
 
@@ -411,6 +420,7 @@ function buildCaseModuleSelectOptions(
   for (const node of nodes) {
     options.push({
       id: node.id,
+      parentId: node.parent_id,
       label: node.name,
       path: node.path,
       depth,
@@ -424,6 +434,7 @@ function buildCaseModuleSelectOptions(
 const caseModuleSelectOptions = computed<CaseModuleSelectNode[]>(() => [
   {
     id: 0,
+    parentId: 0,
     label: '未规划用例',
     path: '/未规划用例',
     depth: 0,
@@ -432,11 +443,73 @@ const caseModuleSelectOptions = computed<CaseModuleSelectNode[]>(() => [
   ...buildCaseModuleSelectOptions(moduleTree.value),
 ])
 
+const batchMoveModuleOptions = computed(() => caseModuleSelectOptions.value)
+
+const directoryParentOptions = computed<CaseModuleSelectNode[]>(() => [
+  {
+    id: 0,
+    parentId: 0,
+    label: '全部用例（根目录）',
+    path: '/',
+    depth: 0,
+    caseCount: 0,
+  },
+  ...buildCaseModuleSelectOptions(moduleTree.value),
+])
+
+const selectedBatchMoveModuleOption = computed<CaseModuleSelectNode>(() => {
+  return (
+    batchMoveModuleOptions.value.find((option) => option.id === batchMoveTargetId.value) ??
+    batchMoveModuleOptions.value[0]
+  )
+})
+
+const selectedDirectoryParentOption = computed<CaseModuleSelectNode>(() => {
+  return (
+    directoryParentOptions.value.find((option) => option.id === directoryForm.parentId) ??
+    directoryParentOptions.value[0]
+  )
+})
+
+const moduleMoveParentOptions = computed<CaseModuleSelectNode[]>(() => {
+  const source = moduleMoveSource.value
+  if (!source) return directoryParentOptions.value
+  const childPathPrefix = `${source.path}/`
+  return directoryParentOptions.value.filter((option) => {
+    if (option.id === source.id) return false
+    if (option.path.startsWith(childPathPrefix)) return false
+    return true
+  })
+})
+
+const selectedModuleMoveParentOption = computed<CaseModuleSelectNode>(() => {
+  return (
+    moduleMoveParentOptions.value.find((option) => option.id === moduleMoveTargetParentId.value) ??
+    moduleMoveParentOptions.value[0]
+  )
+})
+
+const canSubmitModuleMove = computed(() => {
+  const source = moduleMoveSource.value
+  if (!source) return false
+  if (source.caseCount > 0) return false
+  return moduleMoveTargetParentId.value !== source.parentId
+})
+
+const filteredBatchMoveModuleOptions = computed(() => {
+  const keyword = batchMoveDirectoryKeyword.value.trim().toLowerCase()
+  if (!keyword) return batchMoveModuleOptions.value
+  return batchMoveModuleOptions.value.filter((option) =>
+    `${option.label} ${option.path}`.toLowerCase().includes(keyword),
+  )
+})
+
 const selectedCaseModuleOption = computed<CaseModuleSelectNode>(() => {
   const found = caseModuleSelectOptions.value.find((option) => option.id === caseForm.moduleId)
   return (
     found ?? {
       id: 0,
+      parentId: 0,
       label: '未规划用例',
       path: '/未规划用例',
       depth: 0,
@@ -454,6 +527,7 @@ const filteredCaseModuleOptions = computed(() => {
 })
 
 function formatModuleDisplayPath(path: string) {
+  if (path === '/') return '全部用例（根目录）'
   const normalized = path.replace(/^\/+/, '').replace(/\//g, ' / ')
   return normalized || '未规划用例'
 }
@@ -587,6 +661,33 @@ watch(batchMoveTargetId, (newId) => {
     }
   }
 })
+
+function selectBatchMoveDirectory(option: CaseModuleSelectNode) {
+  batchMoveTargetId.value = option.id
+}
+
+function selectDirectoryParent(option: CaseModuleSelectNode) {
+  directoryForm.parentId = option.id
+}
+
+function selectModuleMoveParent(option: CaseModuleSelectNode) {
+  moduleMoveTargetParentId.value = option.id
+}
+
+function openModuleMoveDialog(moduleId: number) {
+  const source = directoryParentOptions.value.find((option) => option.id === moduleId)
+  if (!source) {
+    ElMessage.warning('目录不存在，请刷新后重试')
+    return
+  }
+  if (source.caseCount > 0) {
+    ElMessage.warning('该目录下存在用例，不能移动')
+    return
+  }
+  moduleMoveSource.value = source
+  moduleMoveTargetParentId.value = source.parentId
+  moduleMoveVisible.value = true
+}
 
 globalTreeActions.onModuleClick = (path: string, id?: number) => onModuleClick(path, id || 0)
 globalTreeActions.openCreateDirectory = () => {
@@ -1097,6 +1198,7 @@ async function onBatchMove() {
 function openBatchMoveDialog() {
   batchMoveTargetId.value = 0
   batchMoveTargetPath.value = '/未规划用例'
+  batchMoveDirectoryKeyword.value = ''
   batchMoveVisible.value = true
 }
 
@@ -1464,7 +1566,7 @@ async function onDelete(row: TableRow) {
 // ── Directory ──
 
 async function submitDirectory() {
-  if (!selectedProject.value) return
+  if (!selectedProject.value || directorySubmitting.value) return
   const name = directoryForm.name.trim()
   if (!name) {
     ElMessage.warning('目录名称不能为空')
@@ -1476,12 +1578,34 @@ async function submitDirectory() {
   }
 
   try {
+    directorySubmitting.value = true
     await createModule(selectedProject.value, directoryForm.parentId, name)
     ElMessage.success('创建成功')
     directoryDialogVisible.value = false
     await loadTreeData()
   } catch (e: unknown) {
     ElMessage.error(extractErrorMessage(e, '创建失败'))
+  } finally {
+    directorySubmitting.value = false
+  }
+}
+
+async function submitModuleMove() {
+  const source = moduleMoveSource.value
+  if (!selectedProject.value || !source || !canSubmitModuleMove.value || moduleMoveSubmitting.value)
+    return
+
+  try {
+    moduleMoveSubmitting.value = true
+    await moveModule(selectedProject.value, source.id, moduleMoveTargetParentId.value, 0)
+    ElMessage.success('目录移动成功')
+    moduleMoveVisible.value = false
+    await loadTreeData()
+    await loadCases()
+  } catch (e: unknown) {
+    ElMessage.error(extractErrorMessage(e, '目录移动失败'))
+  } finally {
+    moduleMoveSubmitting.value = false
   }
 }
 
@@ -1943,9 +2067,37 @@ watch(selectedProject, (newId) => {
             <tr v-else-if="rows.length === 0">
               <td colspan="10" class="empty-td testcase-empty-cell">
                 <div class="testcase-empty-wrap">
-                  <el-empty description="暂无数据" :image-size="140">
+                  <div class="testcase-empty-state">
+                    <svg
+                      class="testcase-empty-visual"
+                      viewBox="0 0 120 96"
+                      role="img"
+                      aria-label="暂无用例"
+                    >
+                      <defs>
+                        <linearGradient id="testcase-empty-card" x1="24" x2="96" y1="18" y2="82">
+                          <stop offset="0" stop-color="var(--tp-accent-primary-soft)" />
+                          <stop offset="1" stop-color="var(--tp-surface-input)" />
+                        </linearGradient>
+                        <linearGradient id="testcase-empty-line" x1="28" x2="92" y1="24" y2="76">
+                          <stop offset="0" stop-color="var(--tp-primary)" />
+                          <stop offset="1" stop-color="var(--tp-secondary)" />
+                        </linearGradient>
+                      </defs>
+                      <path
+                        class="testcase-empty-shadow"
+                        d="M35 80h50c7 0 12 2 12 5s-5 5-12 5H35c-7 0-12-2-12-5s5-5 12-5Z"
+                      />
+                      <path class="testcase-empty-sheet is-back" d="M41 14h36l17 17v49H41z" />
+                      <path class="testcase-empty-sheet" d="M32 20h42l17 17v45H32z" />
+                      <path class="testcase-empty-fold" d="M74 20v17h17" />
+                      <path class="testcase-empty-line" d="M45 45h31" />
+                      <path class="testcase-empty-line" d="M45 56h22" />
+                      <path class="testcase-empty-check" d="M43 69l6 6 13-15" />
+                    </svg>
+                    <strong>暂无数据</strong>
                     <el-button type="primary" plain @click="openCreate">去新建</el-button>
-                  </el-empty>
+                  </div>
                 </div>
               </td>
             </tr>
@@ -2282,15 +2434,74 @@ watch(selectedProject, (newId) => {
     </el-drawer>
 
     <!-- Batch move dialog -->
-    <el-dialog v-model="batchMoveVisible" title="批量移动" width="400px" :append-to-body="true">
-      <el-form label-position="top">
-        <el-form-item label="目标目录">
-          <el-select v-model="batchMoveTargetId" style="width: 100%">
-            <el-option label="/未规划用例" :value="0" />
-            <el-option v-for="n in flatModules" :key="n.id" :label="n.path" :value="n.id" />
-          </el-select>
-        </el-form-item>
-      </el-form>
+    <el-dialog
+      v-model="batchMoveVisible"
+      title="批量移动"
+      class="batch-move-dialog"
+      width="min(720px, calc(100vw - 32px))"
+      :append-to-body="true"
+      :close-on-click-modal="false"
+    >
+      <div class="batch-move-panel">
+        <div class="batch-move-summary">
+          <span class="material-symbols-outlined batch-move-summary-icon" aria-hidden="true">
+            {{ selectedBatchMoveModuleOption.id === 0 ? 'inventory_2' : 'folder' }}
+          </span>
+          <span class="batch-move-summary-text">
+            <span class="batch-move-summary-label">目标目录</span>
+            <span class="batch-move-summary-name">
+              {{ formatModuleDisplayPath(selectedBatchMoveModuleOption.path) }}
+            </span>
+          </span>
+          <span class="batch-move-selected-meta">{{ selectedIds.length }} 条用例</span>
+        </div>
+        <el-input
+          v-model="batchMoveDirectoryKeyword"
+          class="batch-move-search"
+          clearable
+          placeholder="搜索目录名称或路径"
+          :prefix-icon="Search"
+        />
+        <div class="batch-move-list-header">
+          <span>选择迁移目录</span>
+          <span>
+            {{
+              batchMoveDirectoryKeyword
+                ? `${filteredBatchMoveModuleOptions.length} / ${batchMoveModuleOptions.length}`
+                : `${batchMoveModuleOptions.length} 个目录`
+            }}
+          </span>
+        </div>
+        <div
+          class="batch-move-directory-list"
+          :class="{ 'is-compact': filteredBatchMoveModuleOptions.length <= 8 }"
+          role="listbox"
+          aria-label="选择目标目录"
+        >
+          <button
+            v-for="item in filteredBatchMoveModuleOptions"
+            :key="item.id"
+            type="button"
+            class="batch-move-directory-row"
+            :class="{ 'is-selected': item.id === batchMoveTargetId, 'is-root': item.id === 0 }"
+            :style="{ '--option-depth': item.depth }"
+            role="option"
+            :aria-selected="item.id === batchMoveTargetId"
+            :aria-label="`${item.label}，${item.caseCount} 条用例`"
+            @click="selectBatchMoveDirectory(item)"
+          >
+            <span class="batch-move-tree-guide" aria-hidden="true"></span>
+            <span class="material-symbols-outlined batch-move-directory-icon" aria-hidden="true">
+              {{ item.id === 0 ? 'inventory_2' : 'folder' }}
+            </span>
+            <span class="batch-move-directory-name">{{ item.label }}</span>
+            <span class="batch-move-directory-count">{{ item.caseCount }}</span>
+          </button>
+          <div v-if="filteredBatchMoveModuleOptions.length === 0" class="batch-move-empty">
+            没有匹配的目录
+          </div>
+        </div>
+      </div>
       <template #footer>
         <el-button @click="batchMoveVisible = false">取消</el-button>
         <el-button type="primary" @click="onBatchMove">
@@ -3312,21 +3523,170 @@ watch(selectedProject, (newId) => {
     </el-drawer>
 
     <!-- Directory dialog -->
-    <el-dialog v-model="directoryDialogVisible" title="新建目录" width="520px">
-      <el-form label-position="top">
+    <el-dialog
+      v-model="directoryDialogVisible"
+      title="新建目录"
+      class="directory-create-dialog"
+      width="min(600px, calc(100vw - 32px))"
+      :close-on-click-modal="false"
+    >
+      <el-form class="directory-create-form" label-position="top">
         <el-form-item label="父级目录">
-          <el-select v-model="directoryForm.parentId" placeholder="请选择父级目录">
-            <el-option label="全部用例（根目录）" :value="0" />
-            <el-option v-for="n in flatModules" :key="n.id" :label="n.path" :value="n.id" />
-          </el-select>
+          <div class="directory-create-parent">
+            <div class="directory-create-list-header">
+              <span class="directory-create-current">
+                <span
+                  class="material-symbols-outlined directory-create-current-icon"
+                  aria-hidden="true"
+                >
+                  {{ selectedDirectoryParentOption.id === 0 ? 'account_tree' : 'folder' }}
+                </span>
+                <span class="directory-create-current-text">
+                  当前父级：
+                  <strong>{{ formatModuleDisplayPath(selectedDirectoryParentOption.path) }}</strong>
+                </span>
+              </span>
+              <span>{{ directoryParentOptions.length }} 个目录</span>
+            </div>
+            <div class="directory-create-parent-list" role="listbox" aria-label="选择父级目录">
+              <button
+                v-for="item in directoryParentOptions"
+                :key="item.id"
+                type="button"
+                class="directory-create-parent-row"
+                :class="{
+                  'is-selected': item.id === directoryForm.parentId,
+                  'is-root': item.id === 0,
+                }"
+                :style="{ '--option-depth': item.depth }"
+                role="option"
+                :aria-selected="item.id === directoryForm.parentId"
+                :aria-label="`父级目录：${formatModuleDisplayPath(item.path)}`"
+                @click="selectDirectoryParent(item)"
+              >
+                <span class="directory-create-tree-guide" aria-hidden="true"></span>
+                <span
+                  class="material-symbols-outlined directory-create-parent-icon"
+                  aria-hidden="true"
+                >
+                  {{ item.id === 0 ? 'account_tree' : 'folder' }}
+                </span>
+                <span class="directory-create-parent-name">{{ item.label }}</span>
+                <span
+                  v-if="item.id === directoryForm.parentId"
+                  class="directory-create-selected-text"
+                >
+                  已选
+                </span>
+              </button>
+            </div>
+          </div>
         </el-form-item>
         <el-form-item label="目录名称">
-          <el-input v-model="directoryForm.name" maxlength="40" placeholder="例如：登录" />
+          <el-input
+            v-model="directoryForm.name"
+            maxlength="40"
+            show-word-limit
+            placeholder="例如：登录"
+            @keyup.enter="submitDirectory"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="directoryDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitDirectory">创建并使用</el-button>
+        <el-button
+          type="primary"
+          :loading="directorySubmitting"
+          :disabled="!directoryForm.name.trim()"
+          @click="submitDirectory"
+        >
+          创建并使用
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Move directory dialog -->
+    <el-dialog
+      v-model="moduleMoveVisible"
+      title="移动目录"
+      class="module-move-dialog"
+      width="min(600px, calc(100vw - 32px))"
+      :close-on-click-modal="false"
+    >
+      <div v-if="moduleMoveSource" class="module-move-panel">
+        <div class="module-move-source">
+          <span class="material-symbols-outlined module-move-source-icon" aria-hidden="true">
+            folder
+          </span>
+          <span class="module-move-source-text">
+            <span class="module-move-source-label">移动目录</span>
+            <span class="module-move-source-name">
+              {{ formatModuleDisplayPath(moduleMoveSource.path) }}
+            </span>
+          </span>
+          <span class="module-move-source-count">{{ moduleMoveSource.caseCount }} 条用例</span>
+        </div>
+
+        <div class="module-move-list-header">
+          <span class="module-move-current">
+            <span class="material-symbols-outlined module-move-current-icon" aria-hidden="true">
+              drive_file_move
+            </span>
+            <span class="module-move-current-text">
+              目标父级：
+              <strong>{{ formatModuleDisplayPath(selectedModuleMoveParentOption.path) }}</strong>
+            </span>
+          </span>
+          <span>{{ moduleMoveParentOptions.length }} 个可选父级</span>
+        </div>
+
+        <div class="module-move-parent-list" role="listbox" aria-label="选择目标父级目录">
+          <button
+            v-for="item in moduleMoveParentOptions"
+            :key="item.id"
+            type="button"
+            class="module-move-parent-row"
+            :class="{
+              'is-selected': item.id === moduleMoveTargetParentId,
+              'is-root': item.id === 0,
+            }"
+            :style="{ '--option-depth': item.depth }"
+            role="option"
+            :aria-selected="item.id === moduleMoveTargetParentId"
+            :aria-label="`目标父级目录：${formatModuleDisplayPath(item.path)}`"
+            @click="selectModuleMoveParent(item)"
+          >
+            <span class="module-move-tree-guide" aria-hidden="true"></span>
+            <span class="material-symbols-outlined module-move-parent-icon" aria-hidden="true">
+              {{ item.id === 0 ? 'account_tree' : 'folder' }}
+            </span>
+            <span class="module-move-parent-name">{{ item.label }}</span>
+            <span v-if="item.id === moduleMoveTargetParentId" class="module-move-selected-text">
+              已选
+            </span>
+          </button>
+        </div>
+
+        <p v-if="moduleMoveSource.caseCount > 0" class="module-move-warning">
+          该目录下存在用例，不能移动。
+        </p>
+        <p
+          v-else-if="moduleMoveTargetParentId === moduleMoveSource.parentId"
+          class="module-move-hint"
+        >
+          请选择一个不同的父级目录。
+        </p>
+      </div>
+      <template #footer>
+        <el-button @click="moduleMoveVisible = false">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="moduleMoveSubmitting"
+          :disabled="!canSubmitModuleMove"
+          @click="submitModuleMove"
+        >
+          确认移动
+        </el-button>
       </template>
     </el-dialog>
 
@@ -3452,6 +3812,700 @@ watch(selectedProject, (newId) => {
   margin-right: 10px;
   box-shadow: 0 0 0 3px var(--tp-primary-lighter);
   vertical-align: middle;
+}
+
+.batch-move-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tp-space-3);
+}
+
+.testcase-empty-cell {
+  padding: var(--tp-space-6) var(--tp-space-2) !important;
+}
+
+.testcase-empty-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  border: 1px solid color-mix(in srgb, var(--tp-border-subtle) 44%, transparent) !important;
+  border-radius: var(--tp-radius-lg) !important;
+  background:
+    radial-gradient(
+      circle at 50% 18%,
+      color-mix(in srgb, var(--tp-primary) 7%, transparent),
+      transparent 34%
+    ),
+    color-mix(in srgb, var(--tp-surface-card) 72%, transparent) !important;
+}
+
+.testcase-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tp-space-3);
+}
+
+.testcase-empty-visual {
+  width: 132px;
+  height: 106px;
+}
+
+.testcase-empty-shadow {
+  fill: color-mix(in srgb, var(--tp-primary) 16%, transparent);
+  opacity: 0.38;
+}
+
+.testcase-empty-sheet {
+  fill: url('#testcase-empty-card');
+  stroke: color-mix(in srgb, var(--tp-accent-primary-border) 74%, transparent);
+  stroke-width: 1.3;
+}
+
+.testcase-empty-sheet.is-back {
+  opacity: 0.42;
+  transform: translate(5px, -5px);
+}
+
+.testcase-empty-fold {
+  fill: color-mix(in srgb, var(--tp-primary) 18%, var(--tp-surface-card));
+  stroke: color-mix(in srgb, var(--tp-accent-primary-border) 74%, transparent);
+  stroke-width: 1.3;
+}
+
+.testcase-empty-line {
+  fill: none;
+  stroke: url('#testcase-empty-line');
+  stroke-linecap: round;
+  stroke-width: 4;
+  opacity: 0.58;
+}
+
+.testcase-empty-check {
+  fill: none;
+  stroke: var(--tp-primary);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+  opacity: 0.78;
+}
+
+.testcase-empty-state strong {
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-sm);
+  font-weight: var(--tp-font-semibold);
+}
+
+.batch-move-dialog :deep(.el-dialog__body) {
+  padding-bottom: var(--tp-space-3);
+}
+
+.batch-move-dialog :deep(.el-dialog__footer) {
+  padding-top: var(--tp-space-3);
+}
+
+.batch-move-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--tp-space-3);
+  min-height: 56px;
+  padding: var(--tp-space-3) var(--tp-space-4);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: var(--tp-radius-sm);
+  background: var(--tp-surface-input);
+}
+
+.batch-move-summary-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--tp-radius-sm);
+  background: var(--tp-accent-primary-soft);
+  color: var(--tp-primary);
+  font-size: var(--tp-text-xl);
+}
+
+.batch-move-summary-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: var(--tp-space-1);
+}
+
+.batch-move-summary-label {
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+}
+
+.batch-move-summary-name {
+  overflow: hidden;
+  color: var(--tp-text-primary);
+  font-size: var(--tp-text-sm);
+  font-weight: var(--tp-font-bold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.batch-move-selected-meta {
+  flex: 0 0 auto;
+  padding: var(--tp-space-1) var(--tp-space-3);
+  border: 1px solid var(--tp-accent-primary-border);
+  border-radius: var(--tp-radius-sm);
+  background: var(--tp-accent-primary-soft);
+  color: var(--tp-primary);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-bold);
+}
+
+.batch-move-search :deep(.el-input__wrapper) {
+  min-height: 38px;
+  border-radius: var(--tp-radius-sm);
+  background: var(--tp-surface-card);
+  box-shadow: 0 0 0 1px var(--tp-border-subtle) inset;
+}
+
+.batch-move-search :deep(.el-input__wrapper.is-focus) {
+  box-shadow:
+    0 0 0 1px var(--tp-accent-primary-border) inset,
+    0 0 0 3px var(--tp-accent-primary-soft);
+}
+
+.batch-move-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+}
+
+.batch-move-directory-list {
+  max-height: min(52vh, 460px);
+  min-height: 256px;
+  overflow-y: auto;
+  padding: var(--tp-space-2);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: var(--tp-radius-sm);
+  background: var(--tp-surface-card);
+}
+
+.batch-move-directory-list.is-compact {
+  min-height: 216px;
+}
+
+.batch-move-directory-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--tp-space-2);
+  width: 100%;
+  min-height: 36px;
+  padding: var(--tp-space-1) var(--tp-space-2) var(--tp-space-1)
+    calc(var(--tp-space-2) + var(--option-depth) * 22px);
+  border: 0;
+  border-radius: var(--tp-radius-sm);
+  background: transparent;
+  color: var(--tp-text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.batch-move-directory-row:hover {
+  background: var(--tp-surface-hover);
+}
+
+.batch-move-directory-row:focus-visible {
+  outline: 2px solid var(--tp-accent-primary-border);
+  outline-offset: 1px;
+}
+
+.batch-move-directory-row.is-selected {
+  background: var(--tp-accent-primary-soft);
+  color: var(--tp-text-primary);
+  box-shadow: inset 3px 0 0 var(--tp-primary);
+}
+
+.batch-move-directory-row.is-root {
+  padding-left: var(--tp-space-2);
+}
+
+.batch-move-tree-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(17px + (var(--option-depth) - 1) * 22px);
+  display: none;
+  width: var(--tp-space-4);
+  border-left: 1px solid color-mix(in srgb, var(--tp-border-subtle) 72%, transparent);
+}
+
+.batch-move-tree-guide::after {
+  position: absolute;
+  top: 50%;
+  left: -1px;
+  width: var(--tp-space-4);
+  border-top: 1px solid color-mix(in srgb, var(--tp-border-strong) 76%, transparent);
+  content: '';
+}
+
+.batch-move-directory-row:not(.is-root) .batch-move-tree-guide {
+  display: block;
+}
+
+.batch-move-directory-icon {
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-lg);
+}
+
+.batch-move-directory-row.is-selected .batch-move-directory-icon {
+  color: var(--tp-primary);
+}
+
+.batch-move-directory-name {
+  overflow: hidden;
+  font-size: var(--tp-text-sm);
+  font-weight: var(--tp-font-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.batch-move-directory-count {
+  min-width: 24px;
+  padding: var(--tp-space-1) var(--tp-space-2);
+  border-radius: var(--tp-radius-sm);
+  background: var(--tp-surface-input);
+  color: var(--tp-text-secondary);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-bold);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.batch-move-directory-row.is-selected .batch-move-directory-count {
+  background: var(--tp-surface-card);
+  color: var(--tp-primary);
+}
+
+.batch-move-empty {
+  padding: var(--tp-space-6) var(--tp-space-3);
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-sm);
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .batch-move-summary {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .batch-move-selected-meta {
+    margin-left: 48px;
+  }
+
+  .batch-move-directory-list {
+    max-height: 50vh;
+    min-height: 300px;
+  }
+
+  .batch-move-directory-list.is-compact {
+    min-height: 240px;
+  }
+}
+
+.directory-create-dialog :deep(.el-dialog__body) {
+  padding-bottom: var(--tp-space-3);
+}
+
+.directory-create-dialog :deep(.el-dialog__footer) {
+  padding-top: var(--tp-space-3);
+}
+
+.directory-create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.directory-create-parent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tp-space-2);
+  width: 100%;
+}
+
+.directory-create-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tp-space-3);
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+}
+
+.directory-create-current {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--tp-space-2);
+}
+
+.directory-create-current-icon {
+  color: var(--tp-primary);
+  font-size: var(--tp-text-lg);
+}
+
+.directory-create-current-text {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--tp-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.directory-create-current-text strong {
+  color: var(--tp-text-primary);
+  font-weight: var(--tp-font-bold);
+}
+
+.directory-create-parent-list {
+  max-height: min(32vh, 260px);
+  min-height: 224px;
+  overflow-y: auto;
+  padding: var(--tp-space-2);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: var(--tp-radius-sm);
+  background: var(--tp-surface-card);
+}
+
+.directory-create-parent-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--tp-space-2);
+  width: 100%;
+  min-height: 32px;
+  padding: var(--tp-space-1) var(--tp-space-2) var(--tp-space-1)
+    calc(var(--tp-space-2) + var(--option-depth) * 22px);
+  border: 0;
+  border-radius: var(--tp-radius-sm);
+  background: transparent;
+  color: var(--tp-text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.directory-create-parent-row:hover {
+  background: var(--tp-surface-hover);
+}
+
+.directory-create-parent-row:focus-visible {
+  outline: 2px solid var(--tp-accent-primary-border);
+  outline-offset: 1px;
+}
+
+.directory-create-parent-row.is-selected {
+  background: var(--tp-accent-primary-soft);
+  box-shadow: inset 3px 0 0 var(--tp-primary);
+}
+
+.directory-create-parent-row.is-root {
+  padding-left: var(--tp-space-2);
+}
+
+.directory-create-tree-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(17px + (var(--option-depth) - 1) * 22px);
+  display: none;
+  width: var(--tp-space-4);
+  border-left: 1px solid color-mix(in srgb, var(--tp-border-subtle) 72%, transparent);
+}
+
+.directory-create-tree-guide::after {
+  position: absolute;
+  top: 50%;
+  left: -1px;
+  width: var(--tp-space-4);
+  border-top: 1px solid color-mix(in srgb, var(--tp-border-strong) 76%, transparent);
+  content: '';
+}
+
+.directory-create-parent-row:not(.is-root) .directory-create-tree-guide {
+  display: block;
+}
+
+.directory-create-parent-icon {
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-lg);
+}
+
+.directory-create-parent-row.is-selected .directory-create-parent-icon {
+  color: var(--tp-primary);
+}
+
+.directory-create-parent-name {
+  overflow: hidden;
+  font-size: var(--tp-text-sm);
+  font-weight: var(--tp-font-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.directory-create-selected-text {
+  padding: 2px var(--tp-space-2);
+  border: 1px solid var(--tp-accent-primary-border);
+  border-radius: var(--tp-radius-sm);
+  background: var(--tp-surface-card);
+  color: var(--tp-primary);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-bold);
+}
+
+.directory-create-empty {
+  padding: var(--tp-space-6) var(--tp-space-3);
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-sm);
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .directory-create-parent-list {
+    max-height: 32vh;
+    min-height: 208px;
+  }
+}
+
+.module-move-dialog :deep(.el-dialog__body) {
+  padding-bottom: var(--tp-space-3);
+}
+
+.module-move-dialog :deep(.el-dialog__footer) {
+  padding-top: var(--tp-space-3);
+}
+
+.module-move-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tp-space-3);
+}
+
+.module-move-source {
+  display: flex;
+  align-items: center;
+  gap: var(--tp-space-3);
+  min-height: 52px;
+  padding: var(--tp-space-3);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: var(--tp-radius-sm);
+  background: color-mix(in srgb, var(--tp-surface-input) 76%, transparent);
+}
+
+.module-move-source-icon {
+  flex: 0 0 auto;
+  color: var(--tp-primary);
+  font-size: var(--tp-text-xl);
+}
+
+.module-move-source-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--tp-space-1);
+}
+
+.module-move-source-label {
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+}
+
+.module-move-source-name {
+  overflow: hidden;
+  color: var(--tp-text-primary);
+  font-size: var(--tp-text-sm);
+  font-weight: var(--tp-font-bold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.module-move-source-count {
+  flex: 0 0 auto;
+  padding: var(--tp-space-1) var(--tp-space-2);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: var(--tp-radius-sm);
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-bold);
+}
+
+.module-move-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tp-space-3);
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-semibold);
+}
+
+.module-move-current {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--tp-space-2);
+}
+
+.module-move-current-icon {
+  color: var(--tp-primary);
+  font-size: var(--tp-text-lg);
+}
+
+.module-move-current-text {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--tp-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.module-move-current-text strong {
+  color: var(--tp-text-primary);
+  font-weight: var(--tp-font-bold);
+}
+
+.module-move-parent-list {
+  max-height: min(34vh, 280px);
+  min-height: 228px;
+  overflow-y: auto;
+  padding: var(--tp-space-2);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: var(--tp-radius-sm);
+  background: var(--tp-surface-card);
+}
+
+.module-move-parent-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--tp-space-2);
+  width: 100%;
+  min-height: 32px;
+  padding: var(--tp-space-1) var(--tp-space-2) var(--tp-space-1)
+    calc(var(--tp-space-2) + var(--option-depth) * 22px);
+  border: 0;
+  border-radius: var(--tp-radius-sm);
+  background: transparent;
+  color: var(--tp-text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.module-move-parent-row:hover {
+  background: var(--tp-surface-hover);
+}
+
+.module-move-parent-row:focus-visible {
+  outline: 2px solid var(--tp-accent-primary-border);
+  outline-offset: 1px;
+}
+
+.module-move-parent-row.is-selected {
+  background: var(--tp-accent-primary-soft);
+  box-shadow: inset 3px 0 0 var(--tp-primary);
+}
+
+.module-move-parent-row.is-root {
+  padding-left: var(--tp-space-2);
+}
+
+.module-move-tree-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(17px + (var(--option-depth) - 1) * 22px);
+  display: none;
+  width: var(--tp-space-4);
+  border-left: 1px solid color-mix(in srgb, var(--tp-border-subtle) 72%, transparent);
+}
+
+.module-move-tree-guide::after {
+  position: absolute;
+  top: 50%;
+  left: -1px;
+  width: var(--tp-space-4);
+  border-top: 1px solid color-mix(in srgb, var(--tp-border-strong) 76%, transparent);
+  content: '';
+}
+
+.module-move-parent-row:not(.is-root) .module-move-tree-guide {
+  display: block;
+}
+
+.module-move-parent-icon {
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-lg);
+}
+
+.module-move-parent-row.is-selected .module-move-parent-icon {
+  color: var(--tp-primary);
+}
+
+.module-move-parent-name {
+  overflow: hidden;
+  font-size: var(--tp-text-sm);
+  font-weight: var(--tp-font-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.module-move-selected-text {
+  padding: 2px var(--tp-space-2);
+  border: 1px solid var(--tp-accent-primary-border);
+  border-radius: var(--tp-radius-sm);
+  background: var(--tp-surface-card);
+  color: var(--tp-primary);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-bold);
+}
+
+.module-move-warning,
+.module-move-hint {
+  margin: 0;
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+}
+
+.module-move-warning {
+  color: var(--tp-accent-danger);
+}
+
+@media (max-width: 640px) {
+  .module-move-parent-list {
+    max-height: 34vh;
+    min-height: 220px;
+  }
 }
 
 /* tag-selector 内部微调：让自定义 chip 在输入框内更紧凑 */
