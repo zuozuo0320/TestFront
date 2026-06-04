@@ -1,17 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import {
-  User as UserIcon,
-  UserFilled,
-  Filter,
-  Download,
-  Edit,
-  Clock,
-  CircleClose,
-  CircleCheck,
-  Delete,
-} from '@element-plus/icons-vue'
+import { Download, Search, Edit, Clock } from '@element-plus/icons-vue'
+import { Users, UserCheck, Pencil, KeyRound, Ban, Trash2, Camera } from 'lucide-vue-next'
 import {
   listUsers,
   createUser,
@@ -466,12 +457,12 @@ const roleDistribution = computed(() => {
       counts[rid] = (counts[rid] || 0) + 1
     })
   })
-  const maxCount = Math.max(...Object.values(counts), 1)
+  const totalCount = Object.values(counts).reduce((a, b) => a + b, 0) || 1
   return roles.value.map((r) => ({
     name: r.name,
     displayName: r.display_name || r.name,
     count: counts[r.id] || 0,
-    percent: ((counts[r.id] || 0) / maxCount) * 100,
+    percent: ((counts[r.id] || 0) / totalCount) * 100,
     color: ROLE_COLORS[r.name.toLowerCase()] || DEFAULT_COLOR,
   }))
 })
@@ -485,67 +476,65 @@ onMounted(async () => {
 
 <template>
   <div v-loading="usersLoading" class="um-root">
-    <div class="um-top-header">
-      <div class="um-header-left">
-        <h2 class="um-title">用户管理</h2>
-      </div>
-      <div class="um-header-right">
-        <div class="um-stats-panel">
-          <div class="um-stat-item">
-            <span class="um-stat-label">总用户</span>
-            <span class="um-stat-number um-stat-primary">{{ users.length }}</span>
-          </div>
-          <div class="um-stat-divider"></div>
-          <div class="um-stat-item">
-            <span class="um-stat-label">活跃用户</span>
-            <span class="um-stat-number um-stat-secondary">{{ activeUserCount }}</span>
-          </div>
-          <button class="um-add-btn" @click="openCreateUser">
-            <span class="um-add-icon">+</span>
-            添加用户
-          </button>
-        </div>
-      </div>
-    </div>
-
     <div class="um-dashboard-bento">
-      <div class="um-bento-card">
-        <div class="um-bento-bg-icon group-hover-icon">
-          <el-icon><UserIcon /></el-icon>
+      <!-- Card 1: 总用户量 -->
+      <div class="insight-card">
+        <div class="insight-left">
+          <div class="insight-icon-wrap icon-purple">
+            <Users :size="18" />
+          </div>
+          <div class="insight-trend trend-green">较上周 ↑12%</div>
         </div>
-        <p class="um-bento-label">总用户量</p>
-        <div class="um-bento-value-row">
-          <h3 class="um-bento-value text-white">{{ users.length.toLocaleString() }}</h3>
-          <span class="um-bento-trend success">↑ 12%</span>
+        <div class="insight-right">
+          <div class="insight-label">总用户量</div>
+          <div class="insight-value">{{ users.length }}</div>
+          <div class="insight-chart">
+            <div class="bar" style="height: 40%; background: var(--tp-accent-primary-soft)"></div>
+            <div class="bar" style="height: 70%; background: var(--tp-accent-primary-border)"></div>
+            <div class="bar" style="height: 90%; background: var(--tp-primary)"></div>
+          </div>
         </div>
       </div>
-      <div class="um-bento-card">
-        <div class="um-bento-bg-icon group-hover-icon">
-          <el-icon><UserFilled /></el-icon>
+
+      <!-- Card 2: 活跃用户 -->
+      <div class="insight-card">
+        <div class="insight-left">
+          <div class="insight-icon-wrap icon-blue">
+            <UserCheck :size="18" />
+          </div>
+          <div class="insight-trend trend-green">76.6% 活跃</div>
         </div>
-        <p class="um-bento-label">活跃用户</p>
-        <div class="um-bento-value-row">
-          <h3 class="um-bento-value text-secondary">{{ activeUserCount.toLocaleString() }}</h3>
-          <span class="um-bento-trend faint">76.6% 转化率</span>
+        <div class="insight-right">
+          <div class="insight-label">活跃用户</div>
+          <div class="insight-value">{{ activeUserCount }}</div>
+          <div class="insight-chart">
+            <div class="bar" style="height: 30%; background: var(--tp-accent-info-soft)"></div>
+            <div class="bar" style="height: 50%; background: var(--tp-accent-info-border)"></div>
+            <div class="bar" style="height: 80%; background: var(--tp-accent-info)"></div>
+          </div>
         </div>
       </div>
-      <div class="um-bento-card col-span-2 flex-card">
-        <div class="um-role-dist-wrapper">
-          <p class="um-bento-label mb-md">角色分布</p>
-          <div class="um-role-bar">
-            <div
-              v-for="rd in roleDistribution"
-              :key="rd.name"
-              class="um-role-segment"
-              :style="{ width: rd.percent + '%', background: rd.color }"
-            ></div>
-          </div>
-          <div class="um-role-legends">
-            <span v-for="rd in roleDistribution" :key="rd.name" class="um-role-legend">
-              <span class="um-legend-dot" :style="{ background: rd.color }"></span>
-              {{ rd.displayName }} ({{ Math.round(rd.percent) }}%)
-            </span>
-          </div>
+
+      <!-- Card 3: 角色分布 -->
+      <div class="role-dist-card">
+        <div class="role-dist-title">角色分布</div>
+        <div class="role-dist-bar">
+          <div
+            v-for="rd in roleDistribution"
+            :key="rd.name"
+            class="role-dist-segment"
+            :style="{ width: rd.percent + '%', background: rd.color }"
+          ></div>
+        </div>
+        <div class="role-dist-legends">
+          <span
+            v-for="rd in roleDistribution.filter((r) => r.count > 0)"
+            :key="rd.name"
+            class="role-dist-legend"
+          >
+            <span class="role-legend-dot" :style="{ background: rd.color }"></span>
+            {{ rd.displayName }} ({{ Math.round(rd.percent) }}%)
+          </span>
         </div>
       </div>
     </div>
@@ -555,14 +544,61 @@ onMounted(async () => {
       <div class="um-list-header">
         <div class="um-list-h-left">
           <h4 class="um-list-title">所有用户</h4>
-          <span class="um-live-badge">实时更新</span>
         </div>
         <div class="um-list-h-right">
-          <button class="um-action-btn">
-            <el-icon><Filter /></el-icon>
-          </button>
-          <button class="um-action-btn">
+          <!-- 搜索输入框 -->
+          <div class="um-search-box">
+            <el-input
+              v-model="searchKeyword"
+              placeholder="搜索姓名 / 邮箱"
+              clearable
+              class="um-search-input"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+          </div>
+
+          <!-- 角色筛选 -->
+          <el-select
+            v-model="filterRoleId"
+            placeholder="所有角色"
+            clearable
+            class="um-filter-select"
+            popper-class="filter-select-popper-pl"
+            style="width: 120px"
+          >
+            <el-option
+              v-for="r in roles"
+              :key="r.id"
+              :label="r.display_name || r.name"
+              :value="r.id"
+            />
+          </el-select>
+
+          <!-- 状态筛选 -->
+          <el-select
+            v-model="filterStatus"
+            placeholder="所有状态"
+            clearable
+            class="um-filter-select"
+            popper-class="filter-select-popper-pl"
+            style="width: 120px"
+          >
+            <el-option label="已启用" value="active" />
+            <el-option label="已冻结" value="disabled" />
+          </el-select>
+
+          <!-- 导出数据 -->
+          <button class="um-action-btn" title="导出数据">
             <el-icon><Download /></el-icon>
+          </button>
+
+          <!-- 添加用户按钮 -->
+          <button class="um-add-btn-new" @click="openCreateUser">
+            <span class="um-add-icon">+</span>
+            添加用户
           </button>
         </div>
       </div>
@@ -571,11 +607,11 @@ onMounted(async () => {
         <table class="um-table">
           <thead>
             <tr>
-              <th>用户信息</th>
-              <th>角色级别</th>
-              <th>最后登录</th>
-              <th>状态</th>
-              <th class="text-right">管理操作</th>
+              <th style="width: 32%">用户信息</th>
+              <th style="width: 18%">角色级别</th>
+              <th style="width: 20%">最后登录</th>
+              <th style="width: 15%">状态</th>
+              <th style="width: 15%" class="text-right">管理操作</th>
             </tr>
           </thead>
           <tbody>
@@ -626,27 +662,25 @@ onMounted(async () => {
                     title="编辑"
                     @click="openEditUser(u)"
                   >
-                    <el-icon class="btn-icon"><Edit /></el-icon>
+                    <Pencil :size="15" />
                     <span>编辑</span>
                   </button>
                   <button
-                    class="action-btn action-clone icon-only"
+                    class="action-btn action-reset-pwd icon-only"
                     title="重置密码"
                     @click="openResetPwd(u)"
                   >
-                    <el-icon class="btn-icon"><Clock /></el-icon>
+                    <KeyRound :size="15" />
                     <span>重置密码</span>
                   </button>
                   <button
-                    class="action-btn action-clone icon-only"
+                    class="action-btn action-freeze icon-only"
                     :title="u.active ? '冻结' : '解冻'"
                     :disabled="isAdmin(u)"
                     @click="!isAdmin(u) && toggleFreeze(u)"
                   >
-                    <el-icon class="btn-icon">
-                      <CircleClose v-if="u.active" />
-                      <CircleCheck v-else />
-                    </el-icon>
+                    <Ban v-if="u.active" :size="15" />
+                    <UserCheck v-else :size="15" />
                     <span>{{ u.active ? '冻结' : '解冻' }}</span>
                   </button>
                   <button
@@ -655,7 +689,7 @@ onMounted(async () => {
                     :disabled="isAdmin(u)"
                     @click="!isAdmin(u) && removeUser(u)"
                   >
-                    <el-icon class="btn-icon"><Delete /></el-icon>
+                    <Trash2 :size="15" />
                     <span>删除</span>
                   </button>
                 </div>
@@ -733,74 +767,98 @@ onMounted(async () => {
       width="640px"
       class="um-dialog"
     >
-      <el-form label-position="top">
-        <el-form-item label="用户头像">
-          <div class="um-avatar-upload" @click="triggerAvatarInput">
-            <img v-if="avatarPreview" :src="avatarPreview" class="um-avatar-preview" />
-            <div v-else class="um-avatar-placeholder">
-              <span class="um-avatar-placeholder-icon">+</span>
-              <span class="um-avatar-placeholder-text">点击上传</span>
+      <el-form label-position="top" class="um-form-container">
+        <!-- 头像行 -->
+        <el-form-item label="用户头像" class="form-item-full">
+          <div class="um-avatar-upload-row">
+            <div class="um-avatar-upload" @click="triggerAvatarInput">
+              <div v-if="avatarPreview" class="um-avatar-preview-wrapper">
+                <img :src="avatarPreview" class="um-avatar-preview" />
+                <div class="um-avatar-overlay">
+                  <Camera :size="16" class="um-avatar-overlay-icon" />
+                  <span>更换头像</span>
+                </div>
+              </div>
+              <div v-else class="um-avatar-placeholder">
+                <Camera class="um-avatar-placeholder-icon" :size="20" />
+                <span class="um-avatar-placeholder-text">点击上传</span>
+              </div>
+              <input
+                ref="avatarInputRef"
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                style="display: none"
+                @change="onAvatarSelected"
+              />
             </div>
-            <input
-              ref="avatarInputRef"
-              type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp"
-              style="display: none"
-              @change="onAvatarSelected"
+            <div class="um-avatar-hint-wrap">
+              <span class="um-avatar-hint-title">支持 PNG / JPG / GIF / WebP 格式</span>
+              <span class="um-avatar-hint-sub">推荐尺寸 200x200 像素，文件最大不超过 2MB</span>
+            </div>
+          </div>
+        </el-form-item>
+
+        <!-- 双列网格表单 -->
+        <div class="um-form-grid">
+          <el-form-item label="姓名" class="form-item-half">
+            <el-input v-model="userForm.name" placeholder="姓名" />
+          </el-form-item>
+          <el-form-item label="手机号" class="form-item-half">
+            <el-input v-model="userForm.phone" placeholder="手机号" />
+          </el-form-item>
+
+          <el-form-item label="邮箱" :class="editingUserId ? 'form-item-full' : 'form-item-half'">
+            <el-input v-model="userForm.email" :disabled="!!editingUserId" placeholder="邮箱" />
+          </el-form-item>
+          <el-form-item v-if="!editingUserId" label="初始密码" class="form-item-half">
+            <el-input
+              v-model="userForm.password"
+              type="password"
+              show-password
+              placeholder="密码"
+            />
+          </el-form-item>
+
+          <el-form-item label="角色（必选，可多选）" class="form-item-full">
+            <el-select
+              v-model="userForm.roleIds"
+              multiple
+              filterable
+              placeholder="选择角色"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="r in editingUserId ? roles : creatableRoles"
+                :key="r.id"
+                :label="r.display_name || r.name"
+                :value="r.id"
+              />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="项目（必选，可多选）" class="form-item-full">
+            <el-select
+              v-model="userForm.projectIds"
+              multiple
+              filterable
+              placeholder="选择项目"
+              style="width: 100%"
+            >
+              <el-option v-for="p in projects" :key="p.id" :label="p.name" :value="p.id" />
+            </el-select>
+          </el-form-item>
+        </div>
+
+        <!-- 状态选项 -->
+        <el-form-item label="用户状态" class="form-item-full um-status-form-item">
+          <div class="um-status-switch-wrap">
+            <el-switch
+              v-model="userForm.active"
+              active-text="启用账号"
+              inactive-text="冻结账号"
+              class="um-status-switch"
             />
           </div>
-          <span class="um-avatar-hint">支持 PNG/JPG/GIF/WebP，最大 2MB</span>
-        </el-form-item>
-        <el-form-item label="姓名">
-          <el-input v-model="userForm.name" placeholder="2-40字符" />
-        </el-form-item>
-        <el-form-item label="邮箱">
-          <el-input
-            v-model="userForm.email"
-            :disabled="!!editingUserId"
-            placeholder="登录邮箱（创建后不可修改）"
-          />
-        </el-form-item>
-        <el-form-item v-if="!editingUserId" label="初始密码">
-          <el-input
-            v-model="userForm.password"
-            type="password"
-            show-password
-            placeholder="≥8位，含大写+小写+数字"
-          />
-        </el-form-item>
-        <el-form-item label="手机号">
-          <el-input v-model="userForm.phone" placeholder="选填" />
-        </el-form-item>
-        <el-form-item label="角色（必选，可多选）">
-          <el-select
-            v-model="userForm.roleIds"
-            multiple
-            filterable
-            placeholder="请选择角色"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="r in editingUserId ? roles : creatableRoles"
-              :key="r.id"
-              :label="r.display_name || r.name"
-              :value="r.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="项目（必选，可多选）">
-          <el-select
-            v-model="userForm.projectIds"
-            multiple
-            filterable
-            placeholder="请选择项目"
-            style="width: 100%"
-          >
-            <el-option v-for="p in projects" :key="p.id" :label="p.name" :value="p.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-switch v-model="userForm.active" active-text="启用" inactive-text="冻结" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -819,7 +877,7 @@ onMounted(async () => {
             v-model="resetPwdForm.newPassword"
             type="password"
             show-password
-            placeholder="≥8位，含大写+小写+数字"
+            placeholder="新密码"
           />
         </el-form-item>
       </el-form>
@@ -865,7 +923,7 @@ onMounted(async () => {
   padding: 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 16px;
 }
 
 /* Utilities */
@@ -989,8 +1047,85 @@ onMounted(async () => {
 .um-dashboard-bento {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
+  gap: 16px;
 }
+
+/* ── Custom Filter Bar & Action Styling ── */
+.um-search-box {
+  width: 200px;
+}
+
+/* 统一输入框与下拉框为圆角胶囊风格，高度 32px */
+.um-search-input :deep(.el-input__wrapper),
+.um-filter-select :deep(.el-select__wrapper) {
+  height: 32px !important;
+  line-height: 32px !important;
+  border-radius: 999px !important;
+  background-color: var(--tp-surface-input) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  box-shadow: none !important;
+  padding: 0 12px !important;
+  transition: all var(--tp-transition) !important;
+}
+
+.um-search-input :deep(.el-input__wrapper):hover,
+.um-filter-select :deep(.el-select__wrapper):hover {
+  border-color: var(--tp-border-strong) !important;
+}
+
+.um-search-input :deep(.el-input__wrapper.is-focus),
+.um-filter-select :deep(.el-select__wrapper.is-focused) {
+  background-color: var(--tp-surface-card) !important;
+  border-color: var(--tp-primary) !important;
+  box-shadow: 0 0 0 1px var(--tp-primary) !important;
+}
+
+/* 统一输入框与下拉框文字与图标颜色，使用主题变量 */
+.um-search-input :deep(.el-input__inner),
+.um-filter-select :deep(.el-select__placeholder),
+.um-filter-select :deep(.el-select__text) {
+  font-size: 13px !important;
+  color: var(--tp-text-primary) !important;
+}
+
+.um-search-input :deep(.el-input__inner::placeholder),
+.um-filter-select :deep(.el-select__placeholder) {
+  color: var(--tp-text-placeholder) !important;
+}
+
+.um-search-input :deep(.el-input__prefix) {
+  color: var(--tp-text-muted) !important;
+  margin-right: 4px;
+}
+
+/* 统一添加用户按钮样式为 32px 胶囊 */
+.um-add-btn-new {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: none;
+  background: var(--tp-btn-bg);
+  color: var(--tp-btn-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--tp-transition);
+  white-space: nowrap;
+  box-shadow: var(--tp-btn-shadow);
+}
+
+.um-add-btn-new:hover {
+  background: var(--tp-btn-bg-hover);
+  box-shadow: var(--tp-btn-shadow-hover);
+}
+
+.um-add-btn-new:active {
+  transform: scale(0.96);
+}
+
 .um-bento-card {
   background: var(--bg-card);
   border-radius: 12px;
@@ -1082,6 +1217,9 @@ onMounted(async () => {
   border-radius: 16px;
   border: 1px solid var(--border-lighter);
   overflow: visible;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 .um-list-header {
   padding: 24px;
@@ -1100,37 +1238,41 @@ onMounted(async () => {
   font-weight: 600;
   margin: 0;
 }
-.um-live-badge {
-  background: var(--bg-card-high);
-  color: var(--primary);
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 700;
-}
+
 .um-list-h-right {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
 }
 .um-action-btn {
-  background: var(--bg-card-high);
-  border: none;
-  padding: 8px;
-  border-radius: 8px;
-  color: var(--text-slate);
+  width: 32px;
+  height: 32px;
+  background-color: var(--tp-surface-input);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 50%;
+  color: var(--tp-text-subtle);
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.2s;
+  padding: 0;
+  transition: all var(--tp-transition);
 }
 .um-action-btn:hover {
-  color: #fff;
+  border-color: var(--tp-border-strong);
+  background-color: var(--tp-surface-hover);
+  color: var(--tp-primary);
+}
+.um-action-btn:focus-visible {
+  outline: none;
+  border-color: var(--tp-primary);
+  box-shadow: 0 0 0 1px var(--tp-primary);
 }
 
 .um-table-wrapper {
   width: 100%;
   overflow-x: auto;
+  flex: 1;
 }
 .um-table {
   width: 100%;
@@ -1138,23 +1280,22 @@ onMounted(async () => {
   text-align: left;
 }
 .um-table th {
-  padding: 16px 24px;
-  font-size: 11px;
+  padding: 14px 24px;
+  font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: #64748b;
-  border-bottom: 1px solid var(--border-lighter);
+  color: var(--tp-text-subtle);
+  background: var(--tp-surface-header);
+  border-bottom: 1px solid var(--tp-border-subtle);
 }
 .um-tr {
-  transition: background 0.2s;
+  transition: background var(--tp-transition);
 }
 .um-tr:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--tp-surface-row-hover);
 }
 .um-tr td {
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--border-lighter);
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--tp-border-subtle);
   vertical-align: middle;
 }
 .um-user-cell {
@@ -1231,12 +1372,65 @@ onMounted(async () => {
   font-weight: 500;
 }
 
-/* 操作按钮使用全局 .action-btn 样式 */
+/* ── Row Action Buttons Styling ── */
 .um-tr .action-group {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 2px;
+  gap: 8px; /* 使用合适的间距，不再依靠横线分隔 */
+}
+
+/* 消除全局纵向分隔线 */
+.um-tr .action-btn + .action-btn::before {
+  display: none !important;
+}
+
+.um-tr .action-btn.icon-only {
+  width: 30px;
+  height: 30px;
+  border-radius: 50% !important; /* 完美的圆形操作按钮 */
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  color: var(--tp-text-secondary) !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 !important;
+  transition: all var(--tp-transition) !important;
+}
+
+/* 各种按钮的 Hover 精致态，与系统用例列表及评审对齐 */
+.um-tr .action-btn.action-edit.icon-only:hover:not(:disabled) {
+  background: var(--tp-accent-primary-soft) !important;
+  border-color: var(--tp-accent-primary-border) !important;
+  color: var(--tp-primary) !important;
+}
+
+.um-tr .action-btn.action-reset-pwd.icon-only:hover:not(:disabled) {
+  background: var(--tp-accent-info-soft) !important;
+  border-color: var(--tp-accent-info-border) !important;
+  color: var(--tp-accent-info) !important;
+}
+
+.um-tr .action-btn.action-freeze.icon-only:hover:not(:disabled) {
+  background: var(--tp-accent-warning-soft) !important;
+  border-color: var(--tp-accent-warning-border) !important;
+  color: var(--tp-accent-warning, #f59e0b) !important;
+}
+
+.um-tr .action-btn.action-delete.icon-only:hover:not(:disabled) {
+  background: var(--tp-accent-danger-soft) !important;
+  border-color: var(--tp-accent-danger-border) !important;
+  color: var(--tp-danger) !important;
+}
+
+/* 禁用状态 */
+.um-tr .action-btn.icon-only:disabled {
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+  background: transparent !important;
+  border-color: transparent !important;
+  color: var(--tp-text-placeholder) !important;
 }
 
 .um-empty {
@@ -1284,7 +1478,7 @@ onMounted(async () => {
 .um-security-section {
   display: grid;
   grid-template-columns: 2fr 1fr;
-  gap: 32px;
+  gap: 16px;
 }
 .um-sec-panel {
   background: var(--bg-card);
@@ -1807,5 +2001,472 @@ onMounted(async () => {
 .um-tr:hover,
 .um-log-row:hover {
   box-shadow: inset 2px 0 0 var(--tp-primary);
+}
+
+/* ── Stats Card Premium Layout (Consistent with Case Review) ── */
+.insight-card {
+  display: flex;
+  justify-content: space-between;
+  background:
+    linear-gradient(180deg, var(--tp-surface-sheen), transparent 40%), var(--tp-surface-card) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--tp-shadow-card) !important;
+  min-height: 80px !important;
+  padding: 10px 12px !important;
+  transition: all var(--tp-transition) !important;
+}
+
+.insight-card:hover {
+  border-color: var(--tp-border-strong) !important;
+  box-shadow: var(--tp-shadow-card-hover) !important;
+}
+
+.insight-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.insight-icon-wrap {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.insight-trend {
+  margin-top: 6px !important;
+  padding: 1px 6px !important;
+  border-radius: 999px !important;
+  font-size: 10px !important;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.trend-grey {
+  background: var(--tp-surface-muted) !important;
+  border-color: var(--tp-border-subtle) !important;
+  color: var(--tp-text-secondary) !important;
+}
+
+.trend-green {
+  background: var(--tp-accent-success-soft) !important;
+  border-color: var(--tp-accent-success-border) !important;
+  color: var(--tp-accent-success) !important;
+}
+
+.insight-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  text-align: right;
+}
+
+.insight-label {
+  font-size: 11px !important;
+  font-weight: var(--tp-font-bold) !important;
+  color: var(--tp-text-muted) !important;
+}
+
+.insight-value {
+  margin: 2px 0 !important;
+  font-size: 22px !important;
+  font-weight: 780;
+  color: var(--tp-text-primary) !important;
+  line-height: 1;
+}
+
+.insight-chart {
+  display: flex;
+  align-items: flex-end;
+  height: 15px;
+  gap: 2px;
+}
+
+.insight-chart .bar {
+  width: 3px;
+  border-radius: 999px;
+}
+
+.icon-purple {
+  background: var(--tp-accent-primary-soft) !important;
+  color: var(--tp-primary) !important;
+}
+
+.icon-blue {
+  background: var(--tp-accent-info-soft) !important;
+  color: var(--tp-accent-info) !important;
+}
+
+/* ── Role Distribution Premium Styling ── */
+.role-dist-card {
+  grid-column: span 2;
+  background:
+    linear-gradient(180deg, var(--tp-surface-sheen), transparent 40%), var(--tp-surface-card) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--tp-shadow-card) !important;
+  min-height: 80px !important;
+  padding: 12px 16px !important;
+  transition: all var(--tp-transition) !important;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.role-dist-card:hover {
+  border-color: var(--tp-border-strong) !important;
+  box-shadow: var(--tp-shadow-card-hover) !important;
+}
+
+.role-dist-title {
+  font-size: 11px !important;
+  font-weight: var(--tp-font-bold) !important;
+  color: var(--tp-text-muted) !important;
+  margin-bottom: 8px;
+}
+
+.role-dist-bar {
+  display: flex;
+  width: 100%;
+  height: 6px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: var(--tp-surface-input);
+  margin-bottom: 12px;
+}
+
+.role-dist-segment {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.role-dist-legends {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--tp-text-secondary);
+}
+
+.role-dist-legend {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.role-legend-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+/* ── 筛选下拉悬浮窗 (Popper) 美化样式 ── */
+:global(.filter-select-popper-pl.el-popper) {
+  border: 1px solid var(--tp-border-subtle) !important;
+  border-radius: var(--tp-radius-md) !important;
+  box-shadow: var(--tp-shadow-sm) !important;
+  background: var(--tp-glass-bg-strong, rgba(255, 255, 255, 0.96)) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+/* 暗色主题适配 */
+:global(html[data-theme='genart'] .filter-select-popper-pl.el-popper) {
+  background: var(--tp-gray-100) !important;
+  border-color: var(--tp-border-subtle) !important;
+}
+
+/* 下拉菜单列表内边距，使选项呈现悬浮感 */
+:global(.filter-select-popper-pl .el-select-dropdown__list) {
+  padding: 6px !important;
+}
+
+/* 下拉选项圆角与交互过渡 */
+:global(.filter-select-popper-pl .el-select-dropdown__item) {
+  height: 32px !important;
+  line-height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: var(--tp-radius-sm) !important;
+  color: var(--tp-text-secondary) !important;
+  font-size: 13px !important;
+  font-weight: var(--tp-font-medium) !important;
+  margin-bottom: 2px !important;
+  transition: all var(--tp-transition) !important;
+}
+
+:global(.filter-select-popper-pl .el-select-dropdown__item:last-child) {
+  margin-bottom: 0 !important;
+}
+
+/* 选项 Hover 态 */
+:global(.filter-select-popper-pl .el-select-dropdown__item.is-hovering),
+:global(.filter-select-popper-pl .el-select-dropdown__item:hover) {
+  background: var(--tp-surface-hover) !important;
+  color: var(--tp-primary) !important;
+}
+
+/* 选项 Selected 选中态 */
+:global(.filter-select-popper-pl .el-select-dropdown__item.is-selected) {
+  background: var(--tp-accent-primary-soft) !important;
+  color: var(--tp-primary) !important;
+  font-weight: var(--tp-font-semibold) !important;
+}
+
+/* 箭头三角背景色与边框色对齐 */
+:global(.filter-select-popper-pl .el-popper__arrow::before) {
+  background: var(--tp-glass-bg-strong, rgba(255, 255, 255, 0.96)) !important;
+  border-color: var(--tp-border-subtle) !important;
+}
+
+:global(html[data-theme='genart'] .filter-select-popper-pl .el-popper__arrow::before) {
+  background: var(--tp-gray-100) !important;
+  border-color: var(--tp-border-subtle) !important;
+}
+
+/* ── Form Dialog Premium Styling ── */
+.um-form-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px; /* 增加行间距，显得更开阔 */
+}
+.um-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px 24px; /* 增加列和行间距 */
+  width: 100%;
+}
+.form-item-full {
+  grid-column: span 2;
+  margin-bottom: 0 !important;
+}
+.form-item-half {
+  grid-column: span 1;
+  margin-bottom: 0 !important;
+}
+.um-status-form-item {
+  margin-top: 8px;
+}
+.um-status-switch-wrap {
+  display: flex;
+  align-items: center;
+  height: 48px;
+  background: var(--tp-surface-input);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: var(--tp-radius-md);
+  padding: 0 16px;
+  box-sizing: border-box;
+}
+
+/* 统一对话框中的 ElForm 样式，符合 Element Plus 2.x 设计系统 */
+:global(.el-overlay .el-dialog.um-dialog .el-form-item__label) {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: var(--tp-text-secondary) !important;
+  padding-bottom: 8px !important;
+}
+
+:global(.el-overlay .el-dialog.um-dialog .el-input__wrapper) {
+  height: 38px !important; /* 对话框中输入框适当增高，更显高端质感 */
+  line-height: 38px !important;
+  border-radius: 10px !important; /* 调整为更精致的 10px 圆角而非极端的胶囊圆角，适合输入框 */
+  background-color: var(--tp-surface-input) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  box-shadow: none !important;
+  padding: 0 16px !important;
+  transition: all var(--tp-transition) !important;
+}
+
+:global(.el-overlay .el-dialog.um-dialog .el-select__wrapper) {
+  min-height: 38px !important; /* 多选框使用 min-height，以支持多行标签自动换行 */
+  padding: 4px 16px !important;
+  border-radius: 10px !important; /* 同样使用精致 of 10px 圆角 */
+  background-color: var(--tp-surface-input) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  box-shadow: none !important;
+  transition: all var(--tp-transition) !important;
+}
+
+:global(.el-overlay .el-dialog.um-dialog .el-input__wrapper:hover),
+:global(.el-overlay .el-dialog.um-dialog .el-select__wrapper:hover) {
+  border-color: var(--tp-border-strong) !important;
+}
+
+:global(.el-overlay .el-dialog.um-dialog .el-input__wrapper.is-focus),
+:global(.el-overlay .el-dialog.um-dialog .el-select__wrapper.is-focused) {
+  background-color: var(--tp-surface-card) !important;
+  border-color: var(--tp-primary) !important;
+  box-shadow: 0 0 0 1px var(--tp-primary) !important;
+}
+
+/* 消除输入框/选择框及子元素的默认聚焦外框线 (outline) */
+:global(.el-overlay .el-dialog.um-dialog .el-input__wrapper),
+:global(.el-overlay .el-dialog.um-dialog .el-select__wrapper) {
+  outline: none !important;
+}
+:global(.el-overlay .el-dialog.um-dialog .el-input__wrapper *),
+:global(.el-overlay .el-dialog.um-dialog .el-select__wrapper *) {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* 对话框内多选标签美化 */
+:global(.el-overlay .el-dialog.um-dialog .el-select__tags) {
+  padding-left: 0;
+}
+:global(.el-overlay .el-dialog.um-dialog .el-tag) {
+  border-radius: 6px !important;
+  border: 1px solid rgba(139, 92, 246, 0.15) !important;
+  background-color: var(--tp-primary-lighter) !important;
+  color: var(--tp-primary) !important;
+  padding: 0 8px !important;
+  height: 24px !important;
+  line-height: 22px !important;
+}
+:global(.el-overlay .el-dialog.um-dialog .el-tag .el-tag__close) {
+  color: var(--tp-primary) !important;
+}
+:global(.el-overlay .el-dialog.um-dialog .el-tag .el-tag__close:hover) {
+  background-color: var(--tp-primary) !important;
+  color: #fff !important;
+}
+
+/* 头像行排版 */
+.um-avatar-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: var(--tp-surface-input);
+  padding: 16px;
+  border-radius: var(--tp-radius-md);
+  border: 1px solid var(--tp-border-subtle);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.um-avatar-upload {
+  width: 80px;
+  height: 80px;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px dashed var(--tp-border-subtle);
+  transition: all var(--tp-transition) ease;
+  position: relative;
+  background: var(--tp-surface-card);
+}
+
+.um-avatar-upload:hover {
+  border-color: var(--tp-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--tp-primary-shadow);
+}
+
+.um-avatar-preview-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.um-avatar-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.um-avatar-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity var(--tp-transition);
+}
+
+.um-avatar-preview-wrapper:hover .um-avatar-overlay {
+  opacity: 1;
+}
+
+.um-avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--tp-primary-lighter);
+  color: var(--tp-primary);
+  transition: background var(--tp-transition);
+}
+
+.um-avatar-placeholder-icon {
+  color: var(--tp-primary);
+  margin-bottom: 4px;
+}
+
+.um-avatar-placeholder-text {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--tp-primary);
+}
+
+.um-avatar-hint-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.um-avatar-hint-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tp-text-primary);
+}
+.um-avatar-hint-sub {
+  font-size: 12px;
+  color: var(--tp-text-subtle);
+  line-height: 1.4;
+}
+
+/* 对话框内 Switch 美化 */
+:global(.el-overlay .el-dialog.um-dialog .um-status-switch .el-switch__label) {
+  font-size: 13px !important;
+  color: var(--tp-text-subtle) !important;
+  font-weight: 500 !important;
+}
+:global(.el-overlay .el-dialog.um-dialog .um-status-switch .el-switch__label.is-active) {
+  color: var(--tp-primary) !important;
+  font-weight: 600 !important;
+}
+
+/* 对话框 Footer 按钮微调 */
+:global(.el-overlay .el-dialog.um-dialog .el-button) {
+  height: 36px !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  padding: 0 20px !important;
+}
+:global(.el-overlay .el-dialog.um-dialog .el-button--primary) {
+  background-color: var(--tp-primary) !important;
+  border-color: var(--tp-primary) !important;
+}
+:global(.el-overlay .el-dialog.um-dialog .el-button--primary:hover) {
+  background-color: var(--tp-primary-dark) !important;
+  border-color: var(--tp-primary-dark) !important;
 }
 </style>

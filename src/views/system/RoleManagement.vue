@@ -203,26 +203,21 @@ onMounted(() => loadRoles())
   <div v-loading="rolesLoading" class="rm-root">
     <!-- Header Section -->
     <div class="rm-header">
-      <div class="rm-header-left">
-        <h2 class="rm-title">角色管理</h2>
-      </div>
-      <div class="rm-header-right">
-        <div class="rm-stats-panel">
-          <div class="rm-stat-item">
-            <span class="rm-stat-label">总角色</span>
-            <span class="rm-stat-number rm-stat-primary">{{ totalRoles }}</span>
-          </div>
-          <div class="rm-stat-divider"></div>
-          <div class="rm-stat-item">
-            <span class="rm-stat-label">活跃用户</span>
-            <span class="rm-stat-number rm-stat-secondary">{{ totalAssignedUsers }}</span>
-          </div>
-          <button class="rm-add-btn" type="button" @click="openCreateRole">
-            <span class="rm-add-icon">+</span>
-            新增角色
-          </button>
+      <div class="rm-stats-panel">
+        <div class="rm-stat-item">
+          <span class="rm-stat-label">总角色</span>
+          <span class="rm-stat-number rm-stat-primary">{{ totalRoles }}</span>
+        </div>
+        <div class="rm-stat-divider"></div>
+        <div class="rm-stat-item">
+          <span class="rm-stat-label">活跃用户</span>
+          <span class="rm-stat-number rm-stat-secondary">{{ totalAssignedUsers }}</span>
         </div>
       </div>
+      <button class="rm-add-btn" type="button" @click="openCreateRole">
+        <span class="rm-add-icon">+</span>
+        新增角色
+      </button>
     </div>
 
     <!-- Roles Bento Grid -->
@@ -893,14 +888,15 @@ onMounted(() => loadRoles())
 }
 
 .rm-header {
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-  padding: 10px 12px;
-  background: var(--tp-glass-bg-strong);
-  border: 1px solid var(--tp-border-subtle);
-  border-radius: 12px;
-  box-shadow: none;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-bottom: 16px !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  min-height: auto !important;
 }
 
 .rm-title {
@@ -916,7 +912,9 @@ onMounted(() => loadRoles())
 }
 
 .rm-stats-panel {
-  gap: 8px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
   padding: 0;
   background: transparent;
   border: 0;
@@ -969,26 +967,32 @@ onMounted(() => loadRoles())
 }
 
 .rm-grid {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 20px !important;
 }
 
 .rm-card {
-  min-height: 150px;
-  padding: 14px 14px 12px;
-  border-radius: 12px;
-  background: var(--tp-glass-bg-strong);
-  border-color: var(--tp-border-subtle);
-  box-shadow: none;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 180px;
+  padding: 22px 20px 20px !important;
+  border-radius: 14px !important;
+  background: var(--tp-glass-bg-strong) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  box-shadow: var(--tp-shadow-sm) !important;
   transition:
-    border-color 0.16s ease,
-    background-color 0.16s ease;
+    border-color 0.25s ease,
+    background-color 0.25s ease,
+    transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    box-shadow 0.25s ease !important;
 }
 
 .rm-card:hover {
-  background: var(--tp-glass-bg-strong);
-  border-color: var(--tp-border-strong);
-  box-shadow: none;
+  background: var(--tp-glass-bg-strong) !important;
+  border-color: var(--tp-primary) !important;
+  transform: translateY(-4px) !important;
+  box-shadow: 0 12px 30px rgba(139, 92, 246, 0.08) !important;
 }
 
 .rm-card-accent {
@@ -1000,30 +1004,38 @@ onMounted(() => loadRoles())
 }
 
 .rm-card-top {
+  display: flex;
   align-items: center;
-  margin-bottom: 10px;
+  justify-content: space-between;
+  margin-bottom: 14px !important;
 }
 
 .rm-card-icon {
-  width: 32px;
-  height: 32px;
+  width: 36px !important;
+  height: 36px !important;
   border-radius: 9px;
-  background: var(--tp-accent-primary-soft);
-  border: 1px solid var(--tp-accent-primary-border);
-  color: var(--tp-primary);
+  background: var(--tp-accent-primary-soft) !important;
+  border: 1px solid var(--tp-accent-primary-border) !important;
+  color: var(--tp-primary) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .rm-card-icon .material-symbols-outlined {
-  font-size: 20px;
+  font-size: 22px !important;
 }
 
 .rm-badge {
+  display: flex;
+  align-items: center;
   gap: 4px;
   min-height: 22px;
   padding: 2px 8px;
-  background: var(--tp-accent-primary-soft);
-  border-color: var(--tp-accent-primary-border);
-  color: var(--tp-primary);
+  background: var(--tp-accent-primary-soft) !important;
+  border: 1px solid var(--tp-accent-primary-border) !important;
+  color: var(--tp-primary) !important;
+  border-radius: 12px !important;
 }
 
 .rm-badge-icon {
@@ -1032,106 +1044,151 @@ onMounted(() => loadRoles())
 
 .rm-badge-text {
   font-size: 11px;
+  font-weight: 600;
 }
 
 .rm-card-name {
-  margin-bottom: 4px;
-  color: var(--tp-text-primary);
-  font-size: 14px;
+  margin-bottom: 6px !important;
+  color: var(--tp-text-primary) !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
   line-height: 1.3;
 }
 
 .rm-card-desc {
-  min-height: 34px;
-  margin-bottom: 10px;
-  color: var(--tp-text-muted);
-  font-size: 11px;
+  min-height: 36px;
+  margin-bottom: 14px !important;
+  color: var(--tp-text-secondary) !important;
+  font-size: 12px !important;
   line-height: 1.5;
 }
 
 .rm-perm-tags {
-  gap: 5px;
-  margin-bottom: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 18px !important;
 }
 
 .rm-perm-tag {
-  padding: 3px 7px;
-  border-radius: 6px;
-  background: var(--tp-surface-muted);
-  border-color: var(--tp-border-subtle);
-  color: var(--tp-text-secondary);
-  font-size: 11px;
-  font-weight: 600;
+  padding: 3px 8px !important;
+  border-radius: 6px !important;
+  background: var(--tp-surface-muted) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  color: var(--tp-text-secondary) !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
 }
 
 .rm-card-actions {
+  display: flex;
   gap: 8px;
+  margin-top: auto;
 }
 
 .rm-btn-edit,
 .rm-btn-view {
-  min-height: 30px;
-  border-radius: 8px;
-  background: var(--tp-glass-bg-strong);
-  border: 1px solid var(--tp-border-subtle);
-  color: var(--tp-text-secondary);
-  font-size: 11px;
-  box-shadow: none;
+  flex: 1;
+  height: 32px !important;
+  min-height: 32px !important;
+  border-radius: 8px !important;
+  font-size: 12px !important;
+  font-weight: var(--tp-font-medium) !important;
+  transition: all 0.2s ease !important;
 }
 
 .rm-btn-edit {
-  background: var(--tp-accent-primary-soft);
-  border-color: var(--tp-accent-primary-border);
-  color: var(--tp-primary-dark);
+  background: var(--tp-accent-primary-soft) !important;
+  border: 1px solid var(--tp-accent-primary-border) !important;
+  color: var(--tp-primary) !important;
 }
 
-.rm-btn-edit:hover,
+.rm-btn-edit:hover {
+  background: var(--tp-primary) !important;
+  border-color: var(--tp-primary) !important;
+  color: #ffffff !important;
+}
+
+.rm-btn-view {
+  background: var(--tp-surface-input) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  color: var(--tp-text-secondary) !important;
+}
+
 .rm-btn-view:hover {
-  background: var(--tp-surface-hover);
-  color: var(--tp-text-primary);
-  box-shadow: none;
+  background: var(--tp-surface-hover) !important;
+  border-color: var(--tp-border-strong) !important;
+  color: var(--tp-text-primary) !important;
 }
 
 .rm-card-empty {
-  min-height: 150px;
-  padding: 16px 14px;
-  border: 1px dashed var(--tp-border-subtle);
-  background: var(--tp-glass-bg-strong);
-  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  padding: 22px 20px 20px !important;
+  border: 1px dashed var(--tp-border-subtle) !important;
+  border-radius: 14px !important;
+  background: var(--tp-glass-bg-strong) !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  transition:
+    border-color 0.25s ease,
+    background-color 0.25s ease,
+    transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    box-shadow 0.25s ease !important;
 }
 
 .rm-card-empty:hover {
-  background: var(--tp-glass-bg-strong);
-  border-color: var(--tp-border-strong);
+  background: var(--tp-accent-primary-soft) !important;
+  border-color: var(--tp-primary) !important;
+  transform: translateY(-4px) !important;
+  box-shadow: 0 12px 30px rgba(139, 92, 246, 0.08) !important;
 }
 
 .rm-empty-icon {
-  width: 34px;
-  height: 34px;
-  margin-bottom: 10px;
-  border-radius: 10px;
-  background: var(--tp-surface-muted);
-  border: 1px solid var(--tp-border-subtle);
+  width: 36px !important;
+  height: 36px !important;
+  margin-bottom: 12px !important;
+  border-radius: 9px !important;
+  background: var(--tp-surface-muted) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s ease !important;
 }
 
 .rm-card-empty:hover .rm-empty-icon {
-  transform: none;
+  transform: scale(1.1) !important;
+  border-color: var(--tp-primary) !important;
+  background: var(--tp-surface-card) !important;
 }
 
 .rm-empty-plus {
   color: var(--tp-text-subtle);
-  font-size: 20px;
+  font-size: 22px !important;
+  font-weight: 500;
+  transition: color 0.25s ease !important;
+}
+
+.rm-card-empty:hover .rm-empty-plus {
+  color: var(--tp-primary) !important;
 }
 
 .rm-empty-title {
-  color: var(--tp-text-primary);
-  font-size: 13px;
+  color: var(--tp-text-primary) !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  margin-bottom: 6px !important;
 }
 
 .rm-empty-desc {
-  color: var(--tp-text-muted);
-  font-size: 11px;
+  color: var(--tp-text-muted) !important;
+  font-size: 11px !important;
   line-height: 1.5;
+  text-align: center;
 }
 
 .rm-add-btn:focus-visible,
@@ -1139,7 +1196,7 @@ onMounted(() => loadRoles())
 .rm-btn-view:focus-visible,
 .rm-card-empty:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft) !important;
 }
 
 .form-hint {
@@ -1159,19 +1216,19 @@ onMounted(() => loadRoles())
 
 @media (max-width: 1280px) {
   .rm-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   }
 }
 
 @media (max-width: 1024px) {
   .rm-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
 
 @media (max-width: 720px) {
   .rm-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
   }
 }
 </style>

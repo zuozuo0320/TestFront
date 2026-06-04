@@ -4,6 +4,8 @@ import { ElMessage, ElMessageBox, ElImageViewer } from 'element-plus'
 import { CopyDocument, Delete, Edit, Search, Grid, List } from '@element-plus/icons-vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import LevelBadge from '../components/LevelBadge.vue'
+import EmptyState from '../components/EmptyState.vue'
+import { FileText, CheckCircle2, Bug, Timer } from 'lucide-vue-next'
 
 import FileUploader from '../components/FileUploader.vue'
 import {
@@ -458,17 +460,13 @@ const directoryParentOptions = computed<CaseModuleSelectNode[]>(() => [
 ])
 
 const selectedBatchMoveModuleOption = computed<CaseModuleSelectNode>(() => {
-  return (
-    batchMoveModuleOptions.value.find((option) => option.id === batchMoveTargetId.value) ??
-    batchMoveModuleOptions.value[0]
-  )
+  return (batchMoveModuleOptions.value.find((option) => option.id === batchMoveTargetId.value) ??
+    batchMoveModuleOptions.value[0]) as CaseModuleSelectNode
 })
 
 const selectedDirectoryParentOption = computed<CaseModuleSelectNode>(() => {
-  return (
-    directoryParentOptions.value.find((option) => option.id === directoryForm.parentId) ??
-    directoryParentOptions.value[0]
-  )
+  return (directoryParentOptions.value.find((option) => option.id === directoryForm.parentId) ??
+    directoryParentOptions.value[0]) as CaseModuleSelectNode
 })
 
 const moduleMoveParentOptions = computed<CaseModuleSelectNode[]>(() => {
@@ -483,10 +481,9 @@ const moduleMoveParentOptions = computed<CaseModuleSelectNode[]>(() => {
 })
 
 const selectedModuleMoveParentOption = computed<CaseModuleSelectNode>(() => {
-  return (
-    moduleMoveParentOptions.value.find((option) => option.id === moduleMoveTargetParentId.value) ??
-    moduleMoveParentOptions.value[0]
-  )
+  return (moduleMoveParentOptions.value.find(
+    (option) => option.id === moduleMoveTargetParentId.value,
+  ) ?? moduleMoveParentOptions.value[0]) as CaseModuleSelectNode
 })
 
 const canSubmitModuleMove = computed(() => {
@@ -1710,37 +1707,14 @@ watch(selectedProject, (newId) => {
     <div class="right-table">
       <!-- Intelligent Insights Layout -->
       <div class="insights-section">
-        <div class="insights-header">
-          <div class="insights-title-area">
-            <h2 class="insights-title">测试用例中心</h2>
-          </div>
-          <div class="insights-actions">
-            <button class="insights-btn-primary" @click="onExportReport">
-              <span class="material-symbols-outlined shrink-0">download</span>
-              <span>导出报告</span>
-            </button>
-            <button class="insights-btn-primary" @click="openCreate">
-              <span class="material-symbols-outlined shrink-0">add</span>
-              <span>新建用例</span>
-            </button>
-            <input
-              ref="importInput"
-              type="file"
-              accept=".xlsx,.xls"
-              style="display: none"
-              @change="onImportXlsx"
-            />
-          </div>
-        </div>
-
         <div class="insights-cards">
           <!-- Card 1: 总用例数 -->
           <div class="insight-card">
             <div class="insight-left">
               <div class="insight-icon-wrap icon-purple">
-                <span class="material-symbols-outlined">inventory_2</span>
+                <FileText :size="18" />
               </div>
-              <div class="insight-trend trend-grey">+24 本周</div>
+              <div class="insight-trend trend-grey">本周 +24</div>
             </div>
             <div class="insight-right">
               <div class="insight-label">总用例数</div>
@@ -1765,15 +1739,15 @@ watch(selectedProject, (newId) => {
           <div class="insight-card">
             <div class="insight-left">
               <div class="insight-icon-wrap icon-blue">
-                <span class="material-symbols-outlined">verified</span>
+                <CheckCircle2 :size="18" />
               </div>
-              <div class="insight-trend trend-green">↑ 1.2% 较上周</div>
+              <div class="insight-trend trend-green">较上周 ↑1.2%</div>
             </div>
             <div class="insight-right">
               <div class="insight-label">通过率</div>
               <div class="insight-value">
                 {{ metricPassRate }}
-                <span style="font-size: 16px; font-weight: 500; margin-left: 2px">%</span>
+                <span style="font-size: 13px; font-weight: 500; margin-left: 2px">%</span>
               </div>
               <div class="insight-chart">
                 <div class="bar" style="height: 30%; background: var(--tp-accent-info-soft)"></div>
@@ -1792,9 +1766,9 @@ watch(selectedProject, (newId) => {
           <div class="insight-card">
             <div class="insight-left">
               <div class="insight-icon-wrap icon-red">
-                <span class="material-symbols-outlined">bug_report</span>
+                <Bug :size="18" />
               </div>
-              <div class="insight-trend trend-red">↓ 3 待修复</div>
+              <div class="insight-trend trend-red">↓3 待修复</div>
             </div>
             <div class="insight-right">
               <div class="insight-label">活动缺陷</div>
@@ -1819,15 +1793,15 @@ watch(selectedProject, (newId) => {
           <div class="insight-card">
             <div class="insight-left">
               <div class="insight-icon-wrap icon-orange">
-                <span class="material-symbols-outlined">timer</span>
+                <Timer :size="18" />
               </div>
-              <div class="insight-trend trend-grey">稳步下降中</div>
+              <div class="insight-trend trend-grey">稳步下降</div>
             </div>
             <div class="insight-right">
               <div class="insight-label">平均执行时间</div>
               <div class="insight-value">
                 14
-                <span style="font-size: 16px; font-weight: 500; margin-left: 2px">m</span>
+                <span style="font-size: 13px; font-weight: 500; margin-left: 2px">m</span>
               </div>
               <div class="insight-chart">
                 <div class="bar" style="height: 100%; background: var(--tp-accent-warning)"></div>
@@ -1866,6 +1840,7 @@ watch(selectedProject, (newId) => {
             clearable
             size="default"
             class="filter-dropdown"
+            popper-class="filter-select-popper-pl"
             @change="onSearch"
           >
             <el-option label="P0" value="P0" />
@@ -1879,6 +1854,7 @@ watch(selectedProject, (newId) => {
             clearable
             size="default"
             class="filter-dropdown"
+            popper-class="filter-select-popper-pl"
             @change="onSearch"
           >
             <el-option label="未执行" value="未执行" />
@@ -1923,6 +1899,31 @@ watch(selectedProject, (newId) => {
             </svg>
           </button>
         </div>
+
+        <!-- Spacer to push action buttons to the right -->
+        <div style="flex-grow: 1"></div>
+
+        <!-- Integrated Action Buttons -->
+        <div
+          class="insights-actions"
+          style="display: flex; align-items: center; gap: 8px; margin-left: auto"
+        >
+          <button class="insights-btn-primary" @click="onExportReport">
+            <span class="material-symbols-outlined shrink-0">download</span>
+            <span>导出报告</span>
+          </button>
+          <button class="insights-btn-primary" @click="openCreate">
+            <span class="material-symbols-outlined shrink-0">add</span>
+            <span>新建用例</span>
+          </button>
+        </div>
+        <input
+          ref="importInput"
+          type="file"
+          accept=".xlsx,.xls"
+          style="display: none"
+          @change="onImportXlsx"
+        />
       </div>
 
       <!-- View Toggle (kept from Style C, positioned in filter bar) -->
@@ -2056,7 +2057,7 @@ watch(selectedProject, (newId) => {
             </tr>
           </thead>
           <tbody>
-            <tr v-if="loadError">
+            <tr v-if="loadError" class="empty-tr-no-hover">
               <td colspan="10" class="empty-td">
                 {{ loadError }}
                 <el-button size="small" style="margin-left: 10px" @click="loadCases">
@@ -2064,41 +2065,14 @@ watch(selectedProject, (newId) => {
                 </el-button>
               </td>
             </tr>
-            <tr v-else-if="rows.length === 0">
+            <tr v-else-if="rows.length === 0" class="empty-tr-no-hover">
               <td colspan="10" class="empty-td testcase-empty-cell">
-                <div class="testcase-empty-wrap">
-                  <div class="testcase-empty-state">
-                    <svg
-                      class="testcase-empty-visual"
-                      viewBox="0 0 120 96"
-                      role="img"
-                      aria-label="暂无用例"
-                    >
-                      <defs>
-                        <linearGradient id="testcase-empty-card" x1="24" x2="96" y1="18" y2="82">
-                          <stop offset="0" stop-color="var(--tp-accent-primary-soft)" />
-                          <stop offset="1" stop-color="var(--tp-surface-input)" />
-                        </linearGradient>
-                        <linearGradient id="testcase-empty-line" x1="28" x2="92" y1="24" y2="76">
-                          <stop offset="0" stop-color="var(--tp-primary)" />
-                          <stop offset="1" stop-color="var(--tp-secondary)" />
-                        </linearGradient>
-                      </defs>
-                      <path
-                        class="testcase-empty-shadow"
-                        d="M35 80h50c7 0 12 2 12 5s-5 5-12 5H35c-7 0-12-2-12-5s5-5 12-5Z"
-                      />
-                      <path class="testcase-empty-sheet is-back" d="M41 14h36l17 17v49H41z" />
-                      <path class="testcase-empty-sheet" d="M32 20h42l17 17v45H32z" />
-                      <path class="testcase-empty-fold" d="M74 20v17h17" />
-                      <path class="testcase-empty-line" d="M45 45h31" />
-                      <path class="testcase-empty-line" d="M45 56h22" />
-                      <path class="testcase-empty-check" d="M43 69l6 6 13-15" />
-                    </svg>
-                    <strong>暂无数据</strong>
-                    <el-button type="primary" plain @click="openCreate">去新建</el-button>
-                  </div>
-                </div>
+                <EmptyState
+                  description="暂无数据"
+                  :show-action="true"
+                  action-text="去新建"
+                  @action="openCreate"
+                />
               </td>
             </tr>
             <tr
@@ -3824,6 +3798,12 @@ watch(selectedProject, (newId) => {
   padding: var(--tp-space-6) var(--tp-space-2) !important;
 }
 
+/* 中文注释：防止用例列表空状态占位图在光标移入时触发表格行 hover 背景加深效果 */
+.case-page .table-shell tbody tr.empty-tr-no-hover:hover,
+.case-page .table-shell tbody tr.empty-tr-no-hover:hover td {
+  background: transparent !important;
+}
+
 .testcase-empty-wrap {
   display: flex;
   align-items: center;
@@ -5169,19 +5149,76 @@ watch(selectedProject, (newId) => {
 }
 
 .case-page .filter-bar {
-  margin-bottom: 0 !important;
-  padding: 10px;
-  border: 1px solid var(--tp-border-subtle);
-  border-radius: 14px;
-  background: var(--tp-surface-card);
-  box-shadow: var(--tp-shadow-sm);
+  display: flex;
+  align-items: center;
+  gap: 10px !important;
+  min-height: 52px !important;
+  padding: 8px 12px !important;
+  border-radius: var(--tp-radius-md) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  background: var(--tp-surface-card) !important;
+  box-shadow: var(--tp-shadow-sm) !important;
 }
 
-.case-page .filter-search-input :deep(.el-input__wrapper),
-.case-page .filter-dropdown :deep(.el-select__wrapper),
+.case-page .filter-search-input :deep(.el-input__wrapper) {
+  min-height: 36px !important;
+  height: 36px !important;
+  border-radius: 999px !important;
+  border: none !important;
+  box-shadow: none !important;
+  background: var(--tp-surface-input) !important;
+  transition: all var(--tp-transition) !important;
+  padding: 0 14px !important;
+}
+
+.case-page .filter-search-input :deep(.el-input__wrapper:hover) {
+  background: var(--tp-surface-hover) !important;
+}
+
+.case-page .filter-search-input :deep(.el-input__wrapper.is-focus) {
+  background: var(--tp-surface-base, #ffffff) !important;
+  box-shadow: 0 0 0 1.5px var(--tp-primary) !important;
+}
+
+.case-page .filter-dropdown :deep(.el-select__wrapper) {
+  min-height: 36px !important;
+  height: 36px !important;
+  border-radius: 999px !important;
+  border: none !important;
+  box-shadow: none !important;
+  background: var(--tp-surface-input) !important;
+  transition: all var(--tp-transition) !important;
+  padding: 0 14px !important;
+}
+
+.case-page .filter-dropdown :deep(.el-select__wrapper.is-hovering:not(.is-focused)) {
+  background: var(--tp-surface-hover) !important;
+}
+
+.case-page .filter-dropdown :deep(.el-select__wrapper.is-focused) {
+  background: var(--tp-surface-base, #ffffff) !important;
+  box-shadow: 0 0 0 1.5px var(--tp-primary) !important;
+}
+
+.case-page .filter-dropdown :deep(.el-select__suffix) {
+  color: var(--tp-text-muted) !important;
+}
+
 .case-page .filter-icon-btn {
-  min-height: 34px;
-  border-radius: 10px !important;
+  min-height: 36px !important;
+  height: 36px !important;
+  width: 36px !important;
+  border-radius: 999px !important;
+  border: none !important;
+  box-shadow: none !important;
+  background: var(--tp-surface-input) !important;
+  transition: all var(--tp-transition) !important;
+  color: var(--tp-text-muted) !important;
+}
+
+.case-page .filter-icon-btn:hover {
+  background: var(--tp-surface-hover) !important;
+  color: var(--tp-primary) !important;
 }
 
 .case-page .filter-bar-search {
@@ -5392,56 +5429,53 @@ watch(selectedProject, (newId) => {
 .case-page .filter-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 50px;
-  padding: 8px 10px !important;
-  border-radius: 10px !important;
-  box-shadow: none !important;
-  background: var(--tp-surface-card) !important;
+  gap: 10px !important;
+  min-height: 52px !important;
+  padding: 8px 12px !important;
+  border-radius: var(--tp-radius-md) !important;
   border: 1px solid var(--tp-border-subtle) !important;
+  background: var(--tp-surface-card) !important;
+  box-shadow: var(--tp-shadow-sm) !important;
 }
 
 .case-page .filter-search-input :deep(.el-input__wrapper) {
-  min-height: 36px;
-  border-radius: 8px !important;
-  box-shadow: 0 0 0 1px transparent inset !important;
-  background: var(--tp-surface-base, #f8f9fa) !important;
-  transition: all 0.15s ease;
-  padding: 0 10px !important;
+  min-height: 36px !important;
+  height: 36px !important;
+  border-radius: 999px !important;
+  border: none !important;
+  box-shadow: none !important;
+  background: var(--tp-surface-input) !important;
+  transition: all var(--tp-transition) !important;
+  padding: 0 14px !important;
 }
 
 .case-page .filter-search-input :deep(.el-input__wrapper:hover) {
-  box-shadow: 0 0 0 1px var(--tp-border-strong) inset !important;
-  background: var(--tp-surface-card) !important;
+  background: var(--tp-surface-hover) !important;
 }
 
 .case-page .filter-search-input :deep(.el-input__wrapper.is-focus) {
-  background: #fff !important;
-  box-shadow:
-    0 0 0 1px var(--tp-accent-primary-border) inset,
-    0 0 0 2px var(--tp-accent-primary-soft) !important;
+  background: var(--tp-surface-base, #ffffff) !important;
+  box-shadow: 0 0 0 1.5px var(--tp-primary) !important;
 }
 
 .case-page .filter-dropdown :deep(.el-select__wrapper) {
-  min-height: 36px;
-  border-radius: 8px !important;
-  box-shadow: 0 0 0 1px var(--tp-border-subtle) inset !important;
-  background: transparent !important;
+  min-height: 36px !important;
+  height: 36px !important;
+  border-radius: 999px !important;
   border: none !important;
-  transition: all 0.15s ease;
-  padding: 0 10px !important;
+  box-shadow: none !important;
+  background: var(--tp-surface-input) !important;
+  transition: all var(--tp-transition) !important;
+  padding: 0 14px !important;
 }
 
 .case-page .filter-dropdown :deep(.el-select__wrapper.is-hovering:not(.is-focused)) {
-  box-shadow: 0 0 0 1px var(--tp-border-strong) inset !important;
-  background: var(--tp-surface-base, #f8f9fa) !important;
+  background: var(--tp-surface-hover) !important;
 }
 
 .case-page .filter-dropdown :deep(.el-select__wrapper.is-focused) {
-  box-shadow:
-    0 0 0 1px var(--tp-accent-primary-border) inset,
-    0 0 0 2px var(--tp-accent-primary-soft) !important;
-  background: #fff !important;
+  background: var(--tp-surface-base, #ffffff) !important;
+  box-shadow: 0 0 0 1.5px var(--tp-primary) !important;
 }
 
 .case-page .filter-dropdown :deep(.el-select__suffix) {
@@ -5449,21 +5483,20 @@ watch(selectedProject, (newId) => {
 }
 
 .case-page .filter-icon-btn {
-  min-height: 36px;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px !important;
+  min-height: 36px !important;
+  height: 36px !important;
+  width: 36px !important;
+  border-radius: 999px !important;
+  border: none !important;
   box-shadow: none !important;
-  border: 1px solid var(--tp-border-subtle) !important;
-  background: transparent !important;
-  transition: all 0.15s ease;
-  color: var(--tp-text-muted);
+  background: var(--tp-surface-input) !important;
+  transition: all var(--tp-transition) !important;
+  color: var(--tp-text-muted) !important;
 }
 
 .case-page .filter-icon-btn:hover {
-  border-color: var(--tp-border-strong) !important;
-  color: var(--tp-text-primary) !important;
-  background: var(--tp-surface-base, #f8f9fa) !important;
+  background: var(--tp-surface-hover) !important;
+  color: var(--tp-primary) !important;
 }
 
 .case-page .filter-search-input :deep(.el-input__prefix .el-icon) {
@@ -5799,48 +5832,67 @@ html[data-theme='genart'] .case-page .table-shell input[type='checkbox']:indeter
 }
 
 .case-page .insights-cards {
-  gap: 6px !important;
+  gap: 12px !important;
 }
 
 .case-page .insight-card {
-  min-height: 68px !important;
-  padding: 8px 10px !important;
-  border-radius: 11px !important;
+  min-height: 80px !important;
+  padding: 10px 12px !important;
+  border-radius: 12px !important;
+  /* 卡片渐变背景与投影 */
+  background:
+    linear-gradient(180deg, var(--tp-surface-sheen), transparent 40%), var(--tp-surface-card) !important;
+  border-color: var(--tp-border-subtle) !important;
+  box-shadow: var(--tp-shadow-card) !important;
+}
+
+.case-page .insight-card:hover {
+  transform: none;
+  border-color: var(--tp-border-strong) !important;
+  box-shadow: var(--tp-shadow-card-hover) !important;
 }
 
 .case-page .insight-icon-wrap {
-  width: 28px !important;
-  height: 28px !important;
+  width: 32px !important;
+  height: 32px !important;
   border-radius: 8px;
 }
 
 .case-page .insight-icon-wrap .material-symbols-outlined {
-  font-size: 17px;
+  font-size: 18px !important;
 }
 
 .case-page .insight-label {
-  font-size: 11px;
+  font-size: 11px !important;
+  font-weight: var(--tp-font-bold) !important;
+  color: var(--tp-text-muted) !important;
   line-height: var(--tp-line-ui);
 }
 
 .case-page .insight-value {
-  margin: 3px 0 !important;
-  font-size: 21px !important;
+  margin: 4px 0 !important;
+  font-size: 22px !important;
+  font-weight: 780 !important;
+  color: var(--tp-text-primary) !important;
   line-height: 1;
 }
 
 .case-page .insight-value span {
-  font-size: 12px !important;
+  font-size: 13px !important;
 }
 
 .case-page .insight-trend {
   margin-top: 8px !important;
-  padding: 1px 6px;
+  padding: 1px 6px !important;
+  border-radius: 999px !important;
   font-size: 10px !important;
+  border: 1px solid transparent !important;
+  display: inline-flex !important;
+  align-items: center !important;
 }
 
 .case-page .insight-chart {
-  height: 14px;
+  height: 15px;
   gap: 2px;
 }
 
@@ -5974,5 +6026,67 @@ html[data-theme='genart'] .case-page .table-shell input[type='checkbox']:indeter
   .case-page .filter-bar-selects {
     flex-wrap: wrap;
   }
+}
+
+/* ── 筛选下拉悬浮窗 (Popper) 美化样式 ── */
+:global(.filter-select-popper-pl.el-popper) {
+  border: 1px solid var(--tp-border-subtle) !important;
+  border-radius: var(--tp-radius-md) !important;
+  box-shadow: var(--tp-shadow-sm) !important;
+  background: var(--tp-glass-bg-strong, rgba(255, 255, 255, 0.96)) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+/* 暗色主题适配 */
+:global(html[data-theme='genart'] .filter-select-popper-pl.el-popper) {
+  background: var(--tp-gray-100) !important;
+  border-color: var(--tp-border-subtle) !important;
+}
+
+/* 下拉菜单列表内边距，使选项呈现悬浮感 */
+:global(.filter-select-popper-pl .el-select-dropdown__list) {
+  padding: 6px !important;
+}
+
+/* 下拉选项圆角与交互过渡 */
+:global(.filter-select-popper-pl .el-select-dropdown__item) {
+  height: 32px !important;
+  line-height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: var(--tp-radius-sm) !important;
+  color: var(--tp-text-secondary) !important;
+  font-size: 13px !important;
+  font-weight: var(--tp-font-medium) !important;
+  margin-bottom: 2px !important;
+  transition: all var(--tp-transition) !important;
+}
+
+:global(.filter-select-popper-pl .el-select-dropdown__item:last-child) {
+  margin-bottom: 0 !important;
+}
+
+/* 选项 Hover 态 */
+:global(.filter-select-popper-pl .el-select-dropdown__item.is-hovering),
+:global(.filter-select-popper-pl .el-select-dropdown__item:hover) {
+  background: var(--tp-surface-hover) !important;
+  color: var(--tp-primary) !important;
+}
+
+/* 选项 Selected 选中态 */
+:global(.filter-select-popper-pl .el-select-dropdown__item.is-selected) {
+  background: var(--tp-accent-primary-soft) !important;
+  color: var(--tp-primary) !important;
+  font-weight: var(--tp-font-semibold) !important;
+}
+
+/* 箭头三角背景色与边框色对齐 */
+:global(.filter-select-popper-pl .el-popper__arrow::before) {
+  background: var(--tp-glass-bg-strong, rgba(255, 255, 255, 0.96)) !important;
+  border-color: var(--tp-border-subtle) !important;
+}
+
+:global(html[data-theme='genart'] .filter-select-popper-pl .el-popper__arrow::before) {
+  background: var(--tp-gray-100) !important;
+  border-color: var(--tp-border-subtle) !important;
 }
 </style>

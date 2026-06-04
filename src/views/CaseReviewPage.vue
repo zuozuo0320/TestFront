@@ -26,6 +26,8 @@ import {
 import { runPlanAIGate, type PlanRunReport } from '../api/caseReviewV02'
 import { listTestCases } from '../api/testcase'
 import { extractErrorMessage, isElMessageBoxCancel } from '../utils/error'
+import EmptyState from '../components/EmptyState.vue'
+import { Clock, Activity, CheckCircle2, Archive } from 'lucide-vue-next'
 
 // ── Stores ──
 const projectStore = useProjectStore()
@@ -639,18 +641,11 @@ async function fetchSummary() {
   }
 }
 
-/** 统计卡进度条宽度：按占"全部计划"的比例渲染 */
-function barWidth(count: number): number {
-  const total = summary.value.total_plans
-  if (!total || total <= 0) return 0
-  return Math.round((count / total) * 100)
-}
-
-/** "已完成"卡副标：当已完成 > 0 且还有其它计划时，展示完成率 */
+/** "已完成"卡副标：展示完成率 */
 const completedRateLabel = computed(() => {
   const { completed_plans: done, total_plans: total } = summary.value
-  if (!done || !total || total <= 0) return ''
-  return `${Math.round((done / total) * 100)}% 完成率`
+  if (!total || total <= 0) return '0%'
+  return `${Math.round((done / total) * 100)}%`
 })
 
 // ── 分页辅助 ──
@@ -743,104 +738,91 @@ function reviewStatusLabel(review: CaseReview) {
 
 <template>
   <div class="case-review-page">
-    <!-- ─── 页面标题 ─── -->
-    <div class="pipeline-header">
-      <div class="pipeline-header-top">
-        <div>
-          <h1 class="pipeline-title">用例评审中心</h1>
-        </div>
-        <div class="pipeline-actions">
-          <div class="pipeline-search-box">
-            <span class="material-symbols-outlined search-icon-pl">search</span>
-            <input
-              v-model="searchKeyword"
-              type="text"
-              aria-label="搜索评审计划"
-              placeholder="搜索计划名称 / ID"
-              class="pipeline-search-input"
-              @keyup.enter="handleSearch"
-            />
-          </div>
-          <button
-            type="button"
-            class="pipeline-btn-create"
-            @click="router.push('/case-reviews/create')"
-          >
-            <span class="material-symbols-outlined" style="font-size: 18px">add_circle</span>
-            新建评审
-          </button>
-        </div>
-      </div>
-    </div>
-
     <!-- ─── 统计卡片（计划维度：未开始/进行中/已完成/已关闭） ─── -->
-    <div class="stats-grid">
+    <div class="insights-cards" style="margin-bottom: 8px">
       <!-- 未开始 -->
-      <div class="stat-card-pl">
-        <div class="stat-bg-icon">
-          <span class="material-symbols-outlined">pending_actions</span>
+      <div class="insight-card">
+        <div class="insight-left">
+          <div class="insight-icon-wrap icon-blue">
+            <Clock :size="18" />
+          </div>
+          <div class="insight-trend trend-grey">{{ summary.not_started_plans }} 计划</div>
         </div>
-        <p class="stat-label-pl">未开始</p>
-        <div class="stat-value-row">
-          <span class="stat-num">{{ summary.not_started_plans }}</span>
-          <span class="stat-sub-hint">个计划</span>
-        </div>
-        <div class="stat-bar-track">
-          <div
-            class="stat-bar-fill bar-secondary"
-            :style="{ width: barWidth(summary.not_started_plans) + '%' }"
-          ></div>
+        <div class="insight-right">
+          <div class="insight-label">未开始</div>
+          <div class="insight-value">{{ summary.not_started_plans }}</div>
+          <div class="insight-chart">
+            <div class="bar" style="height: 30%; background: var(--tp-accent-info-soft)"></div>
+            <div class="bar" style="height: 50%; background: var(--tp-accent-info-border)"></div>
+            <div class="bar" style="height: 80%; background: var(--tp-accent-info)"></div>
+          </div>
         </div>
       </div>
+
       <!-- 进行中 -->
-      <div class="stat-card-pl">
-        <div class="stat-bg-icon icon-primary">
-          <span class="material-symbols-outlined">sync</span>
-        </div>
-        <p class="stat-label-pl">进行中</p>
-        <div class="stat-value-row">
-          <span class="stat-num">{{ summary.in_progress_plans }}</span>
-          <span v-if="summary.in_progress_plans > 0" class="stat-sub primary">进行中</span>
-        </div>
-        <div class="stat-bar-track">
+      <div class="insight-card">
+        <div class="insight-left">
+          <div class="insight-icon-wrap icon-purple">
+            <Activity :size="18" />
+          </div>
           <div
-            class="stat-bar-fill bar-primary"
-            :style="{ width: barWidth(summary.in_progress_plans) + '%' }"
-          ></div>
+            class="insight-trend trend-green"
+            :class="{ 'trend-grey': summary.in_progress_plans === 0 }"
+          >
+            {{ summary.in_progress_plans > 0 ? '活跃' : '无活跃' }}
+          </div>
+        </div>
+        <div class="insight-right">
+          <div class="insight-label">进行中</div>
+          <div class="insight-value">{{ summary.in_progress_plans }}</div>
+          <div class="insight-chart">
+            <div class="bar" style="height: 40%; background: var(--tp-accent-primary-soft)"></div>
+            <div class="bar" style="height: 70%; background: var(--tp-accent-primary-border)"></div>
+            <div class="bar" style="height: 90%; background: var(--tp-primary)"></div>
+          </div>
         </div>
       </div>
+
       <!-- 已完成 -->
-      <div class="stat-card-pl">
-        <div class="stat-bg-icon icon-emerald">
-          <span class="material-symbols-outlined">check_circle</span>
-        </div>
-        <p class="stat-label-pl">已完成</p>
-        <div class="stat-value-row">
-          <span class="stat-num">{{ summary.completed_plans }}</span>
-          <span v-if="completedRateLabel" class="stat-sub emerald">{{ completedRateLabel }}</span>
-        </div>
-        <div class="stat-bar-track">
+      <div class="insight-card">
+        <div class="insight-left">
+          <div class="insight-icon-wrap icon-emerald">
+            <CheckCircle2 :size="18" />
+          </div>
           <div
-            class="stat-bar-fill bar-emerald"
-            :style="{ width: barWidth(summary.completed_plans) + '%' }"
-          ></div>
+            class="insight-trend trend-green"
+            :class="{ 'trend-grey': summary.completed_plans === 0 }"
+          >
+            {{ completedRateLabel }}
+          </div>
+        </div>
+        <div class="insight-right">
+          <div class="insight-label">已完成</div>
+          <div class="insight-value">{{ summary.completed_plans }}</div>
+          <div class="insight-chart">
+            <div class="bar" style="height: 30%; background: var(--tp-accent-success-soft)"></div>
+            <div class="bar" style="height: 60%; background: var(--tp-accent-success-border)"></div>
+            <div class="bar" style="height: 100%; background: var(--tp-accent-success)"></div>
+          </div>
         </div>
       </div>
+
       <!-- 已关闭 -->
-      <div class="stat-card-pl">
-        <div class="stat-bg-icon icon-error">
-          <span class="material-symbols-outlined">cancel</span>
+      <div class="insight-card">
+        <div class="insight-left">
+          <div class="insight-icon-wrap icon-red">
+            <Archive :size="18" />
+          </div>
+          <div class="insight-trend trend-grey">已归档</div>
         </div>
-        <p class="stat-label-pl">已关闭</p>
-        <div class="stat-value-row">
-          <span class="stat-num">{{ summary.closed_plans }}</span>
-          <span v-if="summary.closed_plans > 0" class="stat-sub-hint">不再可编辑</span>
-        </div>
-        <div class="stat-bar-track">
-          <div
-            class="stat-bar-fill bar-error"
-            :style="{ width: barWidth(summary.closed_plans) + '%' }"
-          ></div>
+        <div class="insight-right">
+          <div class="insight-label">已关闭</div>
+          <div class="insight-value">{{ summary.closed_plans }}</div>
+          <div class="insight-chart">
+            <div class="bar" style="height: 80%; background: var(--tp-accent-danger-border)"></div>
+            <div class="bar" style="height: 40%; background: var(--tp-accent-danger)"></div>
+            <div class="bar" style="height: 60%; background: var(--tp-danger)"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -849,7 +831,18 @@ function reviewStatusLabel(review: CaseReview) {
     <div class="table-container-pl">
       <!-- 表头栏 -->
       <div class="table-header-bar">
-        <h3 class="table-section-title">所有评审任务</h3>
+        <!-- 搜索输入框 -->
+        <div class="pipeline-search-box">
+          <span class="material-symbols-outlined search-icon-pl">search</span>
+          <input
+            v-model="searchKeyword"
+            type="text"
+            aria-label="搜索评审计划"
+            placeholder="搜索计划名称 / ID"
+            class="pipeline-search-input"
+            @keyup.enter="handleSearch"
+          />
+        </div>
         <div class="table-header-actions">
           <div class="view-tabs-pl">
             <button
@@ -876,16 +869,36 @@ function reviewStatusLabel(review: CaseReview) {
               </span>
             </button>
           </div>
-          <el-select v-model="filterStatus" placeholder="状态" clearable class="filter-select-pl">
+          <el-select
+            v-model="filterStatus"
+            placeholder="状态"
+            clearable
+            class="filter-select-pl"
+            popper-class="filter-select-popper-pl"
+          >
             <el-option label="未开始" value="not_started" />
             <el-option label="进行中" value="in_progress" />
             <el-option label="已完成" value="completed" />
             <el-option label="已关闭" value="closed" />
           </el-select>
-          <el-select v-model="filterMode" placeholder="模式" clearable class="filter-select-pl">
+          <el-select
+            v-model="filterMode"
+            placeholder="模式"
+            clearable
+            class="filter-select-pl"
+            popper-class="filter-select-popper-pl"
+          >
             <el-option label="独审" value="single" />
             <el-option label="会签" value="parallel" />
           </el-select>
+          <button
+            type="button"
+            class="pipeline-btn-create"
+            @click="router.push('/case-reviews/create')"
+          >
+            <span class="material-symbols-outlined" style="font-size: 18px">add_circle</span>
+            新建评审
+          </button>
         </div>
       </div>
 
@@ -1036,19 +1049,20 @@ function reviewStatusLabel(review: CaseReview) {
         </table>
       </div>
 
-      <!-- 空状态 -->
       <div v-else class="empty-state-pl">
-        <span class="material-symbols-outlined empty-icon-pl">rate_review</span>
-        <h3 class="empty-title-pl">还没有评审计划</h3>
-        <p class="empty-desc-pl">创建评审计划，关联测试用例，邀请团队成员进行用例评审</p>
-        <button
-          type="button"
-          class="pipeline-btn-create"
-          @click="router.push('/case-reviews/create')"
+        <EmptyState
+          type="review"
+          :show-action="true"
+          action-text="创建第一个评审计划"
+          @action="router.push('/case-reviews/create')"
         >
-          <span class="material-symbols-outlined" style="font-size: 18px">add_circle</span>
-          创建第一个评审计划
-        </button>
+          <template #description>
+            <div class="empty-desc-container">
+              <h3 class="empty-title-pl">还没有评审计划</h3>
+              <p class="empty-desc-pl">创建评审计划，关联测试用例，邀请团队成员进行用例评审</p>
+            </div>
+          </template>
+        </EmptyState>
       </div>
 
       <!-- 分页器 -->
@@ -2793,8 +2807,8 @@ function reviewStatusLabel(review: CaseReview) {
 }
 
 .case-review-page .pipeline-btn-create {
-  min-height: 30px;
-  height: 30px;
+  min-height: 32px;
+  height: 32px;
   padding: 0 12px;
   border-radius: 8px;
   font-size: 12px;
@@ -2865,32 +2879,8 @@ function reviewStatusLabel(review: CaseReview) {
   gap: 8px;
 }
 
-.case-review-page .view-tabs-pl {
-  min-height: 30px;
-  padding: 2px;
-  border-radius: 8px;
-}
-
-.case-review-page .view-tab-pl {
-  min-height: 26px;
-  padding: 4px 9px;
-  border-radius: 7px;
-  font-size: 12px;
-}
-
 .case-review-page .view-tab-pl .material-symbols-outlined {
   font-size: 15px !important;
-}
-
-.case-review-page .filter-select-pl {
-  width: 86px;
-  --el-component-size: 30px;
-}
-
-.case-review-page :deep(.filter-select-pl .el-select__wrapper) {
-  min-height: 30px !important;
-  padding: 0 8px !important;
-  border-radius: 8px !important;
 }
 
 .case-review-page .pipeline-table {
@@ -3037,88 +3027,108 @@ function reviewStatusLabel(review: CaseReview) {
     var(--review-focus-ring);
 }
 
-.case-review-page .stats-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px !important;
-  margin-bottom: 8px !important;
+.case-review-page .insights-cards {
+  margin-bottom: 10px !important;
+  gap: 12px !important;
 }
 
-.case-review-page .stat-card-pl {
-  min-height: 76px;
-  padding: 11px 12px 10px;
-  border: 1px solid var(--tp-border-subtle);
-  border-radius: 12px;
-  background: var(--tp-surface-card);
-  box-shadow: none;
+.case-review-page .insight-card {
+  min-height: 80px !important;
+  padding: 10px 12px !important;
+  /* 渐变背景与卡片阴影，适配亮色与暗色主题 */
+  background:
+    linear-gradient(180deg, var(--tp-surface-sheen), transparent 40%), var(--tp-surface-card) !important;
+  border-color: var(--tp-border-subtle) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--tp-shadow-card) !important;
 }
 
-.case-review-page .stat-card-pl::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 2px;
-  background: var(--tp-border-subtle);
+.case-review-page .insight-card:hover {
+  transform: none;
+  border-color: var(--tp-border-strong) !important;
+  box-shadow: var(--tp-shadow-card-hover) !important;
 }
 
-.case-review-page .stat-card-pl:nth-child(1)::after {
-  background: var(--tp-accent-info);
+.case-review-page .insight-icon-wrap {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 8px;
 }
 
-.case-review-page .stat-card-pl:nth-child(2)::after {
-  background: var(--tp-primary);
+.case-review-page .insight-icon-wrap .material-symbols-outlined {
+  font-size: 18px !important;
 }
 
-.case-review-page .stat-card-pl:nth-child(3)::after {
-  background: var(--tp-accent-success);
+.case-review-page .insight-trend {
+  margin-top: 8px !important;
+  padding: 1px 6px !important;
+  border-radius: 999px !important;
+  font-size: 10px !important;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
 }
 
-.case-review-page .stat-card-pl:nth-child(4)::after {
-  background: var(--tp-accent-danger);
+.case-review-page .trend-grey {
+  background: var(--tp-surface-muted) !important;
+  border-color: var(--tp-border-subtle) !important;
+  color: var(--tp-text-secondary) !important;
 }
 
-.case-review-page .stat-card-pl:hover {
-  border-color: var(--tp-border-strong);
-  box-shadow: var(--tp-shadow-sm);
+.case-review-page .trend-green {
+  background: var(--tp-accent-success-soft) !important;
+  border-color: var(--tp-accent-success-border) !important;
+  color: var(--tp-accent-success) !important;
 }
 
-.case-review-page .stat-bg-icon {
-  display: none;
+.case-review-page .trend-red {
+  background: var(--tp-accent-danger-soft) !important;
+  border-color: var(--tp-accent-danger-border) !important;
+  color: var(--tp-accent-danger) !important;
 }
 
-.case-review-page .stat-value-row {
-  align-items: flex-end;
-  min-height: 26px;
-}
-
-.case-review-page .stat-label-pl {
-  margin-bottom: 4px;
-  color: var(--tp-text-muted) !important;
+.case-review-page .insight-label {
   font-size: 11px !important;
-  font-weight: var(--tp-font-semibold) !important;
+  font-weight: var(--tp-font-bold) !important;
+  color: var(--tp-text-muted) !important;
 }
 
-.case-review-page .stat-num {
-  color: var(--tp-text-primary);
+.case-review-page .insight-value {
+  margin: 4px 0 !important;
   font-size: 22px !important;
-  font-variant-numeric: tabular-nums;
+  font-weight: 780;
+  color: var(--tp-text-primary) !important;
 }
 
-.case-review-page .stat-sub,
-.case-review-page .stat-sub-hint {
-  font-size: 11px;
-  line-height: var(--tp-line-ui);
+.case-review-page .insight-chart {
+  height: 15px;
+  gap: 2px;
 }
 
-.case-review-page .stat-sub-hint {
-  color: var(--tp-text-subtle);
+.case-review-page .bar {
+  width: 3px;
+  border-radius: 999px;
 }
 
-.case-review-page .stat-bar-track {
-  height: 3px;
-  margin-top: 9px;
-  background: var(--tp-gray-100);
+/* 适配主题色状态图标 */
+.case-review-page .icon-purple {
+  background: var(--tp-accent-primary-soft) !important;
+  color: var(--tp-primary) !important;
+}
+
+.case-review-page .icon-blue {
+  background: var(--tp-accent-info-soft) !important;
+  color: var(--tp-accent-info) !important;
+}
+
+.case-review-page .icon-red {
+  background: var(--tp-accent-danger-soft) !important;
+  color: var(--tp-accent-danger) !important;
+}
+
+.case-review-page .icon-emerald {
+  background: var(--tp-accent-success-soft) !important;
+  color: var(--tp-accent-success) !important;
 }
 
 .case-review-page .table-container-pl {
@@ -3156,34 +3166,70 @@ function reviewStatusLabel(review: CaseReview) {
 }
 
 .case-review-page .view-tabs-pl {
-  min-height: 30px;
-  border: 1px solid var(--tp-border-subtle);
-  background: var(--tp-surface-input);
+  display: flex;
+  align-items: center;
+  min-height: 32px !important;
+  height: 32px !important;
+  padding: 2px !important;
+  background: var(--tp-surface-input) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  border-radius: 999px !important;
+  gap: 2px !important;
 }
 
 .case-review-page .view-tab-pl {
-  min-height: 26px;
-  border: 1px solid transparent;
-  color: var(--tp-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px !important;
+  min-height: 26px !important;
+  height: 26px !important;
+  padding: 0 12px !important;
+  border: none !important;
+  border-radius: 999px !important;
+  background: transparent !important;
+  color: var(--tp-text-muted) !important;
+  font-size: 12px !important;
+  font-weight: var(--tp-font-medium) !important;
+  cursor: pointer;
+  transition: all var(--tp-transition) !important;
 }
 
 .case-review-page .view-tab-pl:hover:not(.active) {
-  border-color: var(--tp-border-subtle);
-  background: var(--tp-surface-hover);
-  color: var(--tp-text-primary);
+  background: var(--tp-surface-hover) !important;
+  color: var(--tp-text-primary) !important;
+  border: none !important;
 }
 
 .case-review-page .view-tab-pl.active {
-  border-color: var(--tp-accent-primary-border);
-  background: var(--tp-surface-card);
-  color: var(--tp-primary);
-  box-shadow: inset 0 -2px 0 var(--tp-primary);
+  background: var(--tp-primary) !important;
+  color: #ffffff !important;
+  font-weight: var(--tp-font-semibold) !important;
+  box-shadow: 0 2px 6px var(--tp-primary-shadow) !important;
+  border: none !important;
+}
+
+/* 覆盖 layout-enhance.css 中对 active tab 的 !important 样式 */
+.case-review-page .view-tabs-pl .view-tab-pl.active {
+  background: var(--tp-primary) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 2px 6px var(--tp-primary-shadow) !important;
+}
+
+.case-review-page .filter-select-pl {
+  width: 100px !important;
+  --el-component-size: 32px !important;
 }
 
 .case-review-page :deep(.filter-select-pl .el-select__wrapper) {
-  border-color: var(--tp-border-subtle) !important;
+  min-height: 32px !important;
+  height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: 999px !important;
+  border: 1px solid var(--tp-border-subtle) !important;
   background: var(--tp-surface-card) !important;
   box-shadow: none !important;
+  transition: all var(--tp-transition) !important;
 }
 
 .case-review-page :deep(.filter-select-pl .el-select__wrapper:hover) {
@@ -3192,8 +3238,70 @@ function reviewStatusLabel(review: CaseReview) {
 
 .case-review-page :deep(.filter-select-pl .el-select__wrapper.is-focused),
 .case-review-page :deep(.filter-select-pl .el-select__wrapper.is-focus) {
-  border-color: var(--tp-accent-primary-border) !important;
+  border-color: var(--tp-primary) !important;
   box-shadow: var(--review-focus-ring) !important;
+}
+
+/* ── 筛选下拉悬浮窗 (Popper) 美化样式 ── */
+:global(.filter-select-popper-pl.el-popper) {
+  border: 1px solid var(--tp-border-subtle) !important;
+  border-radius: var(--tp-radius-md) !important;
+  box-shadow: var(--tp-shadow-sm) !important;
+  background: var(--tp-glass-bg-strong, rgba(255, 255, 255, 0.96)) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+/* 暗色主题适配 */
+:global(html[data-theme='genart'] .filter-select-popper-pl.el-popper) {
+  background: var(--tp-gray-100) !important;
+  border-color: var(--tp-border-subtle) !important;
+}
+
+/* 下拉菜单列表内边距，使选项呈现悬浮感 */
+:global(.filter-select-popper-pl .el-select-dropdown__list) {
+  padding: 6px !important;
+}
+
+/* 下拉选项圆角与交互过渡 */
+:global(.filter-select-popper-pl .el-select-dropdown__item) {
+  height: 32px !important;
+  line-height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: var(--tp-radius-sm) !important;
+  color: var(--tp-text-secondary) !important;
+  font-size: 13px !important;
+  font-weight: var(--tp-font-medium) !important;
+  margin-bottom: 2px !important;
+  transition: all var(--tp-transition) !important;
+}
+
+:global(.filter-select-popper-pl .el-select-dropdown__item:last-child) {
+  margin-bottom: 0 !important;
+}
+
+/* 选项 Hover 态 */
+:global(.filter-select-popper-pl .el-select-dropdown__item.is-hovering),
+:global(.filter-select-popper-pl .el-select-dropdown__item:hover) {
+  background: var(--tp-surface-hover) !important;
+  color: var(--tp-primary) !important;
+}
+
+/* 选项 Selected 选中态 */
+:global(.filter-select-popper-pl .el-select-dropdown__item.is-selected) {
+  background: var(--tp-accent-primary-soft) !important;
+  color: var(--tp-primary) !important;
+  font-weight: var(--tp-font-semibold) !important;
+}
+
+/* 箭头三角背景色与边框色对齐 */
+:global(.filter-select-popper-pl .el-popper__arrow::before) {
+  background: var(--tp-glass-bg-strong, rgba(255, 255, 255, 0.96)) !important;
+  border-color: var(--tp-border-subtle) !important;
+}
+
+:global(html[data-theme='genart'] .filter-select-popper-pl .el-popper__arrow::before) {
+  background: var(--tp-gray-100) !important;
+  border-color: var(--tp-border-subtle) !important;
 }
 
 .case-review-page .table-scroll-area {
@@ -3581,14 +3689,14 @@ function reviewStatusLabel(review: CaseReview) {
 }
 
 @media (max-width: 1200px) {
-  .case-review-page .stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .case-review-page .insights-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
 
 @media (max-width: 640px) {
-  .case-review-page .stats-grid {
-    grid-template-columns: 1fr;
+  .case-review-page .insights-cards {
+    grid-template-columns: 1fr !important;
   }
 }
 </style>
