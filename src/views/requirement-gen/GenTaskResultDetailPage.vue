@@ -54,6 +54,18 @@ const activeSteps = computed(() => parseSteps(activeResult.value?.steps || ''))
 const activeSuggestedTags = computed(() =>
   parseSuggestedTags(activeResult.value?.tags_suggested || ''),
 )
+const hasSuggestedTags = computed(() => {
+  return (
+    activeSuggestedTags.value.length > 0 &&
+    !activeSuggestedTags.value.every(
+      (tag) => tag === '无' || tag === '暂无' || tag === 'empty' || tag === '',
+    )
+  )
+})
+const hasRemark = computed(() => {
+  const remark = activeResult.value?.remark?.trim()
+  return !!(remark && remark !== '无' && remark !== '暂无' && remark !== '无备注')
+})
 const pendingActionableResults = computed(() =>
   currentResults.value.filter((result) => !result.adopted && !result.discarded),
 )
@@ -285,7 +297,7 @@ watch(
                 </section>
               </div>
 
-              <section v-if="activeSuggestedTags.length" class="detail-section">
+              <section v-if="hasSuggestedTags" class="detail-section">
                 <h3>建议标签</h3>
                 <div class="result-tags">
                   <span
@@ -333,7 +345,7 @@ watch(
                 </div>
               </section>
 
-              <section v-if="activeResult.remark" class="detail-section remark-card">
+              <section v-if="hasRemark" class="detail-section remark-card">
                 <h3>
                   <span class="material-symbols-outlined">notes</span>
                   备注说明
@@ -950,6 +962,7 @@ watch(
 }
 
 .detail-section {
+  flex-shrink: 0;
   overflow: hidden;
   padding: 14px;
   border: 1px solid var(--tp-border-subtle);
@@ -1070,20 +1083,20 @@ watch(
 }
 
 .readonly-box {
-  min-height: 96px;
-  padding: 14px 16px;
+  min-height: 80px;
+  padding: 12px 14px;
   overflow: auto;
   border: 1px solid color-mix(in srgb, var(--tp-border-subtle) 84%, transparent);
-  border-radius: var(--tp-radius-lg);
-  background: color-mix(in srgb, var(--tp-bg-page) 72%, var(--tp-surface-card));
+  border-radius: var(--tp-radius-md);
+  background: var(--tp-surface-muted);
   color: var(--tp-text-primary);
-  font-size: 14px;
-  line-height: 1.8;
+  font-size: 13px;
+  line-height: 1.6;
   white-space: pre-wrap;
 }
 
 .readonly-box--compact {
-  min-height: 76px;
+  min-height: 64px;
 }
 
 .result-tags {
@@ -1153,10 +1166,10 @@ watch(
 }
 
 .step-table-head {
-  min-height: 46px;
+  min-height: 40px;
   border-bottom: 1px solid var(--tp-border-subtle);
-  color: var(--tp-text-muted);
-  background: color-mix(in srgb, var(--tp-surface-muted) 76%, transparent);
+  color: var(--tp-text-primary);
+  background: var(--tp-surface-muted);
   font-size: 13px;
   font-weight: var(--tp-font-bold);
 }
@@ -1166,12 +1179,21 @@ watch(
   display: flex;
   align-items: center;
   min-width: 0;
-  padding: 14px 16px;
+  padding: 10px 14px;
 }
 
 .step-table-row {
-  min-height: 78px;
+  min-height: 56px;
   color: var(--tp-text-primary);
+  transition: background 0.2s ease;
+}
+
+.step-table-row:nth-child(even) {
+  background: rgba(139, 92, 246, 0.012);
+}
+
+.step-table-row:hover {
+  background: rgba(139, 92, 246, 0.035) !important;
 }
 
 .step-table-row + .step-table-row {
@@ -1192,8 +1214,8 @@ watch(
 
 .step-cell {
   color: var(--tp-text-primary);
-  font-size: 14px;
-  line-height: 1.75;
+  font-size: 13px;
+  line-height: 1.6;
   white-space: pre-wrap;
 }
 

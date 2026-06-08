@@ -14,9 +14,11 @@ import TagHeatGrid from './components/TagHeatGrid.vue'
 import TagBatchPanel from './components/TagBatchPanel.vue'
 import TagFormDialog from './components/TagFormDialog.vue'
 import TagListRow from './components/TagListRow.vue'
+import EmptyState from '../../components/EmptyState.vue'
 
 const {
   loading,
+  initialized,
   tags,
   total,
   page,
@@ -103,9 +105,9 @@ const top5Rings = computed(() => {
     } else {
       return {
         rank: config.rank,
-        name: '未分配槽位',
-        color: 'rgba(255, 255, 255, 0.04)',
-        icon: 'do_not_disturb_on',
+        name: `Slot ${config.rank}`,
+        color: 'rgba(99, 102, 241, 0.15)',
+        icon: 'add', // 使用小加号作为空槽位占位图标，引导点击新建
         count: 0,
         pct: 0,
         isEmpty: true,
@@ -122,8 +124,8 @@ const top5Rings = computed(() => {
       <el-empty description="请先在侧边栏选择一个项目" :image-size="120" />
     </div>
 
-    <!-- State 2: Loading -->
-    <div v-else-if="loading && tags.length === 0" class="tm-skeleton">
+    <!-- State 2: Loading (仅在首次加载未完成时显示，防止切换查询时闪烁) -->
+    <div v-else-if="loading && !initialized" class="tm-skeleton">
       <div style="display: flex; justify-content: space-between; align-items: center">
         <el-skeleton :rows="1" animated style="width: 200px" />
         <el-skeleton :rows="0" animated style="width: 240px; height: 32px" />
@@ -137,28 +139,6 @@ const top5Rings = computed(() => {
 
     <!-- State 3: Data -->
     <template v-else>
-      <!-- ═══ TopNavBar ═══ -->
-      <header class="tm-topnav">
-        <div>
-          <h2 class="tm-title">标签管理中心</h2>
-        </div>
-        <div class="tm-topnav-right">
-          <div class="tm-search-box">
-            <span class="material-symbols-outlined tm-search-icon">search</span>
-            <input
-              v-model="keyword"
-              class="tm-search-input"
-              type="text"
-              aria-label="搜索标签"
-              placeholder="搜索标签..."
-              @keyup.enter="onSearch"
-              @input="onSearchDebounce"
-            />
-            <div v-if="loading" class="tm-search-spinner"></div>
-          </div>
-        </div>
-      </header>
-
       <!-- ═══ Quality Insights Dashboard (极客 TOP 5 + 热度排行榜) ═══ -->
       <section class="tm-insights">
         <!-- Left Column: Circular Dials Dashboard -->
@@ -191,83 +171,92 @@ const top5Rings = computed(() => {
               :class="{ 'is-empty': seg.isEmpty }"
               :style="{
                 '--accent': seg.color,
-                '--accent-glow': seg.isEmpty ? 'rgba(255,255,255,0.01)' : seg.color + '40',
+                '--accent-glow': seg.isEmpty ? 'rgba(99, 102, 241, 0.03)' : seg.color + '40',
               }"
+              @click="seg.isEmpty ? openCreate() : null"
             >
               <!-- 环形 SVG 轨道区 (半径 56, 周长 351.85, 起点为顶部正上方旋转 -90deg) -->
-              <div class="tm-dial-circle-wrapper">
-                <!-- 3D 霓虹空气流光发光内胆 aura (Glassmorphism ambient halo) -->
-                <div v-if="!seg.isEmpty" class="tm-dial-bg-glow"></div>
+              <el-tooltip
+                :disabled="!seg.isEmpty"
+                content="槽位空置，点击快速新建标签"
+                placement="top"
+                effect="dark"
+              >
+                <div class="tm-dial-circle-wrapper">
+                  <!-- 3D 霓虹空气流光发光内胆 aura (Glassmorphism ambient halo) -->
+                  <div v-if="!seg.isEmpty" class="tm-dial-bg-glow"></div>
 
-                <svg class="tm-dial-svg" viewBox="0 0 160 160">
-                  <defs>
-                    <!-- 动态霓虹模糊发光滤镜 -->
-                    <filter :id="'glow-' + idx" x="-20%" y="-20%" width="140%" height="140%">
-                      <feGaussianBlur stdDeviation="3" result="blur" />
-                      <feMerge>
-                        <feMergeNode in="blur" />
-                        <feMergeNode in="SourceGraphic" />
-                      </feMerge>
-                    </filter>
+                  <svg class="tm-dial-svg" viewBox="0 0 160 160">
+                    <defs>
+                      <!-- 动态霓虹模糊发光滤镜 -->
+                      <filter :id="'glow-' + idx" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="3" result="blur" />
+                        <feMerge>
+                          <feMergeNode in="blur" />
+                          <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                      </filter>
 
-                    <!-- 动态高精密圆弧遮罩，用于平滑剪裁出比例部分的 Segment 齿轨 -->
-                    <mask :id="'active-mask-' + idx">
-                      <circle
-                        cx="80"
-                        cy="80"
-                        r="56"
-                        stroke="white"
-                        stroke-width="12"
-                        fill="none"
-                        transform="rotate(-90 80 80)"
-                        stroke-dasharray="351.85"
-                        :stroke-dashoffset="351.85 * (1 - seg.pct / 100)"
-                        stroke-linecap="butt"
-                        style="transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)"
-                      />
-                    </mask>
-                  </defs>
+                      <!-- 动态高精密圆弧遮罩，用于平滑剪裁出比例部分的 Segment 齿轨 -->
+                      <mask :id="'active-mask-' + idx">
+                        <circle
+                          cx="80"
+                          cy="80"
+                          r="56"
+                          stroke="white"
+                          stroke-width="12"
+                          fill="none"
+                          transform="rotate(-90 80 80)"
+                          stroke-dasharray="351.85"
+                          :stroke-dashoffset="351.85 * (1 - seg.pct / 100)"
+                          stroke-linecap="butt"
+                          style="transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)"
+                        />
+                      </mask>
+                    </defs>
 
-                  <!-- A. 引导圆弧背景齿轮轨道 (Muted Dashed Gear Track) -->
-                  <circle
-                    cx="80"
-                    cy="80"
-                    r="56"
-                    class="tm-dial-track"
-                    stroke-width="6.5"
-                    fill="none"
-                    stroke-dasharray="2.5 3.5"
-                  />
+                    <!-- A. 引导圆弧背景齿轮轨道 (Muted Dashed Gear Track, 空置时使用更精细的虚线点状) -->
+                    <circle
+                      cx="80"
+                      cy="80"
+                      r="56"
+                      class="tm-dial-track"
+                      :class="{ 'is-empty-track': seg.isEmpty }"
+                      :stroke-width="seg.isEmpty ? 4 : 6.5"
+                      fill="none"
+                      :stroke-dasharray="seg.isEmpty ? '1.5 2.5' : '2.5 3.5'"
+                    />
 
-                  <!-- B. 活跃状态流光发光齿弧轨道 (Glowing Active Dash Gear Track) -->
-                  <circle
-                    v-if="!seg.isEmpty && seg.pct > 0"
-                    cx="80"
-                    cy="80"
-                    r="56"
-                    :stroke="seg.color"
-                    stroke-width="7.5"
-                    fill="none"
-                    stroke-dasharray="2.5 3.5"
-                    :mask="'url(#active-mask-' + idx + ')'"
-                    :filter="'url(#glow-' + idx + ')'"
-                  />
-                </svg>
+                    <!-- B. 活跃状态流光发光齿弧轨道 (Glowing Active Dash Gear Track) -->
+                    <circle
+                      v-if="!seg.isEmpty && seg.pct > 0"
+                      cx="80"
+                      cy="80"
+                      r="56"
+                      :stroke="seg.color"
+                      stroke-width="7.5"
+                      fill="none"
+                      stroke-dasharray="2.5 3.5"
+                      :mask="'url(#active-mask-' + idx + ')'"
+                      :filter="'url(#glow-' + idx + ')'"
+                    />
+                  </svg>
 
-                <!-- C. 轨道正中心多维数据核心 (Core Panel) -->
-                <div class="tm-dial-core">
-                  <!-- 图标舱 -->
-                  <div class="tm-dial-icon-container">
-                    <span class="material-symbols-outlined tm-dial-icon">{{ seg.icon }}</span>
+                  <!-- C. 轨道正中心多维数据核心 (Core Panel) -->
+                  <div class="tm-dial-core">
+                    <!-- 图标舱 -->
+                    <div class="tm-dial-icon-container">
+                      <span class="material-symbols-outlined tm-dial-icon">{{ seg.icon }}</span>
+                    </div>
+
+                    <!-- 标签名 -->
+                    <span class="tm-dial-name">{{ seg.name }}</span>
+
+                    <!-- 使用次数 -->
+                    <span class="tm-dial-count">{{ seg.isEmpty ? '0' : seg.count }}</span>
                   </div>
-
-                  <!-- 标签名 -->
-                  <span class="tm-dial-name">{{ seg.name }}</span>
-
-                  <!-- 使用次数 -->
-                  <span class="tm-dial-count">{{ seg.isEmpty ? '-' : seg.count }}</span>
                 </div>
-              </div>
+              </el-tooltip>
 
               <!-- D. 轨道最下方百分比数值 (Colored Percentage Highlight) -->
               <div class="tm-dial-pct">
@@ -292,39 +281,59 @@ const top5Rings = computed(() => {
             :max-case-count="maxCaseCount"
             :rank-bar-colors="rankBarColors"
           />
-          <p v-else class="tm-panel-empty">暂无数据</p>
+          <div v-else class="tm-panel-empty-state">
+            <div class="tm-panel-empty-icon-wrap">
+              <span class="material-symbols-outlined tm-panel-empty-icon">bar_chart</span>
+            </div>
+            <div class="tm-panel-empty-title">暂无数据</div>
+            <div class="tm-panel-empty-desc">创建标签并关联测试用例，即可分析使用热度榜。</div>
+          </div>
         </div>
       </section>
 
       <section class="tm-tag-workbench" aria-labelledby="tm-tag-workbench-title">
-        <div class="tm-tag-workbench-head">
-          <div>
+        <!-- ═══ 精致单行控制栏 ActionBar ═══ -->
+        <div class="tm-tag-workbench-head-row">
+          <!-- Left: Title, Stats Badge & Tabs -->
+          <div class="tm-head-left">
             <h3 id="tm-tag-workbench-title" class="tm-tag-workbench-title">标签列表</h3>
-            <p class="tm-tag-workbench-desc">
-              当前显示 {{ sortedTags.length }} / {{ total }} 个标签
-            </p>
+            <span class="tm-tag-count-badge">{{ sortedTags.length }} / {{ total }}</span>
+            <div class="tm-tabs">
+              <button
+                type="button"
+                :class="['tm-tab', { active: activeTab === 'all' }]"
+                @click="activeTab = 'all'"
+              >
+                所有
+              </button>
+              <button
+                type="button"
+                :class="['tm-tab', { active: activeTab === 'recent' }]"
+                @click="switchToRecent"
+              >
+                最近更新
+              </button>
+            </div>
           </div>
-        </div>
 
-        <!-- ═══ Action Bar & Tabs ═══ -->
-        <div class="tm-actionbar">
-          <div class="tm-tabs">
-            <button
-              type="button"
-              :class="['tm-tab', { active: activeTab === 'all' }]"
-              @click="activeTab = 'all'"
-            >
-              所有标签
-            </button>
-            <button
-              type="button"
-              :class="['tm-tab', { active: activeTab === 'recent' }]"
-              @click="switchToRecent"
-            >
-              最近更新 (7天内)
-            </button>
-          </div>
-          <div class="tm-actionbar-right">
+          <!-- Right: Search Input, Sorting Select & Action Buttons -->
+          <div class="tm-head-right">
+            <!-- 搜索框 -->
+            <div class="tm-search-box">
+              <span class="material-symbols-outlined tm-search-icon">search</span>
+              <input
+                v-model="keyword"
+                class="tm-search-input"
+                type="text"
+                aria-label="搜索标签"
+                placeholder="搜索标签..."
+                @keyup.enter="onSearch"
+                @input="onSearchDebounce"
+              />
+              <div v-if="loading" class="tm-search-spinner"></div>
+            </div>
+
+            <!-- 排序 -->
             <div class="tm-sort">
               <span class="tm-sort-label">排序:</span>
               <select v-model="sortBy" class="tm-sort-select" aria-label="标签排序方式">
@@ -333,14 +342,18 @@ const top5Rings = computed(() => {
                 <option value="created_at">创建时间</option>
               </select>
             </div>
-            <button type="button" class="tm-btn-filter" @click="openCreate">
-              <span class="material-symbols-outlined" style="font-size: 18px">add</span>
-              新建标签
-            </button>
-            <button type="button" class="tm-btn-wizard" @click="batchExpanded = !batchExpanded">
-              <span class="material-symbols-outlined" style="font-size: 18px">auto_awesome</span>
-              批量创建向导
-            </button>
+
+            <!-- 操作按钮组 -->
+            <div class="tm-action-btns">
+              <button type="button" class="tm-btn-filter" @click="openCreate">
+                <span class="material-symbols-outlined">add</span>
+                新建标签
+              </button>
+              <button type="button" class="tm-btn-wizard" @click="batchExpanded = !batchExpanded">
+                <span class="material-symbols-outlined">auto_awesome</span>
+                智能导入
+              </button>
+            </div>
           </div>
         </div>
 
@@ -378,11 +391,16 @@ const top5Rings = computed(() => {
         </teleport>
 
         <!-- ═══ Tag Cards Grid ═══ -->
-        <div class="tm-card-grid">
+        <div class="tm-card-grid" :class="{ 'is-loading': loading }">
           <div v-if="sortedTags.length === 0" class="tm-list-empty">
-            <el-empty description="暂无标签" :image-size="80">
-              <el-button type="primary" plain @click="openCreate">去新建</el-button>
-            </el-empty>
+            <!-- 使用标签专用的 3D 空状态占位图 -->
+            <EmptyState
+              type="tag"
+              description="暂无标签数据，请先创建首个标签"
+              show-action
+              action-text="新建标签"
+              @action="openCreate"
+            />
           </div>
           <TagListRow
             v-for="tag in sortedTags"
@@ -511,15 +529,14 @@ const top5Rings = computed(() => {
    ══════════════════════════════════════════ */
 .tm-topnav {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-  padding: 20px 32px;
-  background: rgba(17, 19, 30, 0.8);
-  backdrop-filter: blur(20px);
+  padding: 0;
+  background: transparent;
   position: sticky;
   top: 0;
   z-index: 10;
-  margin-bottom: -16px;
+  margin-bottom: 8px;
 }
 .tm-title {
   font-size: 24px;
@@ -735,11 +752,19 @@ const top5Rings = computed(() => {
   transform: translateY(-4px) !important;
 }
 
-/* 环形包装器 (黄金比例增重放大至 138px，大幅增强视觉饱满度) */
+.tm-dial-item.is-empty {
+  opacity: 0.55 !important;
+}
+
+.tm-dial-item.is-empty:hover {
+  opacity: 0.85 !important;
+}
+
+/* 环形包装器 (微调至 128px，大幅增强布局的紧凑度与精致度) */
 .tm-dial-circle-wrapper {
   position: relative !important;
-  width: 160px !important;
-  height: 160px !important;
+  width: 128px !important;
+  height: 128px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -1063,25 +1088,6 @@ html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-pct {
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  border-radius: 8px;
-  border: 1px solid rgba(74, 68, 85, 0.3);
-  background: transparent;
-  color: var(--on-surface);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s;
-  font-family: inherit;
-  white-space: nowrap;
-}
-.tm-btn-filter:hover {
-  background: var(--surface-bright);
-}
-.tm-btn-wizard {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
   border-radius: var(--tp-btn-radius);
   border: none;
   background: var(--tp-btn-bg);
@@ -1094,9 +1100,28 @@ html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-pct {
   font-family: inherit;
   white-space: nowrap;
 }
-.tm-btn-wizard:hover {
+.tm-btn-filter:hover {
   background: var(--tp-btn-bg-hover);
   box-shadow: var(--tp-btn-shadow-hover);
+}
+.tm-btn-wizard {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(74, 68, 85, 0.3);
+  background: transparent;
+  color: var(--on-surface);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.tm-btn-wizard:hover {
+  background: var(--surface-bright);
 }
 
 /* ══════════════════════════════════════════
@@ -1112,7 +1137,7 @@ html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-pct {
 .tm-list-empty {
   grid-column: 1 / -1;
   text-align: center;
-  padding: 60px 0;
+  padding: 16px 0 !important;
 }
 
 /* ══ Pagination ══ */
@@ -1331,15 +1356,27 @@ html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-pct {
     0 0 120px rgba(2, 132, 199, 0.1);
 }
 
-.tm-topnav {
-  margin: 16px 32px -4px;
-  padding: 18px 20px;
-  border: 1px solid var(--tech-border);
-  border-radius: 18px;
-  background: var(--tech-panel);
-  box-shadow:
-    0 18px 42px rgba(15, 23, 42, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+.tm-root .tm-topnav {
+  margin: 24px 32px 12px !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  justify-content: center !important;
+  min-height: 0 !important;
+}
+
+.tm-root .tm-topnav .tm-topnav-right {
+  display: flex !important;
+  flex: 1 1 auto !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 auto !important;
+  gap: 24px !important;
 }
 
 .tm-title {
@@ -1370,7 +1407,7 @@ html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-pct {
 }
 
 .tm-search-box {
-  width: min(390px, 38vw);
+  width: min(320px, 30vw) !important;
   min-height: 38px;
   border-radius: 999px;
   background:
@@ -1378,8 +1415,8 @@ html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-pct {
     var(--tp-surface-input);
   border-color: rgba(99, 102, 241, 0.18);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    0 10px 26px rgba(15, 23, 42, 0.05);
+    0 8px 30px rgba(99, 102, 241, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
 }
 
 .tm-search-box:focus-within {
@@ -1555,29 +1592,36 @@ html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-pct {
 }
 
 .tm-btn-filter {
-  border-color: rgba(99, 102, 241, 0.2);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.82)),
-    var(--tp-surface-input);
-  color: var(--tp-primary);
-  box-shadow: 0 10px 22px rgba(99, 102, 241, 0.08);
-}
-
-.tm-btn-filter:hover {
-  background: rgba(99, 102, 241, 0.1);
-}
-
-.tm-btn-wizard {
   background:
     radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.42), transparent 32%), var(--tp-btn-bg) !important;
   box-shadow:
     0 16px 30px rgba(99, 102, 241, 0.24),
-    0 8px 18px rgba(236, 72, 153, 0.16);
+    0 8px 18px rgba(236, 72, 153, 0.16) !important;
+  color: var(--tp-btn-text) !important;
+  border: none !important;
+}
+
+.tm-btn-filter:hover {
+  background: var(--tp-btn-bg-hover) !important;
+  box-shadow: var(--tp-btn-shadow-hover) !important;
+}
+
+.tm-btn-wizard {
+  border: 1px solid var(--tp-border-subtle) !important;
+  background: var(--tp-surface-card) !important;
+  color: var(--tp-text-secondary) !important;
+  box-shadow: var(--tp-shadow-sm) !important;
+}
+
+.tm-btn-wizard:hover {
+  background: var(--tp-surface-hover) !important;
+  border-color: var(--tp-border-strong) !important;
+  color: var(--tp-text-primary) !important;
 }
 
 .tm-card-grid {
-  grid-template-columns: repeat(auto-fill, minmax(292px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
 }
 
 .tm-pager {
@@ -1708,8 +1752,8 @@ html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-pct {
 }
 
 .tm-card-grid {
-  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
   padding: 0 24px;
   margin-top: -2px;
 }
@@ -1733,17 +1777,12 @@ html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-pct {
 }
 
 .tm-tag-workbench {
-  margin: 0 24px;
-  padding: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.24);
-  border-radius: 18px;
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.88), rgba(248, 250, 252, 0.72)),
-    radial-gradient(circle at 16% 0%, rgba(99, 102, 241, 0.1), transparent 32%),
-    radial-gradient(circle at 90% 16%, rgba(2, 132, 199, 0.08), transparent 28%);
-  box-shadow:
-    0 18px 42px rgba(15, 23, 42, 0.07),
-    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 16px !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 .tm-tag-workbench-head {
@@ -1751,19 +1790,19 @@ html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-pct {
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
-  padding: 2px 4px 10px;
+  padding: 2px 0 !important;
 }
 
 .tm-tag-workbench-title {
   margin: 0;
   color: var(--tp-gray-900);
-  font-size: var(--tp-text-md);
+  font-size: var(--tp-text-lg) !important;
   font-weight: var(--tp-font-bold);
   line-height: var(--tp-line-tight);
 }
 
 .tm-tag-workbench-desc {
-  margin: 3px 0 0;
+  margin: 4px 0 0;
   color: var(--tp-text-muted);
   font-size: var(--tp-text-xs);
   font-weight: var(--tp-font-medium);
@@ -1771,24 +1810,65 @@ html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-pct {
 }
 
 .tm-tag-workbench .tm-actionbar {
-  margin: 0;
-  padding: 8px 0 10px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
+  margin: 0 !important;
+  padding: 6px 0 10px !important;
+  border: none !important;
+  border-bottom: 1px solid var(--tp-border-subtle) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 .tm-tag-workbench .tm-card-grid {
-  grid-template-columns: repeat(4, minmax(228px, 1fr));
-  gap: 10px;
-  padding: 0;
-  margin-top: 0;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
+  align-content: start !important;
+  gap: 10px !important;
+  padding: 4px 2px !important;
+  margin-top: 0 !important;
+  flex: 1 !important;
+  display: grid !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+}
+
+.tm-tag-workbench .tm-list-empty {
+  grid-column: 1 / -1 !important;
+  padding: 0 !important;
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+
+/* 深度重写 el-empty 和 empty-state-wrap 内部的大 padding，消除多层累加空白 */
+.tm-tag-workbench .tm-list-empty :deep(.empty-state-wrap) {
+  padding: 16px 0 !important;
+}
+
+.tm-tag-workbench .tm-list-empty :deep(.el-empty) {
+  padding: 0 !important;
+}
+
+.tm-tag-workbench .tm-list-empty :deep(.el-empty__image) {
+  width: 180px !important;
+  height: auto !important;
+}
+
+.tm-tag-workbench .tm-list-empty :deep(.el-empty__description) {
+  margin-top: 8px !important;
+}
+
+.tm-tag-workbench .tm-list-empty :deep(.el-empty__bottom) {
+  margin-top: 12px !important;
 }
 
 .tm-tag-workbench .tm-pager {
-  margin: 0;
-  padding: 10px 0 0;
+  margin: 24px 0 0 !important;
+  padding: 16px 0 0 !important;
+  border-top: 1px solid var(--tp-border-subtle) !important;
 }
 
 .tm-tag-workbench .tm-btn-filter {
@@ -1827,13 +1907,13 @@ html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-pct {
 
 @media (max-width: 1180px) {
   .tm-tag-workbench .tm-card-grid {
-    grid-template-columns: repeat(3, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important;
   }
 }
 
 @media (max-width: 900px) {
   .tm-tag-workbench .tm-card-grid {
-    grid-template-columns: repeat(2, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)) !important;
   }
 }
 
@@ -1971,6 +2051,11 @@ html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-pct {
 .tm-root {
   gap: 4px !important;
   padding: 8px 12px 16px !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
   background:
     linear-gradient(
       180deg,
@@ -2051,6 +2136,11 @@ html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-pct {
 
 .tm-tag-workbench {
   padding: 8px 12px !important;
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
 }
 
 .tm-tag-workbench-head {
@@ -2129,29 +2219,30 @@ html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-pct {
 }
 
 .tm-tag-workbench .tm-btn-filter {
-  --tm-primary-button-bg: var(--tp-primary);
-  --tm-primary-button-bg-hover: var(--tp-primary-dark);
-  --tm-primary-button-text: var(--tp-btn-text);
-  border: 1px solid var(--tm-primary-button-bg);
-  background: var(--tm-primary-button-bg) !important;
-  color: var(--tm-primary-button-text);
-  box-shadow: none;
+  /* 使用全站统一的渐变色按钮背景、文字颜色和阴影 */
+  background: var(--tp-btn-bg) !important;
+  color: var(--tp-btn-text) !important;
+  border: 1px solid transparent !important;
+  box-shadow: var(--tp-btn-shadow) !important;
 }
 
 .tm-tag-workbench .tm-btn-filter:hover {
-  border-color: var(--tm-primary-button-bg-hover);
-  background: var(--tm-primary-button-bg-hover) !important;
-  color: var(--tm-primary-button-text);
-  box-shadow: none;
+  background: var(--tp-btn-bg-hover) !important;
+  box-shadow: var(--tp-btn-shadow-hover) !important;
+  transform: translateY(-0.5px) !important;
 }
 
 .tm-tag-workbench .tm-btn-filter:focus,
 .tm-tag-workbench .tm-btn-filter:active,
 .tm-tag-workbench .tm-btn-filter:focus-visible {
-  border-color: var(--tm-primary-button-bg-hover);
-  background: var(--tm-primary-button-bg-hover) !important;
-  color: var(--tm-primary-button-text);
-  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
+  background: var(--tp-btn-bg-hover) !important;
+  box-shadow:
+    0 0 0 3px var(--tp-accent-primary-soft),
+    var(--tp-btn-shadow-hover) !important;
+}
+
+.tm-tag-workbench .tm-btn-filter:active {
+  transform: scale(0.98) !important;
 }
 
 .tm-tag-workbench .tm-actionbar-right .tm-btn-filter,
@@ -2175,6 +2266,547 @@ html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-pct {
 </style>
 
 <style>
+/* 针对包裹 tm-root 的父级容器，强制去除 padding 彻底抹平灰边 */
+.workbench-container:has(.tm-root) {
+  padding: 0 !important;
+}
+
+/* 修复仪表盘标题在默认亮色模式下隐形的问题，并让其与右侧标题样式对齐 */
+html body .tm-root .tm-dials-title {
+  color: var(--tp-text-primary) !important;
+}
+html[data-theme='genart'] body .tm-root .tm-dials-title {
+  color: #ffffff !important;
+}
+
+/* 强制全局重置，使标签管理页面能够垂直填满可用空间并实现内部列表滚动 */
+html body .tm-root {
+  height: 100% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  padding: 4px !important; /* 对齐角色管理页面的外边距 (layout-enhance 全局 4px 规范) */
+  gap: 4px !important; /* 垂直间距调整为 4px */
+}
+
+/* 仪表盘大容器 */
+html body .tm-root .tm-insights {
+  margin: 0 !important;
+  padding: 0 !important;
+  gap: 4px !important; /* 左右卡片的横向间隙与角色页面对齐，统一为 4px */
+}
+
+/* 仪表盘子面板 */
+html body .tm-root .tm-panel {
+  border-radius: 12px !important;
+  padding: 10px !important; /* 卡片内边距调整为 10px */
+}
+
+/* 强制下部列表卡片容器透明无边框，使标签卡片直接漂浮于页面背景上，彻底抹平双重框视觉 Bug */
+html body .tm-root .tm-tag-workbench {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* 整合后的单行 ActionBar 工具条，改用透明底以与整体背景融为一体 */
+html body .tm-root .tm-tag-workbench-head-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0 0 4px 0 !important; /* 去除左右侧多余缩进，仅保留 4px 底部边距 */
+  border-bottom: 1px solid var(--tp-border-subtle) !important;
+  gap: 8px !important; /* 操作按钮与搜索框间隙调整为较为舒适的 8px */
+  flex-wrap: wrap !important;
+  background: transparent !important;
+  margin-bottom: 4px !important;
+}
+
+/* 左侧标题、计数与 Tab 聚合 */
+html body .tm-root .tm-head-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+/* 标签列表标题 */
+html body .tm-root .tm-tag-workbench-title {
+  font-size: 13.5px !important;
+  font-weight: var(--tp-font-semibold, 600) !important;
+  color: var(--tp-text-primary) !important;
+  margin: 0 !important;
+  letter-spacing: -0.01em;
+}
+
+/* 计数小胶囊徽章 */
+html body .tm-root .tm-tag-count-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 1.5px 6px !important;
+  border-radius: 999px !important;
+  font-family: var(--tp-font-mono, monospace) !important;
+  font-size: 10.5px !important;
+  font-weight: 600 !important;
+  background: var(--tp-surface-input) !important;
+  color: var(--tp-text-secondary) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+}
+
+/* Tabs 胶囊外壳 */
+html body .tm-root .tm-tabs {
+  display: flex !important;
+  gap: 2px !important;
+  padding: 2px !important;
+  border-radius: 999px !important;
+  background: var(--tp-surface-input) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+}
+
+/* Tab 按钮 */
+html body .tm-root .tm-tab {
+  min-height: 24px !important;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  color: var(--tp-text-muted) !important;
+  font-size: 11px !important;
+  font-weight: var(--tp-font-medium, 500) !important;
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: all var(--tp-transition) !important;
+  line-height: 1 !important;
+}
+
+html body .tm-root .tm-tab.active {
+  background: var(--tp-surface-card) !important;
+  color: var(--tp-text-primary) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+  font-weight: 600 !important;
+}
+
+/* 右侧搜索、排序与操作按钮聚合 */
+html body .tm-root .tm-head-right {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+}
+
+/* 搜索框：支持聚焦时自然过渡变宽的物理呼吸动效 */
+html body .tm-root .tm-search-box {
+  width: 150px !important;
+  min-height: 28px !important;
+  height: 28px !important;
+  padding: 0 8px !important;
+  border-radius: 8px !important;
+  background: var(--tp-surface-input) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  box-shadow: none !important;
+  transition:
+    width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.2s,
+    box-shadow 0.2s,
+    background 0.2s !important;
+}
+
+html body .tm-root .tm-search-box:focus-within {
+  width: 200px !important;
+  border-color: var(--tp-accent-primary-border) !important;
+  background: var(--tp-surface-card) !important;
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft) !important;
+}
+
+html body .tm-root .tm-search-icon {
+  font-size: 15px !important;
+  color: var(--tp-text-subtle) !important;
+}
+
+html body .tm-root .tm-search-input {
+  font-size: 11px !important;
+  color: var(--tp-text-primary) !important;
+}
+
+/* 排序下拉容器 */
+html body .tm-root .tm-sort {
+  display: flex !important;
+  align-items: center !important;
+  height: 28px !important;
+  padding: 0 6px !important;
+  border-radius: 8px !important;
+  background: var(--tp-surface-input) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  gap: 4px !important;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s !important; /* 平滑过渡焦点状态，提升可交互质感 */
+}
+
+/* 内部 select 元素聚焦时，将外框的高亮效果应用到父级容器，避免产生双重内框 */
+html body .tm-root .tm-sort:focus-within {
+  border-color: var(--tp-accent-primary-border) !important;
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft) !important;
+}
+
+html body .tm-root .tm-sort-label {
+  font-size: 11px !important;
+  color: var(--tp-text-subtle) !important;
+}
+
+html body .tm-root .tm-sort-select {
+  font-size: 11px !important;
+  color: var(--tp-text-primary) !important;
+  font-weight: 600 !important;
+  border: none !important;
+  outline: none !important;
+  cursor: pointer !important;
+  /* 强制清除所有浏览器的原生默认下拉框外观样式与边框/阴影，消除双框 bug */
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  background-color: transparent !important;
+  /* 引入自定义内联 SVG 箭头，在抹除原生外观后保证下拉方向指示的可见性与美观度 */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 2px center !important;
+  background-size: 10px 10px !important;
+  padding: 0 14px 0 2px !important; /* 给自定义的下拉小箭头留出合理的右侧内边距空间，防止文字重叠 */
+}
+
+/* 彻底禁绝 select 元素自身的聚焦虚线框和阴影，避免在不同浏览器上产生杂余内框 */
+html body .tm-root .tm-sort-select:focus,
+html body .tm-root .tm-sort-select:active,
+html body .tm-root .tm-sort-select:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* 操作按钮组 */
+html body .tm-root .tm-action-btns {
+  display: flex !important;
+  gap: 6px !important;
+}
+
+html body .tm-root .tm-btn-filter,
+html body .tm-root .tm-btn-wizard {
+  min-height: 28px !important;
+  height: 28px !important;
+  padding: 0 10px !important;
+  border-radius: 8px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+  border: 1px solid transparent !important;
+  transition: all var(--tp-transition) !important;
+}
+
+html body .tm-root .tm-btn-filter .material-symbols-outlined,
+html body .tm-root .tm-btn-wizard .material-symbols-outlined {
+  font-size: 14px !important;
+}
+
+/* 新建标签按钮：对齐全站统一的渐变高保真按钮样式 */
+html body .tm-root .tm-btn-filter {
+  background: var(--tp-btn-bg) !important;
+  color: var(--tp-btn-text) !important;
+  box-shadow: var(--tp-btn-shadow) !important;
+}
+
+html body .tm-root .tm-btn-filter:hover {
+  background: var(--tp-btn-bg-hover) !important;
+  box-shadow: var(--tp-btn-shadow-hover) !important;
+  transform: translateY(-0.5px) !important;
+}
+
+html body .tm-root .tm-btn-filter:active {
+  transform: scale(0.98) !important;
+}
+
+/* 智能导入按钮 */
+html body .tm-root .tm-btn-wizard {
+  background: var(--tp-surface-input) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  color: var(--tp-text-secondary) !important;
+  box-shadow: none !important;
+}
+
+html body .tm-root .tm-btn-wizard:hover {
+  background: var(--tp-surface-hover) !important;
+  color: var(--tp-text-primary) !important;
+}
+html body .tm-root .tm-tag-workbench .tm-card-grid {
+  flex: 1 !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  padding: 0 !important; /* 卡片网格彻底贴边无缩进，完全由页面外边距统一对齐 */
+  gap: 4px !important; /* 网格卡片间隙与角色页面对齐，统一为 4px */
+  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+html body .tm-root .tm-tag-workbench .tm-card-grid.is-loading {
+  opacity: 0.62 !important;
+  pointer-events: none !important; /* 防止网络延迟时用户重复触发操作 */
+}
+html body .tm-root .tm-tag-workbench .tm-pager {
+  margin: 4px 0 0 !important;
+  padding: 4px 0 0 0 !important; /* 分页条贴边无缩进，间隙为 4px */
+  border-top: 1px solid var(--tp-border-subtle) !important;
+  background: transparent !important;
+}
+
+/* 右侧热度榜暂无数据美化 */
+html body .tm-root .tm-panel-empty-state {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 24px 8px !important;
+  text-align: center !important;
+  gap: 8px !important;
+  opacity: 0.85 !important;
+}
+
+html body .tm-root .tm-panel-empty-icon-wrap {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 50% !important;
+  background: var(--tp-surface-input) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  margin-bottom: 4px !important;
+  box-shadow: var(--tp-shadow-sm) !important;
+  transition: all var(--tp-transition) !important;
+}
+
+html body .tm-root .tm-panel-empty-state:hover .tm-panel-empty-icon-wrap {
+  transform: scale(1.06) !important;
+  border-color: var(--tp-accent-primary-border) !important;
+  background: var(--tp-accent-primary-soft) !important;
+  box-shadow: 0 0 16px var(--tp-accent-primary-soft) !important;
+}
+
+html body .tm-root .tm-panel-empty-icon {
+  font-size: 24px !important;
+  color: var(--tp-text-subtle) !important;
+  line-height: 1 !important;
+  transition: all var(--tp-transition) !important;
+}
+
+html body .tm-root .tm-panel-empty-state:hover .tm-panel-empty-icon {
+  color: var(--tp-primary) !important;
+}
+
+html body .tm-root .tm-panel-empty-title {
+  font-size: 13px !important;
+  font-weight: var(--tp-font-semibold, 600) !important;
+  color: var(--tp-text-secondary) !important;
+}
+
+html body .tm-root .tm-panel-empty-desc {
+  font-size: 11px !important;
+  color: var(--tp-text-muted) !important;
+  max-width: 200px !important;
+  line-height: 1.5 !important;
+}
+
+/* 左侧仪表盘暂无数据美化 */
+html body .tm-root .tm-dials-empty-state {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 32px 16px !important;
+  text-align: center !important;
+  gap: 8px !important;
+  opacity: 0.85 !important;
+  margin: 12px 0 !important;
+}
+
+html body .tm-root .tm-dials-empty-icon-wrap {
+  width: 52px !important;
+  height: 52px !important;
+  border-radius: 50% !important;
+  background: var(--tp-surface-input) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  margin-bottom: 4px !important;
+  box-shadow: var(--tp-shadow-sm) !important;
+  transition: all var(--tp-transition) !important;
+}
+
+html body .tm-root .tm-dials-empty-state:hover .tm-dials-empty-icon-wrap {
+  transform: scale(1.06) !important;
+  border-color: var(--tp-accent-primary-border) !important;
+  background: var(--tp-accent-primary-soft) !important;
+  box-shadow: 0 0 16px var(--tp-accent-primary-soft) !important;
+}
+
+html body .tm-root .tm-dials-empty-icon {
+  font-size: 26px !important;
+  color: var(--tp-text-subtle) !important;
+  line-height: 1 !important;
+  transition: all var(--tp-transition) !important;
+}
+
+html body .tm-root .tm-dials-empty-state:hover .tm-dials-empty-icon {
+  color: var(--tp-primary) !important;
+}
+
+html body .tm-root .tm-dials-empty-title {
+  font-size: 13px !important;
+  font-weight: var(--tp-font-semibold, 600) !important;
+  color: var(--tp-text-secondary) !important;
+}
+
+html body .tm-root .tm-dials-empty-desc {
+  font-size: 11px !important;
+  color: var(--tp-text-muted) !important;
+  max-width: 280px !important;
+  line-height: 1.5 !important;
+}
+
+/* ══════════════════════════════════════════
+   未分配空槽位 (is-empty) 的极客精致感样式与交互
+   ══════════════════════════════════════════ */
+/* 去除默认粗暴的 0.55 opacity 滤镜，采用精心调配的非激活对比度 */
+html body .tm-root .tm-dial-item.is-empty {
+  opacity: 1 !important;
+}
+
+/* 细虚线空置轨道 */
+html body .tm-root .tm-dial-item.is-empty .is-empty-track {
+  stroke: rgba(99, 102, 241, 0.08) !important;
+  transition: stroke 0.3s ease !important;
+}
+
+html[data-theme='genart'] body .tm-root .tm-dial-item.is-empty .is-empty-track {
+  stroke: rgba(255, 255, 255, 0.03) !important;
+}
+
+/* 空置图标舱：虚线圆圈 */
+html body .tm-root .tm-dial-item.is-empty .tm-dial-icon-container {
+  background: transparent !important;
+  border: 1px dashed rgba(99, 102, 241, 0.22) !important;
+  box-shadow: none !important;
+}
+
+/* 空置加号图标 */
+html body .tm-root .tm-dial-item.is-empty .tm-dial-icon {
+  font-size: 14px !important;
+  color: var(--tp-text-placeholder, rgba(99, 102, 241, 0.45)) !important;
+  font-weight: bold !important;
+}
+
+/* 空置槽位名称：极客 monospace 风格 */
+html body .tm-root .tm-dial-item.is-empty .tm-dial-name {
+  font-family: var(--tp-font-mono, monospace) !important;
+  font-size: 10.5px !important;
+  font-weight: 500 !important;
+  color: var(--tp-text-placeholder, rgba(99, 102, 241, 0.38)) !important;
+  letter-spacing: 0.05em;
+}
+
+/* 空置用例数字：微暗的 0 */
+html body .tm-root .tm-dial-item.is-empty .tm-dial-count {
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  color: var(--tp-text-placeholder, rgba(0, 0, 0, 0.16)) !important;
+  text-shadow: none !important;
+}
+
+html[data-theme='genart'] body .tm-root .tm-dial-item.is-empty .tm-dial-count {
+  color: rgba(255, 255, 255, 0.08) !important;
+  text-shadow: none !important;
+}
+
+/* 空置百分比数值 */
+html body .tm-root .tm-dial-item.is-empty .tm-dial-pct {
+  font-size: 11.5px !important;
+  color: var(--tp-text-placeholder, rgba(0, 0, 0, 0.18)) !important;
+}
+
+html[data-theme='genart'] body .tm-root .tm-dial-item.is-empty .tm-dial-pct {
+  color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ── 空槽位 Hover 点击状态反馈 ── */
+html body .tm-root .tm-dial-item.is-empty:hover {
+  transform: translateY(-3px) !important;
+}
+
+html body .tm-root .tm-dial-item.is-empty:hover .tm-dial-icon-container {
+  border-style: solid !important;
+  border-color: var(--tp-primary) !important;
+  background: rgba(99, 102, 241, 0.08) !important;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.18) !important;
+}
+
+html body .tm-root .tm-dial-item.is-empty:hover .tm-dial-icon {
+  color: var(--tp-primary) !important;
+  transform: scale(1.15) !important;
+}
+
+html body .tm-root .tm-dial-item.is-empty:hover .tm-dial-name {
+  color: var(--tp-primary) !important;
+}
+
+html body .tm-root .tm-dial-item.is-empty:hover .tm-dial-count {
+  color: var(--tp-primary-light, rgba(99, 102, 241, 0.6)) !important;
+}
+
+html body .tm-root .tm-dial-item.is-empty:hover .is-empty-track {
+  stroke: rgba(99, 102, 241, 0.3) !important;
+}
+
+/* 解决空状态大垂直空隙问题 — 全局穿透覆盖，去除 :deep */
+html body .tm-root .tm-tag-workbench .tm-list-empty {
+  grid-column: 1 / -1 !important;
+  padding: 0 !important;
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+html body .tm-root .tm-tag-workbench .tm-list-empty .empty-state-wrap {
+  padding: 12px 0 !important;
+}
+html body .tm-root .tm-tag-workbench .tm-list-empty .el-empty {
+  padding: 0 !important;
+}
+html body .tm-root .tm-tag-workbench .tm-list-empty .el-empty__image {
+  width: 150px !important;
+  height: auto !important;
+}
+html body .tm-root .tm-tag-workbench .tm-list-empty .el-empty__description {
+  margin-top: 6px !important;
+}
+html body .tm-root .tm-tag-workbench .tm-list-empty .el-empty__bottom {
+  margin-top: 10px !important;
+}
+
 /* ══ Batch panel modal (unscoped — teleported to body) ══ */
 .tm-modal-overlay {
   position: fixed;
@@ -2257,32 +2889,123 @@ html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-pct {
   --purple-20: rgba(124, 58, 237, 0.2);
   --purple-50: rgba(124, 58, 237, 0.5);
 }
-/* hide redundant inner header & remove double border */
+/* 隐藏模态框内子组件的冗余头部标题，避免双重标题冲突 */
 .tm-modal-body .tm-panel-header {
-  display: none;
+  display: none !important;
 }
+/* 强制将子组件的磨砂玻璃面板透明化，去除冗余边框、阴影与内边距，消除“卡片嵌套卡片”的视觉硬块感 */
 .tm-modal-body .tm-glass-panel {
-  background: transparent;
-  border: none;
-  padding: 0;
-  backdrop-filter: none;
-  border-radius: 0;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  border-radius: 0 !important;
 }
-/* make textarea visible & styled inside modal */
+/* 模态框内文本描述美化 */
+.tm-modal-body .tm-panel-desc {
+  font-size: 13px !important;
+  color: var(--tp-text-secondary) !important;
+  font-weight: 500 !important;
+  line-height: 1.5 !important;
+  margin: 0 0 14px !important;
+}
+/* 模态框内的批量输入文本框，采用圆角与微透质感，完美适配双色主题 */
 .tm-modal-body .tm-batch-textarea {
-  background: #0c0e18;
-  border: 1px solid rgba(74, 68, 85, 0.3);
-  border-radius: 12px;
-  color: #e1e1f2;
-  font-size: 14px;
-  padding: 16px;
-  min-height: 120px;
+  width: 100% !important;
+  background: var(--tp-surface-input) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  border-radius: 12px !important;
+  color: var(--tp-text-primary) !important;
+  font-size: 13.5px !important;
+  padding: 14px 16px !important;
+  min-height: 140px !important;
+  font-family: inherit !important;
+  outline: none !important;
+  box-shadow: none !important;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s !important;
+  box-sizing: border-box !important;
 }
 .tm-modal-body .tm-batch-textarea:focus {
-  border-color: rgba(124, 58, 237, 0.5);
+  border-color: var(--tp-accent-primary-border) !important;
+  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft) !important;
 }
 .tm-modal-body .tm-batch-textarea::placeholder {
-  color: rgba(149, 141, 161, 0.5);
+  color: var(--tp-gray-400) !important;
+}
+/* 即将创建标签预览信息小胶囊，采用柔和背景和边框，提供科技感与视觉对齐 */
+.tm-modal-body .tm-batch-preview {
+  font-size: 12px !important;
+  color: var(--tp-primary) !important;
+  margin: 12px 0 0 !important;
+  font-weight: 500 !important;
+  background: var(--tp-accent-primary-soft) !important;
+  border: 1px solid var(--tp-accent-primary-border) !important;
+  padding: 6px 12px !important;
+  border-radius: 8px !important;
+  display: inline-block !important;
+}
+/* 批量模态框尾部按钮与配置区对齐 */
+.tm-modal-body .tm-batch-footer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin-top: 20px !important;
+}
+/* 智能导入复选框交互动效 */
+.tm-modal-body .tm-batch-checkbox {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  cursor: pointer !important;
+  font-size: 12px !important;
+  color: var(--tp-text-secondary) !important;
+  font-weight: 500 !important;
+  user-select: none !important;
+  transition: color 0.15s !important;
+}
+.tm-modal-body .tm-batch-checkbox:hover {
+  color: var(--tp-text-primary) !important;
+}
+.tm-modal-body .tm-batch-checkbox input[type='checkbox'] {
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 4px !important;
+  accent-color: var(--tp-primary) !important;
+  cursor: pointer !important;
+}
+/* 极客炫彩提交按钮，在轻微 translateY 与阴影过渡中赋予按压触感反馈 */
+.tm-modal-body .tm-batch-submit {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 8px 22px !important;
+  border-radius: 999px !important;
+  border: none !important;
+  background: var(--tp-btn-bg) !important;
+  color: var(--tp-btn-text, #ffffff) !important;
+  font-size: 13px !important;
+  font-weight: 650 !important;
+  cursor: pointer !important;
+  transition: all var(--tp-transition) !important;
+  white-space: nowrap !important;
+  box-shadow: var(--tp-btn-shadow) !important;
+}
+.tm-modal-body .tm-batch-submit:hover:not(:disabled) {
+  background: var(--tp-btn-bg-hover) !important;
+  box-shadow: var(--tp-btn-shadow-hover) !important;
+  transform: translateY(-1.5px) !important;
+}
+.tm-modal-body .tm-batch-submit:active:not(:disabled) {
+  transform: translateY(0) scale(0.97) !important;
+}
+.tm-modal-body .tm-batch-submit:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+  box-shadow: none !important;
 }
 .tm-modal-enter-active,
 .tm-modal-leave-active {
@@ -2345,16 +3068,7 @@ html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-pct {
   --purple-50: var(--tp-accent-primary-border);
 }
 
-.tm-modal-body .tm-batch-textarea {
-  background: var(--tp-surface-input);
-  border-color: var(--tp-border-subtle);
-  color: var(--tp-gray-900);
-}
-
-.tm-modal-body .tm-batch-textarea:focus {
-  border-color: var(--tp-accent-primary-border);
-  box-shadow: 0 0 0 3px var(--tp-accent-primary-soft);
-}
+/* 批量文本域与焦点动效已由上方全局规则统一处理，此处清除冗余样式 */
 
 .tm-modal-header .tm-icon-btn:focus-visible {
   outline: none;

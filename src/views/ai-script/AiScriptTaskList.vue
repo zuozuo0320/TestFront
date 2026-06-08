@@ -143,8 +143,9 @@ function goDetail(task: AiScriptTask) {
   router.push(`/ai-script/${task.id}`)
 }
 
-function getStatusColor(status: TaskStatus) {
-  return TaskStatusColor[status] || 'info'
+// 获取状态对应的语义颜色
+function getStatusColor(status: TaskStatus | string) {
+  return TaskStatusColor[status as TaskStatus] || 'info'
 }
 
 function isRunning(status: TaskStatus) {
@@ -254,6 +255,12 @@ function selectEnvironment(environmentId: string) {
   createForm.startUrl =
     environmentOptions.value.find((env) => env.id === environmentId)?.base_url ?? ''
   showEnvironmentDropdown.value = false
+}
+
+// 点击弹窗空白处时收起内部下拉，避免模板内写多语句表达式导致构建失败。
+function closeCreateDropdowns() {
+  showEnvironmentDropdown.value = false
+  showCaseDropdown.value = false
 }
 
 /**
@@ -801,23 +808,6 @@ async function handleTokenInvalidate() {
 
 <template>
   <div class="ai-page ai-task-list-page">
-    <!-- 页面头部：标题 + 工具栏合为一行 -->
-    <div class="ai-page-header">
-      <div class="ai-page-header-left">
-        <h1>智能脚本中心</h1>
-      </div>
-      <div class="ai-action-group">
-        <button class="ai-btn ai-btn-ghost ai-btn-sm" @click="openTokenDialog">
-          <span class="material-symbols-outlined">key</span>
-          Token
-        </button>
-        <button class="ai-btn ai-btn-primary ai-btn-sm" @click="openCreateDialog">
-          <span class="material-symbols-outlined">add</span>
-          新建任务
-        </button>
-      </div>
-    </div>
-
     <!-- 筛选栏 -->
     <div class="ai-filter-bar">
       <div class="ai-filter-bar-search">
@@ -839,6 +829,7 @@ async function handleTokenInvalidate() {
           clearable
           size="default"
           class="ai-filter-el-select"
+          popper-class="ai-select-popper"
           @change="applyFilter"
         >
           <template #prefix>
@@ -849,165 +840,178 @@ async function handleTokenInvalidate() {
               tune
             </span>
           </template>
-          <el-option
-            v-for="(label, key) in TaskStatusLabel"
-            :key="key"
-            :label="label"
-            :value="key"
-          />
+          <el-option v-for="(label, key) in TaskStatusLabel" :key="key" :label="label" :value="key">
+            <div class="ai-select-option-item">
+              <span class="ai-select-option-dot" :class="getStatusColor(key)" />
+              <span class="ai-select-option-label">{{ label }}</span>
+            </div>
+          </el-option>
         </el-select>
         <button class="ai-filter-reset-btn" title="重置筛选" @click="resetFilter">
           <span class="material-symbols-outlined" style="font-size: 16px">restart_alt</span>
+        </button>
+
+        <div class="ai-filter-divider"></div>
+
+        <button class="ai-btn ai-btn-ghost ai-btn-sm" @click="openTokenDialog">
+          <span class="material-symbols-outlined">key</span>
+          Token
+        </button>
+        <button class="ai-btn ai-btn-primary ai-btn-sm" @click="openCreateDialog">
+          <span class="material-symbols-outlined">add</span>
+          新建任务
         </button>
       </div>
     </div>
 
     <!-- 主表格 -->
     <div class="ai-table-wrap">
-      <table class="ai-table">
-        <thead>
-          <tr>
-            <th class="ai-col-check">
-              <input
-                type="checkbox"
-                class="ai-row-checkbox"
-                :checked="currentPageAllSelected"
-                :data-partial="currentPagePartiallySelected"
-                @click.stop
-                @change="handleCurrentPageCheckboxChange"
-              />
-            </th>
-            <th>任务名称 / ID</th>
-            <th>关联用例</th>
-            <th>输出框架</th>
-            <th>任务状态</th>
-            <th>验证状态</th>
-            <th>创建人</th>
-            <th>创建时间</th>
-            <th>更新时间</th>
-            <th class="ai-col-actions">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="task in store.taskList"
-            :key="task.id"
-            :class="{
-              'is-selected': store.isTaskSelected(task.id),
-              'is-running': isRunning(task.taskStatus),
-            }"
-            @click="goDetail(task)"
-          >
-            <td @click.stop>
-              <input
-                type="checkbox"
-                class="ai-row-checkbox"
-                :checked="store.isTaskSelected(task.id)"
-                @click.stop
-                @change="toggleTaskChecked(task.id)"
-              />
-            </td>
-            <td>
-              <div class="ai-task-cell">
-                <span class="ai-task-name">{{ task.taskName }}</span>
-                <span class="ai-task-id">TASK-{{ task.id }}</span>
-              </div>
-            </td>
-            <td>
-              <div class="ai-case-tags">
-                <span v-for="tag in task.caseTags" :key="tag" class="ai-case-tag">{{ tag }}</span>
-                <span v-if="!task.caseTags?.length" class="ai-case-tag">
-                  {{ task.caseCount }} 条用例
-                </span>
-              </div>
-            </td>
-            <td>
-              <span class="ai-framework-text">{{ task.frameworkType }}</span>
-            </td>
-            <td>
-              <div class="ai-status-badge" :class="getStatusColor(task.taskStatus)">
-                <span
-                  class="ai-status-dot"
-                  :class="{ 'animate-pulse': isRunning(task.taskStatus) }"
-                ></span>
-                <template v-if="task.taskStatus === TaskStatus.GENERATE_SUCCESS">
-                  <span class="material-symbols-outlined ai-status-icon">check_circle</span>
-                </template>
-                <template v-else-if="task.taskStatus === TaskStatus.GENERATE_FAILED">
-                  <span class="material-symbols-outlined ai-status-icon">error</span>
-                </template>
-                <template v-else-if="task.taskStatus === TaskStatus.PENDING_CONFIRM">
-                  <span class="material-symbols-outlined ai-status-icon">pending</span>
-                </template>
-                {{ TaskStatusLabel[task.taskStatus] }}
-              </div>
-            </td>
-            <td>
-              <div
-                v-if="task.latestValidationStatus"
-                class="ai-status-badge"
-                :class="ValidationStatusColor[task.latestValidationStatus]"
-              >
-                {{ ValidationStatusLabel[task.latestValidationStatus] }}
-              </div>
-              <span v-else class="ai-validation-empty">—</span>
-            </td>
-            <td>
-              <span class="ai-task-creator">{{ task.createdName }}</span>
-            </td>
-            <td>
-              <span class="ai-task-time">{{ formatTime(task.createdAt) }}</span>
-            </td>
-            <td>
-              <span class="ai-task-time">{{ formatTime(task.updatedAt) }}</span>
-            </td>
-            <td>
-              <div class="ai-row-actions">
-                <button class="ai-row-action-btn" title="查看详情" @click.stop="goDetail(task)">
-                  <span class="material-symbols-outlined">visibility</span>
-                </button>
-                <button
-                  v-if="task.taskStatus !== TaskStatus.DISCARDED"
-                  class="ai-row-action-btn"
-                  title="修改名称"
-                  @click.stop="openRenameDialog(task)"
+      <div class="ai-table-scroll-container">
+        <table class="ai-table">
+          <thead>
+            <tr>
+              <th class="ai-col-check">
+                <input
+                  type="checkbox"
+                  class="ai-row-checkbox"
+                  :checked="currentPageAllSelected"
+                  :data-partial="currentPagePartiallySelected"
+                  @click.stop
+                  @change="handleCurrentPageCheckboxChange"
+                />
+              </th>
+              <th>任务名称 / ID</th>
+              <th>关联用例</th>
+              <th>输出框架</th>
+              <th>任务状态</th>
+              <th>验证状态</th>
+              <th>创建人</th>
+              <th>创建时间</th>
+              <th>更新时间</th>
+              <th class="ai-col-actions">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="task in store.taskList"
+              :key="task.id"
+              :class="{
+                'is-selected': store.isTaskSelected(task.id),
+                'is-running': isRunning(task.taskStatus),
+              }"
+              @click="goDetail(task)"
+            >
+              <td @click.stop>
+                <input
+                  type="checkbox"
+                  class="ai-row-checkbox"
+                  :checked="store.isTaskSelected(task.id)"
+                  @click.stop
+                  @change="toggleTaskChecked(task.id)"
+                />
+              </td>
+              <td>
+                <div class="ai-task-cell">
+                  <span class="ai-task-name">{{ task.taskName }}</span>
+                  <span class="ai-task-id">TASK-{{ task.id }}</span>
+                </div>
+              </td>
+              <td>
+                <div class="ai-case-tags">
+                  <span v-for="tag in task.caseTags" :key="tag" class="ai-case-tag">{{ tag }}</span>
+                  <span v-if="!task.caseTags?.length" class="ai-case-tag">
+                    {{ task.caseCount }} 条用例
+                  </span>
+                </div>
+              </td>
+              <td>
+                <span class="ai-framework-text">{{ task.frameworkType }}</span>
+              </td>
+              <td>
+                <div class="ai-status-badge" :class="getStatusColor(task.taskStatus)">
+                  <span
+                    class="ai-status-dot"
+                    :class="{ 'animate-pulse': isRunning(task.taskStatus) }"
+                  ></span>
+                  <template v-if="task.taskStatus === TaskStatus.GENERATE_SUCCESS">
+                    <span class="material-symbols-outlined ai-status-icon">check_circle</span>
+                  </template>
+                  <template v-else-if="task.taskStatus === TaskStatus.GENERATE_FAILED">
+                    <span class="material-symbols-outlined ai-status-icon">error</span>
+                  </template>
+                  <template v-else-if="task.taskStatus === TaskStatus.PENDING_CONFIRM">
+                    <span class="material-symbols-outlined ai-status-icon">pending</span>
+                  </template>
+                  {{ TaskStatusLabel[task.taskStatus] }}
+                </div>
+              </td>
+              <td>
+                <div
+                  v-if="task.latestValidationStatus"
+                  class="ai-status-badge"
+                  :class="ValidationStatusColor[task.latestValidationStatus]"
                 >
-                  <span class="material-symbols-outlined">edit</span>
-                </button>
-                <button
-                  v-if="
-                    task.taskStatus === TaskStatus.PENDING_EXECUTE ||
-                    task.taskStatus === TaskStatus.GENERATE_FAILED
-                  "
-                  class="ai-row-action-btn"
-                  title="触发执行"
-                  @click.stop="handleExecute(task)"
-                >
-                  <span class="material-symbols-outlined">play_arrow</span>
-                </button>
-                <button class="ai-row-action-btn" title="复制配置" @click.stop>
-                  <span class="material-symbols-outlined">content_copy</span>
-                </button>
-                <button
-                  class="ai-row-action-btn danger"
-                  title="废弃"
-                  @click.stop="openDiscardDialog(task)"
-                >
-                  <span class="material-symbols-outlined">block</span>
-                </button>
-                <button
-                  v-if="task.taskStatus === TaskStatus.DISCARDED"
-                  class="ai-row-action-btn danger"
-                  title="删除"
-                  @click.stop="openDeleteDialog(task)"
-                >
-                  <span class="material-symbols-outlined">delete_forever</span>
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+                  {{ ValidationStatusLabel[task.latestValidationStatus] }}
+                </div>
+                <span v-else class="ai-validation-empty">—</span>
+              </td>
+              <td>
+                <span class="ai-task-creator">{{ task.createdName }}</span>
+              </td>
+              <td>
+                <span class="ai-task-time">{{ formatTime(task.createdAt) }}</span>
+              </td>
+              <td>
+                <span class="ai-task-time">{{ formatTime(task.updatedAt) }}</span>
+              </td>
+              <td>
+                <div class="ai-row-actions">
+                  <button class="ai-row-action-btn" title="查看详情" @click.stop="goDetail(task)">
+                    <span class="material-symbols-outlined">visibility</span>
+                  </button>
+                  <button
+                    v-if="task.taskStatus !== TaskStatus.DISCARDED"
+                    class="ai-row-action-btn"
+                    title="修改名称"
+                    @click.stop="openRenameDialog(task)"
+                  >
+                    <span class="material-symbols-outlined">edit</span>
+                  </button>
+                  <button
+                    v-if="
+                      task.taskStatus === TaskStatus.PENDING_EXECUTE ||
+                      task.taskStatus === TaskStatus.GENERATE_FAILED
+                    "
+                    class="ai-row-action-btn"
+                    title="触发执行"
+                    @click.stop="handleExecute(task)"
+                  >
+                    <span class="material-symbols-outlined">play_arrow</span>
+                  </button>
+                  <button class="ai-row-action-btn" title="复制配置" @click.stop>
+                    <span class="material-symbols-outlined">content_copy</span>
+                  </button>
+                  <button
+                    class="ai-row-action-btn danger"
+                    title="废弃"
+                    @click.stop="openDiscardDialog(task)"
+                  >
+                    <span class="material-symbols-outlined">block</span>
+                  </button>
+                  <button
+                    v-if="task.taskStatus === TaskStatus.DISCARDED"
+                    class="ai-row-action-btn danger"
+                    title="删除"
+                    @click.stop="openDeleteDialog(task)"
+                  >
+                    <span class="material-symbols-outlined">delete_forever</span>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       <!-- 分页 -->
       <div class="ai-table-footer">
@@ -1088,7 +1092,7 @@ async function handleTokenInvalidate() {
         <div class="ai-quickstart-content">
           <div class="ai-stat-label">快速入口</div>
           <h4>从 UI 轨迹生成</h4>
-          <p>将手动录制的操作日志直接转换为 Playwright 代码</p>
+          <p>录制轨迹直接生成 Playwright 代码</p>
         </div>
         <button class="ai-quickstart-link" @click="openCreateDialog">
           立即体验
@@ -1158,7 +1162,7 @@ async function handleTokenInvalidate() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="create-task-title"
-          @click="showEnvironmentDropdown = false"
+          @click="closeCreateDropdowns"
         >
           <div class="ai-dialog-header">
             <div>
@@ -1180,8 +1184,11 @@ async function handleTokenInvalidate() {
                   </div>
                 </div>
                 <div class="ai-form-grid">
-                  <div class="ai-form-group ai-form-group-half">
-                    <label class="ai-form-label">生成模式 *</label>
+                  <div class="ai-form-group ai-form-group-full">
+                    <label class="ai-form-label">
+                      生成模式
+                      <span class="ai-required">*</span>
+                    </label>
                     <div class="ai-choice-grid">
                       <button
                         v-for="mode in generationModeOptions"
@@ -1197,8 +1204,11 @@ async function handleTokenInvalidate() {
                       </button>
                     </div>
                   </div>
-                  <div class="ai-form-group ai-form-group-half">
-                    <label class="ai-form-label">测试环境 *</label>
+                  <div class="ai-form-group ai-form-group-full">
+                    <label class="ai-form-label">
+                      测试环境
+                      <span class="ai-required">*</span>
+                    </label>
                     <div
                       class="ai-env-select"
                       :class="{ open: showEnvironmentDropdown, loading: environmentLoading }"
@@ -1261,7 +1271,10 @@ async function handleTokenInvalidate() {
                 </div>
                 <div class="ai-form-grid">
                   <div class="ai-form-group ai-form-group-full">
-                    <label class="ai-form-label">任务名称 *</label>
+                    <label class="ai-form-label">
+                      任务名称
+                      <span class="ai-required">*</span>
+                    </label>
                     <input
                       v-model="createForm.taskName"
                       class="ai-form-input"
@@ -1270,7 +1283,10 @@ async function handleTokenInvalidate() {
                   </div>
                   <div class="ai-form-group ai-form-group-full">
                     <div class="ai-case-field-head">
-                      <label class="ai-form-label">场景描述 *</label>
+                      <label class="ai-form-label">
+                        场景描述
+                        <span class="ai-required">*</span>
+                      </label>
                       <span class="ai-prompt-count">{{ createForm.scenarioDesc.length }} 字</span>
                     </div>
                     <div class="ai-prompt-helper">
@@ -1296,12 +1312,15 @@ async function handleTokenInvalidate() {
                 <div class="ai-form-grid">
                   <div class="ai-form-group ai-form-group-full ai-case-field">
                     <div class="ai-case-field-head">
-                      <label class="ai-form-label">关联用例 *</label>
+                      <label class="ai-form-label">
+                        关联用例
+                        <span class="ai-required">*</span>
+                      </label>
                       <span class="ai-case-selected-count">
                         已选择 {{ selectedCaseIds.length }} 条
                       </span>
                     </div>
-                    <div class="ai-case-picker-panel">
+                    <div class="ai-case-picker-panel" @click.stop>
                       <div class="ai-case-toolbar">
                         <div class="ai-case-picker">
                           <input
@@ -1637,7 +1656,10 @@ async function handleTokenInvalidate() {
               </p>
             </div>
             <div class="ai-form-group">
-              <label class="ai-form-label">废弃原因 *</label>
+              <label class="ai-form-label">
+                废弃原因
+                <span class="ai-required">*</span>
+              </label>
               <textarea
                 v-model="discardReason"
                 class="ai-form-textarea"
@@ -1731,7 +1753,10 @@ async function handleTokenInvalidate() {
               </p>
             </div>
             <div class="ai-form-group">
-              <label class="ai-form-label">废弃原因 *</label>
+              <label class="ai-form-label">
+                废弃原因
+                <span class="ai-required">*</span>
+              </label>
               <textarea
                 v-model="batchDiscardReason"
                 class="ai-form-textarea"
@@ -1807,6 +1832,42 @@ async function handleTokenInvalidate() {
 </template>
 
 <style scoped>
+.ai-filter-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--tp-border-subtle);
+  margin: 0 6px;
+  opacity: 0.8;
+}
+
+.ai-task-list-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.ai-table-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--tp-surface-card);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 14px;
+}
+
+.ai-table-scroll-container {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.ai-stats-grid {
+  flex-shrink: 0;
+  margin-top: 12px;
+}
 @keyframes pulse {
   0%,
   100% {
@@ -2022,5 +2083,562 @@ async function handleTokenInvalidate() {
 :global(html[data-theme='genart'] .ai-row-checkbox[data-partial='true']) {
   border-color: var(--tp-primary) !important;
   background-color: var(--tp-primary) !important;
+}
+
+/* ── 下拉选择器弹出框 (Popper) 样式优化 ── */
+:global(.ai-select-popper.el-popper) {
+  background: var(--tp-glass-bg) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid var(--tp-glass-border) !important;
+  box-shadow: var(--tp-shadow-md) !important;
+  border-radius: var(--tp-radius-md) !important;
+}
+
+:global(.ai-select-popper .el-select-dropdown__list) {
+  padding: 6px !important;
+  background: transparent !important;
+}
+
+:global(.ai-select-popper .el-select-dropdown__item) {
+  display: flex !important;
+  align-items: center !important;
+  height: 36px !important;
+  line-height: 36px !important;
+  padding: 0 10px !important;
+  margin: 2px 0 !important;
+  border-radius: var(--tp-radius-sm) !important;
+  color: var(--tp-text-secondary) !important;
+  font-size: 13px !important;
+  transition: all var(--tp-transition) !important;
+  background: transparent !important;
+}
+
+/* 悬浮与选中状态 */
+:global(.ai-select-popper :is(.el-select-dropdown__item.hover, .el-select-dropdown__item:hover)) {
+  background: var(--tp-surface-hover) !important;
+  color: var(--tp-text-primary) !important;
+}
+
+:global(.ai-select-popper .el-select-dropdown__item.selected) {
+  background: var(--tp-primary-lighter) !important;
+  color: var(--tp-primary) !important;
+  font-weight: 600 !important;
+}
+
+/* 滚动条美化 */
+:global(.ai-select-popper .el-scrollbar__bar) {
+  opacity: 0.6 !important;
+}
+
+:global(.ai-select-popper .el-scrollbar__thumb) {
+  background-color: var(--tp-gray-400) !important;
+}
+
+/* 下拉小箭头 */
+:global(.ai-select-popper .el-popper__arrow::before) {
+  background: var(--tp-glass-bg) !important;
+  border: 1px solid var(--tp-glass-border) !important;
+}
+
+/* 下拉项内容布局与状态圆点 */
+.ai-select-option-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+}
+
+.ai-select-option-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+  background: var(--tp-gray-400);
+}
+
+/* 语义状态指示点颜色与外发光 */
+.ai-select-option-dot.success {
+  background: var(--tp-success);
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.4);
+}
+
+.ai-select-option-dot.warning {
+  background: var(--tp-warning);
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.4);
+}
+
+.ai-select-option-dot.danger {
+  background: var(--tp-danger);
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
+}
+
+.ai-select-option-dot.primary {
+  background: var(--tp-primary);
+  box-shadow: 0 0 6px rgba(139, 92, 246, 0.4);
+}
+
+.ai-select-option-dot.info {
+  background: var(--tp-gray-400);
+}
+
+/* 暗色主题 (genart) 微调 */
+:global(html[data-theme='genart'] .ai-select-popper.el-popper) {
+  background: rgba(10, 10, 12, 0.82) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+:global(html[data-theme='genart'] .ai-select-popper .el-popper__arrow::before) {
+  background: rgba(10, 10, 12, 0.82) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ── 底部统计卡片高度 (上下宽度) 与间距优化 ── */
+.ai-stats-grid .ai-stat-card,
+.ai-stats-grid .ai-quickstart-card {
+  min-height: 100px !important;
+  padding: 10px 16px !important;
+}
+
+/* 快速入口卡片布局优化：由垂直排列改为水平排列以缩减高度 */
+.ai-stats-grid .ai-quickstart-card {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+}
+
+.ai-stats-grid .ai-quickstart-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-stats-grid .ai-stat-label {
+  margin-bottom: 4px !important;
+}
+
+.ai-stats-grid .ai-stat-value {
+  font-size: 1.6rem !important;
+  margin-bottom: 2px !important;
+}
+
+.ai-stats-grid .ai-stat-bar {
+  margin-top: 8px !important;
+}
+
+.ai-stats-grid .ai-stat-segments {
+  margin-top: 8px !important;
+}
+
+.ai-stats-grid .ai-quickstart-card h4 {
+  margin-top: 4px !important;
+}
+
+.ai-stats-grid .ai-quickstart-card p {
+  margin-top: 4px !important;
+  max-width: 220px !important;
+}
+
+.ai-stats-grid .ai-quickstart-link {
+  margin-top: 0 !important;
+  align-self: center !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+}
+
+/* ── 新建任务弹窗 Glassmorphism 与品牌配色深度优化 ── */
+
+/* 遮罩层毛玻璃 — 调轻遮罩底色，保持整体明亮感 */
+:global(.ai-create-dialog-overlay) {
+  background: rgba(15, 23, 42, 0.25) !important;
+  backdrop-filter: blur(10px) saturate(110%) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(110%) !important;
+}
+
+:global(html[data-theme='genart'] .ai-create-dialog-overlay) {
+  background: rgba(4, 4, 8, 0.65) !important;
+}
+
+/* 弹窗主体 — 引入品牌浅紫微光边框与圆润投影 */
+:global(.ai-create-dialog) {
+  background: #ffffff !important;
+  border: 1px solid rgba(139, 92, 246, 0.15) !important;
+  box-shadow:
+    0 24px 60px -10px rgba(139, 92, 246, 0.12),
+    var(--tp-shadow-md) !important;
+  border-radius: var(--tp-radius-lg, 16px) !important;
+  overflow: hidden !important;
+}
+
+:global(html[data-theme='genart'] .ai-create-dialog) {
+  background: rgba(20, 20, 28, 0.95) !important;
+  border-color: rgba(139, 92, 246, 0.2) !important;
+  box-shadow:
+    0 24px 60px -10px rgba(0, 0, 0, 0.5),
+    0 0 1px 1px rgba(255, 255, 255, 0.05) !important;
+}
+
+/* 弹窗 Body 区域 — 使用极淡的品牌紫靛色温底面，彻底消除灰色感 */
+:global(.ai-create-dialog-body) {
+  background: #f8f9fc !important;
+  padding: 24px !important;
+}
+
+:global(html[data-theme='genart'] .ai-create-dialog-body) {
+  background: rgba(10, 10, 15, 0.3) !important;
+}
+
+/* 头尾区域 — 设为纯白，与 body 的极淡紫靛色形成层次对比，摒弃灰色拼凑感 */
+:global(.ai-create-dialog .ai-dialog-header) {
+  border-bottom: 1px solid rgba(139, 92, 246, 0.1) !important;
+  background: #ffffff !important;
+  padding: 20px 24px !important;
+}
+
+:global(.ai-create-dialog .ai-dialog-footer) {
+  border-top: 1px solid rgba(139, 92, 246, 0.1) !important;
+  background: #ffffff !important;
+  padding: 16px 24px !important;
+}
+
+:global(html[data-theme='genart'] .ai-create-dialog :is(.ai-dialog-header, .ai-dialog-footer)) {
+  background: rgba(20, 20, 28, 0.95) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* 分块区域设计 — 纯白卡片结合微弱品牌紫描边与精致发光 */
+:global(.ai-create-section) {
+  background: #ffffff !important;
+  border: 1px solid rgba(139, 92, 246, 0.08) !important;
+  border-radius: var(--tp-radius-lg, 16px) !important;
+  padding: 24px !important;
+  margin-bottom: 20px !important;
+  box-shadow:
+    0 8px 24px -8px rgba(139, 92, 246, 0.06),
+    var(--tp-shadow-sm) !important;
+}
+
+:global(html[data-theme='genart'] .ai-create-section) {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
+  box-shadow: none !important;
+}
+
+:global(.ai-create-section-head) {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 14px !important;
+  margin-bottom: 20px !important;
+}
+
+:global(.ai-create-section-head h3) {
+  margin: 0 !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  color: var(--tp-text-primary) !important;
+  line-height: 1.4 !important;
+}
+
+:global(.ai-create-section-head p) {
+  margin: 2px 0 0 0 !important;
+  font-size: 12px !important;
+  color: var(--tp-text-subtle) !important;
+}
+
+/* 区域数字标识（完美圆形） */
+:global(.ai-create-section-index) {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  border-radius: 50% !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: var(--tp-primary-lighter, rgba(139, 92, 246, 0.1)) !important;
+  color: var(--tp-primary, #8b5cf6) !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  border: 1px solid var(--tp-primary-light, #a78bfa) !important;
+}
+
+:global(html[data-theme='genart'] .ai-create-section-index) {
+  background: rgba(139, 92, 246, 0.15) !important;
+  border-color: rgba(139, 92, 246, 0.3) !important;
+}
+
+/* 必填星号星红色标注 */
+:global(.ai-required) {
+  color: var(--tp-danger, #ef4444) !important;
+  font-weight: bold !important;
+  margin-left: 2px !important;
+}
+
+/* 表单输入与文本域 — 纯白背景与精致品牌微光边框 */
+:global(.ai-create-dialog .ai-form-group) {
+  margin-bottom: 16px !important;
+}
+
+:global(.ai-create-dialog .ai-form-label) {
+  display: block !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: var(--tp-text-secondary) !important;
+  margin-bottom: 8px !important;
+}
+
+:global(.ai-create-dialog .ai-form-input),
+:global(.ai-create-dialog .ai-form-textarea) {
+  background: #ffffff !important;
+  border: 1px solid rgba(139, 92, 246, 0.15) !important;
+  border-radius: var(--tp-radius-sm, 8px) !important;
+  padding: 10px 14px !important;
+  transition: all var(--tp-transition, 0.2s) !important;
+  font-size: 13px !important;
+  color: var(--tp-text-primary) !important;
+}
+
+:global(html[data-theme='genart'] .ai-create-dialog :is(.ai-form-input, .ai-form-textarea)) {
+  background: rgba(0, 0, 0, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: #fff !important;
+}
+
+:global(.ai-create-dialog :is(.ai-form-input, .ai-form-textarea):focus) {
+  border-color: var(--tp-primary, #8b5cf6) !important;
+  background: #ffffff !important;
+  box-shadow: 0 0 0 3px var(--tp-primary-lighter, rgba(139, 92, 246, 0.15)) !important;
+}
+
+:global(html[data-theme='genart'] .ai-create-dialog :is(.ai-form-input, .ai-form-textarea):focus) {
+  background: rgba(0, 0, 0, 0.35) !important;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.25) !important;
+}
+
+/* 模式选择卡片 — 精致白底与焦点框 */
+:global(.ai-choice-card) {
+  border: 1px solid rgba(139, 92, 246, 0.15) !important;
+  background: #ffffff !important;
+  border-radius: var(--tp-radius-md, 12px) !important;
+  padding: 14px 16px !important;
+  transition: all var(--tp-transition, 0.2s) !important;
+  cursor: pointer !important;
+  text-align: left !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  width: 100% !important;
+}
+
+:global(html[data-theme='genart'] .ai-choice-card) {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+:global(.ai-choice-card:hover) {
+  border-color: var(--tp-primary-light, #a78bfa) !important;
+  background: var(--tp-surface-hover, #f5f3ff) !important;
+  transform: translateY(-1px);
+}
+
+:global(html[data-theme='genart'] .ai-choice-card:hover) {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+:global(.ai-choice-card.active) {
+  border-color: var(--tp-primary, #8b5cf6) !important;
+  background: var(--tp-primary-lighter, rgba(139, 92, 246, 0.08)) !important;
+  box-shadow:
+    0 0 0 1px var(--tp-primary, #8b5cf6),
+    0 8px 20px -6px rgba(139, 92, 246, 0.15) !important;
+}
+
+:global(html[data-theme='genart'] .ai-choice-card.active) {
+  background: rgba(139, 92, 246, 0.12) !important;
+  border-color: var(--tp-primary, #8b5cf6) !important;
+  box-shadow:
+    0 0 0 1px var(--tp-primary, #8b5cf6),
+    0 8px 20px -6px rgba(139, 92, 246, 0.3) !important;
+}
+
+:global(.ai-choice-title) {
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  color: var(--tp-text-primary) !important;
+}
+
+:global(.ai-choice-desc) {
+  font-size: 12px !important;
+  color: var(--tp-text-subtle) !important;
+  line-height: 1.45 !important;
+}
+
+/* 环境下拉选择框 — 纯白精致外观 */
+:global(.ai-env-select-trigger) {
+  border: 1px solid rgba(139, 92, 246, 0.15) !important;
+  background: #ffffff !important;
+  border-radius: var(--tp-radius-sm, 8px) !important;
+  padding: 10px 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  width: 100% !important;
+  transition: all var(--tp-transition, 0.2s) !important;
+  cursor: pointer;
+}
+
+:global(html[data-theme='genart'] .ai-env-select-trigger) {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+:global(.ai-env-select.open .ai-env-select-trigger) {
+  border-color: var(--tp-primary, #8b5cf6) !important;
+  background: var(--tp-surface-base, #ffffff) !important;
+  box-shadow: 0 0 0 3px var(--tp-primary-lighter, rgba(139, 92, 246, 0.15)) !important;
+}
+
+:global(html[data-theme='genart'] .ai-env-select.open .ai-env-select-trigger) {
+  background: rgba(0, 0, 0, 0.4) !important;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.25) !important;
+}
+
+/* 紫色助手提示横幅 */
+:global(.ai-prompt-helper) {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 10px 14px !important;
+  background: var(--tp-accent-primary-soft, rgba(139, 92, 246, 0.06)) !important;
+  border: 1px solid var(--tp-accent-primary-border, rgba(139, 92, 246, 0.18)) !important;
+  border-radius: var(--tp-radius-sm, 8px) !important;
+  color: var(--tp-primary, #8b5cf6) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  margin-bottom: 12px !important;
+}
+
+:global(html[data-theme='genart'] .ai-prompt-helper) {
+  background: rgba(139, 92, 246, 0.08) !important;
+  border-color: rgba(139, 92, 246, 0.2) !important;
+  color: #c084fc !important;
+}
+
+:global(.ai-prompt-helper .material-symbols-outlined) {
+  font-size: 16px !important;
+  color: inherit !important;
+}
+
+/* 浮动下拉用例列表 (Autocomplete) */
+:global(.ai-case-picker-panel) {
+  position: relative !important;
+}
+
+:global(.ai-case-dropdown) {
+  position: absolute !important;
+  top: 100% !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 1000 !important;
+  margin-top: 6px !important;
+  max-height: 220px !important;
+  overflow-y: auto !important;
+  background: var(--tp-glass-bg-strong, rgba(255, 255, 255, 0.98)) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid var(--tp-glass-border, rgba(229, 231, 235, 0.8)) !important;
+  border-radius: var(--tp-radius-md, 12px) !important;
+  box-shadow:
+    var(--tp-shadow-md),
+    0 12px 32px -8px rgba(0, 0, 0, 0.12) !important;
+  padding: 6px !important;
+}
+
+:global(html[data-theme='genart'] .ai-case-dropdown) {
+  background: rgba(20, 20, 28, 0.96) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.5) !important;
+}
+
+:global(.ai-case-option) {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 8px 12px !important;
+  border-radius: var(--tp-radius-sm, 8px) !important;
+  cursor: pointer !important;
+  transition: all var(--tp-transition, 0.2s) !important;
+  margin: 2px 0 !important;
+  color: var(--tp-text-secondary) !important;
+  font-size: 13px !important;
+}
+
+:global(.ai-case-option:hover) {
+  background: var(--tp-surface-hover, #f5f3ff) !important;
+  color: var(--tp-text-primary) !important;
+}
+
+:global(html[data-theme='genart'] .ai-case-option:hover) {
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+:global(.ai-case-option.selected) {
+  background: var(--tp-primary-lighter, rgba(139, 92, 246, 0.08)) !important;
+  color: var(--tp-primary, #8b5cf6) !important;
+}
+
+:global(html[data-theme='genart'] .ai-case-option.selected) {
+  background: rgba(139, 92, 246, 0.15) !important;
+  color: #c084fc !important;
+}
+
+/* 已选择的用例标签 */
+:global(.ai-selected-case-list) {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  margin-top: 12px !important;
+}
+
+:global(.ai-selected-case-tag) {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 4px 10px !important;
+  background: var(--tp-primary-lighter, rgba(139, 92, 246, 0.08)) !important;
+  border: 1px solid var(--tp-btn-plain-border, rgba(139, 92, 246, 0.2)) !important;
+  color: var(--tp-primary, #8b5cf6) !important;
+  border-radius: var(--tp-radius-sm, 8px) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+:global(html[data-theme='genart'] .ai-selected-case-tag) {
+  background: rgba(139, 92, 246, 0.12) !important;
+  border-color: rgba(139, 92, 246, 0.25) !important;
+  color: #c084fc !important;
+}
+
+:global(.ai-selected-case-remove) {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: inherit !important;
+  opacity: 0.7 !important;
+  transition: opacity 0.2s !important;
+}
+
+:global(.ai-selected-case-remove:hover) {
+  opacity: 1 !important;
+}
+
+:global(.ai-selected-case-remove .material-symbols-outlined) {
+  font-size: 14px !important;
 }
 </style>

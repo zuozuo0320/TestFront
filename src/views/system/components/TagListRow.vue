@@ -476,8 +476,8 @@ function formatCount(n: number): string {
 .tc-card {
   overflow: hidden !important;
   position: relative !important;
-  border-radius: 16px !important;
-  padding: 18px 20px !important;
+  border-radius: 14px !important;
+  padding: 12px 14px !important;
   cursor: default !important;
   /* 默认浅色主题：温润白紫 + 极简发光 aura */
   background:

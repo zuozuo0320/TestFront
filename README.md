@@ -49,6 +49,17 @@ npm run test:watch   # Vitest 监听模式
 
 ---
 
+## 当前实现事实源
+
+如需更新前端文档，请优先对齐：
+
+- 后端/Executor/前端总览：`../TestPilot/docs/测试管理平台-当前实现业务逻辑总览-20260605.md`
+- 前端入口：`src/main.ts`
+- 前端路由事实源：`src/router/index.ts`
+- 前端 API 事实源：`src/api/`
+
+---
+
 ## 项目结构
 
 ```
@@ -63,6 +74,14 @@ src/
 │   ├── module.ts           #   模块管理
 │   ├── testcase.ts         #   测试用例
 │   ├── aiScript.ts         #   测试智编
+│   ├── caseReview.ts       #   用例评审
+│   ├── caseReviewV02.ts    #   AI 门禁与 Action Items
+│   ├── requirementDoc.ts   #   需求文档
+│   ├── requirementGen.ts   #   需求智生
+│   ├── aiSkill.ts          #   AI Skill
+│   ├── tag.ts              #   标签管理
+│   ├── projectSettings.ts  #   项目设置
+│   ├── aiModelConfig.ts    #   AI 模型配置
 │   ├── attachment.ts       #   附件上传
 │   └── xlsx.ts             #   Excel 导入导出
 ├── stores/                 # Pinia 状态
@@ -76,6 +95,10 @@ src/
 │   ├── useTable.ts         #   表格分页
 │   ├── useTestCaseTree.ts  #   用例树操作
 │   ├── useLocalStorage.ts  #   本地存储
+│   ├── useCaseReviewList.ts # 用例评审列表逻辑
+│   ├── useReviewDefects.ts #   评审缺陷逻辑
+│   ├── useRequirementGen.ts # 需求智生逻辑
+│   ├── useTagManagement.ts #   标签管理逻辑
 │   └── useParticles.ts     #   粒子动画（登录页）
 ├── components/             # 通用组件
 │   ├── AppHeader.vue       #   顶部导航
@@ -87,23 +110,39 @@ src/
 │   ├── EmptyState.vue      #   空状态占位
 │   ├── HoloOrb.vue         #   全息球动画（登录页）
 │   ├── StatusBadge.vue     #   状态徽章
-│   └── LevelBadge.vue      #   等级徽章
+│   ├── LevelBadge.vue      #   等级徽章
+│   ├── ReviewAIGatePanel.vue       # 评审 AI 门禁面板
+│   ├── ReviewAIReportDialog.vue    # 评审 AI 报告弹窗
+│   ├── ReviewListTable.vue         # 评审列表表格
+│   └── ReviewStatCard.vue          # 评审统计卡片
 ├── router/                 # 路由配置
 │   └── index.ts            #   路由定义 + 权限守卫
 ├── views/                  # 页面
 │   ├── LoginPage.vue       #   登录
 │   ├── WorkbenchPage.vue   #   工作台仪表盘
 │   ├── TestCasePage.vue    #   用例管理
+│   ├── CaseReviewPage.vue          # 用例评审列表
+│   ├── CaseReviewCreate.vue        # 创建评审计划
+│   ├── CaseReviewDetail.vue        # 评审详情
 │   ├── ForbiddenPage.vue   #   403 无权限
 │   ├── ComingSoonPage.vue  #   敬请期待占位
 │   ├── ai-script/          #   测试智编
 │   │   ├── AiScriptTaskList.vue     # 任务列表
 │   │   ├── AiScriptTaskDetail.vue   # 任务详情
 │   │   └── AiScriptLibrary.vue      # 脚本库
+│   ├── requirement-gen/    #   需求智生
+│   │   ├── RequirementGenPage.vue           # 入口页
+│   │   ├── RequirementDocList.vue           # 需求文档
+│   │   ├── GenTaskList.vue                  # 生成任务
+│   │   ├── GenResultViewPage.vue            # 生成结果
+│   │   ├── GenTaskResultDetailPage.vue      # 任务结果详情
+│   │   └── SkillList.vue                    # Skill 列表
 │   └── system/             #   系统管理（需管理员权限）
 │       ├── UserManagement.vue       # 用户管理
 │       ├── RoleManagement.vue       # 角色管理
-│       └── ProjectManagement.vue    # 项目管理
+│       ├── ProjectManagement.vue    # 项目管理
+│       ├── TagManagement.vue        # 标签管理
+│       └── AiModelConfigPage.vue    # AI 模型配置
 ├── styles/                 # 样式
 │   ├── variables.css       #   CSS 变量 / 设计令牌
 │   ├── base.css            #   全局基础样式
@@ -123,12 +162,22 @@ src/
 | `/login` | 登录 | 公开 |
 | `/` | 工作台仪表盘 | 需登录 |
 | `/testcases` | 用例管理 | 需登录 |
+| `/case-reviews` | 用例评审 — 评审列表 | 需登录 |
+| `/case-reviews/create` | 用例评审 — 创建评审计划 | 需登录 |
+| `/case-reviews/:reviewId` | 用例评审 — 评审详情 | 需登录 |
 | `/ai-script` | 测试智编 — 任务列表 | 需登录 |
 | `/ai-script/library` | 测试智编 — 脚本库 | 需登录 |
 | `/ai-script/:taskId` | 测试智编 — 任务详情 | 需登录 |
+| `/requirement-gen` | 需求智生 — 入口页 | 需登录 |
+| `/requirement-gen/docs` | 需求智生 — 需求文档 | 需登录 |
+| `/requirement-gen/tasks` | 需求智生 — 生成任务 | 需登录 |
+| `/requirement-gen/results` | 需求智生 — 生成结果 | 需登录 |
+| `/requirement-gen/tasks/:taskId/results` | 需求智生 — 任务结果详情 | 需登录 |
 | `/defects` | 缺陷管理（开发中） | 需登录 |
 | `/analytics` | 分析报表（开发中） | 需登录 |
 | `/system/users` | 用户管理 | 需管理员 |
 | `/system/roles` | 角色管理 | 需管理员 |
-| `/system/projects` | 项目管理 | 需管理员 |
+| `/system/projects` | 项目管理 | 需管理员或项目管理员 |
+| `/system/tags` | 标签管理 | 需系统管理菜单权限 |
+| `/system/ai-model` | AI 模型配置 | 需管理员 |
 | `/forbidden` | 无权限提示 | 需登录 |

@@ -9,7 +9,7 @@ export type AuthUser = {
 
 export type LoginResp = {
   access_token: string
-  user_id: number
+  user_id?: number
   user: AuthUser
 }
 

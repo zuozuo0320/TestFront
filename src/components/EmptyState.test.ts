@@ -115,4 +115,20 @@ describe('EmptyState.vue', () => {
     // 齿轮类名不应存在
     expect(wrapper.find('.es-gear-rotate').exists()).toBe(false)
   })
+
+  it('renders aimodel SVG elements when type is aimodel', () => {
+    const wrapper = mount(EmptyState, {
+      props: {
+        type: 'aimodel',
+      },
+      global: {
+        plugins: [ElementPlus],
+      },
+    })
+    // 神经网络连接点类名应存在于 AI 模型配置中
+    expect(wrapper.find('.es-float-nodes').exists()).toBe(true)
+    // 齿轮和放大镜都不应存在
+    expect(wrapper.find('.es-gear-rotate').exists()).toBe(false)
+    expect(wrapper.find('.es-magnifier').exists()).toBe(false)
+  })
 })

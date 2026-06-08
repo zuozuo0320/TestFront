@@ -34,6 +34,7 @@ export function useTagManagement() {
 
   // ── 列表状态 ──
   const loading = ref(false) // 加载中标志
+  const initialized = ref(false) // 是否完成首次初始化加载，用于控制骨架屏闪烁
   const tags = ref<Tag[]>([]) // 当前页标签列表
   const total = ref(0) // 符合条件的标签总数（分页用）
   const page = ref(1) // 当前页码
@@ -126,6 +127,7 @@ export function useTagManagement() {
     } finally {
       if (!signal?.aborted) {
         loading.value = false
+        initialized.value = true // 标记首次加载已完成，之后刷新不闪烁骨架屏
       }
     }
   }
@@ -390,6 +392,7 @@ export function useTagManagement() {
   return {
     // ── 响应式状态 ──
     loading,
+    initialized,
     tags,
     total,
     page,

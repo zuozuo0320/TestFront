@@ -185,9 +185,14 @@ function statusClass(status: string) {
           <template #empty>
             <div class="table-empty" role="status">
               <div class="table-empty-visual" aria-hidden="true">
-                <div class="table-empty-card table-empty-card--back"></div>
+                <div class="table-empty-card table-empty-card--back">
+                  <span class="material-symbols-outlined">description</span>
+                </div>
                 <div class="table-empty-card table-empty-card--front">
-                  <span class="material-symbols-outlined">auto_awesome_motion</span>
+                  <span class="material-symbols-outlined main-icon">rule</span>
+                  <div class="ai-spark-badge">
+                    <span class="material-symbols-outlined">auto_awesome</span>
+                  </div>
                 </div>
               </div>
               <div class="table-empty-title">暂无生成任务</div>
@@ -589,7 +594,17 @@ html[data-theme='genart'] .task-list-page {
 .table-empty-card--back {
   inset: 8px 4px 0 18px;
   opacity: 0.72;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tp-text-subtle);
   transform: rotate(7deg);
+  animation: table-empty-float-back 6s ease-in-out infinite;
+}
+
+.table-empty-card--back .material-symbols-outlined {
+  font-size: 22px;
+  line-height: 1;
 }
 
 .table-empty-card--front {
@@ -602,11 +617,54 @@ html[data-theme='genart'] .task-list-page {
     radial-gradient(circle at 70% 18%, var(--tp-accent-primary-soft), transparent 36%),
     var(--tp-surface-elevated);
   transform: rotate(-5deg);
+  animation: table-empty-float-front 6s ease-in-out infinite;
 }
 
-.table-empty-card--front .material-symbols-outlined {
-  font-size: 30px;
+.table-empty-card--front .main-icon {
+  font-size: 26px;
+  color: var(--tp-primary);
   line-height: 1;
+}
+
+.ai-spark-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--tp-btn-bg);
+  border: 1px solid var(--tp-surface-elevated);
+  box-shadow: 0 4px 10px rgba(139, 92, 246, 0.3);
+}
+
+.ai-spark-badge .material-symbols-outlined {
+  font-size: 11px;
+  color: #ffffff;
+  line-height: 1;
+}
+
+@keyframes table-empty-float-front {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-5deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(-3deg);
+  }
+}
+
+@keyframes table-empty-float-back {
+  0%,
+  100% {
+    transform: translateY(0) rotate(7deg);
+  }
+  50% {
+    transform: translateY(-3px) rotate(9deg);
+  }
 }
 
 .table-empty-title {

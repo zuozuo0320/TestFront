@@ -349,12 +349,13 @@ const ruleCheckFeedbackTimers = new Map<number, ReturnType<typeof setTimeout>>()
 
 function buildRuleCheckFeedback(report: PlanRunReport): RuleCheckFeedback {
   const summary = `${report.passed_count}/${report.total_count} 通过`
+  const autoSummary = formatAutoReviewSummary(report)
   if (report.error_count > 0) {
     return {
       type: 'error',
       icon: 'error',
       title: '规则检查完成，有执行异常',
-      message: `${summary}，${report.failed_count} 未通过，${report.error_count} 异常`,
+      message: `${summary}，${report.failed_count} 未通过，${report.error_count} 异常${autoSummary}`,
     }
   }
   if (report.failed_count > 0) {
@@ -362,7 +363,7 @@ function buildRuleCheckFeedback(report: PlanRunReport): RuleCheckFeedback {
       type: 'warning',
       icon: 'report_problem',
       title: '规则检查完成，发现需关注项',
-      message: `${summary}，${report.failed_count} 条未通过`,
+      message: `${summary}，${report.failed_count} 条未通过${autoSummary}`,
     }
   }
   return {
@@ -371,6 +372,19 @@ function buildRuleCheckFeedback(report: PlanRunReport): RuleCheckFeedback {
     title: '规则检查完成',
     message: `${summary}，未发现阻断项`,
   }
+}
+
+function formatAutoReviewSummary(report: PlanRunReport) {
+  const submitted = report.auto_submitted_count ?? 0
+  const already = report.auto_already_count ?? 0
+  const skipped = report.auto_skipped_count ?? 0
+  const error = report.auto_error_count ?? 0
+  const parts: string[] = []
+  if (submitted > 0) parts.push(`${submitted} 条已自动打回`)
+  if (already > 0) parts.push(`${already} 条已有自动打回记录`)
+  if (skipped > 0) parts.push(`${skipped} 条未自动打回`)
+  if (error > 0) parts.push(`${error} 条自动打回失败`)
+  return parts.length > 0 ? `，${parts.join('，')}` : ''
 }
 
 function setRuleCheckFeedback(reviewID: number, feedback: RuleCheckFeedback) {
@@ -609,6 +623,11 @@ function reviewResultLabel(result: string) {
     needs_update: '打回修订',
   }
   return map[result] || result
+}
+
+function reviewItemResultLabel(item: CaseReviewItem) {
+  if (item.final_result === 'pending' && item.current_round_no > 1) return '待复审'
+  return reviewResultLabel(item.final_result)
 }
 
 function reviewResultType(result: string) {
@@ -1268,7 +1287,7 @@ function reviewStatusLabel(review: CaseReview) {
             <el-table-column label="评审结果" width="100" align="center">
               <template #default="{ row }">
                 <el-tag :type="reviewResultType(row.final_result)" size="small">
-                  {{ reviewResultLabel(row.final_result) }}
+                  {{ reviewItemResultLabel(row) }}
                 </el-tag>
               </template>
             </el-table-column>
@@ -1313,7 +1332,7 @@ function reviewStatusLabel(review: CaseReview) {
                   </el-button>
                 </template>
                 <el-tag v-else :type="reviewResultType(row.final_result)" size="small">
-                  {{ reviewResultLabel(row.final_result) }}
+                  {{ reviewItemResultLabel(row) }}
                 </el-tag>
               </template>
             </el-table-column>

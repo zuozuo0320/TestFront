@@ -13,8 +13,8 @@ export interface EmptyStateProps {
   showAction?: boolean
   /** 操作按钮文案 */
   actionText?: string
-  /** 占位图类型: 'testcase' | 'review' */
-  type?: 'testcase' | 'review'
+  /** 占位图类型: 'testcase' | 'review' | 'aimodel' | 'tag' */
+  type?: 'testcase' | 'review' | 'aimodel' | 'tag'
 }
 
 defineProps<EmptyStateProps>()
@@ -272,6 +272,122 @@ function handleAction() {
             </g>
           </g>
 
+          <!-- 4. 标签管理插图 (type === 'tag') -->
+          <g v-else-if="type === 'tag'">
+            <!-- 标签底盘投影 -->
+            <ellipse
+              cx="120"
+              cy="122"
+              rx="30"
+              ry="10"
+              fill="var(--tp-primary-dark)"
+              fill-opacity="0.2"
+              filter="blur(2.5px)"
+            />
+
+            <!-- 浮动核心组件：科技感大吊牌 -->
+            <g class="es-float-main">
+              <g transform="translate(90, 36)">
+                <!-- 3D厚度 -->
+                <polygon points="10,0 45,0 35,55 0,55" fill="var(--tp-primary-dark)" />
+                <!-- 吊牌正面 -->
+                <polygon points="8,-2 43,-2 33,53 -2,53" fill="url(#es-grad-primary)" />
+
+                <!-- 吊牌孔 -->
+                <circle cx="20" cy="8" r="3" fill="var(--tp-surface-card)" />
+
+                <!-- 抽象的井号键 '#' 代表 Tag 分类 -->
+                <line
+                  x1="8"
+                  y1="21"
+                  x2="28"
+                  y2="21"
+                  stroke="#ffffff"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-opacity="0.9"
+                />
+                <line
+                  x1="6"
+                  y1="31"
+                  x2="26"
+                  y2="31"
+                  stroke="#ffffff"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-opacity="0.9"
+                />
+                <line
+                  x1="14"
+                  y1="13"
+                  x2="8"
+                  y2="39"
+                  stroke="#ffffff"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-opacity="0.9"
+                />
+                <line
+                  x1="24"
+                  y1="13"
+                  x2="18"
+                  y2="39"
+                  stroke="#ffffff"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-opacity="0.9"
+                />
+              </g>
+            </g>
+
+            <!-- 辅助浮动组件：右侧中等胶囊标签 (蓝绿) -->
+            <g class="es-float-sec">
+              <g transform="translate(136, 58)">
+                <!-- 厚度投影 -->
+                <rect
+                  x="0"
+                  y="2"
+                  width="38"
+                  height="15"
+                  rx="7.5"
+                  fill="var(--tp-accent-info-dark)"
+                  opacity="0.6"
+                />
+                <!-- 主体 -->
+                <rect x="-2" y="0" width="38" height="15" rx="7.5" fill="url(#es-grad-secondary)" />
+                <!-- 胶囊内容 -->
+                <circle cx="7" cy="7.5" r="2.2" fill="#ffffff" />
+                <line
+                  x1="14"
+                  y1="7.5"
+                  x2="28"
+                  y2="7.5"
+                  stroke="#ffffff"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              </g>
+            </g>
+
+            <!-- 辅助悬浮组件：左侧金黄色微型胶囊 -->
+            <g class="es-float-nodes">
+              <g transform="translate(52, 64)">
+                <!-- 琥珀金胶囊 -->
+                <rect x="0" y="0" width="28" height="12" rx="6" fill="#f59e0b" opacity="0.85" />
+                <circle cx="5" cy="6" r="1.8" fill="#ffffff" />
+                <line
+                  x1="10"
+                  y1="6"
+                  x2="20"
+                  y2="6"
+                  stroke="#ffffff"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                />
+              </g>
+            </g>
+          </g>
+
           <!-- 2. 用例评审中心插图 (type === 'review') -->
           <g v-else-if="type === 'review'">
             <!-- 评审文档底盘投影 -->
@@ -429,6 +545,181 @@ function handleAction() {
                 stroke-linecap="round"
                 stroke-opacity="0.7"
               />
+            </g>
+          </g>
+
+          <!-- 3. AI模型配置插图 (type === 'aimodel') -->
+          <g v-else-if="type === 'aimodel'">
+            <!-- 核心阴影/底盘发光 -->
+            <ellipse
+              cx="120"
+              cy="122"
+              rx="40"
+              ry="15"
+              fill="var(--tp-primary-dark)"
+              fill-opacity="0.2"
+              filter="blur(3px)"
+            />
+
+            <!-- 浮动核心组件：AI 智能芯片 -->
+            <g class="es-float-main">
+              <!-- 芯片底座厚度 -->
+              <polygon
+                points="120,62 165,82 120,102 75,82"
+                fill="var(--tp-primary-dark)"
+                opacity="0.8"
+              />
+              <!-- 芯片主体面板 -->
+              <polygon
+                points="120,58 162,79 120,100 78,79"
+                fill="var(--tp-surface-card)"
+                stroke="var(--tp-border-strong)"
+                stroke-width="1.5"
+              />
+
+              <!-- 芯片边缘彩色金属触点 -->
+              <!-- 西北侧触点 -->
+              <line x1="88" y1="74" x2="94" y2="71" stroke="#2dd4bf" stroke-width="2" />
+              <line x1="96" y1="70" x2="102" y2="67" stroke="#2dd4bf" stroke-width="2" />
+              <line x1="104" y1="66" x2="110" y2="63" stroke="#2dd4bf" stroke-width="2" />
+
+              <!-- 东北侧触点 -->
+              <line x1="152" y1="74" x2="146" y2="71" stroke="#8b5cf6" stroke-width="2" />
+              <line x1="144" y1="70" x2="138" y2="67" stroke="#8b5cf6" stroke-width="2" />
+              <line x1="136" y1="66" x2="130" y2="63" stroke="#8b5cf6" stroke-width="2" />
+
+              <!-- 西南侧触点 -->
+              <line x1="88" y1="84" x2="94" y2="87" stroke="#8b5cf6" stroke-width="2" />
+              <line x1="96" y1="88" x2="102" y2="91" stroke="#8b5cf6" stroke-width="2" />
+              <line x1="104" y1="92" x2="110" y2="95" stroke="#8b5cf6" stroke-width="2" />
+
+              <!-- 东南侧触点 -->
+              <line x1="152" y1="84" x2="146" y2="87" stroke="#2dd4bf" stroke-width="2" />
+              <line x1="144" y1="88" x2="138" y2="91" stroke="#2dd4bf" stroke-width="2" />
+              <line x1="136" y1="92" x2="130" y2="95" stroke="#2dd4bf" stroke-width="2" />
+
+              <!-- 内部印刷电路纹路 -->
+              <polygon
+                points="120,68 145,80 120,92 95,80"
+                fill="none"
+                stroke="var(--tp-primary)"
+                stroke-width="1"
+                stroke-opacity="0.3"
+              />
+              <line
+                x1="120"
+                y1="68"
+                x2="120"
+                y2="92"
+                stroke="var(--tp-primary)"
+                stroke-opacity="0.2"
+              />
+              <line
+                x1="95"
+                y1="80"
+                x2="145"
+                y2="80"
+                stroke="var(--tp-primary)"
+                stroke-opacity="0.2"
+              />
+
+              <!-- 芯片中心的发光量子核心 -->
+              <ellipse cx="120" cy="79" rx="15" ry="8" fill="url(#es-bg-glow)" />
+              <!-- 核心立体球体/能量球 -->
+              <circle cx="120" cy="76" r="10" fill="url(#es-grad-primary)" />
+              <circle cx="117" cy="73" r="3" fill="#ffffff" opacity="0.6" />
+            </g>
+
+            <!-- 环绕能量轨道（带粒子） -->
+            <g class="es-float-sec">
+              <!-- 轨道 -->
+              <ellipse
+                cx="120"
+                cy="72"
+                rx="50"
+                ry="22"
+                fill="none"
+                stroke="url(#es-grad-secondary)"
+                stroke-width="1.2"
+                stroke-dasharray="4 8"
+                opacity="0.7"
+              />
+              <!-- 轨道上流动的粒子 -->
+              <circle cx="70" cy="72" r="3" fill="#2dd4bf" />
+              <circle cx="170" cy="72" r="2.5" fill="#6366f1" />
+            </g>
+
+            <!-- 顶部悬浮的 AI 神经网络连接点 -->
+            <g class="es-float-nodes">
+              <!-- 细的虚线连接到中央核心 -->
+              <line
+                x1="120"
+                y1="76"
+                x2="90"
+                y2="40"
+                stroke="var(--tp-primary)"
+                stroke-width="1"
+                stroke-dasharray="2 3"
+                opacity="0.5"
+              />
+              <line
+                x1="120"
+                y1="76"
+                x2="155"
+                y2="45"
+                stroke="var(--tp-primary)"
+                stroke-width="1"
+                stroke-dasharray="2 3"
+                opacity="0.5"
+              />
+              <line
+                x1="120"
+                y1="76"
+                x2="120"
+                y2="30"
+                stroke="var(--tp-primary)"
+                stroke-width="1"
+                stroke-dasharray="2 3"
+                opacity="0.5"
+              />
+
+              <!-- 连接点球体 -->
+              <g transform="translate(90, 40)" class="es-node-glow">
+                <circle cx="0" cy="0" r="4" fill="#a78bfa" />
+                <circle
+                  cx="0"
+                  cy="0"
+                  r="7"
+                  fill="none"
+                  stroke="#a78bfa"
+                  stroke-width="1"
+                  opacity="0.5"
+                />
+              </g>
+              <g transform="translate(155, 45)" class="es-node-glow">
+                <circle cx="0" cy="0" r="3.5" fill="#2dd4bf" />
+                <circle
+                  cx="0"
+                  cy="0"
+                  r="6"
+                  fill="none"
+                  stroke="#2dd4bf"
+                  stroke-width="1"
+                  opacity="0.5"
+                />
+              </g>
+              <g transform="translate(120, 30)" class="es-node-glow">
+                <circle cx="0" cy="0" r="4.5" fill="#ec4899" />
+                <circle
+                  cx="0"
+                  cy="0"
+                  r="8"
+                  fill="none"
+                  stroke="#ec4899"
+                  stroke-width="1"
+                  opacity="0.5"
+                />
+              </g>
             </g>
           </g>
 
@@ -601,6 +892,37 @@ function handleAction() {
   }
   50% {
     transform: translate(125px, 66px) rotate(-6deg) scale(1.05);
+  }
+}
+
+/* AI 神经网络连接点浮动 */
+.es-float-nodes {
+  animation: floatNodes 4.5s ease-in-out infinite;
+}
+
+@keyframes floatNodes {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+/* 神经网络节点发光呼吸灯效果 */
+.es-node-glow {
+  animation: nodeGlow 3s ease-in-out infinite alternate;
+}
+
+@keyframes nodeGlow {
+  0% {
+    opacity: 0.8;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1.05);
   }
 }
 </style>

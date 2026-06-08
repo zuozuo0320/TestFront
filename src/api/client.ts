@@ -17,7 +17,7 @@ apiClient.interceptors.request.use((config) => {
     config.headers['Authorization'] = `Bearer ${token}`
   }
   const userId = localStorage.getItem('tp-user-id')
-  if (userId) {
+  if (userId && userId !== 'undefined' && userId !== 'null') {
     config.headers = config.headers || {}
     config.headers['X-User-ID'] = userId
   }

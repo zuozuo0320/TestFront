@@ -5,7 +5,16 @@ import { CopyDocument, Delete, Edit, Search, Grid, List } from '@element-plus/ic
 import StatusBadge from '../components/StatusBadge.vue'
 import LevelBadge from '../components/LevelBadge.vue'
 import EmptyState from '../components/EmptyState.vue'
-import { FileText, CheckCircle2, Bug, Timer } from 'lucide-vue-next'
+import {
+  FileText,
+  CheckCircle2,
+  Bug,
+  Timer,
+  ArrowUp,
+  ArrowDown,
+  Copy,
+  Trash2,
+} from 'lucide-vue-next'
 
 import FileUploader from '../components/FileUploader.vue'
 import {
@@ -1299,6 +1308,20 @@ function formatRelativeTime(dateStr: string): string {
   if (diffHr < 24) return `${diffHr}小时前`
   if (diffDay < 7) return `${diffDay}天前`
   return dateStr.substring(0, 10)
+}
+
+function getActivityIconClass(act: CaseActivity) {
+  const icon = act.icon || ''
+  if (icon.includes('check') || icon.includes('rule')) {
+    return 'is-success'
+  }
+  if (icon.includes('edit') || icon.includes('history') || icon.includes('update')) {
+    return 'is-warning'
+  }
+  if (icon.includes('add') || icon.includes('create')) {
+    return 'is-info'
+  }
+  return 'is-default'
 }
 
 function formatAbsoluteTime(dateStr: string): string {
@@ -2790,7 +2813,7 @@ watch(selectedProject, (newId) => {
                 </div>
 
                 <!-- Tags -->
-                <div class="stitch-form-item case-tags-field">
+                <div class="stitch-form-item case-tags-field col-span-full">
                   <label id="case-tags-label">标签</label>
                   <el-select
                     v-model="selectedTagIds"
@@ -2960,20 +2983,20 @@ watch(selectedProject, (newId) => {
                           <template #dropdown>
                             <el-dropdown-menu class="step-icon-menu">
                               <el-dropdown-item command="insertAbove" title="在上方插入">
-                                <span class="material-symbols-outlined">arrow_upward</span>
+                                <ArrowUp :size="15" />
                               </el-dropdown-item>
                               <el-dropdown-item command="insertBelow" title="在下方插入">
-                                <span class="material-symbols-outlined">arrow_downward</span>
+                                <ArrowDown :size="15" />
                               </el-dropdown-item>
                               <el-dropdown-item command="copy" title="复制步骤">
-                                <span class="material-symbols-outlined">content_copy</span>
+                                <Copy :size="15" />
                               </el-dropdown-item>
                               <el-dropdown-item
                                 command="delete"
                                 class="danger-item"
                                 title="删除步骤"
                               >
-                                <span class="material-symbols-outlined">delete</span>
+                                <Trash2 :size="15" />
                               </el-dropdown-item>
                             </el-dropdown-menu>
                           </template>
@@ -3086,7 +3109,112 @@ watch(selectedProject, (newId) => {
               </div>
             </section>
 
-            <!-- Assets -->
+            <!-- AI 智检助手 -->
+            <section
+              class="case-ai-card"
+              :class="{ 'is-ai-locked': !editingId && !aiAnalyzing && !aiError && !aiResult }"
+            >
+              <div class="case-ai-head">
+                <div class="case-ai-icon">
+                  <span class="material-symbols-outlined">smart_toy</span>
+                </div>
+                <div class="case-ai-title">
+                  <h4>AI 智检助手</h4>
+                  <span>
+                    {{ aiAnalyzing ? '分析中...' : aiResult ? '分析完成' : '智能审计可用' }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- 加载态 -->
+              <div v-if="aiAnalyzing" class="case-ai-state">
+                <div class="ai-spinner"></div>
+                <p class="case-ai-description">正在进行 AI 质量分析，请稍候...</p>
+              </div>
+
+              <!-- 错误态 -->
+              <div v-else-if="aiError" class="case-ai-body">
+                <p class="case-ai-error">{{ aiError }}</p>
+                <button type="button" class="case-ai-action" @click="runAIAnalyze">重新检测</button>
+              </div>
+
+              <!-- 分析结果 -->
+              <div v-else-if="aiResult">
+                <div class="ai-dims-container">
+                  <div
+                    v-for="dim in [
+                      { label: '覆盖率', score: aiResult.coverage.score },
+                      { label: '边界值', score: aiResult.boundary.score },
+                      { label: '质量', score: aiResult.quality.score },
+                    ]"
+                    :key="dim.label"
+                    class="ai-dim-card"
+                  >
+                    <div class="ai-dim-label">
+                      {{ dim.label }}
+                    </div>
+                    <div class="ai-dim-score" :style="{ color: getScoreColor(dim.score) }">
+                      {{ dim.score }}
+                    </div>
+                  </div>
+                </div>
+
+                <p v-if="aiResult.summary" class="case-ai-description">
+                  {{ aiResult.summary }}
+                </p>
+
+                <div
+                  v-if="
+                    aiResult.coverage.issues.length ||
+                    aiResult.boundary.issues.length ||
+                    aiResult.quality.suggestions.length
+                  "
+                  class="ai-issues-list"
+                >
+                  <div
+                    v-for="issue in [
+                      ...aiResult.coverage.issues.map((i) => ({ text: i, type: 'coverage' })),
+                      ...aiResult.boundary.issues.map((i) => ({ text: i, type: 'boundary' })),
+                      ...aiResult.quality.suggestions.map((i) => ({ text: i, type: 'quality' })),
+                    ]"
+                    :key="issue.text"
+                    class="ai-issue-item"
+                    :class="`type-${issue.type}`"
+                  >
+                    <span class="material-symbols-outlined ai-issue-icon">
+                      {{
+                        issue.type === 'coverage'
+                          ? 'checklist'
+                          : issue.type === 'boundary'
+                            ? 'warning'
+                            : 'tips_and_updates'
+                      }}
+                    </span>
+                    <span class="ai-issue-text">{{ issue.text }}</span>
+                  </div>
+                </div>
+
+                <button type="button" class="case-ai-action" @click="runAIAnalyze">重新检测</button>
+              </div>
+
+              <!-- 初始态 -->
+              <div v-else class="case-ai-body">
+                <p class="case-ai-description">
+                  基于当前用例内容，AI
+                  将从覆盖率、边界值、综合质量三个维度进行分析，给出评分和改进建议。
+                </p>
+                <button
+                  type="button"
+                  class="case-ai-action"
+                  :disabled="!editingId"
+                  @click="runAIAnalyze"
+                >
+                  {{ editingId ? '开始检测' : '保存后可检测' }}
+                </button>
+              </div>
+            </section>
+
+            <!-- 视觉辅助/附件 -->
             <section class="stitch-panel">
               <h3 class="stitch-subtitle">视觉辅助/附件</h3>
               <div class="stitch-assets-grid">
@@ -3327,7 +3455,7 @@ watch(selectedProject, (newId) => {
               <div v-if="caseActivities.length === 0" class="stitch-empty-state">
                 <span class="material-symbols-outlined">history</span>
                 <span>暂无动态记录</span>
-                <span class="stitch-empty-state-sub">编辑或执行后将在此显示</span>
+                <span class="stitch-empty-state-sub">编辑、执行或评审后将在此显示</span>
               </div>
               <div v-else class="stitch-timeline">
                 <div class="timeline-line"></div>
@@ -3336,8 +3464,8 @@ watch(selectedProject, (newId) => {
                   :key="act.id"
                   class="timeline-item flex gap-4 relative"
                 >
-                  <div class="timeline-icon bg-secondary z-10 shrink-0">
-                    <span class="material-symbols-outlined text-white text-sm">{{ act.icon }}</span>
+                  <div class="timeline-icon z-10 shrink-0" :class="getActivityIconClass(act)">
+                    <span class="material-symbols-outlined text-sm">{{ act.icon }}</span>
                   </div>
                   <div class="timeline-content flex-1">
                     <p class="text-xs leading-tight">
@@ -3345,143 +3473,9 @@ watch(selectedProject, (newId) => {
                       {{ act.action }}
                       <span v-if="act.detail" class="font-mono bg-white-5">{{ act.detail }}</span>
                     </p>
-                    <p class="time italic">{{ formatRelativeTime(act.created_at) }}</p>
+                    <p class="timeline-time">{{ formatRelativeTime(act.created_at) }}</p>
                   </div>
                 </div>
-              </div>
-            </section>
-
-            <!-- AI Bot -->
-            <section
-              class="stitch-ai-panel rounded-xl p-6 relative"
-              :class="{ 'is-ai-locked': !editingId && !aiAnalyzing && !aiError && !aiResult }"
-            >
-              <div class="ai-header flex items-center gap-3 mb-4">
-                <div
-                  class="ai-icon w-8 h-8 rounded-full bg-primary flex items-center justify-center"
-                >
-                  <span class="material-symbols-outlined text-white text-sm">smart_toy</span>
-                </div>
-                <div>
-                  <h4 class="text-sm font-bold text-white leading-none">AI 智检助手</h4>
-                  <span class="text-xs text-primary-dim uppercase tracking-wider">
-                    {{ aiAnalyzing ? '分析中...' : aiResult ? '分析完成' : '智能审计可用' }}
-                  </span>
-                </div>
-              </div>
-
-              <!-- Loading -->
-              <div v-if="aiAnalyzing" style="text-align: center; padding: 16px 0">
-                <div class="ai-spinner"></div>
-                <p class="text-xs text-variant" style="margin-top: 8px">
-                  正在进行 AI 质量分析，请稍候...
-                </p>
-              </div>
-
-              <!-- Error -->
-              <div v-else-if="aiError" style="margin-bottom: 12px">
-                <p class="text-xs" style="color: #f44336; margin-bottom: 8px">{{ aiError }}</p>
-                <button
-                  type="button"
-                  class="ai-btn w-full py-2 bg-white-10 hover:bg-white-20 text-xs font-bold text-primary-dim rounded-lg transition-all border border-white-10"
-                  @click="runAIAnalyze"
-                >
-                  重新检测
-                </button>
-              </div>
-
-              <!-- Result -->
-              <div v-else-if="aiResult">
-                <div style="display: flex; gap: 8px; margin-bottom: 12px">
-                  <div
-                    v-for="dim in [
-                      { label: '覆盖率', score: aiResult.coverage.score },
-                      { label: '边界值', score: aiResult.boundary.score },
-                      { label: '质量', score: aiResult.quality.score },
-                    ]"
-                    :key="dim.label"
-                    style="
-                      flex: 1;
-                      text-align: center;
-                      padding: 8px 4px;
-                      border-radius: 8px;
-                      background: var(--tp-surface-muted);
-                    "
-                  >
-                    <div class="text-xs text-variant" style="margin-bottom: 4px">
-                      {{ dim.label }}
-                    </div>
-                    <div
-                      style="font-size: 18px; font-weight: 700"
-                      :style="{ color: getScoreColor(dim.score) }"
-                    >
-                      {{ dim.score }}
-                    </div>
-                  </div>
-                </div>
-
-                <p
-                  v-if="aiResult.summary"
-                  class="text-xs text-variant"
-                  style="margin-bottom: 8px; line-height: 1.5"
-                >
-                  {{ aiResult.summary }}
-                </p>
-
-                <div
-                  v-if="
-                    aiResult.coverage.issues.length ||
-                    aiResult.boundary.issues.length ||
-                    aiResult.quality.suggestions.length
-                  "
-                  style="margin-bottom: 12px"
-                >
-                  <div
-                    v-for="issue in [
-                      ...aiResult.coverage.issues.map((i) => ({ text: i, type: 'coverage' })),
-                      ...aiResult.boundary.issues.map((i) => ({ text: i, type: 'boundary' })),
-                      ...aiResult.quality.suggestions.map((i) => ({ text: i, type: 'quality' })),
-                    ]"
-                    :key="issue.text"
-                    class="text-xs"
-                    style="padding: 3px 0; color: var(--tp-gray-600); line-height: 1.4"
-                  >
-                    <span class="material-symbols-outlined ai-issue-icon">
-                      {{
-                        issue.type === 'coverage'
-                          ? 'checklist'
-                          : issue.type === 'boundary'
-                            ? 'warning'
-                            : 'tips_and_updates'
-                      }}
-                    </span>
-                    {{ issue.text }}
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  class="ai-btn w-full py-2 bg-white-10 hover:bg-white-20 text-xs font-bold text-primary-dim rounded-lg transition-all border border-white-10"
-                  @click="runAIAnalyze"
-                >
-                  重新检测
-                </button>
-              </div>
-
-              <!-- Initial state -->
-              <div v-else>
-                <p class="text-xs text-variant leading-relaxed mb-4">
-                  基于当前用例内容，AI
-                  将从覆盖率、边界值、综合质量三个维度进行分析，给出评分和改进建议。
-                </p>
-                <button
-                  type="button"
-                  class="ai-btn w-full py-2 bg-white-10 hover:bg-white-20 text-xs font-bold text-primary-dim rounded-lg transition-all border border-white-10"
-                  :disabled="!editingId"
-                  @click="runAIAnalyze"
-                >
-                  {{ editingId ? '开始检测' : '保存后可检测' }}
-                </button>
               </div>
             </section>
           </div>
@@ -3675,8 +3669,256 @@ watch(selectedProject, (newId) => {
   </div>
 </template>
 
+<style>
+/* 步骤下拉菜单 (纯图标紧凑 SaaS 风格) — 全局样式，以支持 teleported 的 dropdown popper */
+.step-icon-dropdown {
+  padding: 3px !important;
+  border-radius: 10px !important;
+  box-shadow:
+    0 10px 32px -6px rgba(139, 92, 246, 0.12),
+    var(--tp-shadow-md) !important;
+  border: 1px solid rgba(139, 92, 246, 0.1) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  width: 38px !important;
+  min-width: 38px !important;
+  box-sizing: border-box !important;
+}
+
+html[data-theme='genart'] .step-icon-dropdown {
+  background: rgba(20, 20, 28, 0.94) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 10px 32px -6px rgba(0, 0, 0, 0.5) !important;
+}
+
+.step-icon-menu {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  width: 32px !important;
+}
+
+.step-icon-menu .el-dropdown-menu__item {
+  padding: 0 !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 6px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all var(--tp-transition, 0.2s) !important;
+  background: transparent !important;
+  color: var(--tp-text-secondary) !important;
+  margin: 0 !important;
+  cursor: pointer !important;
+}
+
+/* 普通菜单项悬停效果 */
+.step-icon-menu .el-dropdown-menu__item:not(.is-disabled):hover {
+  background: var(--tp-primary-lighter, rgba(139, 92, 246, 0.08)) !important;
+}
+
+html[data-theme='genart'] .step-icon-menu .el-dropdown-menu__item:not(.is-disabled):hover {
+  background: rgba(232, 121, 249, 0.15) !important;
+}
+
+/* Lucide SVG 图标样式 */
+.step-icon-menu .el-dropdown-menu__item svg {
+  width: 15px !important;
+  height: 15px !important;
+  color: var(--tp-text-subtle) !important;
+  transition: color var(--tp-transition, 0.2s) !important;
+}
+
+.step-icon-menu .el-dropdown-menu__item:not(.is-disabled):hover svg {
+  color: var(--tp-primary) !important;
+}
+
+html[data-theme='genart'] .step-icon-menu .el-dropdown-menu__item:not(.is-disabled):hover svg {
+  color: #c084fc !important;
+}
+
+/* 危险项 (删除) 特殊处理与分隔 */
+.step-icon-menu .el-dropdown-menu__item.danger-item {
+  margin-top: 5px !important;
+  border-radius: 6px !important;
+}
+
+.step-icon-menu .el-dropdown-menu__item.danger-item svg {
+  color: var(--tp-danger, #ef4444) !important;
+}
+
+.step-icon-menu .el-dropdown-menu__item.danger-item:not(.is-disabled):hover {
+  background: rgba(239, 68, 68, 0.08) !important;
+}
+
+.step-icon-menu .el-dropdown-menu__item.danger-item:not(.is-disabled):hover svg {
+  color: var(--tp-danger, #ef4444) !important;
+}
+</style>
+
 <style scoped>
 @import '../styles/testcase-drawer.css';
+
+.case-ai-card {
+  position: relative;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  min-height: 148px !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  padding: 14px !important;
+  border: 1px solid color-mix(in srgb, var(--tp-primary) 20%, var(--tp-border-subtle)) !important;
+  border-radius: 10px !important;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--tp-primary) 5%, var(--tp-surface-card)),
+      var(--tp-surface-card)
+    ),
+    var(--tp-surface-card) !important;
+  box-shadow: var(--tp-shadow-sm) !important;
+  box-sizing: border-box !important;
+}
+
+.case-ai-card:hover {
+  border-color: color-mix(in srgb, var(--tp-primary) 32%, var(--tp-border-subtle)) !important;
+}
+
+.case-ai-card.is-ai-locked {
+  min-height: 136px !important;
+}
+
+.case-ai-head {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-height: 32px !important;
+  margin: 0 !important;
+}
+
+.case-ai-icon {
+  width: 30px !important;
+  height: 30px !important;
+  flex: 0 0 30px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 9px !important;
+  background: var(--tp-primary) !important;
+  color: #fff !important;
+}
+
+.case-ai-icon .material-symbols-outlined {
+  color: #fff !important;
+  font-size: 17px !important;
+  line-height: 1 !important;
+}
+
+.case-ai-title {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.case-ai-title h4 {
+  margin: 0 !important;
+  color: var(--tp-text-primary) !important;
+  font-size: 13px !important;
+  font-weight: var(--tp-font-semibold) !important;
+  line-height: 18px !important;
+  white-space: nowrap;
+}
+
+.case-ai-title span {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--tp-text-muted) !important;
+  font-size: 11px !important;
+  line-height: 14px !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+.case-ai-body,
+.case-ai-state {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+}
+
+.case-ai-state {
+  align-items: center;
+  padding: 8px 0 2px;
+  text-align: center;
+}
+
+.case-ai-description {
+  display: block !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  color: var(--tp-text-secondary) !important;
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+  -webkit-line-clamp: initial !important;
+  line-clamp: initial !important;
+  -webkit-box-orient: initial !important;
+}
+
+.case-ai-error {
+  margin: 0 !important;
+  color: var(--tp-danger, #ef4444) !important;
+  font-size: 12px !important;
+  line-height: 1.45 !important;
+}
+
+.case-ai-action {
+  width: 100% !important;
+  min-height: 34px !important;
+  padding: 0 12px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: var(--tp-primary) !important;
+  color: #fff !important;
+  font-size: 12px !important;
+  font-weight: var(--tp-font-semibold) !important;
+  line-height: 34px !important;
+  cursor: pointer;
+  box-shadow: none !important;
+  transition:
+    background var(--tp-transition, 0.2s),
+    opacity var(--tp-transition, 0.2s);
+}
+
+.case-ai-action:hover:not(:disabled) {
+  background: var(--tp-btn-bg-hover, var(--tp-primary-dark)) !important;
+}
+
+.case-ai-action:disabled {
+  background: var(--tp-surface-muted) !important;
+  color: var(--tp-text-muted) !important;
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.case-ai-card .ai-dims-container {
+  margin-bottom: 10px !important;
+}
+
+.case-ai-card .ai-issues-list {
+  margin-bottom: 10px !important;
+}
 
 .review-cell {
   display: flex;

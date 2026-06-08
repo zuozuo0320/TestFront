@@ -641,9 +641,8 @@
 }
 
 .case-tags-field {
-  grid-column: 1 / 2;
-  width: 320px;
-  max-width: 100%;
+  grid-column: 1 / -1;
+  width: 100%;
   min-width: 0;
 }
 
@@ -2801,9 +2800,30 @@
   position: sticky !important;
   top: 58px !important;
   grid-column: 2 / 3 !important;
-  max-height: calc(100vh - 70px) !important;
+  max-height: calc(100vh - 80px) !important;
+  min-height: 0 !important;
   overflow-y: auto !important;
   padding-right: 2px !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 92, 246, 0.18) transparent;
+}
+
+/* 优雅精致的滚动条样式 */
+.stitch-col-right::-webkit-scrollbar {
+  width: 6px;
+}
+
+.stitch-col-right::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.18) !important;
+  border-radius: 999px !important;
+}
+
+.stitch-col-right::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.35) !important;
+}
+
+.stitch-col-right::-webkit-scrollbar-track {
+  background: transparent !important;
 }
 
 .stitch-btn-save,
@@ -2813,29 +2833,69 @@
 }
 
 .stitch-panel,
-.stitch-ai-panel,
 .case-basic-panel,
-.stitch-col-right .stitch-panel,
-.stitch-col-right .stitch-ai-panel {
+.stitch-col-right .stitch-panel {
   background: var(--tp-surface-card) !important;
   border-color: var(--tp-border-subtle) !important;
   box-shadow: none !important;
 }
 
+.stitch-ai-panel,
+.stitch-col-right .stitch-ai-panel {
+  background:
+    linear-gradient(145deg, #ffffff, #ffffff),
+    radial-gradient(circle at 10% 0%, rgba(139, 92, 246, 0.08), transparent 40%),
+    radial-gradient(circle at 90% 100%, rgba(236, 72, 153, 0.06), transparent 40%) !important;
+  border: 1px solid rgba(139, 92, 246, 0.15) !important;
+  box-shadow:
+    0 8px 20px -6px rgba(139, 92, 246, 0.05),
+    var(--tp-shadow-sm) !important;
+}
+
+:global(html[data-theme='genart']) .stitch-ai-panel,
+:global(html[data-theme='genart']) .stitch-col-right .stitch-ai-panel {
+  background:
+    linear-gradient(145deg, rgba(20, 20, 28, 0.95), rgba(10, 10, 15, 0.95)),
+    radial-gradient(circle at 10% 0%, rgba(232, 121, 249, 0.16), transparent 40%) !important;
+  border-color: rgba(232, 121, 249, 0.2) !important;
+  box-shadow: none !important;
+}
+
 .stitch-panel:hover,
-.stitch-ai-panel:hover {
+.stitch-col-right .stitch-panel:hover {
   border-color: var(--tp-border-strong) !important;
   box-shadow: none !important;
 }
 
+.stitch-ai-panel:hover,
+.stitch-col-right .stitch-ai-panel:hover {
+  border-color: rgba(139, 92, 246, 0.3) !important;
+  box-shadow:
+    0 8px 24px -4px rgba(139, 92, 246, 0.1),
+    var(--tp-shadow-sm) !important;
+}
+
+:global(html[data-theme='genart']) .stitch-ai-panel:hover,
+:global(html[data-theme='genart']) .stitch-col-right .stitch-ai-panel:hover {
+  border-color: rgba(232, 121, 249, 0.35) !important;
+}
+
 .stitch-panel-title .material-symbols-outlined {
-  width: auto;
-  height: auto;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 6px !important;
+  background: var(--tp-primary-lighter, rgba(139, 92, 246, 0.08)) !important;
   color: var(--tp-primary) !important;
-  font-size: 16px !important;
+  font-size: 14px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin-right: 2px !important;
+}
+
+:global(html[data-theme='genart']) .stitch-panel-title .material-symbols-outlined {
+  background: rgba(232, 121, 249, 0.15) !important;
+  color: #c084fc !important;
 }
 
 .stitch-input,
@@ -3019,64 +3079,6 @@
 
 .stitch-table .w-op {
   width: 58px !important;
-}
-
-/* Step Dropdown Menu (Icon Only) */
-.step-icon-dropdown {
-  padding: 4px !important;
-  border-radius: 8px !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
-  border: 1px solid var(--tp-border-subtle) !important;
-  background: var(--tp-surface-card) !important;
-  min-width: unset !important;
-  width: 36px !important;
-  box-sizing: border-box !important;
-}
-
-.step-icon-menu {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 2px !important;
-  padding: 0 !important;
-  margin: 0 !important;
-}
-
-.step-icon-menu .el-dropdown-menu__item {
-  padding: 0 !important;
-  width: 26px !important;
-  height: 26px !important;
-  border-radius: 6px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  transition: all 0.15s ease !important;
-  margin: 0 auto !important;
-  line-height: 1 !important;
-  background: transparent !important;
-}
-
-.step-icon-menu .el-dropdown-menu__item:not(.is-disabled):hover {
-  background: var(--tp-surface-hover) !important;
-}
-
-.step-icon-menu .el-dropdown-menu__item .material-symbols-outlined {
-  font-size: 16px !important;
-  margin: 0 !important;
-  color: var(--tp-text-muted) !important;
-  transition: color 0.15s ease !important;
-}
-
-.step-icon-menu .el-dropdown-menu__item:not(.is-disabled):hover .material-symbols-outlined {
-  color: var(--tp-primary) !important;
-}
-
-/* 危险项特殊处理 */
-.step-icon-menu .el-dropdown-menu__item.danger-item .material-symbols-outlined {
-  color: var(--tp-accent-danger) !important;
-}
-
-.step-icon-menu .el-dropdown-menu__item.danger-item:not(.is-disabled):hover {
-  background: var(--tp-accent-danger-soft) !important;
 }
 
 .stitch-table th {
@@ -3408,16 +3410,14 @@
   gap: 10px !important;
 }
 
-.stitch-col-right .stitch-panel,
-.stitch-col-right .stitch-ai-panel {
+.stitch-col-right .stitch-panel {
   padding: 12px !important;
   border-radius: 10px !important;
   background: var(--tp-surface-card) !important;
   border-color: var(--tp-border-subtle) !important;
 }
 
-.stitch-col-right .stitch-panel:hover,
-.stitch-col-right .stitch-ai-panel:hover {
+.stitch-col-right .stitch-panel:hover {
   border-color: var(--tp-border-strong) !important;
 }
 
@@ -3682,49 +3682,22 @@
   font-size: 17px !important;
 }
 
-.step-icon-dropdown {
-  width: 38px !important;
-  padding: 5px !important;
-  border: 1px solid var(--tp-border-subtle) !important;
-  border-radius: 10px !important;
-  background: var(--tp-surface-card) !important;
-  box-shadow: var(--tp-shadow-card) !important;
-}
-
-.step-icon-menu {
-  gap: 3px !important;
-}
-
-.step-icon-menu .el-dropdown-menu__item {
-  width: 28px !important;
-  height: 28px !important;
-  border-radius: 8px !important;
-}
-
-.step-icon-menu .el-dropdown-menu__item:not(.is-disabled):hover {
-  background: var(--tp-primary-lighter) !important;
-}
-
-.step-icon-menu .el-dropdown-menu__item:not(.is-disabled):hover .material-symbols-outlined {
-  color: var(--tp-primary) !important;
-}
-
-.step-icon-menu .el-dropdown-menu__item.danger-item:not(.is-disabled):hover {
-  background: var(--tp-accent-danger-soft) !important;
-}
-
-.step-icon-menu
-  .el-dropdown-menu__item.danger-item:not(.is-disabled):hover
-  .material-symbols-outlined {
-  color: var(--tp-accent-danger) !important;
-}
-
 .stitch-header {
-  min-height: 48px !important;
-  padding: 8px 12px !important;
-  background: var(--tp-surface-card) !important;
-  border-bottom: 1px solid var(--tp-border-subtle) !important;
+  min-height: 56px !important;
+  padding: 10px 24px !important;
+  background: rgba(255, 255, 255, 0.72) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.08) !important;
   box-shadow: none !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 50 !important;
+}
+
+html[data-theme='genart'] .stitch-header {
+  background: rgba(13, 13, 20, 0.72) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.06) !important;
 }
 
 .stitch-header-left {
@@ -3734,33 +3707,95 @@
 
 .stitch-title {
   color: var(--tp-text-primary) !important;
-  font-size: 15px !important;
-  font-weight: var(--tp-font-bold) !important;
-  line-height: 22px !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  line-height: 24px !important;
+  letter-spacing: -0.01em !important;
 }
 
 .stitch-header-right {
-  gap: 8px !important;
-  margin-left: 16px !important;
+  gap: 10px !important;
+  margin-left: 20px !important;
 }
 
 .stitch-btn-cancel,
 .stitch-btn-save {
-  min-height: 32px !important;
-  min-width: 72px !important;
-  padding: 0 14px !important;
+  height: 34px !important;
+  min-height: 34px !important;
+  min-width: 80px !important;
+  padding: 0 16px !important;
   border-radius: 8px !important;
-  font-size: 12px !important;
-  line-height: 1 !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  outline: none !important;
+}
+
+.stitch-btn-cancel {
+  background: rgba(255, 255, 255, 0.6) !important;
+  border: 1px solid rgba(139, 92, 246, 0.28) !important;
+  color: var(--tp-text-secondary, #475569) !important;
+}
+
+.stitch-btn-cancel:hover {
+  background: var(--tp-surface-hover, #f5f3ff) !important;
+  border-color: rgba(139, 92, 246, 0.55) !important;
+  color: var(--tp-primary, #8b5cf6) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px 0 rgba(139, 92, 246, 0.06) !important;
+}
+
+.stitch-btn-cancel:active {
+  transform: translateY(0) !important;
+}
+
+html[data-theme='genart'] .stitch-btn-cancel {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+html[data-theme='genart'] .stitch-btn-cancel:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  color: #ffffff !important;
 }
 
 .stitch-btn-save {
-  box-shadow: 0 1px 2px var(--tp-primary-shadow) !important;
+  background: linear-gradient(135deg, var(--tp-primary, #8b5cf6), #a78bfa) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 4px 12px 0 rgba(139, 92, 246, 0.16) !important;
+}
+
+.stitch-btn-save:hover:not(:disabled) {
+  filter: brightness(1.05) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 20px 0 rgba(139, 92, 246, 0.3) !important;
+}
+
+.stitch-btn-save:active:not(:disabled) {
+  transform: translateY(0) !important;
+}
+
+html[data-theme='genart'] .stitch-btn-save {
+  background: linear-gradient(135deg, #a855f7, #6366f1) !important;
+  box-shadow: 0 4px 12px 0 rgba(168, 85, 247, 0.2) !important;
+}
+
+html[data-theme='genart'] .stitch-btn-save:hover:not(:disabled) {
+  box-shadow: 0 6px 20px 0 rgba(168, 85, 247, 0.4) !important;
 }
 
 .stitch-btn-save:disabled {
   cursor: not-allowed !important;
-  opacity: 0.68 !important;
+  opacity: 0.6 !important;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 .stitch-grid {
@@ -3777,7 +3812,9 @@
 .stitch-col-right {
   top: 58px !important;
   gap: 10px !important;
-  max-height: calc(100vh - 70px) !important;
+  max-height: calc(100vh - 80px) !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
 }
 
 .stitch-panel,
@@ -3915,34 +3952,26 @@
   color: var(--tp-accent-danger) !important;
 }
 
-/* 用例详情输入面：默认态保持低噪声，聚焦态再使用品牌强调色。 */
+/* 用例详情输入面：提升为品牌纯白背景与精致紫色边框 */
 .stitch-drawer-wrapper {
-  --case-editor-field-bg: color-mix(in srgb, var(--tp-surface-input) 78%, var(--tp-surface-card));
-  --case-editor-field-bg-hover: color-mix(
-    in srgb,
-    var(--tp-surface-input) 64%,
-    var(--tp-surface-elevated)
-  );
-  --case-editor-field-bg-focus: color-mix(
-    in srgb,
-    var(--tp-surface-input) 46%,
-    var(--tp-surface-elevated)
-  );
-  --case-editor-field-border: color-mix(
-    in srgb,
-    var(--tp-border-subtle) 72%,
-    var(--tp-text-disabled)
-  );
-  --case-editor-field-border-hover: color-mix(
-    in srgb,
-    var(--tp-border-subtle) 54%,
-    var(--tp-text-subtle)
-  );
+  --case-editor-field-bg: #ffffff;
+  --case-editor-field-bg-hover: var(--tp-surface-hover, #f5f3ff);
+  --case-editor-field-bg-focus: #ffffff;
+  --case-editor-field-border: rgba(139, 92, 246, 0.15);
+  --case-editor-field-border-hover: rgba(139, 92, 246, 0.3);
   --case-editor-popover-bg:
     linear-gradient(180deg, var(--tp-surface-elevated), var(--tp-surface-card)),
     var(--tp-surface-base);
   --case-editor-popover-shadow: var(--tp-shadow-md), 0 0 0 1px var(--tp-border-subtle);
   --case-editor-popover-z: 120;
+}
+
+:global(html[data-theme='genart']) .stitch-drawer-wrapper {
+  --case-editor-field-bg: rgba(0, 0, 0, 0.2) !important;
+  --case-editor-field-bg-hover: rgba(255, 255, 255, 0.04) !important;
+  --case-editor-field-bg-focus: rgba(0, 0, 0, 0.3) !important;
+  --case-editor-field-border: rgba(255, 255, 255, 0.08) !important;
+  --case-editor-field-border-hover: rgba(255, 255, 255, 0.15) !important;
 }
 
 .stitch-drawer-wrapper .stitch-input,
@@ -4050,4 +4079,221 @@
   margin-left: auto !important;
   color: var(--tp-primary) !important;
   font-size: 16px !important;
+}
+
+/* ── 最新动态 & AI 智检助手样式优化 ── */
+
+/* 1. 时间轴优化 */
+.stitch-timeline {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-left: 12px;
+}
+
+.timeline-line {
+  position: absolute;
+  left: 25px !important; /* 配合 26px 宽度的图标居中 */
+  top: 8px;
+  bottom: 8px;
+  width: 0 !important;
+  border-left: 2px dashed rgba(148, 163, 184, 0.2) !important; /* 虚线连接更显精致 */
+}
+
+.timeline-icon {
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 10 !important;
+  flex-shrink: 0 !important;
+  transition: all 0.2s ease;
+}
+
+.timeline-icon.is-success {
+  background: var(--tp-accent-success-soft) !important;
+  color: var(--tp-accent-success) !important;
+  border: 1.5px solid var(--tp-accent-success-border) !important;
+}
+
+.timeline-icon.is-warning {
+  background: var(--tp-accent-warning-soft) !important;
+  color: var(--tp-accent-warning) !important;
+  border: 1.5px solid var(--tp-accent-warning-border) !important;
+}
+
+.timeline-icon.is-info {
+  background: var(--tp-accent-info-soft) !important;
+  color: var(--tp-accent-info) !important;
+  border: 1.5px solid var(--tp-accent-info-border) !important;
+}
+
+.timeline-icon.is-default {
+  background: var(--tp-surface-muted) !important;
+  color: var(--tp-text-muted) !important;
+  border: 1.5px solid var(--tp-border-subtle) !important;
+}
+
+.timeline-time {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--tp-text-muted) !important;
+  font-weight: normal;
+  font-style: normal !important; /* 去除斜体，采用现代的扁平元数据排版 */
+}
+
+.timeline-content .bg-white-5 {
+  display: inline-block !important;
+  margin-top: 4px !important;
+  padding: 3px 8px !important;
+  border-radius: 6px !important;
+  font-family: inherit !important;
+  font-size: 11px !important;
+  font-weight: 550 !important;
+  background: var(--tp-accent-primary-soft) !important;
+  border: 1px solid var(--tp-accent-primary-border) !important;
+  color: var(--tp-primary) !important;
+}
+
+/* 2. AI 智检助手卡片整体强化 */
+.stitch-ai-panel {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--tp-primary) 6%, var(--tp-surface-card)),
+    color-mix(in srgb, var(--tp-accent-info) 4%, var(--tp-surface-card))
+  ) !important;
+  border: 1px solid color-mix(in srgb, var(--tp-primary) 18%, var(--tp-border-subtle)) !important;
+  box-shadow:
+    0 8px 30px rgba(139, 92, 246, 0.05),
+    var(--tp-shadow-sm) !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.stitch-ai-panel:hover {
+  border-color: color-mix(in srgb, var(--tp-primary) 28%, var(--tp-border-subtle)) !important;
+  box-shadow:
+    0 8px 32px rgba(139, 92, 246, 0.1),
+    var(--tp-shadow-md) !important;
+  transform: translateY(-2px);
+}
+
+/* 评分区域卡片化 */
+.ai-dims-container {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.ai-dim-card {
+  flex: 1;
+  text-align: center;
+  padding: 10px 6px !important;
+  border-radius: 8px !important;
+  background: var(--tp-surface-input) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  transition: all 0.2s ease;
+}
+
+.ai-dim-card:hover {
+  background: var(--tp-surface-hover) !important;
+  border-color: color-mix(in srgb, var(--tp-primary) 20%, var(--tp-border-subtle)) !important;
+}
+
+.ai-dim-label {
+  font-size: 11px;
+  color: var(--tp-text-muted) !important;
+  margin-bottom: 4px;
+}
+
+.ai-dim-score {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* 问题项优化 */
+.ai-issues-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.ai-issue-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px !important;
+  border-radius: 8px !important;
+  background: var(--tp-surface-input) !important;
+  color: var(--tp-text-secondary) !important;
+  line-height: 1.45;
+  font-size: 12px;
+  border: 1px solid var(--tp-border-subtle) !important;
+  transition: all 0.15s ease;
+}
+
+.ai-issue-item:hover {
+  background: var(--tp-surface-hover) !important;
+}
+
+.ai-issue-item.type-coverage {
+  border-left: 3px solid var(--tp-accent-info) !important;
+}
+
+.ai-issue-item.type-boundary {
+  border-left: 3px solid var(--tp-accent-warning) !important;
+}
+
+.ai-issue-item.type-quality {
+  border-left: 3px solid var(--tp-accent-primary) !important;
+}
+
+.ai-issue-icon {
+  font-size: 14px !important;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.ai-issue-item.type-coverage .ai-issue-icon {
+  color: var(--tp-accent-info);
+}
+
+.ai-issue-item.type-boundary .ai-issue-icon {
+  color: var(--tp-accent-warning);
+}
+
+.ai-issue-item.type-quality .ai-issue-icon {
+  color: var(--tp-primary);
+}
+
+/* AI 检测按钮强光效 */
+.stitch-ai-panel .ai-btn {
+  width: 100%;
+  min-height: 36px !important;
+  border-radius: 8px !important;
+  background: var(--tp-primary) !important;
+  color: #ffffff !important;
+  border: none !important;
+  font-size: 12px !important;
+  font-weight: var(--tp-font-semibold) !important;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25) !important;
+  transition: all 0.2s ease !important;
+}
+
+.stitch-ai-panel .ai-btn:hover:not(:disabled) {
+  background: var(--tp-btn-bg-hover) !important;
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.4) !important;
+  transform: translateY(-1px);
+}
+
+.stitch-ai-panel .ai-btn:disabled {
+  background: var(--tp-surface-muted) !important;
+  color: var(--tp-text-muted) !important;
+  box-shadow: none !important;
+  cursor: not-allowed;
+  opacity: 0.6;
 }

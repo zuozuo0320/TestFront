@@ -63,6 +63,15 @@ export const DEFECT_SOURCE = {
 } as const
 export type DefectSource = (typeof DEFECT_SOURCE)[keyof typeof DEFECT_SOURCE]
 
+/** 规则失败后的自动评审提交状态 */
+export const AUTO_REVIEW_STATUS = {
+  Submitted: 'submitted',
+  Already: 'already',
+  Skipped: 'skipped',
+  Error: 'error',
+} as const
+export type AutoReviewStatus = (typeof AUTO_REVIEW_STATUS)[keyof typeof AUTO_REVIEW_STATUS]
+
 // ─── 对象类型 ───
 
 /** 规则引擎单条命中 */
@@ -85,6 +94,10 @@ export interface RuleRunReport {
   major_count: number
   minor_count: number
   defect_ids: number[]
+  auto_review_status?: AutoReviewStatus
+  auto_review_result?: 'needs_update'
+  auto_review_message?: string
+  auto_review_comment?: string
   run_at: string
 }
 
@@ -99,6 +112,9 @@ export interface PlanItemSummary {
   major_count: number
   minor_count: number
   defect_count: number
+  auto_review_status?: AutoReviewStatus
+  auto_review_result?: 'needs_update'
+  auto_review_message?: string
   error?: string
 }
 
@@ -109,6 +125,10 @@ export interface PlanRunReport {
   passed_count: number
   failed_count: number
   error_count: number
+  auto_submitted_count: number
+  auto_already_count: number
+  auto_skipped_count: number
+  auto_error_count: number
   items: PlanItemSummary[]
   run_at: string
 }

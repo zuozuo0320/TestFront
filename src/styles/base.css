@@ -130,9 +130,30 @@ body {
 .el-textarea__inner:focus {
   border-color: var(--tp-primary) !important;
   background: var(--tp-surface-hover) !important;
+  outline: none !important;
   box-shadow:
     inset 0 0 0 1px var(--tp-primary),
     0 0 0 3px var(--tp-accent-primary-soft) !important;
+}
+.el-input__wrapper:focus,
+.el-input__wrapper:focus-within,
+.el-input__wrapper:focus-visible,
+.el-select__wrapper:focus,
+.el-select__wrapper:focus-within,
+.el-select__wrapper:focus-visible,
+.el-textarea__inner:focus,
+.el-textarea__inner:focus-within,
+.el-textarea__inner:focus-visible {
+  outline: none !important;
+}
+.el-input__inner:focus,
+.el-input__inner:focus-within,
+.el-input__inner:focus-visible,
+.el-select__input:focus,
+.el-select__input:focus-within,
+.el-select__input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
 }
 .el-input__inner {
   color: var(--tp-text-primary) !important;

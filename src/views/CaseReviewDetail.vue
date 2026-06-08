@@ -57,10 +57,7 @@ const currentItem = computed(() => items.value[currentItemIndex.value] || null)
 const activeReviewField = ref<ReviewFieldKey | null>(null)
 let activeReviewFieldTimer: number | undefined
 
-type SidebarFilter = 'all' | 'pending' | 'ai_failed'
 type ReviewDecision = 'approved' | 'rejected' | 'needs_update'
-
-const sidebarFilter = ref<SidebarFilter>('all')
 const reviewDecision = ref<ReviewDecision | null>(null)
 const reviewComment = ref('')
 
@@ -293,6 +290,14 @@ async function handleRunAIReview() {
     await fetchAIDefects(projectId.value, reviewId.value, itemId)
     if (report.passed) {
       ElMessage.success('检查通过')
+    } else if (report.auto_review_status === 'submitted') {
+      ElMessage.warning('检查未通过，已自动打回修订')
+    } else if (report.auto_review_status === 'already') {
+      ElMessage.warning('检查未通过，已存在自动打回记录')
+    } else if (report.auto_review_status === 'skipped') {
+      ElMessage.warning(report.auto_review_message || '检查未通过，未自动打回')
+    } else if (report.auto_review_status === 'error') {
+      ElMessage.error(report.auto_review_message || '检查未通过，自动打回失败')
     } else {
       ElMessage.warning('检查未通过，查看规则门禁')
     }
@@ -402,15 +407,7 @@ function resultLabel(result: string) {
   }
   return map[result] || result
 }
-function sidebarResultLabel(result: string) {
-  const map: Record<string, string> = {
-    pending: '待审',
-    approved: '通过',
-    rejected: '拒绝',
-    needs_update: '返修',
-  }
-  return map[result] || resultLabel(result)
-}
+
 function resultIcon(result: string) {
   const map: Record<string, string> = {
     approved: 'check_circle',
@@ -439,54 +436,11 @@ function reviewerAvatarUrl(record: CaseReviewRecord) {
 function onReviewerAvatarError(event: Event, name: string) {
   authStore.handleAvatarError(event, name)
 }
-function aiGateClass(status?: string) {
-  if (status === 'passed' || status === 'bypassed') return 'passed'
-  if (status === 'failed' || status === 'timeout') return 'failed'
-  if (status === 'running') return 'running'
-  return 'idle'
-}
-function aiGateLabel(status?: string) {
-  const map: Record<string, string> = {
-    not_started: '未检查',
-    running: '检查中',
-    passed: '检查通过',
-    failed: '检查未过',
-    timeout: '检查超时',
-    bypassed: '规则放行',
-  }
-  return map[status || 'not_started'] || '未检查'
-}
-function sidebarAIGateLabel(status?: string) {
-  const map: Record<string, string> = {
-    not_started: '未检',
-    running: '检查中',
-    passed: '通过',
-    failed: '异常',
-    timeout: '超时',
-    bypassed: '放行',
-  }
-  return map[status || 'not_started'] || '未检'
-}
+
 function formatDate(d: string) {
   if (!d) return '—'
   return new Date(d).toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })
 }
-
-const sidebarPendingCount = computed(
-  () => items.value.filter((item) => resultClass(item.final_result) === 'pending').length,
-)
-const sidebarAIFailedCount = computed(
-  () => items.value.filter((item) => aiGateClass(item.ai_gate_status) === 'failed').length,
-)
-const sidebarCaseRows = computed(() =>
-  items.value
-    .map((item, index) => ({ item, index }))
-    .filter(({ item }) => {
-      if (sidebarFilter.value === 'pending') return resultClass(item.final_result) === 'pending'
-      if (sidebarFilter.value === 'ai_failed') return aiGateClass(item.ai_gate_status) === 'failed'
-      return true
-    }),
-)
 
 // ── 导航 ──
 function goNextItem() {
@@ -1180,23 +1134,32 @@ function onKeyNav(e: KeyboardEvent) {
   }
 }
 
-/** 评审项徽章文本（用于顶部 TC-xxxx 卡片） */
-const currentTestCaseTag = computed(() => {
-  const id = currentItem.value?.testcase_id
-  return id ? `TC-${id}` : 'TC-—'
+const REVIEW_EXECUTED_RESULTS = new Set<ReviewDecision>(['approved', 'rejected', 'needs_update'])
+
+/** 当前评审项是否已经执行过评审操作 */
+const isReviewActionExecuted = computed(() => {
+  const finalResult = currentItem.value?.final_result
+  return isReviewDecision(finalResult) && REVIEW_EXECUTED_RESULTS.has(finalResult)
 })
 
-const reviewedCaseCount = computed(
-  () =>
-    (review.value?.approved_count ?? 0) +
-    (review.value?.rejected_count ?? 0) +
-    (review.value?.needs_update_count ?? 0),
-)
+const decisionStatusLabel = computed(() => {
+  if (
+    currentItem.value?.final_result === 'pending' &&
+    (currentItem.value?.current_round_no ?? 1) > 1
+  ) {
+    return '待复审'
+  }
+  return isReviewActionExecuted.value ? '已执行' : '未执行'
+})
 
-const reviewProgressPercent = computed(() => {
-  const total = review.value?.case_total_count ?? 0
-  if (total <= 0) return 0
-  return Math.min(100, Math.round((reviewedCaseCount.value / total) * 1000) / 10)
+const decisionStatusClass = computed(() => {
+  if (
+    currentItem.value?.final_result === 'pending' &&
+    (currentItem.value?.current_round_no ?? 1) > 1
+  ) {
+    return 'resubmitted'
+  }
+  return isReviewActionExecuted.value ? 'executed' : 'not-executed'
 })
 
 type PriorityTone = 'critical' | 'high' | 'medium' | 'low' | 'default'
@@ -1325,7 +1288,6 @@ watch(
       <section class="rv2-summary">
         <div class="rv2-summary-l">
           <div id="case-summary-title" class="rv2-summary-title-row">
-            <span class="rv2-tc-badge">{{ currentTestCaseTag }}</span>
             <h1 class="rv2-summary-title">
               {{ currentItem?.title_snapshot || review.name }}
             </h1>
@@ -1335,15 +1297,6 @@ watch(
           </p>
         </div>
         <div class="rv2-summary-r">
-          <div class="rv2-progress-compact" aria-label="评审进度">
-            <div class="rv2-progress-copy">
-              <span>评审进度</span>
-              <strong>{{ reviewedCaseCount }}/{{ review.case_total_count }}</strong>
-            </div>
-            <div class="rv2-progress-track">
-              <div class="rv2-progress-fill" :style="{ width: `${reviewProgressPercent}%` }"></div>
-            </div>
-          </div>
           <div v-if="currentItem" class="rv2-nav-btns">
             <button
               type="button"
@@ -1372,74 +1325,6 @@ watch(
 
       <!-- ══ sidebar + 主内容 ══ -->
       <div v-if="currentItem" class="rv2-body">
-        <!-- 左侧：评审用例列表 -->
-        <aside class="rv2-sidebar">
-          <div class="rv2-sidebar-header">
-            <div class="rv2-sidebar-title-row">
-              <span class="material-symbols-outlined">folder_open</span>
-              <span class="rv2-sidebar-title">评审用例</span>
-              <span class="rv2-sidebar-counter">{{ currentItemIndex + 1 }}/{{ items.length }}</span>
-            </div>
-            <div class="rv2-sidebar-stats">
-              <button
-                type="button"
-                class="rv2-sidebar-filter"
-                :class="{ active: sidebarFilter === 'all' }"
-                @click="sidebarFilter = 'all'"
-              >
-                全部 {{ items.length }}
-              </button>
-              <button
-                type="button"
-                class="rv2-sidebar-filter"
-                :class="{ active: sidebarFilter === 'pending' }"
-                @click="sidebarFilter = 'pending'"
-              >
-                待评审 {{ sidebarPendingCount }}
-              </button>
-              <button
-                type="button"
-                class="rv2-sidebar-filter"
-                :class="{ active: sidebarFilter === 'ai_failed' }"
-                @click="sidebarFilter = 'ai_failed'"
-              >
-                规则异常 {{ sidebarAIFailedCount }}
-              </button>
-            </div>
-          </div>
-          <div class="rv2-sidebar-list">
-            <button
-              v-for="{ item, index } in sidebarCaseRows"
-              :key="item.id"
-              type="button"
-              class="rv2-case-row"
-              :class="{ active: index === currentItemIndex }"
-              @click="selectItemIndex(index)"
-            >
-              <span class="rv2-case-idx">{{ String(index + 1).padStart(2, '0') }}</span>
-              <span class="rv2-case-main">
-                <span class="rv2-case-name" :title="item.title_snapshot">
-                  {{ item.title_snapshot }}
-                </span>
-                <span class="rv2-case-meta">
-                  <span class="rv2-case-status" :class="resultClass(item.final_result)">
-                    {{ sidebarResultLabel(item.final_result) }}
-                  </span>
-                  <span
-                    class="rv2-case-ai"
-                    :class="aiGateClass(item.ai_gate_status)"
-                    :title="aiGateLabel(item.ai_gate_status)"
-                    :aria-label="aiGateLabel(item.ai_gate_status)"
-                  >
-                    {{ sidebarAIGateLabel(item.ai_gate_status) }}
-                  </span>
-                </span>
-              </span>
-            </button>
-            <div v-if="sidebarCaseRows.length === 0" class="rv2-sidebar-empty">无匹配用例</div>
-          </div>
-        </aside>
-
         <!-- 70/30 主网格 -->
         <div class="rv2-grid">
           <!-- 左栏 70% -->
@@ -1809,6 +1694,9 @@ watch(
               <h2 class="rv2-panel-title">
                 <span class="material-symbols-outlined">gavel</span>
                 执行决策
+                <span v-if="currentItem" class="rv2-exec-status-badge" :class="decisionStatusClass">
+                  {{ decisionStatusLabel }}
+                </span>
               </h2>
               <div class="rv2-decision-options" role="radiogroup" aria-label="评审结论">
                 <button
@@ -1846,11 +1734,11 @@ watch(
               </button>
             </section>
 
-            <!-- 审计轨迹 -->
+            <!-- 评审轨迹 -->
             <section class="rv2-panel rv2-audit">
               <h2 class="rv2-panel-title">
                 <span class="material-symbols-outlined">history</span>
-                审计轨迹
+                评审轨迹
                 <div class="rv2-panel-actions">
                   <button
                     v-if="currentItem && records.length > 0"
@@ -2299,6 +2187,32 @@ watch(
   text-transform: uppercase;
   border: 1px solid rgba(173, 198, 255, 0.2);
 }
+.rv2-exec-status-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+}
+.rv2-exec-status-badge.executed {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--rv2-success);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+.rv2-exec-status-badge.resubmitted {
+  background: color-mix(in srgb, var(--rv2-warning) 12%, transparent);
+  color: var(--rv2-warning);
+  border-color: color-mix(in srgb, var(--rv2-warning) 24%, transparent);
+}
+.rv2-exec-status-badge.not-executed {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--rv2-fg-muted);
+  border-color: rgba(148, 163, 184, 0.2);
+}
 .rv2-summary-title {
   margin: 0;
   font-size: clamp(18px, 1.05vw, 22px);
@@ -2396,20 +2310,14 @@ watch(
 /* ── body：左侧边栏 + 主内容 ── */
 .rv2-body {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   width: 100%;
   min-width: 0;
 }
 @media (min-width: 1100px) {
   .rv2-body {
-    grid-template-columns: clamp(240px, 15vw, 320px) minmax(0, 1fr);
     align-items: flex-start;
-  }
-}
-@media (min-width: 1600px) {
-  .rv2-body {
-    grid-template-columns: clamp(280px, 15vw, 360px) minmax(0, 1fr);
   }
 }
 
@@ -2786,32 +2694,40 @@ watch(
 .rv2-finding {
   position: relative;
   overflow: hidden;
-  padding: 10px 12px;
+  padding: 10px 12px 10px 20px; /* 增加左边距，为悬浮 vertical pill 预留空间 */
   border-radius: 8px;
   background: rgba(12, 14, 24, 0.55);
   border: 1px solid var(--rv2-border-muted);
   display: flex;
   flex-direction: column;
   gap: 6px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.rv2-finding:hover {
+  transform: translateX(2px);
+  border-color: color-mix(in srgb, var(--rv2-primary) 30%, var(--rv2-border-muted));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 .rv2-finding.sev-critical::before,
 .rv2-finding.sev-major::before,
 .rv2-finding.sev-minor::before {
   content: '';
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 2px;
+  left: 8px;
+  top: 10px;
+  bottom: 10px;
+  width: 4px;
+  border-radius: 99px; /* 圆角胶囊形状 */
+  transition: transform 0.2s ease;
 }
 .rv2-finding.sev-critical::before {
-  background: rgba(239, 68, 68, 0.8);
+  background: var(--tp-accent-danger, #dc2626);
 }
 .rv2-finding.sev-major::before {
-  background: rgba(245, 158, 11, 0.8);
+  background: var(--tp-accent-warning, #f59e0b);
 }
 .rv2-finding.sev-minor::before {
-  background: rgba(173, 198, 255, 0.6);
+  background: var(--tp-accent-info, #6366f1);
 }
 .rv2-finding-head {
   display: flex;
@@ -3241,6 +3157,7 @@ watch(
 /* ── 评审用例列表（左侧边栏内） ── */
 .rv2-case-row {
   display: flex;
+  flex-shrink: 0;
   align-items: flex-start;
   gap: 10px;
   min-height: 64px;
@@ -3387,7 +3304,7 @@ watch(
 .rv2-attach-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
 }
 .rv2-attach-drop {
   display: flex;
@@ -3417,7 +3334,7 @@ watch(
 .rv2-attach-card {
   position: relative;
   display: flex;
-  align-items: stretch;
+  align-items: center;
   gap: 12px;
   padding: 12px 44px 12px 12px;
   min-height: 120px;
@@ -3434,7 +3351,7 @@ watch(
   border-color: var(--rv2-border-muted);
 }
 .rv2-attach-card.has-preview {
-  min-height: 132px;
+  min-height: 120px;
 }
 .rv2-attach-icon {
   flex-shrink: 0;
@@ -3449,7 +3366,8 @@ watch(
 }
 .rv2-attach-preview {
   flex-shrink: 0;
-  width: 108px;
+  width: 96px;
+  height: 96px;
   min-height: 96px;
   padding: 0;
   border-radius: var(--rv2-radius-sm);
@@ -3499,7 +3417,13 @@ watch(
   color: var(--rv2-fg-muted);
   opacity: 0.7;
   display: flex;
-  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+}
+.rv2-attach-meta span {
+  display: inline-block;
+  white-space: nowrap;
 }
 .rv2-attach-actions {
   position: absolute;
@@ -3758,7 +3682,7 @@ watch(
   filter: none;
 }
 
-/* ── 审计轨迹 ── */
+/* ── 评审轨迹 ── */
 .rv2-audit-empty {
   display: flex;
   flex-direction: column;
@@ -4991,20 +4915,10 @@ watch(
 }
 
 @media (min-width: 1100px) {
-  .rv2-body {
-    grid-template-columns: clamp(220px, 14vw, 280px) minmax(0, 1fr);
-  }
-
   .rv2-sidebar {
     height: calc(100vh - 56px - 48px);
     max-height: calc(100vh - 56px - 48px);
     top: 12px;
-  }
-}
-
-@media (min-width: 1600px) {
-  .rv2-body {
-    grid-template-columns: clamp(240px, 14vw, 300px) minmax(0, 1fr);
   }
 }
 
@@ -5357,13 +5271,7 @@ watch(
   box-shadow: var(--tp-shadow-sm);
 }
 
-/* 详情页首轮收敛：左侧列表必须可读，中等宽度下右侧决策下移，避免三栏互相挤压。 */
-@media (min-width: 1100px) {
-  .rv2-body {
-    grid-template-columns: clamp(280px, 20vw, 340px) minmax(0, 1fr);
-  }
-}
-
+/* 详情页收缩左侧栏，仅显示序号和状态徽章，极简排版并为右侧主体内容释放更多空间 */
 @media (min-width: 1180px) {
   .rv2-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -5383,10 +5291,6 @@ watch(
 }
 
 @media (min-width: 1440px) {
-  .rv2-body {
-    grid-template-columns: clamp(292px, 18vw, 340px) minmax(0, 1fr);
-  }
-
   .rv2-grid {
     grid-template-columns: minmax(0, 1fr) minmax(300px, 20vw);
   }
@@ -5398,15 +5302,21 @@ watch(
 }
 
 .rv2-case-row {
-  min-height: 56px;
+  min-height: 38px;
+  padding: 8px var(--tp-space-3);
+  display: flex;
+  align-items: center;
 }
 
-.rv2-case-name {
-  display: -webkit-box;
-  overflow: hidden;
-  white-space: normal;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+.rv2-case-meta {
+  margin-left: auto; /* 徽章右对齐 */
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rv2-sidebar-list {
+  padding: var(--tp-space-2) 0; /* 在顶部和底部留出少许内边距，使列表不贴边 */
 }
 
 .rv2-gate-empty-state {
@@ -5595,15 +5505,25 @@ watch(
 }
 
 .rv2-gate-card .rv2-finding {
-  padding: var(--tp-space-2) 10px;
+  padding: 10px 12px 10px 20px; /* 增加左侧内边距，留给悬浮的 severity 条 */
   background: var(--tp-surface-card);
   border-color: var(--tp-border-subtle);
+  border-radius: var(--tp-radius-md);
+  box-shadow: var(--tp-shadow-sm);
   gap: 5px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rv2-gate-card .rv2-finding:hover {
+  transform: translateX(3px); /* 悬浮时向右微移，增强交互感 */
+  border-color: color-mix(in srgb, var(--tp-primary) 35%, var(--tp-border-subtle));
+  box-shadow: var(--tp-shadow-md);
+  background: var(--tp-surface-hover);
 }
 
 .rv2-finding-main {
   display: flex;
-  align-items: flex-start;
+  align-items: center; /* 垂直居中对齐，使标签和文字更加整齐 */
   gap: var(--tp-space-2);
   width: 100%;
   min-height: 28px;
@@ -5634,10 +5554,11 @@ watch(
 .rv2-finding-field-name {
   flex: 0 0 auto;
   max-width: 96px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--tp-primary) 10%, transparent);
-  color: var(--tp-text-secondary);
+  padding: 3px 8px; /* 增加内边距，呈现更圆润丰满的胶囊效果 */
+  border-radius: var(--tp-radius-sm);
+  background: color-mix(in srgb, var(--tp-primary) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tp-primary) 15%, transparent); /* 细边框提升精致感 */
+  color: var(--tp-primary); /* 使用品牌主色增强一致性 */
   font-size: var(--tp-text-xs);
   font-weight: var(--tp-font-semibold);
   line-height: var(--tp-line-ui);
@@ -5652,6 +5573,11 @@ watch(
   color: var(--tp-text-primary);
   font-weight: var(--tp-font-medium);
   word-break: break-word;
+  transition: color 0.16s ease; /* 微交互过渡效果 */
+}
+
+.rv2-finding-main:hover .rv2-finding-text {
+  color: var(--tp-primary); /* 悬浮时文本颜色同步过渡 */
 }
 
 .rv2-finding-meta {
@@ -5732,10 +5658,9 @@ watch(
   flex-wrap: wrap;
   align-items: center;
   gap: var(--tp-space-2) var(--tp-space-3);
-  padding: var(--tp-space-2) var(--tp-space-3);
-  border: 1px solid var(--tp-border-subtle);
-  border-radius: var(--tp-radius-md);
-  background: var(--tp-surface-input);
+  padding: 0 0 var(--tp-space-3) 0; /* 移除灰底边框，采用极简无背景底线布局，减少视觉嵌套感 */
+  border: none;
+  background: transparent;
 }
 
 .rv2-basic-field {
@@ -5800,9 +5725,16 @@ watch(
   min-height: 0;
 }
 
+/* 前后置条件区域等高对齐及卡片质感美化 */
+.rv2-conditions {
+  align-items: stretch !important; /* 强制网格内卡片等高对齐 */
+}
+
 .rv2-cond-col {
+  display: flex;
+  flex-direction: column;
   padding: var(--tp-space-3);
-  background: var(--tp-surface-input);
+  background: var(--tp-surface-card); /* 采用纯白卡片底色，比原本的灰色输入底色更显通透干净 */
   border-color: var(--tp-border-subtle);
 }
 
@@ -5810,9 +5742,13 @@ watch(
   margin-bottom: var(--tp-space-2);
 }
 
+.rv2-cond-list {
+  flex: 1; /* 占据可用高度，利于内容对齐 */
+}
+
 .rv2-cond-item {
   padding: 7px var(--tp-space-2);
-  background: var(--tp-surface-card);
+  background: var(--tp-surface-input); /* 列表项采用微灰背景底色形成对比 */
   border-color: var(--tp-border-subtle);
 }
 
@@ -5820,14 +5756,17 @@ watch(
   padding-top: var(--tp-space-3);
 }
 
+/* 步骤表格容器与表头卡片化美化 */
 .rv2-step-table-wrap {
-  background: var(--tp-surface-input);
+  background: var(--tp-surface-card); /* 用例步骤表格同样改用卡片白底色 */
   border-color: var(--tp-border-subtle);
 }
 
 .rv2-step-table th {
   padding: 10px var(--tp-space-4);
-  background: var(--tp-surface-header);
+  background: var(--tp-surface-input); /* 表头使用偏亮灰色背景，更现代美观 */
+  font-weight: var(--tp-font-semibold);
+  color: var(--tp-text-secondary);
 }
 
 .rv2-step-table td {

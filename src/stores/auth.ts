@@ -20,11 +20,16 @@ export const useAuthStore = defineStore('auth', () => {
     loginLoading.value = true
     try {
       const data = await loginByEmail(loginForm.value.email, loginForm.value.password)
+      const nextUserId = data.user_id ?? data.user?.id
       token.value = data.access_token
-      userId.value = String(data.user_id)
+      userId.value = nextUserId ? String(nextUserId) : null
       user.value = data.user
       localStorage.setItem('tp-token', data.access_token)
-      localStorage.setItem('tp-user-id', String(data.user_id))
+      if (nextUserId) {
+        localStorage.setItem('tp-user-id', String(nextUserId))
+      } else {
+        localStorage.removeItem('tp-user-id')
+      }
       return data
     } finally {
       loginLoading.value = false
@@ -43,26 +48,26 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = nextUser
   }
 
-  // 本地离线头像：基于姓名首字符生成 SVG data URI，不依赖外网
-  const AVATAR_PALETTE = [
-    '#7C3AED',
-    '#3B82F6',
-    '#14B8A6',
-    '#F59E0B',
-    '#EF4444',
-    '#EC4899',
-    '#8B5CF6',
-    '#06B6D4',
-    '#10B981',
-    '#F97316',
+  // 本地离线头像：使用精挑细选的 10 款双色渐变色彩搭配方案，提升头像质感，不依赖外网
+  const AVATAR_GRADIENTS = [
+    { start: '#8B5CF6', end: '#6366F1' }, // 紫罗兰 - 靛蓝
+    { start: '#3B82F6', end: '#1D4ED8' }, // 蓝色 - 深蓝
+    { start: '#10B981', end: '#059669' }, // 翡翠 - 翠绿
+    { start: '#F59E0B', end: '#D97706' }, // 琥珀 - 橙黄
+    { start: '#EF4444', end: '#B91C1C' }, // 红色 - 深红
+    { start: '#EC4899', end: '#C084FC' }, // 粉色 - 紫色
+    { start: '#06B6D4', end: '#0891B2' }, // 青色 - 深青
+    { start: '#14B8A6', end: '#0D9488' }, // 蓝绿 - 深绿
+    { start: '#F97316', end: '#EA580C' }, // 橙色 - 深橙
+    { start: '#6366F1', end: '#4338CA' }, // 靛蓝 - 深靛蓝
   ]
 
-  function pickColor(seed: string): string {
+  function pickGradient(seed: string) {
     let hash = 0
     for (let i = 0; i < seed.length; i++) {
       hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
     }
-    return AVATAR_PALETTE[hash % AVATAR_PALETTE.length] || AVATAR_PALETTE[0]!
+    return AVATAR_GRADIENTS[hash % AVATAR_GRADIENTS.length] || AVATAR_GRADIENTS[0]!
   }
 
   function extractInitial(name: string): string {
@@ -76,8 +81,8 @@ export const useAuthStore = defineStore('auth', () => {
   function fallbackAvatarUrl(name?: string) {
     const seed = (name || 'Aisight').trim() || 'Aisight'
     const initial = extractInitial(seed)
-    const bg = pickColor(seed)
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><rect width="128" height="128" fill="${bg}"/><text x="50%" y="50%" dy=".1em" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-family="'PingFang SC','Microsoft YaHei',system-ui,sans-serif" font-size="56" font-weight="600">${initial}</text></svg>`
+    const grad = pickGradient(seed)
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><defs><linearGradient id="avatarGrad-${initial}" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="${grad.start}"/><stop offset="100%" stop-color="${grad.end}"/></linearGradient></defs><rect width="128" height="128" fill="url(#avatarGrad-${initial})"/><text x="50%" y="50%" dy=".08em" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-family="'Inter','Outfit','PingFang SC',system-ui,sans-serif" font-size="52" font-weight="700" letter-spacing="1">${initial}</text></svg>`
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
   }
 

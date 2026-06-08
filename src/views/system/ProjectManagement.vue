@@ -593,29 +593,50 @@ void Search // suppress unused import warning
 
 <template>
   <div v-loading="appLoading" class="pm-page">
-    <!-- 头部 -->
-    <div class="pm-header">
-      <div class="pm-header-left">
-        <h2 class="pm-title">项目管理</h2>
-      </div>
-      <div class="pm-header-right">
-        <div class="pm-stats-panel">
-          <div class="pm-stat-item">
-            <span class="pm-stat-label">总项目</span>
-            <span class="pm-stat-number pm-stat-primary">{{ totalProjects }}</span>
-          </div>
-          <div class="pm-stat-divider"></div>
-          <div class="pm-stat-item">
-            <span class="pm-stat-label">活跃项目</span>
-            <span class="pm-stat-number pm-stat-secondary">
-              {{ filteredProjects.filter((p) => p.status === 'active').length }}
-            </span>
-          </div>
-          <button class="pm-add-btn" @click="openCreateProject">
-            <span class="pm-add-icon">+</span>
-            新增项目
+    <!-- 工具栏：过滤 tabs + 搜索框 + 新增项目按钮 -->
+    <div class="pm-toolbar">
+      <div class="pm-toolbar-left">
+        <div class="pm-tabs">
+          <button
+            type="button"
+            class="pm-tab-btn"
+            :class="{ active: statusFilter === '' }"
+            @click="statusFilter = ''"
+          >
+            全部项目
+          </button>
+          <button
+            type="button"
+            class="pm-tab-btn"
+            :class="{ active: statusFilter === 'active' }"
+            @click="statusFilter = 'active'"
+          >
+            活跃项目
+          </button>
+          <button
+            type="button"
+            class="pm-tab-btn"
+            :class="{ active: statusFilter === 'archived' }"
+            @click="statusFilter = 'archived'"
+          >
+            已归档
           </button>
         </div>
+      </div>
+      <div class="pm-toolbar-right">
+        <div class="pm-search-box">
+          <el-input
+            v-model="searchKeyword"
+            placeholder="搜索项目名称..."
+            clearable
+            :prefix-icon="Search"
+            class="pm-search-input"
+          />
+        </div>
+        <button class="pm-add-btn" @click="openCreateProject">
+          <span class="pm-add-icon">+</span>
+          新增项目
+        </button>
       </div>
     </div>
 
@@ -641,7 +662,12 @@ void Search // suppress unused import warning
           </tr>
         </thead>
         <tbody>
-          <tr v-for="p in paginatedProjects" :key="p.id" class="pm-row">
+          <tr
+            v-for="p in paginatedProjects"
+            :key="p.id"
+            class="pm-row"
+            :class="'pm-row--' + getProjectQuality(p).color"
+          >
             <td class="pm-td pm-td-check">
               <input
                 type="checkbox"
@@ -762,7 +788,8 @@ void Search // suppress unused import warning
                     class="pm-progress-bar"
                     :style="{
                       width: getProjectProgress(p) + '%',
-                      background: getProgressColor(p),
+                      backgroundColor: getProgressColor(p),
+                      color: getProgressColor(p),
                     }"
                     :class="{ 'pm-progress-glow': getProjectProgress(p) === 100 }"
                   ></div>
@@ -770,29 +797,60 @@ void Search // suppress unused import warning
               </div>
             </td>
             <td class="pm-td pm-td-action">
-              <el-dropdown trigger="click" @command="(cmd: string) => onCardAction(cmd, p)">
-                <button class="pm-more-btn">
+              <el-dropdown
+                trigger="click"
+                popper-class="pm-action-dropdown-popper"
+                @command="(cmd: string) => onCardAction(cmd, p)"
+              >
+                <button class="pm-more-btn" aria-label="更多操作">
                   <span class="material-symbols-outlined">more_vert</span>
                 </button>
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item command="edit">编辑</el-dropdown-item>
-                    <el-dropdown-item command="members">成员管理</el-dropdown-item>
-                    <el-dropdown-item command="environments">测试环境</el-dropdown-item>
+                    <el-dropdown-item command="edit">
+                      <span class="pm-action-menu-item">
+                        <span class="material-symbols-outlined pm-action-icon">edit</span>
+                        编辑项目
+                      </span>
+                    </el-dropdown-item>
+                    <el-dropdown-item command="members">
+                      <span class="pm-action-menu-item">
+                        <span class="material-symbols-outlined pm-action-icon">group</span>
+                        成员管理
+                      </span>
+                    </el-dropdown-item>
+                    <el-dropdown-item command="environments">
+                      <span class="pm-action-menu-item">
+                        <span class="material-symbols-outlined pm-action-icon">lan</span>
+                        测试环境
+                      </span>
+                    </el-dropdown-item>
                     <el-dropdown-item
                       v-if="p.status === 'active'"
                       command="archive"
                       :disabled="isSeedProject(p)"
                     >
-                      归档
+                      <span class="pm-action-menu-item">
+                        <span class="material-symbols-outlined pm-action-icon">archive</span>
+                        归档项目
+                      </span>
                     </el-dropdown-item>
-                    <el-dropdown-item v-else command="restore">恢复</el-dropdown-item>
+                    <el-dropdown-item v-else command="restore">
+                      <span class="pm-action-menu-item">
+                        <span class="material-symbols-outlined pm-action-icon">unarchive</span>
+                        恢复项目
+                      </span>
+                    </el-dropdown-item>
                     <el-dropdown-item
                       command="delete"
                       :disabled="isSeedProject(p) || p.status === 'active'"
                       divided
+                      class="pm-action-delete-item"
                     >
-                      删除
+                      <span class="pm-action-menu-item pm-action-menu-item--danger">
+                        <span class="material-symbols-outlined pm-action-icon">delete</span>
+                        删除项目
+                      </span>
                     </el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
@@ -908,24 +966,29 @@ void Search // suppress unused import warning
       v-model="dialogVisible"
       :title="dialogMode === 'create' ? '新建项目' : '编辑项目'"
       width="520px"
+      class="pm-dialog"
     >
       <el-form label-position="top">
         <el-form-item label="项目头像">
-          <div class="pm-avatar-upload" @click="triggerAvatarInput">
-            <img v-if="avatarPreview" :src="avatarPreview" class="pm-avatar-preview" />
-            <div v-else class="pm-avatar-placeholder">
-              <span class="pm-avatar-placeholder-icon">+</span>
-              <span class="pm-avatar-placeholder-text">点击上传</span>
+          <div class="pm-avatar-row">
+            <div class="pm-avatar-upload" @click="triggerAvatarInput">
+              <img v-if="avatarPreview" :src="avatarPreview" class="pm-avatar-preview" />
+              <div v-else class="pm-avatar-placeholder">
+                <span class="pm-avatar-placeholder-icon">+</span>
+                <span class="pm-avatar-placeholder-text">点击上传</span>
+              </div>
+              <input
+                ref="avatarInputRef"
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                style="display: none"
+                @change="onAvatarSelected"
+              />
             </div>
-            <input
-              ref="avatarInputRef"
-              type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp"
-              style="display: none"
-              @change="onAvatarSelected"
-            />
+            <div class="pm-avatar-info">
+              <span class="pm-avatar-hint">PNG/JPG/GIF/WebP，不超过 2MB</span>
+            </div>
           </div>
-          <span class="pm-avatar-hint">支持 PNG/JPG/GIF/WebP，最大 2MB</span>
         </el-form-item>
         <el-form-item label="项目名称">
           <el-input
@@ -959,7 +1022,22 @@ void Search // suppress unused import warning
               :key="user.id"
               :label="`${user.name} (${user.email})`"
               :value="user.id"
-            />
+            >
+              <div class="user-option-item">
+                <img
+                  class="user-option-avatar"
+                  :src="resolveAvatarUrl(user.avatar, user.name)"
+                  alt="avatar"
+                  @error="
+                    (e: any) => {
+                      e.target.src = resolveAvatarUrl('', user.name)
+                    }
+                  "
+                />
+                <span class="user-option-name">{{ user.name }}</span>
+                <span class="user-option-email">({{ user.email }})</span>
+              </div>
+            </el-option>
           </el-select>
         </el-form-item>
       </el-form>
@@ -976,6 +1054,7 @@ void Search // suppress unused import warning
       v-model="memberDialogVisible"
       :title="`${memberProject?.name || ''} - 成员管理`"
       width="900px"
+      class="pm-dialog"
     >
       <div class="mb-toolbar">
         <el-input
@@ -998,7 +1077,22 @@ void Search // suppress unused import warning
               :key="u.id"
               :label="`${u.name} (${u.email})`"
               :value="u.id"
-            />
+            >
+              <div class="user-option-item">
+                <img
+                  class="user-option-avatar"
+                  :src="resolveAvatarUrl(u.avatar, u.name)"
+                  alt="avatar"
+                  @error="
+                    (e: any) => {
+                      e.target.src = resolveAvatarUrl('', u.name)
+                    }
+                  "
+                />
+                <span class="user-option-name">{{ u.name }}</span>
+                <span class="user-option-email">({{ u.email }})</span>
+              </div>
+            </el-option>
           </el-select>
           <button
             class="mb-add-btn"
@@ -1009,23 +1103,28 @@ void Search // suppress unused import warning
           </button>
         </div>
       </div>
-      <div v-loading="membersLoading" class="mb-grid">
-        <div v-for="m in filteredMembers" :key="m.user_id" class="mb-card">
-          <img
-            class="mb-card-avatar"
-            :src="resolveAvatarUrl(m.user?.avatar, m.user?.name)"
-            alt="avatar"
-            @error="
-              (e: any) => {
-                e.target.src = resolveAvatarUrl('', m.user?.name)
-              }
-            "
-          />
-          <span class="mb-card-name">{{ m.user?.name || '-' }}</span>
-          <span class="mb-card-email">{{ m.user?.email || '' }}</span>
-          <div class="mb-card-roles">
+      <div v-loading="membersLoading" class="mb-list">
+        <div v-for="m in filteredMembers" :key="m.user_id" class="mb-list-row">
+          <div class="mb-member-info">
+            <img
+              class="mb-avatar"
+              :src="resolveAvatarUrl(m.user?.avatar, m.user?.name)"
+              alt="avatar"
+              @error="
+                (e: any) => {
+                  e.target.src = resolveAvatarUrl('', m.user?.name)
+                }
+              "
+            />
+            <div class="mb-meta">
+              <span class="mb-name">{{ m.user?.name || '-' }}</span>
+              <span class="mb-email">{{ m.user?.email || '' }}</span>
+            </div>
+          </div>
+          <div class="mb-roles">
             <span v-if="isProjectOwnerMember(m)" class="mb-role-pill mb-role-pill--owner">
-              负责人
+              <span class="mb-role-dot"></span>
+              <span>负责人</span>
             </span>
             <span
               v-for="(roleName, ridx) in getMemberRoleNames(m)"
@@ -1033,23 +1132,33 @@ void Search // suppress unused import warning
               class="mb-role-pill"
               :class="{ 'mb-role-pill--protected': isProtectedRoleName(roleName) }"
             >
-              {{ roleName }}
+              <span class="mb-role-dot"></span>
+              <span>{{ roleName }}</span>
             </span>
             <span
               v-if="getMemberRoleNames(m).length === 0 && !isProjectOwnerMember(m)"
               class="mb-role-pill"
             >
-              成员
+              <span class="mb-role-dot"></span>
+              <span>成员</span>
             </span>
           </div>
-          <el-tooltip
-            v-if="isMemberRemovalBlocked(m)"
-            :content="memberRemovalTip(m)"
-            placement="top"
-          >
-            <button class="mb-card-remove mb-card-remove--disabled" disabled>移除</button>
-          </el-tooltip>
-          <button v-else class="mb-card-remove" @click="onRemoveMember(m)">移除</button>
+          <div class="mb-actions">
+            <el-tooltip
+              v-if="isMemberRemovalBlocked(m)"
+              :content="memberRemovalTip(m)"
+              placement="top"
+            >
+              <button class="mb-remove-btn mb-remove-btn--disabled" disabled>
+                <span class="material-symbols-outlined mb-lock-icon">lock</span>
+                <span>锁定</span>
+              </button>
+            </el-tooltip>
+            <button v-else class="mb-remove-btn" @click="onRemoveMember(m)">
+              <span class="material-symbols-outlined mb-remove-icon">person_remove</span>
+              <span>移除</span>
+            </button>
+          </div>
         </div>
         <div v-if="filteredMembers.length === 0 && !membersLoading" class="mb-empty">暂无成员</div>
       </div>
@@ -1059,6 +1168,7 @@ void Search // suppress unused import warning
       v-model="environmentDialogVisible"
       :title="`${environmentProject?.name || ''} - 测试环境配置`"
       width="860px"
+      class="pm-dialog"
     >
       <div v-loading="environmentLoading" class="pm-env-panel">
         <div class="pm-env-toolbar">
@@ -1082,7 +1192,8 @@ void Search // suppress unused import warning
                 :checked="row.is_default"
                 @change="setDefaultEnvironment(row.id)"
               />
-              默认
+              <span class="pm-env-radio-custom"></span>
+              <span>默认</span>
             </label>
             <el-input v-model="row.name" class="pm-env-name" placeholder="环境名称，如测试环境" />
             <el-input
@@ -1196,7 +1307,6 @@ void Search // suppress unused import warning
   align-items: center;
   gap: 8px;
   padding: 10px 20px;
-  margin-left: 16px;
   border-radius: var(--tp-btn-radius);
   border: none;
   background: var(--tp-btn-bg);
@@ -1699,10 +1809,24 @@ void Search // suppress unused import warning
   position: absolute;
   right: -16px;
   bottom: -16px;
-  opacity: 0.1;
+  opacity: 0.08;
+  color: var(--tp-primary);
+  pointer-events: none;
+  animation: pm-slow-spin 20s linear infinite;
 }
 .pm-capacity-deco .material-symbols-outlined {
   font-size: 120px;
+}
+.pm-capacity-num {
+  text-shadow: 0 0 10px rgba(139, 92, 246, 0.2);
+}
+@keyframes pm-slow-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 .pm-avatar-upload {
   width: 72px;
@@ -1753,29 +1877,58 @@ void Search // suppress unused import warning
   margin-bottom: 18px;
 }
 .mb-search {
-  flex: 3;
+  flex: 1;
   min-width: 0;
 }
 :deep(.mb-search .el-input__wrapper) {
-  border-radius: 8px;
+  border-radius: 10px !important;
+  background: var(--tp-surface-input) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  box-shadow: none !important;
+  height: 32px !important;
+  transition: all var(--tp-transition) !important;
+}
+:deep(.mb-search .el-input__wrapper:hover) {
+  border-color: var(--tp-border-strong) !important;
+  background: var(--tp-surface-hover) !important;
+}
+:deep(.mb-search .el-input__wrapper.is-focus) {
+  border-color: var(--tp-primary) !important;
+  box-shadow: 0 0 0 1px var(--tp-primary) inset !important;
+  background: var(--tp-surface-card) !important;
 }
 .mb-add-bar {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 3;
+  flex: 1.2;
   min-width: 0;
 }
 .mb-add-select {
-  flex: 1;
+  flex: 1.5;
   min-width: 0;
 }
 :deep(.mb-add-select .el-select__wrapper) {
-  border-radius: 8px;
+  border-radius: 10px !important;
+  background: var(--tp-surface-input) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  box-shadow: none !important;
+  height: 32px !important;
+  transition: all var(--tp-transition) !important;
+}
+:deep(.mb-add-select .el-select__wrapper:hover) {
+  border-color: var(--tp-border-strong) !important;
+  background: var(--tp-surface-hover) !important;
+}
+:deep(.mb-add-select .el-select__wrapper.is-focus) {
+  border-color: var(--tp-primary) !important;
+  box-shadow: 0 0 0 1px var(--tp-primary) inset !important;
+  background: var(--tp-surface-card) !important;
 }
 .mb-add-btn {
-  padding: 8px 16px;
-  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  height: 32px;
+  padding: 0 16px;
+  background: linear-gradient(135deg, var(--tp-primary), #6d28d9);
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -1783,131 +1936,236 @@ void Search // suppress unused import warning
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  transition: all var(--tp-transition);
 }
 .mb-add-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.3);
+  background: linear-gradient(135deg, #8b5cf6, var(--tp-primary));
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
+  transform: translateY(-1px);
+}
+.mb-add-btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 .mb-add-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
-.mb-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  max-height: 480px;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-.mb-grid::-webkit-scrollbar {
-  width: 4px;
-}
-.mb-grid::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-}
-.mb-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-top: 2px solid rgba(124, 58, 237, 0.4);
-  border-radius: 10px;
-  padding: 16px 12px 12px;
+.mb-list {
   display: flex;
   flex-direction: column;
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+}
+.mb-list::-webkit-scrollbar {
+  width: 6px;
+}
+.mb-list::-webkit-scrollbar-thumb {
+  background: rgba(124, 58, 237, 0.2);
+  border-radius: 99px;
+}
+
+.mb-list-row {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--tp-border-subtle);
+  border-radius: 0;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mb-list-row:last-child {
+  border-bottom: none;
+}
+
+.mb-list-row:hover {
+  background: rgba(124, 58, 237, 0.03);
+}
+
+.mb-member-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.mb-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--tp-surface-muted);
+  box-shadow: 0 0 0 2px var(--tp-border-subtle);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mb-list-row:hover .mb-avatar {
+  box-shadow: 0 0 0 2px var(--tp-primary);
+  transform: scale(1.08) rotate(3deg);
+}
+
+.mb-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.mb-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--tp-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mb-email {
+  font-size: 11.5px;
+  color: var(--tp-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mb-roles {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 24px;
+}
+
+.mb-role-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 99px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--tp-text-secondary);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  white-space: nowrap;
+}
+
+.mb-role-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  display: inline-block;
+}
+
+.mb-role-pill--protected {
+  background: rgba(239, 68, 68, 0.08) !important;
+  color: #ef4444 !important;
+  border-color: rgba(239, 68, 68, 0.2) !important;
+}
+
+.mb-role-pill--protected .mb-role-dot {
+  box-shadow: 0 0 6px #ef4444;
+}
+
+.mb-role-pill--owner {
+  background: rgba(124, 58, 237, 0.08) !important;
+  color: var(--tp-primary) !important;
+  border-color: rgba(124, 58, 237, 0.2) !important;
+}
+
+.mb-role-pill--owner .mb-role-dot {
+  box-shadow: 0 0 6px var(--tp-primary);
+  animation: mb-pulse 2s infinite ease-in-out;
+}
+
+.mb-actions {
+  display: flex;
+  align-items: center;
+}
+
+.mb-remove-btn {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tp-accent-danger);
+  background: rgba(239, 68, 68, 0.03);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  cursor: pointer;
+  padding: 5px 12px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   gap: 4px;
   transition: all 0.2s ease;
 }
-.mb-card:hover {
-  border-color: rgba(124, 58, 237, 0.5);
-  border-top-color: rgba(124, 58, 237, 0.7);
-  background: rgba(255, 255, 255, 0.05);
+
+.mb-remove-btn .mb-remove-icon,
+.mb-remove-btn .mb-lock-icon {
+  font-size: 13px !important;
+  line-height: 1;
 }
-.mb-card-avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  object-fit: cover;
-  background: rgba(255, 255, 255, 0.06);
-  border: 2px solid rgba(124, 58, 237, 0.25);
-  margin-bottom: 6px;
+
+.mb-remove-btn:hover:not(:disabled) {
+  color: #ffffff;
+  background: #ef4444;
+  border-color: #ef4444;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+  transform: translateY(-1px);
 }
-.mb-card-name {
-  font-size: 13px;
-  font-weight: 700;
-  color: #f0f0f5;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
+
+.mb-remove-btn:active:not(:disabled) {
+  transform: translateY(0);
 }
-.mb-card-email {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.28);
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-  margin-bottom: 4px;
-}
-.mb-card-roles {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 4px;
-  margin-top: 2px;
-}
-.mb-role-pill {
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: var(--tp-accent-primary-soft);
-  color: var(--tp-primary);
-  border: 1px solid var(--tp-accent-primary-soft);
-}
-.mb-role-pill--protected {
-  background: rgba(239, 68, 68, 0.1);
-  color: #f87171;
-  border-color: rgba(239, 68, 68, 0.2);
-}
-.mb-role-pill--owner {
-  background: rgba(139, 92, 246, 0.18);
-  color: #c4b5fd;
-  border-color: rgba(139, 92, 246, 0.32);
-}
-.mb-card-remove {
-  margin-top: 6px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.25);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 3px 10px;
-  border-radius: 6px;
-  transition: all 0.15s;
-}
-.mb-card-remove:hover {
-  color: #f87171;
-  background: rgba(239, 68, 68, 0.1);
-}
-.mb-card-remove--disabled {
-  opacity: 0.3;
+
+.mb-remove-btn--disabled {
+  opacity: 0.45;
+  color: var(--tp-text-disabled);
+  background: rgba(255, 255, 255, 0.02);
+  border-color: var(--tp-border-subtle);
   cursor: not-allowed;
 }
-.mb-card-remove--disabled:hover {
-  color: rgba(255, 255, 255, 0.25);
-  background: none;
+
+.mb-remove-btn--disabled:hover {
+  color: var(--tp-text-disabled) !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border-color: var(--tp-border-subtle) !important;
+  box-shadow: none !important;
+  transform: none !important;
 }
+
 .mb-empty {
-  grid-column: 1 / -1;
   text-align: center;
   padding: 40px 0;
-  color: rgba(255, 255, 255, 0.25);
+  color: var(--tp-text-muted);
   font-size: 14px;
+}
+
+@keyframes mb-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 1;
+    box-shadow: 0 0 10px var(--tp-primary);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
 }
 
 .pm-page {
@@ -2138,52 +2396,7 @@ void Search // suppress unused import warning
   color: var(--tp-gray-400);
 }
 
-.mb-card {
-  background: var(--tp-surface-card);
-  border-color: var(--tp-border-subtle);
-  border-top-color: var(--tp-accent-primary-border);
-}
-
-.mb-card:hover {
-  background: var(--tp-surface-hover);
-  border-color: var(--tp-border-strong);
-  border-top-color: var(--tp-primary);
-}
-
-.mb-grid::-webkit-scrollbar-thumb {
-  background: var(--tp-gray-300);
-}
-
-.mb-role-pill {
-  background: var(--tp-accent-primary-soft);
-  color: var(--tp-primary);
-  border-color: var(--tp-accent-primary-border);
-}
-
-.mb-role-pill--protected {
-  background: var(--tp-accent-danger-soft);
-  color: var(--tp-accent-danger);
-  border-color: var(--tp-accent-danger-border);
-}
-
-.mb-role-pill--owner {
-  background: var(--tp-accent-primary-soft);
-  color: var(--tp-primary);
-  border-color: var(--tp-accent-primary-border);
-}
-
-.mb-card-remove {
-  color: var(--tp-gray-500);
-}
-
-.mb-card-remove:hover {
-  color: var(--tp-accent-danger);
-  background: var(--tp-accent-danger-soft);
-}
-
-.mb-card-remove--disabled:hover {
-  color: var(--tp-gray-400);
-}
+/* Member Card styling is consolidated in the base rules */
 
 .pm-title {
   font-size: var(--tp-text-3xl);
@@ -2371,18 +2584,21 @@ void Search // suppress unused import warning
   gap: 4px;
   height: 32px;
   padding: 0 14px;
-  border: 1px solid rgba(139, 92, 246, 0.18);
-  border-radius: var(--tp-btn-radius);
-  background: var(--tp-accent-primary-soft);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 8px;
+  background: rgba(139, 92, 246, 0.06);
   color: var(--tp-primary);
-  font-size: 13px;
-  font-weight: var(--tp-font-semibold);
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background var(--tp-transition);
+  transition: all var(--tp-transition);
 }
 
 .pm-env-add:hover {
-  background: rgba(139, 92, 246, 0.16);
+  background: var(--tp-primary);
+  color: #ffffff;
+  border-color: var(--tp-primary);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
 }
 
 .pm-env-add .material-symbols-outlined {
@@ -2393,79 +2609,134 @@ void Search // suppress unused import warning
   display: flex;
   flex-direction: column;
   gap: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 4px;
+}
+.pm-env-list::-webkit-scrollbar {
+  width: 6px;
+}
+.pm-env-list::-webkit-scrollbar-thumb {
+  background: rgba(124, 58, 237, 0.2);
+  border-radius: 99px;
 }
 
 .pm-env-row {
   display: grid;
-  grid-template-columns: 72px minmax(120px, 0.7fr) minmax(220px, 1.1fr) minmax(160px, 0.9fr) 40px;
-  gap: 8px;
+  grid-template-columns: 76px minmax(120px, 0.7fr) minmax(220px, 1.1fr) minmax(160px, 0.9fr) 40px;
+  gap: 10px;
   align-items: center;
-  padding: 12px;
-  border: 1px solid rgba(229, 231, 235, 0.7);
-  border-radius: var(--tp-radius-lg);
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(17, 24, 39, 0.02);
-  transition:
-    border-color var(--tp-transition),
-    box-shadow var(--tp-transition);
+  padding: 12px 18px;
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.01);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  transition: all var(--tp-transition);
 }
 
 .pm-env-row:focus-within,
 .pm-env-row:hover {
-  border-color: rgba(139, 92, 246, 0.28);
-  box-shadow:
-    0 6px 14px rgba(17, 24, 39, 0.035),
-    0 0 0 3px rgba(139, 92, 246, 0.06);
+  border-color: rgba(139, 92, 246, 0.25);
+  background: rgba(139, 92, 246, 0.02);
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.08);
 }
 
 .pm-env-row :deep(.el-input__wrapper) {
   box-shadow: none !important;
   background: var(--tp-surface-input);
+  border: 1px solid var(--tp-border-subtle) !important;
   border-radius: 8px;
+  height: 32px !important;
+  transition: all var(--tp-transition);
+}
+
+.pm-env-row :deep(.el-input__wrapper:hover) {
+  border-color: var(--tp-border-strong) !important;
+  background: var(--tp-surface-hover);
 }
 
 .pm-env-row :deep(.el-input__wrapper.is-focus) {
   box-shadow: 0 0 0 1px var(--tp-primary) inset !important;
-  background: #ffffff;
+  border-color: var(--tp-primary) !important;
+  background: var(--tp-surface-card);
 }
 
 .pm-env-row :deep(.el-input__inner) {
-  font-size: 13px;
+  font-size: 12.5px;
 }
 
 .pm-env-default {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   color: var(--tp-text-secondary);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
+  user-select: none;
+  position: relative;
 }
 
 .pm-env-default input[type='radio'] {
-  accent-color: var(--tp-primary);
-  width: 15px;
-  height: 15px;
-  cursor: pointer;
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.pm-env-radio-custom {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--tp-border-strong);
+  border-radius: 50%;
+  position: relative;
+  transition: all 0.2s ease;
+  background: transparent;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.pm-env-default:hover .pm-env-radio-custom {
+  border-color: var(--tp-primary);
+}
+
+.pm-env-default input[type='radio']:checked + .pm-env-radio-custom {
+  border-color: var(--tp-primary);
+  background: var(--tp-primary);
+  box-shadow: 0 0 6px var(--tp-primary);
+}
+
+.pm-env-default input[type='radio']:checked + .pm-env-radio-custom::after {
+  content: '';
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #ffffff;
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .pm-env-remove {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 8px;
   background: transparent;
   color: var(--tp-text-muted);
   cursor: pointer;
+  transition: all var(--tp-transition);
 }
 
 .pm-env-remove:hover {
   background: var(--tp-accent-danger-soft);
   color: var(--tp-accent-danger);
+  transform: scale(1.06) rotate(3deg);
 }
 
 .pm-env-remove .material-symbols-outlined {
@@ -2484,15 +2755,92 @@ void Search // suppress unused import warning
   min-height: auto;
   padding: var(--tp-space-2) var(--tp-space-3) var(--tp-space-4);
   background:
-    radial-gradient(circle at 8% 88%, var(--tp-ambient-info), transparent 32%),
-    radial-gradient(circle at 88% 0%, var(--tp-ambient-primary), transparent 28%),
-    var(--tp-surface-base);
+    radial-gradient(circle at 10% 20%, rgba(139, 92, 246, 0.05), transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(236, 72, 153, 0.03), transparent 40%),
+    linear-gradient(rgba(139, 92, 246, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.015) 1px, transparent 1px), var(--tp-surface-base);
+  background-size:
+    100% 100%,
+    100% 100%,
+    24px 24px,
+    24px 24px;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: var(--tp-space-3) !important;
 }
 
-.pm-header {
+.pm-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--tp-space-2);
+  gap: var(--tp-space-3);
+  flex-wrap: wrap;
+}
+
+.pm-toolbar-left {
+  display: flex;
+  align-items: center;
+}
+
+.pm-toolbar-right {
+  display: flex;
   align-items: center;
   gap: var(--tp-space-3);
-  margin-bottom: var(--tp-space-2);
+}
+
+.pm-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--tp-surface-input);
+  border: 1px solid var(--tp-border-subtle);
+}
+
+.pm-tab-btn {
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: var(--tp-text-muted);
+  font-size: var(--tp-text-xs);
+  font-weight: var(--tp-font-medium);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all var(--tp-transition);
+}
+
+.pm-tab-btn:hover {
+  color: var(--tp-text-primary);
+}
+
+.pm-tab-btn.active {
+  background: var(--tp-surface-card);
+  color: var(--tp-text-primary);
+  box-shadow: var(--tp-shadow-sm);
+}
+
+.pm-search-box {
+  width: 200px;
+}
+
+:deep(.pm-search-input .el-input__wrapper) {
+  background: var(--tp-surface-input) !important;
+  border-color: var(--tp-border-subtle) !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+}
+
+:deep(.pm-search-input .el-input__wrapper:hover) {
+  border-color: var(--tp-border-strong) !important;
+}
+
+:deep(.pm-search-input .el-input__wrapper.is-focus) {
+  border-color: var(--tp-primary) !important;
+  box-shadow: 0 0 0 1px var(--tp-primary) inset !important;
 }
 
 .pm-title {
@@ -2529,16 +2877,21 @@ void Search // suppress unused import warning
 .pm-add-btn {
   height: var(--tp-btn-height-md);
   padding: 0 var(--tp-space-5);
-  margin-left: var(--tp-space-1);
 }
 
 .pm-table-wrap {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 320px;
   overflow: hidden;
   margin-bottom: var(--tp-space-3);
   border: 1px solid var(--tp-border-subtle);
   border-radius: var(--tp-radius-xl);
   background: var(--tp-glass-bg-strong);
   box-shadow: var(--tp-shadow-card);
+  backdrop-filter: blur(16px);
+  position: relative;
 }
 
 .pm-table {
@@ -2579,12 +2932,13 @@ void Search // suppress unused import warning
 }
 
 .pm-row {
-  background: rgba(255, 255, 255, 0.7);
+  background: transparent;
+  border-top-color: var(--tp-border-subtle);
+  transition: all var(--tp-transition);
 }
 
 .pm-row:hover {
-  background: var(--tp-surface-row-hover);
-  box-shadow: none;
+  background: var(--tp-surface-row-hover) !important;
 }
 
 .pm-td {
@@ -2600,6 +2954,17 @@ void Search // suppress unused import warning
   width: 30px;
   height: 30px;
   border-radius: 11px;
+  transition: all var(--tp-transition);
+}
+.pm-row:hover .pm-project-icon {
+  transform: translateY(-1px) scale(1.04);
+  box-shadow: 0 4px 10px rgba(139, 92, 246, 0.15);
+}
+.pm-project-icon .material-symbols-outlined {
+  transition: transform 0.4s ease;
+}
+.pm-row:hover .pm-project-icon .material-symbols-outlined {
+  transform: rotate(-8deg) translateY(-1px);
 }
 
 .pm-project-name,
@@ -2749,7 +3114,7 @@ void Search // suppress unused import warning
   overflow: hidden;
   color: var(--tp-text-primary);
   font-size: 13px;
-  font-weight: var(--tp-font-medium);
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2772,52 +3137,82 @@ void Search // suppress unused import warning
 .pm-env-menu-manage {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   color: var(--tp-text-secondary);
   font-size: 12px;
-  font-weight: var(--tp-font-medium);
+  font-weight: 500;
+  width: 100%;
 }
 
 .pm-env-menu-manage .material-symbols-outlined {
-  font-size: 15px;
+  font-size: 16px;
+  transition: transform 0.3s var(--tp-transition);
 }
 
 :global(.pm-env-dropdown-popper) {
   border: 1px solid var(--tp-border-subtle) !important;
-  border-radius: 10px !important;
-  background: var(--tp-surface-card) !important;
-  box-shadow: var(--tp-shadow-card) !important;
+  border-radius: 12px !important;
+  background: var(--tp-glass-bg-strong) !important;
+  backdrop-filter: blur(16px) !important;
+  box-shadow: var(--tp-shadow-md) !important;
+  padding: 4px !important;
 }
 
 :global(.pm-env-dropdown-popper .el-dropdown-menu) {
-  padding: 4px !important;
+  padding: 0 !important;
   background: transparent !important;
 }
 
 :global(.pm-env-dropdown-popper .el-dropdown-menu__item) {
-  min-height: 40px;
-  padding: 6px 10px !important;
-  border-radius: 6px;
+  min-height: 44px;
+  padding: 8px 12px !important;
+  border-radius: 8px;
   color: var(--tp-text-primary);
   font-size: 13px;
   line-height: 1.35;
+  border: 1px solid transparent !important;
+  transition: all var(--tp-transition) !important;
 }
 
 :global(.pm-env-dropdown-popper .el-dropdown-menu__item:not(.is-disabled):hover) {
   background: var(--tp-surface-hover) !important;
-  color: var(--tp-text-primary) !important;
+  border-color: var(--tp-accent-primary-border) !important;
+}
+
+:global(.pm-env-dropdown-popper .el-dropdown-menu__item:not(.is-disabled):hover .pm-env-menu-name) {
+  color: var(--tp-primary) !important;
+}
+
+:global(
+  .pm-env-dropdown-popper .el-dropdown-menu__item:not(.is-disabled):hover .pm-env-menu-manage
+) {
+  color: var(--tp-primary) !important;
+}
+
+:global(
+  .pm-env-dropdown-popper
+    .el-dropdown-menu__item:not(.is-disabled):hover
+    .pm-env-menu-manage
+    .material-symbols-outlined
+) {
+  transform: rotate(45deg);
 }
 
 :global(.pm-env-dropdown-popper .el-dropdown-menu__item.is-disabled) {
-  background: var(--tp-accent-primary-soft) !important;
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.05),
+    rgba(236, 72, 153, 0.03)
+  ) !important;
+  border: 1px solid rgba(139, 92, 246, 0.12) !important;
   opacity: 1;
   cursor: default;
 }
 
 :global(.pm-env-dropdown-popper .el-dropdown-menu__item--divided) {
-  min-height: 32px;
+  min-height: 36px;
   margin-top: 4px !important;
-  border-top: 1px solid var(--tp-border-subtle) !important;
+  border-top: 1px solid rgba(139, 92, 246, 0.08) !important;
 }
 
 @keyframes pm-spin {
@@ -2867,13 +3262,16 @@ void Search // suppress unused import warning
 }
 
 .pm-pagination {
+  margin-top: auto !important;
   padding: var(--tp-space-2) var(--tp-space-3);
-  background: rgba(255, 255, 255, 0.72);
+  background: transparent !important;
+  border-top: 1px solid var(--tp-border-subtle) !important;
 }
 
 .pm-bento-grid {
   grid-template-columns: 1fr 1.1fr 0.9fr;
   gap: var(--tp-space-3);
+  margin-top: auto !important;
 }
 
 .pm-glass-card,
@@ -2884,6 +3282,13 @@ void Search // suppress unused import warning
   border-radius: var(--tp-radius-xl);
   background: var(--tp-glass-bg-strong);
   box-shadow: var(--tp-shadow-sm);
+  transition: all var(--tp-transition);
+}
+.pm-glass-card:hover,
+.pm-capacity-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--tp-shadow-md);
+  border-color: var(--tp-accent-primary-border);
 }
 
 .pm-card-top {
@@ -2910,7 +3315,20 @@ void Search // suppress unused import warning
 }
 
 .pm-bar {
-  border-radius: 8px 8px 0 0;
+  border-radius: 4px 4px 0 0;
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  background: linear-gradient(180deg, var(--tp-primary-light), rgba(139, 92, 246, 0.15)) !important;
+}
+.pm-bar-mid {
+  background: linear-gradient(180deg, var(--tp-primary), rgba(139, 92, 246, 0.25)) !important;
+}
+.pm-bar-hi {
+  background: linear-gradient(180deg, var(--tp-secondary), rgba(236, 72, 153, 0.3)) !important;
+  box-shadow: 0 0 8px rgba(236, 72, 153, 0.2);
+}
+.pm-bar:hover {
+  transform: scaleY(1.15);
+  filter: brightness(1.08);
 }
 
 .pm-vectors-list {
@@ -2919,9 +3337,37 @@ void Search // suppress unused import warning
 
 .pm-vector-row {
   padding: var(--tp-space-2);
-  border: 1px solid rgba(229, 231, 235, 0.72);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: 10px;
+  background: var(--tp-surface-input);
+  transition: all var(--tp-transition);
+}
+.pm-vector-row:hover {
+  background: var(--tp-surface-hover);
+  border-color: var(--tp-accent-primary-border);
+  transform: translateX(2px);
+}
+.pm-vector-rose {
+  color: var(--tp-accent-danger);
+  animation: pm-warning-pulse 2s infinite;
+}
+.pm-vector-amber {
+  color: var(--tp-accent-warning);
+  animation: pm-warning-pulse 2.5s infinite;
+}
+@keyframes pm-warning-pulse {
+  0% {
+    opacity: 0.75;
+    filter: drop-shadow(0 0 0px currentColor);
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 3px currentColor);
+  }
+  100% {
+    opacity: 0.75;
+    filter: drop-shadow(0 0 0px currentColor);
+  }
 }
 
 .pm-capacity-card {
@@ -2929,5 +3375,463 @@ void Search // suppress unused import warning
   background:
     radial-gradient(circle at 100% 0%, rgba(139, 92, 246, 0.14), transparent 34%),
     var(--tp-glass-bg-strong);
+}
+
+/* ───────────────────────────────
+   Aisight Premium Dashboard Table & Badge Styling
+   ─────────────────────────────── */
+
+/* 1. Health Status Badges - Pulsing Glow */
+.pm-health-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--tp-radius-xl) !important;
+  font-size: var(--tp-text-xs);
+  font-weight: 600;
+  border: 1px solid transparent;
+  backdrop-filter: blur(4px);
+}
+.pm-health-emerald {
+  background: rgba(52, 211, 153, 0.1) !important;
+  border-color: rgba(52, 211, 153, 0.2) !important;
+  color: #34d399 !important;
+  --pulse-color-rgb: 52, 211, 153;
+}
+.pm-health-amber {
+  background: rgba(245, 158, 11, 0.1) !important;
+  border-color: rgba(245, 158, 11, 0.2) !important;
+  color: #fbbf24 !important;
+  --pulse-color-rgb: 245, 158, 11;
+}
+.pm-health-rose {
+  background: rgba(244, 63, 94, 0.1) !important;
+  border-color: rgba(244, 63, 94, 0.2) !important;
+  color: #f43f5e !important;
+  --pulse-color-rgb: 244, 63, 94;
+}
+.pm-health-slate {
+  background: rgba(148, 163, 184, 0.1) !important;
+  border-color: rgba(148, 163, 184, 0.2) !important;
+  color: #94a3b8 !important;
+  --pulse-color-rgb: 148, 163, 184;
+}
+.pm-health-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pm-pulse 2s infinite;
+}
+
+@keyframes pm-pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(var(--pulse-color-rgb), 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 5px rgba(var(--pulse-color-rgb), 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(var(--pulse-color-rgb), 0);
+  }
+}
+
+/* 2. Progress Bar Glowing Glow Overlay */
+.pm-progress-track {
+  height: 6px !important;
+  background: var(--tp-gray-200) !important;
+  border-radius: 3px !important;
+  overflow: hidden !important;
+  position: relative;
+}
+.pm-progress-bar {
+  border-radius: 3px !important;
+  position: relative;
+}
+.pm-progress-bar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+  animation: pm-shimmer 2s infinite;
+}
+.pm-progress-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 3px;
+  box-shadow: 0 0 10px currentColor;
+  opacity: 0.5;
+  pointer-events: none;
+}
+@keyframes pm-shimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+/* 3. Sleek Floating Table Row Hover State with Custom Gradients */
+.pm-row {
+  transition: all var(--tp-transition);
+}
+.pm-row:hover td:first-child {
+  position: relative;
+}
+.pm-row--emerald:hover {
+  background: linear-gradient(
+    90deg,
+    rgba(52, 211, 153, 0.05) 0%,
+    var(--tp-surface-hover) 30%,
+    transparent 100%
+  ) !important;
+}
+.pm-row--emerald:hover td:first-child::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 15%;
+  bottom: 15%;
+  width: 3px;
+  border-radius: 0 4px 4px 0;
+  background: #34d399;
+  box-shadow: 0 0 8px #34d399;
+}
+.pm-row--amber:hover {
+  background: linear-gradient(
+    90deg,
+    rgba(245, 158, 11, 0.05) 0%,
+    var(--tp-surface-hover) 30%,
+    transparent 100%
+  ) !important;
+}
+.pm-row--amber:hover td:first-child::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 15%;
+  bottom: 15%;
+  width: 3px;
+  border-radius: 0 4px 4px 0;
+  background: #fbbf24;
+  box-shadow: 0 0 8px #fbbf24;
+}
+.pm-row--rose:hover {
+  background: linear-gradient(
+    90deg,
+    rgba(244, 63, 94, 0.05) 0%,
+    var(--tp-surface-hover) 30%,
+    transparent 100%
+  ) !important;
+}
+.pm-row--rose:hover td:first-child::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 15%;
+  bottom: 15%;
+  width: 3px;
+  border-radius: 0 4px 4px 0;
+  background: #f43f5e;
+  box-shadow: 0 0 8px #f43f5e;
+}
+.pm-row--slate:hover {
+  background: linear-gradient(
+    90deg,
+    rgba(148, 163, 184, 0.05) 0%,
+    var(--tp-surface-hover) 30%,
+    transparent 100%
+  ) !important;
+}
+.pm-row--slate:hover td:first-child::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 15%;
+  bottom: 15%;
+  width: 3px;
+  border-radius: 0 4px 4px 0;
+  background: #94a3b8;
+  box-shadow: 0 0 8px #94a3b8;
+}
+
+/* 4. Elegant Environment Trigger Dropdown */
+.pm-env-trigger {
+  border: 1px solid var(--tp-border-subtle) !important;
+  background: var(--tp-glass-bg) !important;
+  color: var(--tp-text-secondary) !important;
+  border-radius: 20px !important;
+  padding: 4px 10px !important;
+  transition: all var(--tp-transition) !important;
+}
+.pm-env-trigger:hover {
+  background: var(--tp-glass-bg-hover) !important;
+  border-color: var(--tp-border-strong) !important;
+  color: var(--tp-text-primary) !important;
+}
+.pm-env-trigger-dot {
+  background: var(--tp-primary) !important;
+  animation: pm-dot-pulse 2s infinite;
+}
+.pm-env-trigger-count {
+  background: var(--tp-primary-soft) !important;
+  color: var(--tp-primary) !important;
+  font-weight: 700 !important;
+}
+@keyframes pm-dot-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(139, 92, 246, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0);
+  }
+}
+
+/* 5. Premium Glassmorphic Dialog Styling */
+:global(.el-overlay) {
+  background-color: var(--tp-overlay-scrim) !important;
+  backdrop-filter: blur(6px) !important;
+}
+
+:deep(.pm-dialog) {
+  border-radius: 16px !important;
+  overflow: hidden;
+  border: 1px solid var(--tp-border-subtle) !important;
+  background: var(--tp-glass-bg-strong) !important;
+  backdrop-filter: blur(20px) !important;
+  box-shadow: var(--tp-shadow-md) !important;
+}
+
+:deep(.pm-dialog .el-dialog__header) {
+  padding: 20px 24px 16px !important;
+  border-bottom: 1px solid var(--tp-border-subtle) !important;
+  margin-right: 0 !important;
+}
+
+:deep(.pm-dialog .el-dialog__title) {
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  color: var(--tp-text-primary) !important;
+}
+
+:deep(.pm-dialog .el-dialog__body) {
+  padding: 24px !important;
+}
+
+:deep(.pm-dialog .el-dialog__footer) {
+  padding: 16px 24px 20px !important;
+  border-top: 1px solid var(--tp-border-subtle) !important;
+}
+
+:deep(.pm-dialog .el-form-item__label) {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: var(--tp-text-secondary) !important;
+  margin-bottom: 8px !important;
+}
+
+:deep(.pm-dialog .el-input__wrapper),
+:deep(.pm-dialog .el-textarea__inner),
+:deep(.pm-dialog .el-select__wrapper) {
+  background: var(--tp-surface-input) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  transition: all var(--tp-transition) !important;
+}
+
+:deep(.pm-dialog .el-input__wrapper:hover),
+:deep(.pm-dialog .el-textarea__inner:hover),
+:deep(.pm-dialog .el-select__wrapper:hover) {
+  border-color: var(--tp-border-strong) !important;
+}
+
+:deep(.pm-dialog .el-input__wrapper.is-focus),
+:deep(.pm-dialog .el-textarea__inner:focus),
+:deep(.pm-dialog .el-select__wrapper.is-focus) {
+  border-color: var(--tp-primary) !important;
+  box-shadow: 0 0 0 1px var(--tp-primary) inset !important;
+  background: var(--tp-surface-card) !important;
+}
+
+:deep(.pm-dialog .el-input__count) {
+  background: transparent !important;
+  color: var(--tp-text-muted) !important;
+  font-size: 11px !important;
+}
+
+:deep(.pm-dialog .el-button) {
+  border-radius: var(--tp-btn-radius) !important;
+  height: var(--tp-btn-height-md) !important;
+  font-weight: 600 !important;
+  padding: 0 20px !important;
+  transition: all var(--tp-transition) !important;
+}
+
+:deep(.pm-dialog .el-button--primary) {
+  background: var(--tp-btn-bg) !important;
+  border: none !important;
+  color: var(--tp-btn-text) !important;
+  box-shadow: var(--tp-btn-shadow) !important;
+}
+
+:deep(.pm-dialog .el-button--primary:hover) {
+  background: var(--tp-btn-bg-hover) !important;
+  box-shadow: var(--tp-btn-shadow-hover) !important;
+}
+
+:deep(.pm-dialog .el-button:not(.el-button--primary)) {
+  background: var(--tp-surface-card) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  color: var(--tp-text-secondary) !important;
+}
+
+:deep(.pm-dialog .el-button:not(.el-button--primary):hover) {
+  background: var(--tp-surface-hover) !important;
+  border-color: var(--tp-border-strong) !important;
+  color: var(--tp-primary) !important;
+}
+
+/* Avatar Upload Alignment Row */
+.pm-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: var(--tp-space-4);
+  width: 100%;
+}
+
+.pm-avatar-upload {
+  flex-shrink: 0;
+  border-radius: 12px;
+  border: 2px dashed var(--tp-border-strong) !important;
+  transition: all var(--tp-transition) !important;
+}
+
+.pm-avatar-upload:hover {
+  border-color: var(--tp-primary) !important;
+  background: var(--tp-accent-primary-soft) !important;
+}
+
+.pm-avatar-info {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.pm-avatar-hint {
+  font-size: 11px;
+  color: var(--tp-text-subtle) !important;
+  font-weight: 500;
+  margin: 0 !important;
+  line-height: 1;
+}
+
+/* 6. Premium Actions Dropdown Menu Styling */
+:global(.pm-action-dropdown-popper) {
+  border: 1px solid var(--tp-border-subtle) !important;
+  border-radius: 12px !important;
+  background: var(--tp-glass-bg-strong) !important;
+  backdrop-filter: blur(16px) !important;
+  box-shadow: var(--tp-shadow-md) !important;
+  padding: 4px !important;
+  min-width: 130px;
+}
+
+:global(.pm-action-dropdown-popper .el-dropdown-menu) {
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+:global(.pm-action-dropdown-popper .el-dropdown-menu__item) {
+  min-height: 38px;
+  padding: 8px 12px !important;
+  border-radius: 8px;
+  color: var(--tp-text-primary);
+  font-size: 13px;
+  line-height: 1.35;
+  border: 1px solid transparent !important;
+  transition: all var(--tp-transition) !important;
+}
+
+:global(.pm-action-dropdown-popper .el-dropdown-menu__item:not(.is-disabled):hover) {
+  background: var(--tp-surface-hover) !important;
+  border-color: var(--tp-accent-primary-border) !important;
+  color: var(--tp-primary) !important;
+}
+
+:global(
+  .pm-action-dropdown-popper .el-dropdown-menu__item.pm-action-delete-item:not(.is-disabled):hover
+) {
+  background: var(--tp-accent-danger-soft) !important;
+  border-color: var(--tp-accent-danger-border) !important;
+  color: var(--tp-accent-danger) !important;
+}
+
+:global(.pm-action-dropdown-popper .el-dropdown-menu__item.is-disabled) {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: transparent !important;
+}
+
+:global(.pm-action-dropdown-popper .el-dropdown-menu__item--divided) {
+  margin-top: 4px !important;
+  border-top: 1px solid rgba(139, 92, 246, 0.08) !important;
+}
+
+.pm-action-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font-weight: 500;
+}
+
+.pm-action-icon {
+  font-size: 16px;
+  color: inherit;
+  opacity: 0.8;
+}
+
+.user-option-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+}
+
+.user-option-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.user-option-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tp-text-primary);
+  white-space: nowrap;
+}
+
+.user-option-email {
+  font-size: 11px;
+  color: var(--tp-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>

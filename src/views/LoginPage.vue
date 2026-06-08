@@ -36,8 +36,13 @@ async function doLogin() {
   loginLoading.value = true
   try {
     const data = await loginByEmail(loginForm.email, loginForm.password)
+    const userID = data.user_id ?? data.user?.id
     localStorage.setItem('tp-token', data.access_token)
-    localStorage.setItem('tp-user-id', String(data.user_id))
+    if (userID) {
+      localStorage.setItem('tp-user-id', String(userID))
+    } else {
+      localStorage.removeItem('tp-user-id')
+    }
     // 记住邮箱
     if (rememberMe.value) {
       localStorage.setItem('tp-remember-email', loginForm.email)

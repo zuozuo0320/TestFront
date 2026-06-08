@@ -1,6 +1,8 @@
 # Aisight Frontend — 系统架构文档
 
-> 版本 2.2 · 2026-03-23 · 工业级测试管理平台前端
+> 当前实现版 · 2026-06-05 · 以 `src/main.ts`、`src/router/index.ts`、`src/api/` 和 `package.json` 为准
+
+如需跨后端、Executor、前端统一核对业务逻辑，请先查看 `../TestPilot/docs/测试管理平台-当前实现业务逻辑总览-20260605.md`。
 
 ---
 
@@ -26,7 +28,7 @@
 ```
 src/
 ├── main.ts                          # 入口
-├── App.vue                          # 根壳组件（≤ 50 行）
+├── App.vue                          # 根壳组件（应用框架、导航、个人中心、项目初始化）
 ├── router/
 │   └── index.ts                     # Vue Router 路由配置
 ├── stores/                          # Pinia 状态管理
@@ -45,24 +47,42 @@ src/
 │   ├── attachment.ts                # 附件上传/下载
 │   ├── xlsx.ts                      # Excel 导入/导出
 │   ├── aiScript.ts                  # 测试智编（任务 CRUD + 录制 + 执行 + 验证）
+│   ├── caseReview.ts                # 用例评审
+│   ├── caseReviewV02.ts             # AI 门禁与 Action Items
+│   ├── caseReviewAttachment.ts      # 评审附件
+│   ├── requirementDoc.ts            # 需求文档
+│   ├── requirementGen.ts            # 需求智生
+│   ├── aiSkill.ts                   # AI Skill
+│   ├── tag.ts                       # 标签管理
+│   ├── projectSettings.ts           # 项目设置
+│   ├── aiModelConfig.ts             # AI 模型配置
 │   └── types.ts                     # 共享类型定义
 ├── composables/                     # 可复用逻辑（Composition API）
 │   ├── useTable.ts                  # 表格通用逻辑（分页/排序/筛选）
 │   ├── useCrud.ts                   # CRUD 通用逻辑
 │   ├── useParticles.ts              # 粒子动画逻辑
-│   └── useLocalStorage.ts           # localStorage 封装
+│   ├── useLocalStorage.ts           # localStorage 封装
+│   ├── useCaseReviewList.ts         # 用例评审列表逻辑
+│   ├── useReviewDefects.ts          # 评审缺陷逻辑
+│   ├── useRequirementGen.ts         # 需求智生逻辑
+│   ├── useTagManagement.ts          # 标签管理逻辑
+│   └── useTheme.ts                  # 主题初始化与切换
 ├── views/                           # 页面级组件
 │   ├── LoginPage.vue                # 登录页
 │   ├── WorkbenchPage.vue            # 工作台仪表盘
 │   ├── TestCasePage.vue             # 用例管理（项目切换器 + 目录树 + 表格 + 编辑抽屉）
+│   ├── CaseReviewPage.vue           # 用例评审列表
+│   ├── CaseReviewCreate.vue         # 创建评审计划
+│   ├── CaseReviewDetail.vue         # 评审详情
 │   ├── ComingSoonPage.vue           # 占位页
+│   ├── requirement-gen/             # 需求智生
+│   ├── ai-script/                   # 测试智编
 │   └── system/
 │       ├── UserManagement.vue       # 用户管理
 │       ├── RoleManagement.vue       # 角色管理
-│       └── ProjectManagement.vue    # 项目管理
-│   └── ai-script/                   # 测试智编
-│       ├── AiScriptTaskList.vue     # 任务列表（搜索/筛选/创建/快速入口）
-│       └── AiScriptTaskDetail.vue   # 任务详情（CodeMirror 预览 + 录制 + 验证 + 轮询）
+│       ├── ProjectManagement.vue    # 项目管理
+│       ├── TagManagement.vue        # 标签管理
+│       └── AiModelConfigPage.vue    # AI 模型配置
 ├── components/                      # 通用 UI 组件
 │   ├── AppHeader.vue                # 顶部导航栏（品牌LOGO + 侧栏展开 + 通知 + 用户信息）
 │   ├── AppSidebar.vue               # 侧边菜单栏（导航项 + 系统管理 + 折叠按钮，底部固定）
@@ -73,15 +93,22 @@ src/
 │   ├── FileUploader.vue             # 文件上传组件
 │   ├── CodeEditor.vue               # CodeMirror 代码编辑器封装（TypeScript + one-dark）
 │   ├── HoloOrb.vue                  # 登录页全息球动画
-│   └── BreadcrumbBar.vue            # 面包屑导航
+│   ├── BreadcrumbBar.vue            # 面包屑导航
+│   ├── ReviewAIGatePanel.vue        # 评审 AI 门禁面板
+│   ├── ReviewAIReportDialog.vue     # AI 评审报告弹窗
+│   ├── ReviewListTable.vue          # 评审列表表格
+│   └── ReviewStatCard.vue           # 评审统计卡片
 ├── styles/                          # 样式系统
 │   ├── variables.css                # CSS 设计令牌
 │   ├── base.css                     # 全局基础样式
 │   ├── layout.css                   # 布局样式
+│   ├── layout-enhance.css           # 布局增强
+│   ├── icon-fonts.css               # 图标字体
+│   ├── ai-script.css                # 测试智编样式
+│   ├── review-ai-report-dialog.css  # AI 评审报告样式
+│   ├── testcase-drawer.css          # 用例抽屉样式
 │   └── animations.css               # 动画关键帧
-└── utils/                           # 纯工具函数（待创建）
-    ├── format.ts                    # 日期/数字格式化
-    └── validators.ts                # 表单验证规则
+└── utils/                           # 工具函数
 ```
 
 ---
@@ -138,30 +165,28 @@ createApp(App)
 
 | 能力 | 实现 |
 |------|------|
-| 基础配置 | `baseURL` 通过环境变量 `VITE_API_BASE_URL` 配置 |
-| 认证注入 | Request 拦截器自动添加 `Authorization: Bearer <token>` |
-| Token 刷新 | 401 拦截 → Refresh Token 轮转 → 重放原请求 |
+| 基础配置 | `VITE_API_BASE_URL` 非空时使用环境变量，否则默认 `/api/v1` |
+| 本地代理 | Vite dev server 将 `/api` 和 `/uploads` 代理到 `http://127.0.0.1:8080` |
+| 认证注入 | Request 拦截器从 `localStorage` 注入 `Authorization: Bearer <tp-token>` 和 `X-User-ID` |
+| Token 失效 | 非登录请求返回 401 时清除本地凭证并刷新页面 |
 | 响应解包 | Response 拦截器自动解析 `{code, data}` 结构 |
 | 分页标准化 | 统一为 `{items, total, page, pageSize}` |
-| 错误处理 | 全局拦截分类处理（见第 7 章） |
+| 超时 | Axios 请求超时 12 秒 |
+| 错误处理 | Response 拦截器保留错误对象，由页面/Composable 处理提示 |
 
-**接口清单**：
+**领域 API 文件清单**：
 
-| 模块 | 接口 | 方法 |
+| 领域 | 文件 | 后端路径 |
 |------|------|------|
-| 认证 | `loginByEmail` | POST `/auth/login` |
-| 项目 | `listProjects` / `createProject` | GET / POST `/projects` |
-| 用例 | `listTestCases` / `createTestCase` / `updateTestCase` / `deleteTestCase` | CRUD `/projects/:id/testcases` |
-| 用例批量 | `batchDeleteTestCases` / `batchUpdateLevel` / `batchMoveTestCases` / `cloneTestCase` | POST `/projects/:id/testcases/batch-*` |
-| 用户 | `listUsers` / `createUser` / `updateUser` / `deleteUserById` | CRUD `/users` |
-| 角色 | `listRoles` / `createRole` / `updateRoleById` / `deleteRoleById` | CRUD `/roles` |
-| 个人 | `getMyProfile` / `updateMyProfile` / `uploadMyAvatar` | GET/PUT/POST `/users/me/*` |
-| 模块 | `listModules` / `createModule` / `renameModule` / `moveModule` / `deleteModule` | CRUD `/projects/:id/modules` |
-| 附件 | `uploadAttachment` / `listAttachments` / `deleteAttachment` | CRUD `/projects/:id/testcases/:id/attachments` |
-| 导入导出 | `exportTestCases` / `importTestCases` | GET/POST `/projects/:id/testcases/export|import` |
-| 测试智编 | `createAiTask` / `listAiTasks` / `getAiTaskDetail` | CRUD `/ai-script/tasks` |
-| 测试智编 | `startRecording` / `finishRecording` / `confirmScript` | POST `/ai-script/tasks/:id/*` |
-| 测试智编 | `executeTask` / `exportScript` / `discardScript` | POST `/ai-script/tasks/:id/*` |
+| 认证/用户/角色/个人资料 | `auth.ts`、`user.ts` | `/auth/*`、`/users/*`、`/roles/*` |
+| 项目/成员/设置 | `project.ts`、`projectMember.ts`、`projectSettings.ts` | `/projects/*` |
+| 用例/模块/附件/Excel | `testcase.ts`、`module.ts`、`attachment.ts`、`xlsx.ts` | `/projects/:projectID/testcases/*`、`/modules/*` |
+| 测试智编 | `aiScript.ts` | `/ai-script/*` |
+| 用例评审 | `caseReview.ts`、`caseReviewAttachment.ts`、`caseReviewV02.ts` | `/projects/:projectID/case-reviews/*`、`/case-review-defects/*` |
+| 标签 | `tag.ts` | `/projects/:projectID/tags/*` |
+| 需求智生 | `requirementDoc.ts`、`requirementGen.ts`、`aiSkill.ts` | `/requirement-docs/*`、`/requirement-gen/*`、`/ai-skills/*` |
+| AI 模型配置 | `aiModelConfig.ts` | `/ai-model-configs/*` |
+| 审计 | `audit.ts` | `/audit-logs` |
 
 ### 4.3 状态管理 (`stores/`)
 
@@ -267,8 +292,9 @@ export function useTable<T>(fetchFn: (params: PageParams) => Promise<PageResult<
 | 项目 | 规范 |
 |------|------|
 | 协议 | HTTP REST |
-| 基础路径 | `/api/v1` |
-| 认证 | Bearer Token (Header: `Authorization`) |
+| 基础路径 | 默认 `/api/v1`，可通过 `VITE_API_BASE_URL` 覆盖 |
+| 本地代理 | `vite.config.ts` 将 `/api`、`/uploads` 转发到 `http://127.0.0.1:8080` |
+| 认证 | Bearer Token (`Authorization`) + `X-User-ID` |
 | 响应格式 | `{ code: number, message: string, data: T }` |
 | 分页格式 | `{ code, message, data: T[], total, page, page_size }` |
 | 超时 | 12 秒 |
@@ -281,23 +307,11 @@ export function useTable<T>(fetchFn: (params: PageParams) => Promise<PageResult<
 
 | 错误类型 | 触发条件 | 处理方式 | 用户反馈 |
 |---------|---------|---------|---------|
-| 网络错误 | 无网络 / 超时 | 指数退避重试（最多 3 次） | Toast: "网络异常，请检查连接" |
-| 401 未授权 | Token 过期 | 刷新 Token → 重放请求，失败则跳转登录 | Toast: "登录已过期" |
-| 403 无权限 | 角色不足 | 阻止操作 | Toast: "暂无权限" |
-| 404 未找到 | 资源已删除 | 刷新列表 | Toast: "资源不存在" |
-| 422 参数错误 | 表单验证失败 | 高亮错误字段 | 表单内联提示 |
-| 500 服务端错误 | 后端异常 | 记录日志 | Toast: "服务异常，请稍后重试" |
-| Vue 运行时错误 | 组件渲染异常 | 错误边界捕获 | 降级 UI |
-
-### 7.2 全局错误边界
-
-```typescript
-// main.ts
-app.config.errorHandler = (err, instance, info) => {
-  console.error(`[Vue Error] ${info}:`, err)
-  // → 上报至 Sentry
-}
-```
+| 网络错误 | 无网络 / 超时 | Axios reject，由调用方捕获 | 页面或 Composable 使用 `ElMessage` 提示 |
+| 401 未授权 | Token 过期或无效 | `api/client.ts` 清除 `tp-token`、`tp-user-id` 并刷新页面 | 回到未登录态 |
+| 403 无权限 | 路由角色不足 | `router.beforeEach` 跳转 `/forbidden` | `ElMessage.warning` |
+| 业务错误 | 后端返回非成功响应 | 调用方通过 `extractErrorMessage` 等工具提取文案 | 页面内提示 |
+| Vue 运行时错误 | 组件渲染异常 | 当前未接入全局错误上报 | 浏览器控制台 |
 
 ---
 
@@ -307,38 +321,26 @@ app.config.errorHandler = (err, instance, info) => {
 
 | 安全项 | 要求 |
 |--------|------|
-| Token 存储 | HttpOnly Cookie（推荐） |
-| Token 刷新 | Refresh Token 轮转 + 静默续期 |
-| Token 过期处理 | 401 拦截 → 自动刷新或跳转登录 |
-| 登出清理 | 清空本地状态 + 通知后端失效 Token |
+| Token 存储 | 当前使用 `localStorage` 的 `tp-token` |
+| 用户 ID 存储 | 当前使用 `localStorage` 的 `tp-user-id` |
+| Token 过期处理 | 401 拦截 → 清除本地凭证 → 刷新页面 |
+| 登出清理 | 清空本地状态与 `localStorage`，跳转 `/login` |
 
 ### 8.2 XSS 防护
 
 | 层级 | 措施 |
 |------|------|
 | 框架层 | Vue 3 模板自动 HTML 转义 |
-| 编码规范 | 禁止使用 `v-html` 渲染用户输入（ESLint `vue/no-v-html`） |
-| CSP 头 | `Content-Security-Policy` 限制脚本来源 |
-| 输入消毒 | 富文本使用 DOMPurify 过滤 |
-
-**CSP 策略**：
-
-```
-Content-Security-Policy:
-  default-src 'self';
-  script-src 'self';
-  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-  font-src 'self' https://fonts.gstatic.com;
-  img-src 'self' data: blob:;
-  connect-src 'self' https://api.testpilot.com;
-```
+| 编码规范 | ESLint 对 `vue/no-v-html` 给出 warning |
+| 富文本 | Tiptap 用于编辑用例步骤描述 |
+| 头像 | 上传类型限制 JPG/PNG/WEBP，大小限制 2MB |
 
 ### 8.3 敏感数据处理
 
 | 数据 | 处理方式 |
 |------|---------|
 | 密码 | 仅登录时传输，不在前端存储或日志中出现 |
-| JWT Token | HttpOnly Cookie 存储 |
+| JWT Token | `localStorage` 存储，退出和 401 时清理 |
 | 用户信息 | 内存 Store 中，登出时清除 |
 | API Key | 仅通过环境变量注入，不硬编码 |
 
@@ -361,12 +363,10 @@ Content-Security-Policy:
 | 策略 | 实现方式 |
 |------|---------|
 | 路由懒加载 | `() => import('./views/XxxPage.vue')` |
-| 组件懒加载 | `defineAsyncComponent` 延迟加载非首屏组件 |
-| Element Plus 按需导入 | `unplugin-vue-components` 自动按需 |
-| 图片优化 | WebP 格式 + `loading="lazy"` |
-| 资源预加载 | `<link rel="preload">` 关键字体 |
-| API 缓存 | `staleWhileRevalidate` 策略 |
-| Gzip/Brotli | Nginx 配置压缩 |
+| Vite 代理 | 本地同源 `/api`、`/uploads` 代理，减少开发环境跨域配置 |
+| Axios 解包 | 响应拦截器统一解包，减少页面重复转换 |
+| Store 复用 | 项目、用例、用户、认证、测试智编状态集中在 Pinia |
+| 主题初始化 | 应用启动时执行 `initializeTheme()` |
 
 ### 9.3 Bundle 体积预算
 
@@ -408,40 +408,28 @@ Content-Security-Policy:
 
 ### 11.1 监控体系
 
-```
-┌─────────────┐  错误/日志/指标  ┌──────────────┐  聚合分析  ┌───────────┐
-│  Browser    │ ────────────→  │ 采集服务      │ ────────→ │ Dashboard │
-│  Vue App    │                │ Sentry/自建   │           │ Grafana   │
-└─────────────┘                └──────────────┘           └───────────┘
-```
+当前前端未接入独立错误追踪或埋点平台；主要依赖浏览器控制台、Axios 错误对象、Element Plus 消息提示和后端日志排查。
 
 ### 11.2 日志分级
 
 | 级别 | 用途 | 生产环境 |
 |------|------|---------|
-| `ERROR` | 未捕获异常、API 500、渲染失败 | ✅ 上报 |
-| `WARN` | API 4xx、降级处理、性能预警 | ✅ 上报 |
-| `INFO` | 用户关键行为（登录/登出/CRUD） | ✅ 上报 |
-| `DEBUG` | 状态变化、API 请求详情 | ❌ 仅开发 |
+| `console.error` | 调试未捕获异常或开发期问题 | 当前未统一上报 |
+| `ElMessage` | 用户可感知的错误、警告、成功提示 | 页面内即时反馈 |
+| 后端日志 | API 错误、审计、业务异常 | 由 Go 后端负责记录 |
 
 ### 11.3 前端埋点事件
 
-| 事件 | 触发时机 | 上报数据 |
-|------|---------|---------|
-| `page_view` | 路由切换 | 页面名、用户ID、时间戳 |
-| `user_login` | 登录成功 | 用户ID、登录方式 |
-| `api_error` | API 请求失败 | URL、状态码、耗时 |
-| `api_slow` | API 耗时 > 3s | URL、耗时 |
-| `js_error` | JS 运行时异常 | 错误栈、组件名 |
-| `performance` | 页面加载完成 | FCP、LCP、TTI |
+当前未实现前端埋点事件。
 
 ### 11.4 工具链
 
 | 场景 | 方案 |
 |------|------|
-| 错误追踪 | Sentry |
-| 性能监控 | Web Vitals + Grafana |
-| 用户行为 | 自建埋点 + ClickHouse |
+| 单元测试 | Vitest + happy-dom |
+| 类型检查 | `vue-tsc --noEmit` |
+| 代码检查 | ESLint Flat Config |
+| 格式化 | Prettier |
 
 ---
 
@@ -451,13 +439,13 @@ Content-Security-Policy:
 
 ```
           ┌─────────┐
-          │  E2E    │  5-10 个关键流程
-          │ Cypress │  登录→创建用例→执行→报告
+          │  E2E    │  当前未配置专用前端 E2E
+          │  Tool   │  可按需接入 Playwright/Cypress
          ┌┴─────────┴┐
-         │  集成测试   │  20-30 个
+         │  组件测试   │  当前按需补充
          │ Vue Test   │  复杂交互、表单验证、状态管理
         ┌┴───────────┴┐
-        │   单元测试    │  50-100 个
+        │   单元测试    │  当前已有 Vitest 配置
         │   Vitest     │  API拦截器、数据转换、计算属性
         └──────────────┘
 ```
@@ -466,10 +454,10 @@ Content-Security-Policy:
 
 | 层级 | 工具 | 目标覆盖率 |
 |------|------|----------|
-| 单元测试 | Vitest | ≥ 80% |
-| 组件测试 | @vue/test-utils | ≥ 60% |
-| E2E 测试 | Cypress | 核心流程 100% |
-| 视觉回归 | Percy / Playwright | 关键页面 |
+| 单元测试 | Vitest | 当前按需补充 |
+| 组件测试 | @vue/test-utils | 当前按需补充 |
+| E2E 测试 | 未配置专用前端 E2E 工具 | 暂无固定覆盖率 |
+| 视觉回归 | 未配置 | 暂无固定覆盖率 |
 
 ### 12.3 测试命名规范
 
@@ -484,25 +472,7 @@ describe('apiClient 响应拦截器', () => {
 
 ## 13. 国际化 (i18n)
 
-**方案**：`vue-i18n`（Vue 官方）
-
-```
-src/locales/
-├── zh-CN.json        # 中文（默认）
-├── en-US.json        # 英文
-└── index.ts          # i18n 实例
-```
-
-**Key 命名规范**：
-
-```json
-{
-  "common.confirm": "确认",
-  "login.title": "登录 Aisight",
-  "testcase.create": "新建用例",
-  "error.network": "网络异常，请检查连接"
-}
-```
+当前未接入 `vue-i18n`。Element Plus 已在 `main.ts` 注册中文 locale；业务文案目前直接写在页面、组件和 Composables 中。
 
 ---
 
@@ -535,16 +505,12 @@ export default defineConfig({
 每周：检查 Patch 版本安全更新 (npm audit)
 每月：评估 Minor 版本新特性
 每季：评估 Major 版本升级 + 兼容性评估
-升级后：全量测试 → Staging 验证 → 灰度发布
+升级后：执行 lint / type-check / test / build，并在本地联调验证
 ```
 
 ### 15.2 许可证合规
 
-所有生产依赖必须为 MIT / Apache 2.0 / BSD 许可证。禁止引入 GPL/AGPL 依赖。
-
-```bash
-npx license-checker --failOn "GPL;AGPL"  # CI 自动检查
-```
+新增生产依赖前应检查许可证，避免引入 GPL/AGPL 等不兼容依赖。当前项目未配置自动许可证检查脚本。
 
 ### 15.3 锁文件
 
@@ -712,15 +678,11 @@ npm run preview      # 预览生产构建
 
 | 环境 | API 地址 | 部署触发 |
 |------|---------|---------|
-| `development` | `localhost:8080` | `npm run dev` |
-| `staging` | `staging-api.testpilot.com` | PR 合入 develop |
-| `production` | `api.testpilot.com` | Tag 发布或审批 |
+| `development` | 默认 `/api/v1`，由 Vite 代理到 `127.0.0.1:8080` | `npm run dev` |
+| `custom` | 通过 `VITE_API_BASE_URL` 覆盖 | 按部署环境配置 |
 
 ```
-.env                    # 共用默认值
-.env.development        # 本地覆盖
-.env.staging            # 预发布覆盖
-.env.production         # 生产覆盖
+VITE_API_BASE_URL=      # 留空时使用 /api/v1
 ```
 
 ---
@@ -736,18 +698,10 @@ npm run preview      # 预览生产构建
 │ Lint     │ Type     │ Unit     │ Build  │
 │ ESLint   │ Check    │ Tests    │ Vite   │
 │ Prettier │ vue-tsc  │ Vitest   │ Bundle │
-├──────────┴──────────┴──────────┴────────┤
-│            E2E Tests (Cypress)           │
-├──────────────────────────────────────────┤
-│       Bundle Size + License Check        │
-└──────────────────────────────────────────┘
-    ↓ (All Pass)
-┌──────────────────────────────────────────┐
-│              CD Pipeline                  │
-│ Staging Deploy → Smoke Test → Approval    │
-│ Production Deploy → Health Check → CDN    │
 └──────────────────────────────────────────┘
 ```
+
+当前仓库提供 npm 脚本和 husky/lint-staged 配置；是否接入 CI/CD 由部署环境决定。
 
 ---
 
