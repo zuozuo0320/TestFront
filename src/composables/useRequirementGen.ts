@@ -11,10 +11,17 @@ import {
   listRequirementDocs,
   uploadRequirementDoc,
   pasteRequirementDoc,
+  getGitLabConfig,
+  saveGitLabConfig,
+  testGitLabConfig,
+  importGitLabIssue,
   deleteRequirementDoc,
   getRequirementDoc,
   type RequirementDoc,
   type DocListParams,
+  type GitLabConfig,
+  type SaveGitLabConfigInput,
+  type ImportGitLabIssueInput,
 } from '@/api/requirementDoc'
 import {
   listGenTasks,
@@ -56,10 +63,16 @@ export function useRequirementDocs() {
   const docs = ref<RequirementDoc[]>([])
   const total = ref(0)
   const loading = ref(false)
+  const gitLabConfig = ref<GitLabConfig | null>(null)
+  const gitLabConfigLoading = ref(false)
+  const gitLabConfigSaving = ref(false)
+  const gitLabTesting = ref(false)
+  const gitLabImporting = ref(false)
   const page = ref(1)
   const pageSize = ref(20)
   const keyword = ref('')
   const parseStatusFilter = ref('')
+  const sourceTypeFilter = ref('')
 
   async function fetchDocs() {
     if (!projectId.value) return
@@ -71,6 +84,7 @@ export function useRequirementDocs() {
       }
       if (keyword.value) params.keyword = keyword.value
       if (parseStatusFilter.value) params.parse_status = parseStatusFilter.value
+      if (sourceTypeFilter.value) params.source_type = sourceTypeFilter.value
 
       const result = await listRequirementDocs(projectId.value, params)
       docs.value = result.items || []
@@ -101,6 +115,66 @@ export function useRequirementDocs() {
       await fetchDocs()
     } catch (e: unknown) {
       ElMessage.error(getErrorMessage(e, '创建失败'))
+    }
+  }
+
+  async function loadGitLabConfig() {
+    if (!projectId.value) return null
+    gitLabConfigLoading.value = true
+    try {
+      gitLabConfig.value = await getGitLabConfig(projectId.value)
+      return gitLabConfig.value
+    } catch (e: unknown) {
+      ElMessage.error(getErrorMessage(e, '加载 GitLab 配置失败'))
+      return null
+    } finally {
+      gitLabConfigLoading.value = false
+    }
+  }
+
+  async function handleSaveGitLabConfig(payload: SaveGitLabConfigInput) {
+    if (!projectId.value) return null
+    gitLabConfigSaving.value = true
+    try {
+      gitLabConfig.value = await saveGitLabConfig(projectId.value, payload)
+      ElMessage.success('GitLab 配置已保存')
+      return gitLabConfig.value
+    } catch (e: unknown) {
+      ElMessage.error(getErrorMessage(e, '保存 GitLab 配置失败'))
+      return null
+    } finally {
+      gitLabConfigSaving.value = false
+    }
+  }
+
+  async function handleTestGitLabConfig() {
+    if (!projectId.value) return false
+    gitLabTesting.value = true
+    try {
+      await testGitLabConfig(projectId.value)
+      ElMessage.success('GitLab 连接正常')
+      return true
+    } catch (e: unknown) {
+      ElMessage.error(getErrorMessage(e, 'GitLab 连接测试失败'))
+      return false
+    } finally {
+      gitLabTesting.value = false
+    }
+  }
+
+  async function handleImportGitLabIssue(payload: ImportGitLabIssueInput) {
+    if (!projectId.value) return null
+    gitLabImporting.value = true
+    try {
+      const doc = await importGitLabIssue(projectId.value, payload)
+      ElMessage.success('GitLab Issue 已导入')
+      await fetchDocs()
+      return doc
+    } catch (e: unknown) {
+      ElMessage.error(getErrorMessage(e, '导入 GitLab Issue 失败'))
+      return null
+    } finally {
+      gitLabImporting.value = false
     }
   }
 
@@ -142,13 +216,23 @@ export function useRequirementDocs() {
     docs,
     total,
     loading,
+    gitLabConfig,
+    gitLabConfigLoading,
+    gitLabConfigSaving,
+    gitLabTesting,
+    gitLabImporting,
     page,
     pageSize,
     keyword,
     parseStatusFilter,
+    sourceTypeFilter,
     fetchDocs,
     handleUpload,
     handlePaste,
+    loadGitLabConfig,
+    handleSaveGitLabConfig,
+    handleTestGitLabConfig,
+    handleImportGitLabIssue,
     handleDelete,
     getDocDetail,
   }

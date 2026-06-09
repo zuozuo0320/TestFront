@@ -5,7 +5,9 @@
  * 提供文档上传、粘贴文本、列表展示、删除功能。
  */
 import { ref } from 'vue'
+import type { UploadFile } from 'element-plus'
 import { useRequirementDocs } from '@/composables/useRequirementGen'
+import type { RequirementDoc } from '@/api/requirementDoc'
 import { formatBeijingDateTime } from '@/utils/time'
 
 const {
@@ -16,6 +18,7 @@ const {
   pageSize,
   keyword,
   parseStatusFilter,
+  sourceTypeFilter,
   fetchDocs,
   handleUpload,
   handlePaste,
@@ -35,8 +38,8 @@ const pasteTitle = ref('')
 const pasteContent = ref('')
 const pasteRemark = ref('')
 
-function onFileChange(file: any) {
-  uploadFile.value = file.raw
+function onFileChange(file: UploadFile) {
+  uploadFile.value = file.raw ?? null
   if (!uploadTitle.value) {
     uploadTitle.value = file.name
   }
@@ -98,7 +101,25 @@ function parseStatusType(status: string) {
 
 /** 来源类型 */
 function sourceLabel(type: string) {
-  return type === 'upload' ? '文件上传' : '粘贴文本'
+  const map: Record<string, string> = {
+    upload_file: '文件上传',
+    paste_text: '粘贴文本',
+    gitlab_issue: 'GitLab Issue',
+  }
+  return map[type] || type
+}
+
+function sourceTagType(type: string) {
+  const map: Record<string, string> = {
+    upload_file: 'info',
+    paste_text: 'success',
+    gitlab_issue: 'warning',
+  }
+  return map[type] || 'info'
+}
+
+function isGitLabSource(row: RequirementDoc) {
+  return row.source_type === 'gitlab_issue' && !!row.source_url
 }
 </script>
 
@@ -127,6 +148,17 @@ function sourceLabel(type: string) {
           <el-option label="已解析" value="parsed" />
           <el-option label="解析失败" value="parse_failed" />
         </el-select>
+        <el-select
+          v-model="sourceTypeFilter"
+          placeholder="来源"
+          clearable
+          style="width: 150px"
+          @change="onSearch"
+        >
+          <el-option label="文件上传" value="upload_file" />
+          <el-option label="粘贴文本" value="paste_text" />
+          <el-option label="GitLab Issue" value="gitlab_issue" />
+        </el-select>
       </div>
       <div class="toolbar-right">
         <el-button type="primary" @click="showUploadDialog = true">上传文档</el-button>
@@ -137,9 +169,23 @@ function sourceLabel(type: string) {
     <!-- 文档列表 -->
     <el-table v-loading="loading" :data="docs" stripe style="width: 100%">
       <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
-      <el-table-column label="来源" width="100">
+      <el-table-column label="来源" width="150">
         <template #default="{ row }">
-          {{ sourceLabel(row.source_type) }}
+          <span class="source-cell">
+            <el-tag :type="sourceTagType(row.source_type)" size="small" effect="plain">
+              {{ sourceLabel(row.source_type) }}
+            </el-tag>
+            <a
+              v-if="isGitLabSource(row)"
+              class="source-link"
+              :href="row.source_url"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="打开 GitLab Issue"
+            >
+              <span class="material-symbols-outlined">open_in_new</span>
+            </a>
+          </span>
         </template>
       </el-table-column>
       <el-table-column label="格式" width="80" prop="file_format" />
@@ -180,7 +226,7 @@ function sourceLabel(type: string) {
 
     <!-- 空状态 -->
     <div v-if="!loading && docs.length === 0" class="empty-state">
-      <p>暂无需求文档，请上传文件或粘贴文本</p>
+      <p>暂无需求文档，请上传文件、粘贴文本或导入 GitLab Issue</p>
     </div>
 
     <!-- 上传对话框 -->
@@ -293,6 +339,7 @@ function sourceLabel(type: string) {
   display: flex;
   gap: 6px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .toolbar-right {
@@ -313,6 +360,37 @@ function sourceLabel(type: string) {
   padding: 48px 0;
   color: var(--tp-text-muted, var(--el-text-color-secondary));
   font-size: 13px;
+}
+
+.source-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.source-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  color: var(--tp-primary, var(--el-color-primary));
+  text-decoration: none;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease;
+}
+
+.source-link:hover {
+  background: var(--tp-primary-lighter, var(--el-color-primary-light-9));
+  color: var(--tp-primary-dark, var(--el-color-primary-dark-2));
+}
+
+.source-link .material-symbols-outlined {
+  font-size: 16px;
+  line-height: 1;
 }
 
 /* ═══════ Upload Dialog Styles ═══════ */

@@ -12,7 +12,7 @@ export interface RequirementDoc {
   id: number
   project_id: number
   title: string
-  source_type: string // upload / paste
+  source_type: string // upload_file / paste_text / gitlab_issue
   file_format: string
   file_path: string
   file_size: number
@@ -26,6 +26,32 @@ export interface RequirementDoc {
   created_by: number
   created_at: string
   updated_at: string
+  source_url?: string
+  sync_status?: string
+}
+
+/** GitLab 集成配置（Token 只返回脱敏状态） */
+export interface GitLabConfig {
+  enabled: boolean
+  base_url: string
+  project_path: string
+  token_configured: boolean
+  token_mask: string
+}
+
+/** 保存 GitLab 集成配置入参 */
+export interface SaveGitLabConfigInput {
+  base_url: string
+  project_path: string
+  token?: string
+  enabled?: boolean
+}
+
+/** 导入 GitLab Issue 入参 */
+export interface ImportGitLabIssueInput {
+  issue_url: string
+  include_comments: boolean
+  analyze_images: boolean
 }
 
 /** 文档列表查询参数 */
@@ -79,6 +105,42 @@ export async function pasteRequirementDoc(
   return data
 }
 
+/** 获取项目 GitLab 集成配置 */
+export async function getGitLabConfig(projectId: number): Promise<GitLabConfig> {
+  const { data } = await apiClient.get<GitLabConfig>(`/projects/${projectId}/integrations/gitlab`)
+  return normalizeGitLabConfig(data)
+}
+
+/** 保存项目 GitLab 集成配置 */
+export async function saveGitLabConfig(
+  projectId: number,
+  payload: SaveGitLabConfigInput,
+): Promise<GitLabConfig> {
+  const { data } = await apiClient.put<GitLabConfig>(
+    `/projects/${projectId}/integrations/gitlab`,
+    payload,
+  )
+  return normalizeGitLabConfig(data)
+}
+
+/** 测试项目 GitLab 集成配置 */
+export async function testGitLabConfig(projectId: number): Promise<void> {
+  await apiClient.post(`/projects/${projectId}/integrations/gitlab/test`)
+}
+
+/** 从 GitLab Issue 导入需求文档 */
+export async function importGitLabIssue(
+  projectId: number,
+  payload: ImportGitLabIssueInput,
+): Promise<RequirementDoc> {
+  const { data } = await apiClient.post<RequirementDoc>(
+    `/projects/${projectId}/requirement-docs/gitlab-issues/import`,
+    payload,
+    { timeout: 120000 },
+  )
+  return data
+}
+
 /** 获取需求文档分页列表 */
 export async function listRequirementDocs(
   projectId: number,
@@ -102,4 +164,14 @@ export async function getRequirementDoc(projectId: number, docId: number): Promi
 /** 删除需求文档 */
 export async function deleteRequirementDoc(projectId: number, docId: number): Promise<void> {
   await apiClient.delete(`/projects/${projectId}/requirement-docs/${docId}`)
+}
+
+function normalizeGitLabConfig(config: GitLabConfig | null | undefined): GitLabConfig {
+  return {
+    enabled: !!config?.enabled,
+    base_url: config?.base_url || '',
+    project_path: config?.project_path || '',
+    token_configured: !!config?.token_configured,
+    token_mask: config?.token_mask || '',
+  }
 }

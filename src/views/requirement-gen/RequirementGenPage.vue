@@ -6,6 +6,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { UploadFile } from 'element-plus'
 import { InfoFilled, SuccessFilled } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { useGenTasks, useRequirementDocs } from '@/composables/useRequirementGen'
 import { useTheme } from '@/composables/useTheme'
 
@@ -15,7 +16,21 @@ import type { SmartGeneratePayload, SmartGenerateResult } from '@/api/requiremen
 
 const router = useRouter()
 const { isGenArtTheme } = useTheme()
-const { docs, fetchDocs, handleUpload, handlePaste } = useRequirementDocs()
+const {
+  docs,
+  fetchDocs,
+  handleUpload,
+  handlePaste,
+  gitLabConfig,
+  gitLabConfigLoading,
+  gitLabConfigSaving,
+  gitLabTesting,
+  gitLabImporting,
+  loadGitLabConfig,
+  handleSaveGitLabConfig,
+  handleTestGitLabConfig,
+  handleImportGitLabIssue,
+} = useRequirementDocs()
 const { tasks, smartGenerating, handleSmartGenerate, fetchTasks } = useGenTasks()
 
 const parsedDocCount = computed(
@@ -54,6 +69,7 @@ const latestDocCaseTotal = computed(() =>
 const hasPendingDocs = computed(() => docs.value.some((d) => isParsingDocStatus(d.parse_status)))
 const activeEngineStatus = computed(() => {
   if (smartGenerating.value) return '流式处理中'
+  if (gitLabIntakeActive.value) return '导入中'
   if (runningTaskCount.value) return '生成中'
   if (hasPendingDocs.value) return '解析中'
   return '待机'
@@ -102,6 +118,7 @@ const latestDocParsing = computed(() => isParsingDocStatus(latestDoc.value?.pars
 const matchedSkillCount = computed(() => smartResultData.value?.recommended_skills?.length || 0)
 const uploading = ref(false)
 const pasting = ref(false)
+const gitLabIntakeActive = ref(false)
 const intakeStageStartedAt = ref<number | null>(null)
 const smartStageStartedAt = ref<number | null>(null)
 
@@ -130,7 +147,7 @@ function getTimedProgress(
 
 const pipelineSteps = computed(() => {
   const step1Done = docs.value.length > 0
-  const step1Active = uploading.value || pasting.value
+  const step1Active = uploading.value || pasting.value || gitLabIntakeActive.value
   const step1Progress = step1Done
     ? 100
     : step1Active
@@ -166,7 +183,7 @@ const pipelineSteps = computed(() => {
     {
       no: '01',
       title: '需求读取',
-      desc: step1Done ? '文档已就绪' : '等待上传...',
+      desc: step1Done ? '文档已就绪' : gitLabIntakeActive.value ? '导入 Issue...' : '等待上传...',
       progress: step1Progress,
       active: step1Active || (step1Done && !step2Done),
       completed: step1Done,
@@ -206,6 +223,7 @@ const isPipelineInProgress = computed(
   () =>
     uploading.value ||
     pasting.value ||
+    gitLabIntakeActive.value ||
     latestDocParsing.value ||
     smartGenerating.value ||
     latestDocGenerating.value,
@@ -484,6 +502,14 @@ const showPasteDialog = ref(false)
 const pasteTitle = ref('')
 const pasteContent = ref('')
 const pasteRemark = ref('')
+const showGitLabDialog = ref(false)
+const gitLabBaseURL = ref('')
+const gitLabProjectPath = ref('')
+const gitLabToken = ref('')
+const gitLabEnabled = ref(true)
+const gitLabIssueURL = ref('')
+const gitLabIncludeComments = ref(true)
+const gitLabAnalyzeImages = ref(true)
 const showSmartDialog = ref(false)
 const smartDocId = ref(0)
 const smartDocTitle = ref('')
@@ -495,6 +521,25 @@ const smartForm = ref<SmartGeneratePayload>({
   extra_prompt: '',
 })
 const smartResultData = ref<SmartGenerateResult | null>(null)
+const gitLabConfigReady = computed(
+  () => !!gitLabConfig.value?.enabled && !!gitLabConfig.value?.token_configured,
+)
+const gitLabConfigStatusText = computed(() => {
+  if (gitLabConfigLoading.value) return '正在读取配置'
+  if (!gitLabConfig.value?.token_configured) return '未配置 Token'
+  if (!gitLabConfig.value.enabled) return '已停用'
+  return `已连接 ${gitLabConfig.value.token_mask || 'GitLab'}`
+})
+const gitLabHasSavedToken = computed(() => !!gitLabConfig.value?.token_configured)
+const canSaveGitLabConfig = computed(
+  () =>
+    !!gitLabBaseURL.value.trim() &&
+    !!gitLabProjectPath.value.trim() &&
+    (gitLabHasSavedToken.value || !!gitLabToken.value.trim()),
+)
+const canImportGitLabIssue = computed(
+  () => gitLabConfigReady.value && !!gitLabIssueURL.value.trim() && !gitLabImporting.value,
+)
 
 function onFileChange(file: UploadFile) {
   uploadFile.value = file.raw ?? null
@@ -543,6 +588,65 @@ async function submitPaste() {
     }
   } finally {
     pasting.value = false
+  }
+}
+
+async function openGitLabDialog() {
+  showGitLabDialog.value = true
+  const config = await loadGitLabConfig()
+  if (config) {
+    gitLabBaseURL.value = config.base_url
+    gitLabProjectPath.value = config.project_path
+    gitLabEnabled.value = config.enabled || !config.token_configured
+    gitLabToken.value = ''
+  }
+}
+
+async function submitGitLabConfig() {
+  if (!canSaveGitLabConfig.value) {
+    ElMessage.warning('请填写 GitLab 地址、项目路径和 Token')
+    return
+  }
+  const config = await handleSaveGitLabConfig({
+    base_url: gitLabBaseURL.value.trim(),
+    project_path: gitLabProjectPath.value.trim(),
+    token: gitLabToken.value.trim() || undefined,
+    enabled: gitLabEnabled.value,
+  })
+  if (config) {
+    gitLabToken.value = ''
+  }
+}
+
+async function submitGitLabTest() {
+  await handleTestGitLabConfig()
+}
+
+async function submitGitLabImport() {
+  if (!canImportGitLabIssue.value) {
+    ElMessage.warning('请先完成 GitLab 配置并填写 Issue URL')
+    return
+  }
+  intakeStageStartedAt.value = Date.now()
+  gitLabIntakeActive.value = true
+  try {
+    const doc = await handleImportGitLabIssue({
+      issue_url: gitLabIssueURL.value.trim(),
+      include_comments: gitLabIncludeComments.value,
+      analyze_images: gitLabAnalyzeImages.value,
+    })
+    if (!doc) return
+    showGitLabDialog.value = false
+    gitLabIssueURL.value = ''
+    triggerActiveCooldown()
+    await nextTick()
+    if (isParsedDocStatus(doc.parse_status) || isParsedDocStatus(latestDoc.value?.parse_status)) {
+      autoTriggerSmartGenerate()
+    } else {
+      startPollIfNeeded()
+    }
+  } finally {
+    gitLabIntakeActive.value = false
   }
 }
 
@@ -807,6 +911,15 @@ function goToResults() {
         </div>
       </button>
 
+      <button class="fab-btn gitlab-fab-btn" type="button" @click="openGitLabDialog">
+        <div class="fab-border">
+          <div class="fab-inner">
+            <span class="material-symbols-outlined">merge</span>
+            <span class="fab-label">GITLAB ISSUE</span>
+          </div>
+        </div>
+      </button>
+
       <button
         class="fab-btn new-requirement-fab-btn"
         type="button"
@@ -912,6 +1025,116 @@ function goToResults() {
         >
           确定创建
         </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="showGitLabDialog"
+      title="导入 GitLab Issue"
+      width="680px"
+      class="gitlab-import-dialog requirement-upload-dialog"
+      :close-on-click-modal="false"
+    >
+      <el-form class="gitlab-dialog-form" label-position="top">
+        <section class="gitlab-dialog-section">
+          <div class="gitlab-section-head">
+            <div>
+              <h3>GitLab 连接</h3>
+              <p>{{ gitLabConfigStatusText }}</p>
+            </div>
+            <el-tag size="small" :type="gitLabConfigReady ? 'success' : 'warning'" effect="plain">
+              {{ gitLabConfigReady ? '已配置' : '待配置' }}
+            </el-tag>
+          </div>
+          <div class="gitlab-config-grid">
+            <el-form-item label="GitLab 地址">
+              <el-input
+                v-model="gitLabBaseURL"
+                class="upload-dialog-input"
+                placeholder="https://gitlab.example.com"
+                clearable
+              />
+            </el-form-item>
+            <el-form-item label="项目路径">
+              <el-input
+                v-model="gitLabProjectPath"
+                class="upload-dialog-input"
+                placeholder="group/project"
+                clearable
+              />
+            </el-form-item>
+          </div>
+          <el-form-item label="访问 Token">
+            <el-input
+              v-model="gitLabToken"
+              class="upload-dialog-input"
+              type="password"
+              show-password
+              :placeholder="
+                gitLabHasSavedToken ? '留空则保留已保存 Token' : '仅保存到后端，推荐 read_api 权限'
+              "
+            />
+          </el-form-item>
+          <div class="gitlab-config-actions">
+            <el-checkbox v-model="gitLabEnabled">启用 GitLab 集成</el-checkbox>
+            <div class="gitlab-action-buttons">
+              <el-button
+                :loading="gitLabConfigSaving"
+                :disabled="!canSaveGitLabConfig"
+                @click="submitGitLabConfig"
+              >
+                保存配置
+              </el-button>
+              <el-button
+                :loading="gitLabTesting"
+                :disabled="!gitLabConfigReady"
+                @click="submitGitLabTest"
+              >
+                测试连接
+              </el-button>
+            </div>
+          </div>
+        </section>
+
+        <section class="gitlab-dialog-section">
+          <div class="gitlab-section-head">
+            <div>
+              <h3>Issue 导入</h3>
+              <p>标题、描述和可选评论会转换成已解析需求文档</p>
+            </div>
+          </div>
+          <el-form-item label="Issue URL">
+            <el-input
+              v-model="gitLabIssueURL"
+              class="upload-dialog-input"
+              placeholder="https://gitlab.example.com/group/project/-/issues/123"
+              clearable
+            />
+          </el-form-item>
+          <div class="gitlab-option-list">
+            <label class="gitlab-option-toggle">
+              <el-checkbox v-model="gitLabIncludeComments">包含用户评论</el-checkbox>
+              <span>适合验收标准或补充说明写在评论里的需求</span>
+            </label>
+            <label class="gitlab-option-toggle">
+              <el-checkbox v-model="gitLabAnalyzeImages">分析图片附件</el-checkbox>
+              <span>识别描述和评论中的截图、流程图、原型图，最多分析 6 张</span>
+            </label>
+          </div>
+        </section>
+      </el-form>
+      <template #footer>
+        <div class="upload-dialog-footer">
+          <el-button @click="showGitLabDialog = false">取消</el-button>
+          <el-button
+            type="primary"
+            :loading="gitLabImporting"
+            :disabled="!canImportGitLabIssue"
+            @click="submitGitLabImport"
+          >
+            导入 Issue
+          </el-button>
+        </div>
       </template>
     </el-dialog>
 
@@ -1600,6 +1823,10 @@ function goToResults() {
 
 .records-fab-btn {
   bottom: 118px;
+}
+
+.gitlab-fab-btn {
+  bottom: 188px;
 }
 
 .fab-border {
@@ -2333,6 +2560,128 @@ function goToResults() {
   box-shadow: none !important;
 }
 
+:deep(.gitlab-import-dialog.el-dialog) {
+  width: min(680px, calc(100vw - 48px)) !important;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  margin-top: 20px !important;
+  margin-bottom: 20px;
+  max-height: min(760px, calc(100vh - 40px));
+}
+
+:deep(.gitlab-import-dialog.el-dialog .el-dialog__header),
+:deep(.gitlab-import-dialog.el-dialog .el-dialog__footer) {
+  min-height: 0;
+}
+
+:deep(.gitlab-import-dialog.el-dialog .el-dialog__body) {
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 20px;
+}
+
+.gitlab-dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gitlab-dialog-form :deep(.el-form-item) {
+  margin-bottom: 10px;
+}
+
+.gitlab-dialog-form :deep(.el-input__wrapper) {
+  min-height: 36px;
+}
+
+.gitlab-dialog-section {
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.045);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.015);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  transition: all var(--tp-transition);
+}
+
+.requirement-upload-dialog :deep(.el-checkbox) {
+  --el-checkbox-text-color: var(--upload-dialog-text);
+  --el-checkbox-input-border: rgba(182, 196, 255, 0.3) !important;
+}
+
+.requirement-upload-dialog :deep(.el-checkbox__input.is-checked .el-checkbox__inner) {
+  background-color: #8b5cf6 !important;
+  border-color: #8b5cf6 !important;
+}
+
+.requirement-upload-dialog :deep(.el-checkbox__input.is-checked + .el-checkbox__label) {
+  color: #b6c4ff !important;
+}
+
+.gitlab-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.gitlab-section-head h3 {
+  margin: 0;
+  color: var(--upload-dialog-text);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+}
+
+.gitlab-section-head p {
+  margin: 2px 0 0;
+  color: var(--upload-dialog-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.gitlab-config-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.gitlab-config-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.gitlab-action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.gitlab-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gitlab-option-toggle {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gitlab-option-toggle span {
+  padding-left: 26px;
+  color: var(--upload-dialog-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
 /* ═══════ Light Mode Overrides ═══════ */
 .requirement-gen-page:not(.is-dark) {
   background: linear-gradient(145deg, #f5f3ff 0%, #eef2ff 40%, #faf5ff 100%);
@@ -2669,9 +3018,27 @@ function goToResults() {
     right: 24px;
   }
 
+  .gitlab-fab-btn {
+    bottom: 164px;
+    right: 24px;
+  }
+
   .fab-btn {
     width: 252px;
     max-width: calc(100vw - 48px);
+  }
+
+  .gitlab-config-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gitlab-config-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .gitlab-action-buttons {
+    justify-content: flex-start;
   }
 }
 
@@ -3191,5 +3558,78 @@ html:not([data-theme]) .requirement-upload-dialog .el-button.is-disabled:hover {
   background: rgba(243, 244, 246, 0.8) !important;
   color: rgba(156, 163, 175, 0.6) !important;
   box-shadow: none !important;
+}
+
+/* ═══════ Light Mode: GitLab Dialog Custom Overrides ═══════ */
+html:not([data-theme]) .requirement-upload-dialog .gitlab-dialog-section {
+  background: rgba(245, 243, 255, 0.45) !important;
+  border: 1px solid rgba(139, 92, 246, 0.08) !important;
+  backdrop-filter: blur(12px) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.03) !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .gitlab-section-head h3 {
+  color: #1f2937 !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .gitlab-section-head p {
+  color: #6b7280 !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .gitlab-option-toggle span {
+  color: #6b7280 !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .el-checkbox {
+  --el-checkbox-text-color: #374151 !important;
+  --el-checkbox-input-border: rgba(139, 92, 246, 0.25) !important;
+}
+
+html:not([data-theme])
+  .requirement-upload-dialog
+  .el-checkbox__input.is-checked
+  .el-checkbox__inner {
+  background-color: #8b5cf6 !important;
+  border-color: #8b5cf6 !important;
+}
+
+html:not([data-theme])
+  .requirement-upload-dialog
+  .el-checkbox__input.is-checked
+  + .el-checkbox__label {
+  color: #8b5cf6 !important;
+}
+
+/* 亮色模式下的 GitLab 连接配置中的非 Primary 按钮 (保存配置、测试连接) 亮暗模式细节适配 */
+html:not([data-theme]) .requirement-upload-dialog .gitlab-action-buttons .el-button,
+html:not([data-theme])
+  .requirement-upload-dialog
+  .upload-dialog-footer
+  .el-button:not(.el-button--primary) {
+  border-color: rgba(139, 92, 246, 0.16) !important;
+  background: rgba(255, 255, 255, 0.72) !important;
+  color: #6d28d9 !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .gitlab-action-buttons .el-button:hover,
+html:not([data-theme])
+  .requirement-upload-dialog
+  .upload-dialog-footer
+  .el-button:not(.el-button--primary):hover {
+  border-color: rgba(139, 92, 246, 0.35) !important;
+  background: rgba(245, 243, 255, 0.95) !important;
+  color: #5b21b6 !important;
+}
+
+html:not([data-theme]) .requirement-upload-dialog .gitlab-action-buttons .el-button.is-disabled,
+html:not([data-theme])
+  .requirement-upload-dialog
+  .gitlab-action-buttons
+  .el-button.is-disabled:hover {
+  border-color: rgba(229, 231, 235, 0.7) !important;
+  background: rgba(243, 244, 246, 0.7) !important;
+  color: rgba(156, 163, 175, 0.6) !important;
 }
 </style>
