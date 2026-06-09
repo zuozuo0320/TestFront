@@ -200,7 +200,6 @@ let caseSearchTimer: ReturnType<typeof setTimeout> | null = null
 const environmentOptions = ref<TestEnvironment[]>([])
 const selectedEnvironmentId = ref('')
 const environmentLoading = ref(false)
-const showEnvironmentDropdown = ref(false)
 const selectedEnvironment = computed(() =>
   environmentOptions.value.find((env) => env.id === selectedEnvironmentId.value),
 )
@@ -250,16 +249,9 @@ async function loadProjectEnvironments(projectId: number) {
     environmentLoading.value = false
   }
 }
-function selectEnvironment(environmentId: string) {
-  selectedEnvironmentId.value = environmentId
-  createForm.startUrl =
-    environmentOptions.value.find((env) => env.id === environmentId)?.base_url ?? ''
-  showEnvironmentDropdown.value = false
-}
 
 // 点击弹窗空白处时收起内部下拉，避免模板内写多语句表达式导致构建失败。
 function closeCreateDropdowns() {
-  showEnvironmentDropdown.value = false
   showCaseDropdown.value = false
 }
 
@@ -282,7 +274,6 @@ async function openCreateDialog() {
   createForm.generationMode = GenerationMode.RECORDING_ENHANCED
   resetCasePickerState()
   showCaseDropdown.value = false
-  showEnvironmentDropdown.value = false
   const hasEnvironment = await loadProjectEnvironments(createForm.projectId)
   if (!hasEnvironment) {
     showToast('请先在项目管理中配置当前项目的测试环境')
@@ -378,7 +369,7 @@ async function submitCreateTask() {
     return
   }
   if (!selectedEnvironmentId.value) {
-    showToast('请选择测试环境')
+    showToast('当前项目未配置测试环境')
     return
   }
   if (!createForm.startUrl.trim()) {
@@ -418,29 +409,36 @@ async function submitCreateTask() {
 const showRenameDialog = ref(false)
 const renameTaskId = ref(0)
 const renameNewName = ref('')
+const renameScenarioDesc = ref('')
 const renameLoading = ref(false)
 
 function openRenameDialog(task: AiScriptTask) {
   renameTaskId.value = task.id
   renameNewName.value = task.taskName
+  renameScenarioDesc.value = task.scenarioDesc
   showRenameDialog.value = true
 }
 
 async function confirmRename() {
   const name = renameNewName.value.trim()
+  const scenarioDesc = renameScenarioDesc.value.trim()
   if (!name) {
     showToast('任务名称不能为空')
     return
   }
+  if (!scenarioDesc) {
+    showToast('场景描述不能为空')
+    return
+  }
   renameLoading.value = true
   try {
-    await renameTask(renameTaskId.value, name)
+    await renameTask(renameTaskId.value, name, scenarioDesc)
     showRenameDialog.value = false
     store.loadTaskList(buildQueryParams(currentPage.value))
-    showToast('任务名称已更新')
+    showToast('任务信息已更新')
   } catch (e) {
-    console.error('重命名失败:', e)
-    showToast('重命名失败')
+    console.error('更新任务失败:', e)
+    showToast('更新任务失败')
   } finally {
     renameLoading.value = false
   }
@@ -498,7 +496,6 @@ async function confirmDelete() {
   }
 }
 
-// ── 触发执行 ──
 // ── 批量操作 ──
 const showBatchDiscardDialog = ref(false)
 const batchDiscardReason = ref('')
@@ -579,20 +576,6 @@ async function confirmBatchDelete() {
   }
 }
 
-async function handleExecute(task: AiScriptTask) {
-  if (
-    task.taskStatus !== TaskStatus.PENDING_EXECUTE &&
-    task.taskStatus !== TaskStatus.GENERATE_FAILED
-  )
-    return
-  try {
-    await store.executeTask(task.id)
-    await store.loadTaskList()
-  } catch (e) {
-    console.error('触发执行失败:', e)
-  }
-}
-
 // ── Token 管理 Dialog ──
 const showTokenDialog = ref(false)
 const tokenTargetUrl = ref('')
@@ -601,6 +584,7 @@ const tokenLoading = ref(false)
 const tokenKeepAliveLoading = ref(false)
 const tokenLastCheckedAt = ref('')
 const tokenLastError = ref('')
+const tokenSuccessMessage = ref('')
 const manualLoginActive = ref(false) // 浏览器已打开，等待用户登录
 const manualLoginLoading = ref(false)
 let tokenKeepAliveTimer: ReturnType<typeof setInterval> | null = null
@@ -640,6 +624,16 @@ function formatCheckedTime(timestamp?: number): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
+function setTokenSuccess(message: string) {
+  tokenLastError.value = ''
+  tokenSuccessMessage.value = message
+}
+
+function setTokenError(message: string) {
+  tokenSuccessMessage.value = ''
+  tokenLastError.value = message
+}
+
 function stopTokenKeepAlive() {
   if (tokenKeepAliveTimer) {
     clearInterval(tokenKeepAliveTimer)
@@ -649,6 +643,7 @@ function stopTokenKeepAlive() {
 
 function closeTokenDialog() {
   showTokenDialog.value = false
+  tokenSuccessMessage.value = ''
 }
 
 function startTokenKeepAlive() {
@@ -661,6 +656,7 @@ function startTokenKeepAlive() {
 
 async function openTokenDialog() {
   tokenAuthState.value = null
+  tokenSuccessMessage.value = ''
   manualLoginActive.value = false
   showTokenDialog.value = true
 
@@ -674,34 +670,35 @@ async function openTokenDialog() {
 
   // 自动检测
   if (tokenTargetUrl.value) {
-    await loadTokenStatus()
+    await loadTokenStatus(true)
     startTokenKeepAlive()
   }
 }
 
-async function loadTokenStatus() {
+async function loadTokenStatus(silent = false) {
   const url = tokenTargetUrl.value.trim()
   if (!url) {
-    showToast('请输入目标站点地址')
+    setTokenError('请输入目标站点地址')
     return
   }
   tokenLoading.value = true
   tokenLastError.value = ''
+  tokenSuccessMessage.value = ''
   try {
     const result = await refreshAuthStatus(url)
     tokenAuthState.value = result.auth_state
     tokenLastCheckedAt.value = formatCheckedTime(result.checked_at)
     if (result.success) {
       startTokenKeepAlive()
+      if (!silent) setTokenSuccess('认证状态已刷新')
     } else {
       stopTokenKeepAlive()
-      tokenLastError.value = result.error || '认证状态不可用，请重新手动登录'
+      setTokenError(result.error || '认证状态不可用，请重新手动登录')
     }
   } catch (e) {
     console.warn('查询认证状态失败:', e)
     tokenAuthState.value = null
-    tokenLastError.value = '查询失败，请确认 Executor 服务正常'
-    showToast('查询失败，请确认 Executor 服务正常')
+    setTokenError('查询失败，请确认 Executor 服务正常')
   } finally {
     tokenLoading.value = false
   }
@@ -710,28 +707,27 @@ async function loadTokenStatus() {
 async function handleTokenKeepAlive(silent = false) {
   const url = tokenTargetUrl.value.trim()
   if (!url) {
-    if (!silent) showToast('请输入目标站点地址')
+    if (!silent) setTokenError('请输入目标站点地址')
     return
   }
   if (tokenKeepAliveLoading.value) return
   tokenKeepAliveLoading.value = true
   tokenLastError.value = ''
+  tokenSuccessMessage.value = ''
   try {
     const result = await refreshAuthStatus(url)
     tokenAuthState.value = result.auth_state
     tokenLastCheckedAt.value = formatCheckedTime(result.checked_at)
     if (result.success) {
       if (!silent) startTokenKeepAlive()
-      if (!silent) showToast('认证状态已保活刷新')
+      if (!silent) setTokenSuccess('认证状态已保活刷新')
     } else {
       stopTokenKeepAlive()
-      tokenLastError.value = result.error || '认证状态不可用，请重新手动登录'
-      if (!silent) showToast(tokenLastError.value)
+      if (!silent) setTokenError(result.error || '认证状态不可用，请重新手动登录')
     }
   } catch (e) {
     console.warn('认证状态保活失败:', e)
-    tokenLastError.value = '保活失败，请确认 Executor 服务正常'
-    if (!silent) showToast(tokenLastError.value)
+    if (!silent) setTokenError('保活失败，请确认 Executor 服务正常')
   } finally {
     tokenKeepAliveLoading.value = false
   }
@@ -740,21 +736,23 @@ async function handleTokenKeepAlive(silent = false) {
 async function handleManualLogin() {
   const url = tokenTargetUrl.value.trim()
   if (!url) {
-    showToast('请输入目标站点地址')
+    setTokenError('请输入目标站点地址')
     return
   }
   manualLoginLoading.value = true
+  tokenLastError.value = ''
+  tokenSuccessMessage.value = ''
   try {
     const result = await manualLoginStart(url)
     if (result.success) {
       manualLoginActive.value = true
-      showToast('浏览器已打开，请在浏览器中完成登录')
+      setTokenSuccess('浏览器已打开，请在浏览器中完成登录')
     } else {
-      showToast(result.error || '打开浏览器失败')
+      setTokenError(result.error || '打开浏览器失败')
     }
   } catch (e) {
     console.error('打开浏览器失败:', e)
-    showToast('打开浏览器失败，请确认 Executor 服务正常')
+    setTokenError('打开浏览器失败，请确认 Executor 服务正常')
   } finally {
     manualLoginLoading.value = false
   }
@@ -770,22 +768,20 @@ async function handleManualLoginComplete() {
       if (result.auth_state) {
         tokenAuthState.value = result.auth_state
       }
-      tokenLastError.value = ''
+      setTokenSuccess('认证状态已保存')
       tokenLastCheckedAt.value = formatCheckedTime()
       manualLoginActive.value = false
       startTokenKeepAlive()
-      showToast('认证状态已保存')
     } else {
       if (result.auth_state) {
         tokenAuthState.value = result.auth_state
       }
       stopTokenKeepAlive()
-      tokenLastError.value = result.error || '保存后在线校验失败，请确认已完成登录'
-      showToast(result.error || '保存认证状态失败')
+      setTokenError(result.error || '保存后在线校验失败，请确认已完成登录')
     }
   } catch (e) {
     console.error('保存认证状态失败:', e)
-    showToast('保存认证状态失败，请确认 Executor 服务正常')
+    setTokenError('保存认证状态失败，请确认 Executor 服务正常')
   } finally {
     manualLoginLoading.value = false
   }
@@ -793,15 +789,19 @@ async function handleManualLoginComplete() {
 
 async function handleTokenInvalidate() {
   const url = tokenTargetUrl.value.trim()
-  if (!url) return
+  if (!url) {
+    setTokenError('请输入目标站点地址')
+    return
+  }
   try {
     await invalidateAuth(url)
     stopTokenKeepAlive()
-    await loadTokenStatus()
-    showToast('认证状态已清除')
+    tokenSuccessMessage.value = ''
+    await loadTokenStatus(true)
+    setTokenSuccess('认证状态已清除')
   } catch (e) {
     console.error('清除认证状态失败:', e)
-    showToast('清除认证状态失败')
+    setTokenError('清除认证状态失败')
   }
 }
 </script>
@@ -966,34 +966,35 @@ async function handleTokenInvalidate() {
               </td>
               <td>
                 <div class="ai-row-actions">
-                  <button class="ai-row-action-btn" title="查看详情" @click.stop="goDetail(task)">
+                  <button
+                    class="ai-row-action-btn"
+                    aria-label="查看详情"
+                    data-tooltip="查看详情"
+                    @click.stop="goDetail(task)"
+                  >
                     <span class="material-symbols-outlined">visibility</span>
                   </button>
                   <button
                     v-if="task.taskStatus !== TaskStatus.DISCARDED"
                     class="ai-row-action-btn"
-                    title="修改名称"
+                    aria-label="编辑任务"
+                    data-tooltip="编辑任务"
                     @click.stop="openRenameDialog(task)"
                   >
                     <span class="material-symbols-outlined">edit</span>
                   </button>
                   <button
-                    v-if="
-                      task.taskStatus === TaskStatus.PENDING_EXECUTE ||
-                      task.taskStatus === TaskStatus.GENERATE_FAILED
-                    "
                     class="ai-row-action-btn"
-                    title="触发执行"
-                    @click.stop="handleExecute(task)"
+                    aria-label="复制配置"
+                    data-tooltip="复制配置"
+                    @click.stop
                   >
-                    <span class="material-symbols-outlined">play_arrow</span>
-                  </button>
-                  <button class="ai-row-action-btn" title="复制配置" @click.stop>
                     <span class="material-symbols-outlined">content_copy</span>
                   </button>
                   <button
                     class="ai-row-action-btn danger"
-                    title="废弃"
+                    aria-label="废弃"
+                    data-tooltip="废弃"
                     @click.stop="openDiscardDialog(task)"
                   >
                     <span class="material-symbols-outlined">block</span>
@@ -1001,7 +1002,8 @@ async function handleTokenInvalidate() {
                   <button
                     v-if="task.taskStatus === TaskStatus.DISCARDED"
                     class="ai-row-action-btn danger"
-                    title="删除"
+                    aria-label="删除"
+                    data-tooltip="删除"
                     @click.stop="openDeleteDialog(task)"
                   >
                     <span class="material-symbols-outlined">delete_forever</span>
@@ -1209,53 +1211,18 @@ async function handleTokenInvalidate() {
                       测试环境
                       <span class="ai-required">*</span>
                     </label>
-                    <div
-                      class="ai-env-select"
-                      :class="{ open: showEnvironmentDropdown, loading: environmentLoading }"
-                      @click.stop
-                    >
-                      <button
-                        type="button"
-                        class="ai-env-select-trigger"
-                        :disabled="environmentLoading"
-                        :aria-expanded="showEnvironmentDropdown"
-                        @click="showEnvironmentDropdown = !showEnvironmentDropdown"
-                      >
+                    <div class="ai-env-select" :class="{ loading: environmentLoading }" @click.stop>
+                      <div class="ai-env-select-trigger ai-env-select-trigger-readonly">
                         <span class="ai-env-choice-dot active"></span>
                         <span class="ai-env-select-copy">
                           <span class="ai-env-choice-name">
-                            {{ selectedEnvironment?.name || '请选择测试环境' }}
+                            {{ selectedEnvironment?.name || '跟随项目配置' }}
                           </span>
                           <span class="ai-env-choice-url">
                             {{ selectedEnvironment?.base_url || '请先在项目管理中配置测试环境' }}
                           </span>
                         </span>
-                        <span v-if="selectedEnvironment?.is_default" class="ai-env-choice-badge">
-                          默认
-                        </span>
-                        <span class="material-symbols-outlined ai-env-select-arrow">
-                          expand_more
-                        </span>
-                      </button>
-                      <div v-if="showEnvironmentDropdown" class="ai-env-dropdown">
-                        <button
-                          v-for="env in environmentOptions"
-                          :key="env.id"
-                          type="button"
-                          class="ai-env-option"
-                          :class="{ active: selectedEnvironmentId === env.id }"
-                          @click="selectEnvironment(env.id)"
-                        >
-                          <span class="ai-env-choice-dot"></span>
-                          <span class="ai-env-select-copy">
-                            <span class="ai-env-choice-name">{{ env.name }}</span>
-                            <span class="ai-env-choice-url">{{ env.base_url }}</span>
-                          </span>
-                          <span v-if="selectedEnvironmentId === env.id" class="ai-env-choice-badge">
-                            当前
-                          </span>
-                          <span v-else-if="env.is_default" class="ai-env-choice-badge">默认</span>
-                        </button>
+                        <span class="ai-env-choice-badge">项目配置</span>
                       </div>
                     </div>
                   </div>
@@ -1445,7 +1412,7 @@ async function handleTokenInvalidate() {
                   class="ai-btn ai-btn-ghost"
                   style="padding: 6px 14px; white-space: nowrap"
                   :disabled="tokenLoading || !tokenTargetUrl"
-                  @click="loadTokenStatus"
+                  @click="loadTokenStatus(false)"
                 >
                   <span v-if="tokenLoading" class="ai-spinner"></span>
                   <span v-else class="material-symbols-outlined" style="font-size: 16px">
@@ -1483,6 +1450,19 @@ async function handleTokenInvalidate() {
                 <span>正在打开目标站点做在线校验，请稍候...</span>
               </div>
             </div>
+            <div v-else-if="tokenLastError && !tokenAuthState" class="ai-token-status-panel">
+              <div class="ai-token-status-header">
+                <span class="ai-section-title" style="font-size: 0.82rem">认证状态</span>
+                <div class="ai-auth-status-badge expired">
+                  <span class="ai-auth-dot"></span>
+                  异常
+                </div>
+              </div>
+              <div class="ai-auth-warning">
+                <span class="material-symbols-outlined">error</span>
+                <span>{{ tokenLastError }}</span>
+              </div>
+            </div>
             <div v-else-if="tokenAuthState" class="ai-token-status-panel">
               <div class="ai-token-status-header">
                 <span class="ai-section-title" style="font-size: 0.82rem">认证状态</span>
@@ -1514,6 +1494,14 @@ async function handleTokenInvalidate() {
               <div v-if="tokenWarningText" class="ai-auth-warning">
                 <span class="material-symbols-outlined">info</span>
                 <span>{{ tokenWarningText }}</span>
+              </div>
+              <div v-if="tokenLastError" class="ai-auth-warning">
+                <span class="material-symbols-outlined">error</span>
+                <span>{{ tokenLastError }}</span>
+              </div>
+              <div v-if="tokenSuccessMessage" class="ai-auth-success">
+                <span class="material-symbols-outlined">check_circle</span>
+                <span>{{ tokenSuccessMessage }}</span>
               </div>
               <div v-if="!tokenAuthState.exists" class="ai-auth-empty-hint">
                 <span class="material-symbols-outlined">lock_open</span>
@@ -1582,22 +1570,31 @@ async function handleTokenInvalidate() {
 
     <!-- Toast 提示 -->
     <Transition name="toast">
-      <div v-if="toastMsg" class="task-list-toast">
-        <span class="material-symbols-outlined" style="font-size: 16px; color: #ff8a80">error</span>
+      <div v-if="toastMsg" class="task-list-toast" role="status" aria-live="polite">
+        <span class="material-symbols-outlined task-list-toast-icon">info</span>
         {{ toastMsg }}
       </div>
     </Transition>
 
     <!-- 重命名任务 Dialog -->
     <Teleport to="body">
-      <div v-if="showRenameDialog" class="ai-dialog-overlay" @click.self="showRenameDialog = false">
-        <div class="ai-dialog ai-rename-dialog" style="max-width: 400px">
+      <div
+        v-if="showRenameDialog"
+        class="ai-dialog-overlay ai-rename-dialog-overlay"
+        @click.self="showRenameDialog = false"
+      >
+        <div
+          class="ai-dialog ai-rename-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="rename-task-title"
+        >
           <div class="ai-dialog-header">
             <div>
-              <h2>修改任务名称</h2>
+              <h2 id="rename-task-title">编辑任务信息</h2>
               <p class="ai-dialog-subtitle">TASK-{{ renameTaskId }}</p>
             </div>
-            <button class="ai-dialog-close" @click="showRenameDialog = false">
+            <button class="ai-dialog-close" aria-label="关闭弹窗" @click="showRenameDialog = false">
               <span class="material-symbols-outlined">close</span>
             </button>
           </div>
@@ -1613,12 +1610,22 @@ async function handleTokenInvalidate() {
               />
               <span class="ai-form-hint">{{ renameNewName.length }} / 128</span>
             </div>
+            <div class="ai-form-group">
+              <label class="ai-form-label">场景描述</label>
+              <textarea
+                v-model="renameScenarioDesc"
+                class="ai-form-textarea ai-rename-scenario-textarea"
+                placeholder="请输入场景描述"
+                rows="4"
+              />
+              <span class="ai-form-hint">{{ renameScenarioDesc.length }} 字</span>
+            </div>
           </div>
           <div class="ai-dialog-footer">
             <button class="ai-btn ai-btn-ghost" @click="showRenameDialog = false">取消</button>
             <button
               class="ai-btn ai-btn-primary"
-              :disabled="renameLoading || !renameNewName.trim()"
+              :disabled="renameLoading || !renameNewName.trim() || !renameScenarioDesc.trim()"
               @click="confirmRename"
             >
               <span v-if="renameLoading" class="ai-spinner"></span>
@@ -1848,6 +1855,144 @@ async function handleTokenInvalidate() {
   overflow: hidden;
 }
 
+.ai-row-action-btn {
+  position: relative;
+}
+
+.ai-row-action-btn::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  z-index: 20;
+  max-width: 120px;
+  padding: 5px 8px;
+  border: 1px solid rgba(139, 92, 246, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+  color: var(--tp-text-primary, #111827);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(3px);
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease;
+}
+
+.ai-row-action-btn:hover::after,
+.ai-row-action-btn:focus-visible::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+:global(.ai-rename-dialog-overlay) {
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 24px !important;
+  background: rgba(15, 23, 42, 0.28) !important;
+  backdrop-filter: blur(8px) saturate(108%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(108%) !important;
+}
+
+:global(.ai-rename-dialog) {
+  width: min(520px, calc(100vw - 48px)) !important;
+  max-width: none !important;
+  max-height: calc(100vh - 48px) !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(139, 92, 246, 0.14) !important;
+  border-radius: 16px !important;
+  background: #ffffff !important;
+  box-shadow:
+    0 24px 64px rgba(15, 23, 42, 0.18),
+    0 0 0 1px rgba(255, 255, 255, 0.88) inset !important;
+}
+
+:global(.ai-rename-dialog .ai-dialog-header) {
+  align-items: flex-start !important;
+  padding: 18px 20px 14px !important;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.1) !important;
+  background: #ffffff !important;
+}
+
+:global(.ai-rename-dialog .ai-dialog-header h2) {
+  color: var(--tp-text-primary, #111827) !important;
+  font-size: 16px !important;
+  line-height: 1.4 !important;
+}
+
+:global(.ai-rename-dialog .ai-dialog-subtitle) {
+  margin: 4px 0 0 !important;
+  color: var(--tp-text-subtle, #6b7280) !important;
+  font-size: 12px !important;
+}
+
+:global(.ai-rename-dialog .ai-dialog-body) {
+  padding: 18px 20px !important;
+  background: #fbfbfe !important;
+}
+
+:global(.ai-rename-dialog .ai-form-label) {
+  color: var(--tp-text-secondary, #374151) !important;
+}
+
+:global(.ai-rename-dialog .ai-form-input),
+:global(.ai-rename-dialog .ai-form-textarea) {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  background: #ffffff !important;
+  border: 1px solid rgba(139, 92, 246, 0.18) !important;
+  color: var(--tp-text-primary, #111827) !important;
+}
+
+:global(.ai-rename-dialog .ai-form-input:focus),
+:global(.ai-rename-dialog .ai-form-textarea:focus) {
+  border-color: var(--tp-primary, #8b5cf6) !important;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.14) !important;
+}
+
+:global(.ai-rename-dialog .ai-rename-scenario-textarea) {
+  min-height: 104px !important;
+  line-height: 1.55 !important;
+  resize: vertical !important;
+}
+
+:global(.ai-rename-dialog .ai-dialog-footer) {
+  padding: 14px 20px 18px !important;
+  border-top: 1px solid rgba(139, 92, 246, 0.1) !important;
+  background: #ffffff !important;
+}
+
+:global(html[data-theme='genart'] .ai-row-action-btn::after) {
+  background: rgba(20, 20, 28, 0.96);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #f8fafc;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
+}
+
+:global(html[data-theme='genart'] .ai-rename-dialog-overlay) {
+  background: rgba(4, 4, 8, 0.58) !important;
+}
+
+:global(html[data-theme='genart'] .ai-rename-dialog) {
+  background: rgba(20, 20, 28, 0.98) !important;
+  border-color: rgba(139, 92, 246, 0.24) !important;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.56) !important;
+}
+
+:global(html[data-theme='genart'] .ai-rename-dialog :is(.ai-dialog-header, .ai-dialog-footer)) {
+  background: rgba(20, 20, 28, 0.98) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+:global(html[data-theme='genart'] .ai-rename-dialog .ai-dialog-body) {
+  background: rgba(10, 10, 15, 0.35) !important;
+}
+
 .ai-table-wrap {
   flex: 1;
   min-height: 0;
@@ -1915,25 +2060,36 @@ async function handleTokenInvalidate() {
 /* Toast */
 .task-list-toast {
   position: fixed !important;
-  top: 24px;
+  top: 74px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 9999;
+  z-index: 30000;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 20px;
-  border-radius: 10px;
-  background: rgba(30, 30, 46, 0.95);
-  border: 1px solid rgba(255, 138, 128, 0.3);
-  color: #ff8a80;
+  min-height: 38px;
+  padding: 9px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(139, 92, 246, 0.16);
+  color: var(--tp-text-primary, #111827);
   font-size: 0.82rem;
-  font-weight: 500;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(12px);
-  max-width: 360px;
+  font-weight: 600;
+  line-height: 1.45;
+  box-shadow:
+    0 16px 36px rgba(15, 23, 42, 0.14),
+    0 0 0 1px rgba(255, 255, 255, 0.72) inset;
+  backdrop-filter: blur(14px) saturate(118%);
+  -webkit-backdrop-filter: blur(14px) saturate(118%);
+  max-width: min(520px, calc(100vw - 48px));
   width: auto;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
+}
+.task-list-toast-icon {
+  flex: 0 0 auto;
+  font-size: 17px !important;
+  color: var(--tp-primary, #8b5cf6);
 }
 .toast-enter-active {
   animation: task-toast-in 0.3s ease;
@@ -1950,6 +2106,17 @@ async function handleTokenInvalidate() {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
   }
+}
+
+:global(html[data-theme='genart'] .task-list-toast) {
+  background: rgba(20, 20, 28, 0.98);
+  border-color: rgba(139, 92, 246, 0.26);
+  color: #f8fafc;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.48);
+}
+
+:global(html[data-theme='genart'] .task-list-toast-icon) {
+  color: #c084fc;
 }
 @keyframes fadeIn {
   from {
@@ -2487,6 +2654,10 @@ async function handleTokenInvalidate() {
   width: 100% !important;
   transition: all var(--tp-transition, 0.2s) !important;
   cursor: pointer;
+}
+
+:global(.ai-env-select-trigger-readonly) {
+  cursor: default !important;
 }
 
 :global(html[data-theme='genart'] .ai-env-select-trigger) {

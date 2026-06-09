@@ -76,6 +76,19 @@ function cleanAnsi(text?: string) {
     .replace(/\[[0-9;]*[a-zA-Z]/g, '')
 }
 
+function formatDuration(durationMs?: number) {
+  if (!durationMs) return '-'
+  return `${(durationMs / 1000).toFixed(1)}s`
+}
+
+function validationHasDetail(item: {
+  failReason?: string
+  logs?: unknown[]
+  screenshots?: unknown[]
+}) {
+  return Boolean(item.failReason?.trim() || item.logs?.length || item.screenshots?.length)
+}
+
 onMounted(async () => {
   if (taskId.value) {
     await store.loadTaskDetailFull(taskId.value)
@@ -174,6 +187,7 @@ const script = computed(() => store.currentScript)
 const traces = computed(() => store.traces)
 const validation = computed(() => store.latestValidation)
 const validationHistory = computed(() => store.validationHistory)
+const expandedValidationHistoryId = ref<number | null>(null)
 const validationFailReason = computed(() => validation.value?.failReason?.trim() || '')
 const validationNeedsLogin = computed(() => {
   const reason = validationFailReason.value
@@ -193,6 +207,10 @@ const GENERATING_PHASE_TEXTS = [
   '正在编排 Playwright 步骤',
   '正在整理工程化脚本',
 ] as const
+
+function toggleValidationHistory(id: number) {
+  expandedValidationHistoryId.value = expandedValidationHistoryId.value === id ? null : id
+}
 
 // ── 操作轨迹（录制模式下用步骤模型填充）──
 type RecordingStep = {
@@ -963,7 +981,7 @@ watch(
             </button>
             <button
               v-if="!recording || recording.recordingStatus !== 'RECORDING'"
-              class="ai-btn ai-btn-secondary"
+              class="ai-btn ai-btn-secondary ai-btn-start-record"
               :disabled="recordingLoading || store.actionLoading"
               @click="handleStartRecording"
             >
@@ -1025,7 +1043,11 @@ watch(
           </button>
         </div>
         <div class="ai-detail-action-group ai-detail-action-group--secondary">
-          <button class="ai-btn ai-btn-secondary" :disabled="!canEdit" @click="openEditDialog">
+          <button
+            class="ai-btn ai-btn-secondary ai-btn-edit-script"
+            :disabled="!canEdit"
+            @click="openEditDialog"
+          >
             <span class="material-symbols-outlined">edit</span>
             编辑脚本
           </button>
@@ -1737,29 +1759,106 @@ watch(
             <div
               v-for="(v, idx) in validationHistory"
               :key="v.id || idx"
-              class="validation-history-row"
+              class="validation-history-item"
+              :class="{ expanded: expandedValidationHistoryId === v.id }"
             >
-              <div
-                class="ai-status-badge"
-                :class="ValidationStatusColor[v.validationStatus]"
-                style="font-size: 0.65rem; min-width: 60px; text-align: center"
+              <button
+                type="button"
+                class="validation-history-row"
+                :aria-expanded="expandedValidationHistoryId === v.id"
+                :aria-controls="`validation-history-detail-${v.id}`"
+                @click="toggleValidationHistory(v.id)"
               >
-                {{ ValidationStatusLabel[v.validationStatus] }}
-              </div>
-              <div class="history-time-col">
-                {{ formatDate(v.startedAt) }}
-              </div>
-              <div class="history-user-col">
-                <span class="material-symbols-outlined history-meta-icon">person</span>
-                {{ v.triggeredName || '-' }}
-              </div>
-              <div v-if="v.durationMs" class="history-duration-col">
-                <span class="material-symbols-outlined history-meta-icon">schedule</span>
-                {{ (v.durationMs / 1000).toFixed(1) }}s
-              </div>
-              <div class="history-steps-col">
-                <span class="material-symbols-outlined history-meta-icon">done_all</span>
-                通过 {{ v.passedStepCount }}/{{ v.totalStepCount }}
+                <div
+                  class="ai-status-badge"
+                  :class="ValidationStatusColor[v.validationStatus]"
+                  style="font-size: 0.65rem; min-width: 60px; text-align: center"
+                >
+                  {{ ValidationStatusLabel[v.validationStatus] }}
+                </div>
+                <div class="history-time-col">
+                  {{ formatDate(v.startedAt) }}
+                </div>
+                <div class="history-user-col">
+                  <span class="material-symbols-outlined history-meta-icon">person</span>
+                  {{ v.triggeredName || '-' }}
+                </div>
+                <div class="history-duration-col">
+                  <span class="material-symbols-outlined history-meta-icon">schedule</span>
+                  {{ formatDuration(v.durationMs) }}
+                </div>
+                <div class="history-steps-col">
+                  <span class="material-symbols-outlined history-meta-icon">done_all</span>
+                  通过 {{ v.passedStepCount }}/{{ v.totalStepCount }}
+                </div>
+                <div class="history-detail-hint">
+                  <span class="material-symbols-outlined history-meta-icon">
+                    {{ expandedValidationHistoryId === v.id ? 'expand_less' : 'expand_more' }}
+                  </span>
+                  详情
+                </div>
+              </button>
+              <div
+                v-if="expandedValidationHistoryId === v.id"
+                :id="`validation-history-detail-${v.id}`"
+                class="validation-history-detail"
+              >
+                <div v-if="v.failReason" class="validation-history-fail-reason">
+                  <span class="material-symbols-outlined">error</span>
+                  <div>
+                    <strong>失败原因</strong>
+                    <p>{{ cleanAnsi(v.failReason) }}</p>
+                  </div>
+                </div>
+                <div v-else-if="!validationHasDetail(v)" class="validation-history-empty-detail">
+                  暂无更多详情，可能是历史数据未记录执行日志。
+                </div>
+                <div v-if="v.assertionSummary?.length" class="validation-history-section">
+                  <span class="validation-history-section-title">步骤结果</span>
+                  <div class="validation-history-step-list">
+                    <span
+                      v-for="(assertion, assertionIndex) in v.assertionSummary"
+                      :key="`${v.id}-${assertionIndex}`"
+                      class="validation-history-step-chip"
+                      :class="{ passed: assertion.passed, failed: !assertion.passed }"
+                    >
+                      <span class="material-symbols-outlined">
+                        {{ assertion.passed ? 'check_circle' : 'cancel' }}
+                      </span>
+                      {{ assertion.name }}
+                    </span>
+                  </div>
+                </div>
+                <div v-if="v.logs?.length" class="validation-history-section">
+                  <span class="validation-history-section-title">执行日志</span>
+                  <div class="validation-history-log-box">
+                    <div
+                      v-for="(log, logIndex) in v.logs.slice(0, 12)"
+                      :key="`${v.id}-log-${logIndex}`"
+                      class="validation-history-log-line"
+                      :class="log.level.toLowerCase()"
+                    >
+                      <span>{{ log.level }}</span>
+                      <code>{{ cleanAnsi(log.message) }}</code>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="v.screenshots?.length" class="validation-history-section">
+                  <span class="validation-history-section-title">失败截图</span>
+                  <div class="validation-history-screenshot-list">
+                    <a
+                      v-for="shot in v.screenshots"
+                      :key="shot.id || shot.fileUrl"
+                      class="validation-history-screenshot-link"
+                      :href="shot.fileUrl"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <img :src="shot.fileUrl" :alt="shot.caption || '验证截图'" />
+                      <span>{{ shot.caption || shot.fileName || '查看截图' }}</span>
+                    </a>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -2062,6 +2161,19 @@ watch(
 </template>
 
 <style scoped>
+.ai-task-detail-page {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.ai-task-detail-header {
+  flex: 0 0 auto !important;
+}
+
 .detail-toast {
   position: fixed;
   top: 80px; /* 避开最顶部全局导航，完美悬浮于右上角内容侧方 */
@@ -2124,6 +2236,640 @@ watch(
     transform: translateX(0);
   }
 }
+
+/* ──────────────────────────────────────────────────
+   双栏布局与卡片设计优化（高保真 SaaS 工作台质感）
+   ────────────────────────────────────────────────── */
+
+/* 左右格栅间距及占比微调 */
+.ai-detail-grid {
+  display: grid !important;
+  grid-template-columns: 360px 1fr !important;
+  gap: 16px !important;
+  margin-top: 16px !important;
+  align-items: start !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* 卡片容器：精细投影与柔和边框 */
+.ai-info-card {
+  background: var(--tp-surface-card) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  border-radius: var(--tp-radius-md, 12px) !important;
+  box-shadow:
+    0 4px 20px rgba(139, 92, 246, 0.02),
+    var(--tp-shadow-sm) !important;
+  padding: 20px !important;
+  transition: all var(--tp-transition) !important;
+}
+
+.ai-info-card:hover {
+  box-shadow:
+    0 8px 30px rgba(139, 92, 246, 0.05),
+    var(--tp-shadow-md) !important;
+  border-color: color-mix(in srgb, var(--tp-primary) 15%, var(--tp-border-subtle)) !important;
+}
+
+/* 卡片头部布局对齐 */
+.ai-info-card-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-bottom: 16px !important;
+}
+
+/* 左侧紫色微标杠标题，增加仪式感 */
+.ai-section-title {
+  position: relative !important;
+  padding-left: 10px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: var(--tp-text-primary) !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.ai-section-title::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 3px !important;
+  bottom: 3px !important;
+  width: 3px !important;
+  background: linear-gradient(180deg, var(--tp-primary), var(--tp-secondary)) !important;
+  border-radius: 2px !important;
+}
+
+/* ──────────────────────────────────────────────────
+   任务基础信息内部子组件美化
+   ────────────────────────────────────────────────── */
+
+/* 任务总览卡片：渐变微光，突出层级 */
+.ai-task-summary-card {
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.04),
+    rgba(236, 72, 153, 0.02)
+  ) !important;
+  border: 1px solid rgba(139, 92, 246, 0.12) !important;
+  border-radius: 10px !important;
+  padding: 16px !important;
+  margin-bottom: 14px !important;
+}
+
+.ai-task-summary-main {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+/* 机器人/自动化 Squircle 智能图标背景 */
+.ai-task-summary-icon {
+  width: 38px !important;
+  height: 38px !important;
+  font-size: 20px !important;
+  flex: 0 0 38px !important;
+  border-radius: 9px !important;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(99, 102, 241, 0.1)) !important;
+  border: 1px solid rgba(139, 92, 246, 0.25) !important;
+  color: var(--tp-primary) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.ai-task-summary-title {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: var(--tp-text-primary) !important;
+  line-height: 1.4 !important;
+}
+
+.ai-task-summary-desc {
+  font-size: 11px !important;
+  color: var(--tp-text-muted) !important;
+  margin-top: 2px !important;
+}
+
+/* 指标分栏布局 */
+.ai-task-summary-metrics {
+  display: flex !important;
+  gap: 10px !important;
+  margin-top: 14px !important;
+  border-top: 1px dashed rgba(139, 92, 246, 0.12) !important;
+  padding-top: 12px !important;
+}
+
+.ai-task-summary-metrics > div {
+  flex: 1 !important;
+  background: var(--tp-surface-card) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  padding: 6px 10px !important;
+  border-radius: 8px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+.ai-task-summary-metrics span {
+  font-size: 10px !important;
+  color: var(--tp-text-muted) !important;
+}
+
+.ai-task-summary-metrics strong {
+  font-size: 12px !important;
+  color: var(--tp-text-primary) !important;
+  font-weight: 600 !important;
+}
+
+/* 元数据列表垂直间距 */
+.ai-task-meta-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 14px !important;
+}
+
+/* 起始地址一键复制只读面板 */
+.ai-task-detail-page .ai-info-url {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  cursor: pointer !important;
+  background: var(--tp-surface-input, rgba(0, 0, 0, 0.02)) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  color: var(--tp-primary) !important;
+  font-family: var(--tp-font-family-mono, monospace) !important;
+  font-weight: 500 !important;
+  padding: 8px 12px !important;
+  border-radius: 8px !important;
+  font-size: 11px !important;
+  transition: all 0.2s ease !important;
+}
+
+.ai-task-detail-page .ai-info-url:hover {
+  background: rgba(139, 92, 246, 0.04) !important;
+  border-color: rgba(139, 92, 246, 0.25) !important;
+  transform: translateY(-0.5px) !important;
+}
+
+/* 场景描述文本展示 */
+.ai-task-scenario {
+  background: var(--tp-surface-input, rgba(0, 0, 0, 0.02)) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  color: var(--tp-text-secondary) !important;
+  padding: 8px 12px !important;
+  border-radius: 8px !important;
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+/* 创建人与时间：格栅轻量化卡片 */
+.ai-task-time-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 8px !important;
+  margin-top: 4px !important;
+}
+
+.ai-task-time-grid > div {
+  background: var(--tp-surface-muted, rgba(0, 0, 0, 0.01)) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  border-radius: 8px !important;
+  padding: 8px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+.ai-task-detail-page .ai-info-label {
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  color: var(--tp-text-muted) !important;
+  margin-bottom: 0 !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+
+.ai-task-detail-page .ai-info-value {
+  font-size: 11px !important;
+  color: var(--tp-text-primary) !important;
+  font-weight: 600 !important;
+}
+
+/* ──────────────────────────────────────────────────
+   录制状态与操作轨迹时间轴优化
+   ────────────────────────────────────────────────── */
+
+/* 录制状态空态卡板：呼吸微光与专业引导 */
+.ai-recording-empty {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 24px 16px !important;
+  text-align: center !important;
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.02),
+    rgba(99, 102, 241, 0.02)
+  ) !important;
+  border: 1px dashed rgba(139, 92, 246, 0.2) !important;
+  border-radius: 10px !important;
+  margin-top: 12px !important;
+}
+
+.ai-recording-empty .material-symbols-outlined {
+  font-size: 32px !important;
+  color: var(--tp-primary) !important;
+  background: rgba(139, 92, 246, 0.1) !important;
+  padding: 10px !important;
+  border-radius: 50% !important;
+  margin-bottom: 12px !important;
+  animation: pulse-icon 2s infinite !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+@keyframes pulse-icon {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(139, 92, 246, 0);
+  }
+}
+
+.ai-recording-empty p {
+  font-size: 11px !important;
+  color: var(--tp-text-secondary) !important;
+  margin: 2px 0 !important;
+  line-height: 1.4 !important;
+}
+
+.ai-recording-empty p:first-of-type {
+  font-weight: 600 !important;
+  color: var(--tp-text-primary) !important;
+  margin-bottom: 4px !important;
+}
+
+/* 时间线轨道微调，与整页风格对齐 */
+.ai-timeline {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 14px !important;
+  margin-top: 14px !important;
+  position: relative !important;
+}
+
+.ai-timeline::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 7px !important;
+  top: 12px !important;
+  bottom: 12px !important;
+  width: 1px !important;
+  background: rgba(139, 92, 246, 0.15) !important;
+}
+
+.ai-timeline-step {
+  display: flex !important;
+  gap: 12px !important;
+  position: relative !important;
+}
+
+.ai-timeline-dot {
+  width: 15px !important;
+  height: 15px !important;
+  border-radius: 50% !important;
+  background: var(--tp-surface-card) !important;
+  border: 2px solid rgba(139, 92, 246, 0.3) !important;
+  flex: 0 0 15px !important;
+  z-index: 10 !important;
+  transition: all 0.25s ease !important;
+  box-sizing: border-box !important;
+  margin-top: 4px !important;
+}
+
+.ai-timeline-step:hover .ai-timeline-dot {
+  border-color: var(--tp-primary) !important;
+  transform: scale(1.1) !important;
+}
+
+.ai-timeline-card {
+  flex: 1 !important;
+  background: var(--tp-surface-muted, rgba(0, 0, 0, 0.01)) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  border-radius: 8px !important;
+  padding: 10px 12px !important;
+  transition: all 0.2s ease !important;
+}
+
+.ai-timeline-step:hover .ai-timeline-card {
+  background: var(--tp-surface-hover, rgba(139, 92, 246, 0.03)) !important;
+  border-color: rgba(139, 92, 246, 0.25) !important;
+}
+
+.ai-timeline-meta {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin-bottom: 4px !important;
+}
+
+.ai-timeline-time {
+  font-size: 10px !important;
+  color: var(--tp-text-muted) !important;
+  font-family: var(--tp-font-family-mono, monospace) !important;
+}
+
+.ai-timeline-meta .material-symbols-outlined {
+  font-size: 14px !important;
+  color: var(--tp-primary) !important;
+}
+
+.ai-timeline-desc {
+  font-size: 11px !important;
+  color: var(--tp-text-primary) !important;
+  line-height: 1.45 !important;
+  margin: 0 !important;
+}
+
+.ai-trace-code {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  font-family: var(--tp-font-family-mono, monospace) !important;
+  font-size: 10px !important;
+  color: var(--tp-primary) !important;
+  padding: 4px 6px !important;
+  border-radius: 4px !important;
+  margin-top: 6px !important;
+  word-break: break-all !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+.ai-trace-code .material-symbols-outlined {
+  font-size: 12px !important;
+  color: var(--tp-text-muted) !important;
+}
+
+/* ──────────────────────────────────────────────────
+   操作按钮视觉个性化微调
+   ────────────────────────────────────────────────── */
+
+/* 顶部开始录制专用高亮红标按钮 */
+.ai-task-detail-actions .ai-btn-start-record {
+  border: 1px solid rgba(239, 68, 68, 0.2) !important;
+  background: rgba(239, 68, 68, 0.04) !important;
+  color: #dc2626 !important;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.06) !important;
+}
+
+.ai-task-detail-actions .ai-btn-start-record:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.08) !important;
+  border-color: rgba(239, 68, 68, 0.35) !important;
+  color: #b91c1c !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.12) !important;
+}
+
+/* 编辑脚本按钮 */
+.ai-task-detail-actions .ai-btn-edit-script {
+  border: 1px solid rgba(139, 92, 246, 0.18) !important;
+  background: rgba(139, 92, 246, 0.02) !important;
+  color: var(--tp-primary) !important;
+}
+
+.ai-task-detail-actions .ai-btn-edit-script:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.06) !important;
+  border-color: rgba(139, 92, 246, 0.35) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* ──────────────────────────────────────────────────
+   右侧空白代码预览面板美化
+   ────────────────────────────────────────────────── */
+
+.ai-script-empty-card {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 380px !important;
+  background: var(--tp-surface-card) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  box-shadow: var(--tp-shadow-sm) !important;
+  border-radius: var(--tp-radius-md, 12px) !important;
+}
+
+.ai-script-empty {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  text-align: center !important;
+  max-width: 320px !important;
+  padding: 30px 20px !important;
+}
+
+.ai-script-empty .material-symbols-outlined {
+  font-size: 44px !important;
+  color: var(--tp-primary) !important;
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.15),
+    rgba(99, 102, 241, 0.08)
+  ) !important;
+  padding: 14px !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(139, 92, 246, 0.2) !important;
+  margin-bottom: 16px !important;
+  box-shadow: 0 8px 20px rgba(139, 92, 246, 0.06) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.ai-script-empty h3 {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: var(--tp-text-primary) !important;
+  margin: 0 0 8px 0 !important;
+}
+
+.ai-script-empty p {
+  font-size: 12px !important;
+  color: var(--tp-text-muted) !important;
+  line-height: 1.55 !important;
+  margin: 0 !important;
+}
+
+/* ──────────────────────────────────────────────────
+   黑曜（Genart）暗色主题特别适配
+   ────────────────────────────────────────────────── */
+:global(html[data-theme='genart']) .ai-info-card {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25) !important;
+}
+
+:global(html[data-theme='genart']) .ai-task-summary-card {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(99, 102, 241, 0.04)) !important;
+  border-color: rgba(168, 85, 247, 0.22) !important;
+}
+
+:global(html[data-theme='genart']) .ai-task-summary-icon {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(99, 102, 241, 0.15)) !important;
+  border-color: rgba(168, 85, 247, 0.3) !important;
+  color: var(--tp-primary) !important;
+}
+
+:global(html[data-theme='genart']) .ai-recording-empty {
+  background: linear-gradient(
+    135deg,
+    rgba(168, 85, 247, 0.04),
+    rgba(99, 102, 241, 0.02)
+  ) !important;
+  border-color: rgba(168, 85, 247, 0.25) !important;
+}
+
+:global(html[data-theme='genart']) .ai-recording-empty .material-symbols-outlined {
+  background: rgba(168, 85, 247, 0.15) !important;
+  color: var(--tp-primary) !important;
+  animation: pulse-icon-dark 2s infinite !important;
+}
+
+@keyframes pulse-icon-dark {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(168, 85, 247, 0);
+  }
+}
+
+/* ──────────────────────────────────────────────────
+   Aisight 布局对齐、滚动条以及按钮状态等高保真优化
+   ────────────────────────────────────────────────── */
+
+/* 1. 顶部操作栏与主格栅完美对齐 */
+.ai-task-detail-header {
+  grid-template-columns: 360px minmax(0, 1fr) !important;
+  column-gap: 16px !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  z-index: 100 !important; /* 确保在滚动时，顶部栏始终置于最上层，避免内容穿透 */
+}
+.ai-detail-header-left {
+  max-width: 360px !important;
+}
+:global(html[data-theme='genart']) .ai-task-detail-header {
+  background: #0d0e15 !important; /* 强制暗色主题下采用不透明高质感深曜黑背景 */
+}
+
+/* 2. 左侧粘性面板滚动条高保真优化 */
+.ai-detail-left {
+  position: static !important;
+  top: auto !important;
+  align-self: start !important;
+  height: 100% !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  padding-right: 6px !important;
+  padding-bottom: 24px !important;
+  scroll-padding-bottom: 24px !important;
+}
+
+.ai-detail-right {
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  padding-bottom: 24px !important;
+}
+
+.ai-detail-left::-webkit-scrollbar {
+  width: 6px !important;
+}
+.ai-detail-left::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+.ai-detail-left::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.2) !important;
+  border-radius: 4px !important;
+}
+.ai-detail-left::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.4) !important;
+}
+
+:global(html[data-theme='genart']) .ai-detail-left::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+:global(html[data-theme='genart']) .ai-detail-left::-webkit-scrollbar-thumb:hover {
+  background: rgba(168, 85, 247, 0.4) !important;
+}
+
+/* 3. 禁用状态按钮样式修正 (防止禁用时仍带有明亮渐变和阴影) */
+.ai-task-detail-actions .ai-btn-primary:disabled {
+  background: #f3f4f6 !important;
+  border: 1px solid #e5e7eb !important;
+  color: #9ca3af !important;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
+}
+
+:global(html[data-theme='genart']) .ai-task-detail-actions .ai-btn-primary:disabled {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+  color: rgba(255, 255, 255, 0.25) !important;
+  box-shadow: none !important;
+}
+
+.ai-task-detail-actions .ai-btn:disabled {
+  cursor: not-allowed !important;
+  opacity: 0.55 !important;
+}
+
+/* 4. 空状态微光渐变与上下微动效，提升视觉质感 */
+.ai-script-empty-card {
+  background: linear-gradient(
+    135deg,
+    var(--tp-surface-card) 0%,
+    rgba(139, 92, 246, 0.01) 100%
+  ) !important;
+  box-shadow:
+    0 4px 20px rgba(139, 92, 246, 0.01),
+    var(--tp-shadow-sm) !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+.ai-script-empty-card::before {
+  content: '' !important;
+  position: absolute !important;
+  top: -50% !important;
+  left: -50% !important;
+  width: 200% !important;
+  height: 200% !important;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.03) 0%, transparent 70%) !important;
+  pointer-events: none !important;
+}
+.ai-script-empty .material-symbols-outlined {
+  animation: bounce-icon 3s ease-in-out infinite !important;
+}
+
+@keyframes bounce-icon {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
 </style>
 
 <style>
@@ -2134,7 +2880,7 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 280px;
+  max-height: 420px;
   overflow-y: auto;
   padding-right: 6px;
 }
@@ -2154,15 +2900,24 @@ watch(
   background: rgba(139, 92, 246, 0.3);
 }
 
+.validation-history-item {
+  border-radius: 10px;
+}
+
 /* 验证历史行样式 (默认浅色) */
 .validation-history-row {
   display: flex;
   align-items: center;
   gap: 16px;
+  width: 100%;
   padding: 8px 14px;
   border-radius: 8px;
   background: rgba(139, 92, 246, 0.02) !important;
   border: 1px solid rgba(139, 92, 246, 0.06) !important;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
   transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
@@ -2171,6 +2926,18 @@ watch(
   border-color: rgba(139, 92, 246, 0.22) !important;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(139, 92, 246, 0.04);
+}
+
+.validation-history-row:focus-visible {
+  outline: 2px solid rgba(139, 92, 246, 0.38);
+  outline-offset: 2px;
+}
+
+.validation-history-item.expanded .validation-history-row {
+  border-color: rgba(139, 92, 246, 0.24) !important;
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+  background: rgba(139, 92, 246, 0.05) !important;
 }
 
 .validation-history-row .history-time-col {
@@ -2183,7 +2950,8 @@ watch(
 
 .validation-history-row .history-user-col,
 .validation-history-row .history-duration-col,
-.validation-history-row .history-steps-col {
+.validation-history-row .history-steps-col,
+.validation-history-row .history-detail-hint {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -2191,10 +2959,169 @@ watch(
   color: #6b7280 !important;
 }
 
+.validation-history-row .history-detail-hint {
+  color: var(--tp-primary, #8b5cf6) !important;
+  font-weight: 600;
+}
+
 .validation-history-row .history-meta-icon {
   font-size: 13px !important;
   color: #9ca3af;
   vertical-align: middle;
+}
+
+.validation-history-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px 14px;
+  border: 1px solid rgba(139, 92, 246, 0.18);
+  border-top: 0;
+  border-radius: 0 0 10px 10px;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.validation-history-fail-reason {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(248, 113, 113, 0.22);
+  border-radius: 9px;
+  background: rgba(254, 242, 242, 0.86);
+  color: #991b1b;
+}
+
+.validation-history-fail-reason .material-symbols-outlined {
+  flex: 0 0 auto;
+  font-size: 18px;
+}
+
+.validation-history-fail-reason strong,
+.validation-history-section-title {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.validation-history-fail-reason p {
+  margin: 0;
+  color: #7f1d1d;
+  font-size: 0.74rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.validation-history-empty-detail {
+  color: #6b7280;
+  font-size: 0.74rem;
+}
+
+.validation-history-section-title {
+  color: #374151;
+}
+
+.validation-history-step-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.validation-history-step-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+}
+
+.validation-history-step-chip .material-symbols-outlined {
+  font-size: 13px;
+}
+
+.validation-history-step-chip.passed {
+  background: rgba(16, 185, 129, 0.09);
+  color: #047857;
+}
+
+.validation-history-step-chip.failed {
+  background: rgba(239, 68, 68, 0.09);
+  color: #b91c1c;
+}
+
+.validation-history-log-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow: auto;
+  padding: 8px;
+  border-radius: 9px;
+  background: #111827;
+}
+
+.validation-history-log-line {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  color: #d1d5db;
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.validation-history-log-line span {
+  color: #a78bfa;
+  font-weight: 700;
+}
+
+.validation-history-log-line.error span {
+  color: #f87171;
+}
+
+.validation-history-log-line.warn span {
+  color: #fbbf24;
+}
+
+.validation-history-log-line code {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--tp-font-mono, monospace);
+}
+
+.validation-history-screenshot-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.validation-history-screenshot-link {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid rgba(139, 92, 246, 0.14);
+  border-radius: 9px;
+  background: rgba(139, 92, 246, 0.03);
+  color: var(--tp-primary, #8b5cf6);
+  font-size: 0.7rem;
+  text-decoration: none;
+}
+
+.validation-history-screenshot-link img {
+  width: 100%;
+  max-height: 110px;
+  object-fit: cover;
+  border-radius: 7px;
+  background: #f3f4f6;
+}
+
+.validation-history-screenshot-link:hover {
+  border-color: rgba(139, 92, 246, 0.32);
+  background: rgba(139, 92, 246, 0.07);
 }
 
 /* 顶部操作区、标题与按钮高保真优化 (默认浅色) */
@@ -2833,6 +3760,11 @@ html[data-theme='genart'] .validation-history-row:hover {
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4) !important;
 }
 
+html[data-theme='genart'] .validation-history-item.expanded .validation-history-row {
+  background: rgba(168, 85, 247, 0.08) !important;
+  border-color: rgba(168, 85, 247, 0.26) !important;
+}
+
 html[data-theme='genart'] .validation-history-row .history-time-col {
   color: #9ca3af !important;
 }
@@ -2843,8 +3775,52 @@ html[data-theme='genart'] .validation-history-row .history-steps-col {
   color: #6b7280 !important;
 }
 
+html[data-theme='genart'] .validation-history-row .history-detail-hint {
+  color: #c084fc !important;
+}
+
 html[data-theme='genart'] .validation-history-row .history-meta-icon {
   color: #4b5563 !important;
+}
+
+html[data-theme='genart'] .validation-history-detail {
+  background: rgba(17, 24, 39, 0.72);
+  border-color: rgba(168, 85, 247, 0.22);
+}
+
+html[data-theme='genart'] .validation-history-fail-reason {
+  background: rgba(127, 29, 29, 0.18);
+  border-color: rgba(248, 113, 113, 0.22);
+  color: #fecaca;
+}
+
+html[data-theme='genart'] .validation-history-fail-reason p {
+  color: #fecaca;
+}
+
+html[data-theme='genart'] .validation-history-empty-detail,
+html[data-theme='genart'] .validation-history-section-title {
+  color: #9ca3af;
+}
+
+html[data-theme='genart'] .validation-history-step-chip.passed {
+  background: rgba(16, 185, 129, 0.14);
+  color: #6ee7b7;
+}
+
+html[data-theme='genart'] .validation-history-step-chip.failed {
+  background: rgba(239, 68, 68, 0.14);
+  color: #fca5a5;
+}
+
+html[data-theme='genart'] .validation-history-log-box {
+  background: rgba(3, 7, 18, 0.86);
+}
+
+html[data-theme='genart'] .validation-history-screenshot-link {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #c084fc;
 }
 
 /* 顶部操作区、标题与按钮高保真优化 (深色黑曜) */

@@ -4,8 +4,8 @@
 
 修改本目录下任何 Vue、TypeScript、CSS、路由、Store、API、测试或构建配置前，必须先阅读并遵守：
 
-- `../.windsurf/rules/testfront-frontend-rules.md`
-- `../.agents/skills/ui-ux-pro-max/SKILL.md`（任何 UI/UX、样式、组件、页面、交互、响应式、可访问性改动必须自动使用）
+- `../.devin/rules/testfront-frontend-rules.md`
+- `../.devin/skills/ui-ux-pro-max/SKILL.md`（任何 UI/UX、样式、组件、页面、交互、响应式、可访问性改动必须自动使用）
 
 ## 强制约定
 

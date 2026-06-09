@@ -363,14 +363,20 @@ export interface AiScriptTrace {
 
 import { apiClient } from './client'
 
+type PlainObject = Record<string, unknown>
+
+function isPlainObject(value: unknown): value is PlainObject {
+  return value !== null && typeof value === 'object' && !(value instanceof Date)
+}
+
 /**
  * snake_case 对象键转 camelCase（单层 + 数组递归）
  * 用于将后端 JSON 响应映射到前端 Interface
  */
-function toCamel(obj: any): any {
+function toCamel(obj: unknown): unknown {
   if (Array.isArray(obj)) return obj.map(toCamel)
-  if (obj !== null && typeof obj === 'object' && !(obj instanceof Date)) {
-    return Object.keys(obj).reduce((acc: Record<string, any>, key) => {
+  if (isPlainObject(obj)) {
+    return Object.keys(obj).reduce((acc: PlainObject, key) => {
       const camelKey = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase())
       acc[camelKey] = toCamel(obj[key])
       return acc
@@ -382,10 +388,10 @@ function toCamel(obj: any): any {
 /**
  * camelCase 对象键转 snake_case（用于发送请求体）
  */
-function toSnake(obj: any): any {
+function toSnake(obj: unknown): unknown {
   if (Array.isArray(obj)) return obj.map(toSnake)
-  if (obj !== null && typeof obj === 'object' && !(obj instanceof Date)) {
-    return Object.keys(obj).reduce((acc: Record<string, any>, key) => {
+  if (isPlainObject(obj)) {
+    return Object.keys(obj).reduce((acc: PlainObject, key) => {
       const snakeKey = key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)
       acc[snakeKey] = toSnake(obj[key])
       return acc
@@ -398,7 +404,7 @@ function toSnake(obj: any): any {
 export async function fetchTaskList(
   params?: AiScriptTaskListQuery,
 ): Promise<{ list: AiScriptTask[]; total: number }> {
-  const query: Record<string, any> = {}
+  const query: Record<string, number | string> = {}
   if (params?.projectId) query.project_id = params.projectId
   if (params?.taskStatus) query.task_status = params.taskStatus
   if (params?.keyword) query.keyword = params.keyword
@@ -603,9 +609,16 @@ export async function fetchValidationHistory(scriptId: number): Promise<AiScript
   return toCamel(Array.isArray(data) ? data : []) as AiScriptValidation[]
 }
 
-/** 更新任务名称 */
-export async function renameTask(taskId: number, taskName: string): Promise<void> {
-  await apiClient.put(`/ai-script/tasks/${taskId}/name`, { task_name: taskName })
+/** 更新任务基础信息 */
+export async function renameTask(
+  taskId: number,
+  taskName: string,
+  scenarioDesc: string,
+): Promise<void> {
+  await apiClient.put(`/ai-script/tasks/${taskId}/name`, {
+    task_name: taskName,
+    scenario_desc: scenarioDesc,
+  })
 }
 
 /** 更新任务关联用例 */

@@ -3953,7 +3953,7 @@ html[data-theme='genart'] .stitch-btn-save:hover:not(:disabled) {
 }
 
 /* 用例详情输入面：提升为品牌纯白背景与精致紫色边框 */
-.stitch-drawer-wrapper {
+:global(.stitch-drawer-wrapper) {
   --case-editor-field-bg: #ffffff;
   --case-editor-field-bg-hover: var(--tp-surface-hover, #f5f3ff);
   --case-editor-field-bg-focus: #ffffff;
@@ -3966,7 +3966,7 @@ html[data-theme='genart'] .stitch-btn-save:hover:not(:disabled) {
   --case-editor-popover-z: 120;
 }
 
-:global(html[data-theme='genart']) .stitch-drawer-wrapper {
+:global(html[data-theme='genart'] .stitch-drawer-wrapper) {
   --case-editor-field-bg: rgba(0, 0, 0, 0.2) !important;
   --case-editor-field-bg-hover: rgba(255, 255, 255, 0.04) !important;
   --case-editor-field-bg-focus: rgba(0, 0, 0, 0.3) !important;
@@ -3974,52 +3974,52 @@ html[data-theme='genart'] .stitch-btn-save:hover:not(:disabled) {
   --case-editor-field-border-hover: rgba(255, 255, 255, 0.15) !important;
 }
 
-.stitch-drawer-wrapper .stitch-input,
-.stitch-drawer-wrapper .stitch-select,
-.stitch-drawer-wrapper .stitch-textarea,
-.stitch-drawer-wrapper .stitch-textarea-wrap,
-.stitch-drawer-wrapper .stitch-level-picker,
-.stitch-drawer-wrapper .module-picker-trigger,
-.stitch-drawer-wrapper .stitch-table-input,
-.stitch-drawer-wrapper .review-readonly-card,
-.stitch-drawer-wrapper .exec-status-select :deep(.el-select__wrapper),
-.stitch-drawer-wrapper .tag-selector :deep(.el-select__wrapper) {
+:global(.stitch-drawer-wrapper .stitch-input),
+:global(.stitch-drawer-wrapper .stitch-select),
+:global(.stitch-drawer-wrapper .stitch-textarea),
+:global(.stitch-drawer-wrapper .stitch-textarea-wrap),
+:global(.stitch-drawer-wrapper .stitch-level-picker),
+:global(.stitch-drawer-wrapper .module-picker-trigger),
+:global(.stitch-drawer-wrapper .stitch-table-input),
+:global(.stitch-drawer-wrapper .review-readonly-card),
+:global(.stitch-drawer-wrapper .exec-status-select :deep(.el-select__wrapper)),
+:global(.stitch-drawer-wrapper .tag-selector :deep(.el-select__wrapper)) {
   background: var(--case-editor-field-bg) !important;
   border-color: var(--case-editor-field-border) !important;
 }
 
-.stitch-drawer-wrapper .stitch-input:hover,
-.stitch-drawer-wrapper .stitch-select:hover,
-.stitch-drawer-wrapper .stitch-textarea:hover,
-.stitch-drawer-wrapper .stitch-textarea-wrap:hover,
-.stitch-drawer-wrapper .stitch-level-picker:hover,
-.stitch-drawer-wrapper .module-picker-trigger:hover,
-.stitch-drawer-wrapper .stitch-table-input:hover,
-.stitch-drawer-wrapper .review-readonly-card:hover,
-.stitch-drawer-wrapper .exec-status-select :deep(.el-select__wrapper:hover),
-.stitch-drawer-wrapper .tag-selector :deep(.el-select__wrapper:hover) {
+:global(.stitch-drawer-wrapper .stitch-input:hover),
+:global(.stitch-drawer-wrapper .stitch-select:hover),
+:global(.stitch-drawer-wrapper .stitch-textarea:hover),
+:global(.stitch-drawer-wrapper .stitch-textarea-wrap:hover),
+:global(.stitch-drawer-wrapper .stitch-level-picker:hover),
+:global(.stitch-drawer-wrapper .module-picker-trigger:hover),
+:global(.stitch-drawer-wrapper .stitch-table-input:hover),
+:global(.stitch-drawer-wrapper .review-readonly-card:hover),
+:global(.stitch-drawer-wrapper .exec-status-select :deep(.el-select__wrapper:hover)),
+:global(.stitch-drawer-wrapper .tag-selector :deep(.el-select__wrapper:hover)) {
   background: var(--case-editor-field-bg-hover) !important;
   border-color: var(--case-editor-field-border-hover) !important;
 }
 
-.stitch-drawer-wrapper .stitch-input:focus,
-.stitch-drawer-wrapper .stitch-select:focus,
-.stitch-drawer-wrapper .stitch-textarea:focus,
-.stitch-drawer-wrapper .stitch-textarea-wrap:focus-within,
-.stitch-drawer-wrapper .stitch-level-picker:focus-visible,
-.stitch-drawer-wrapper .module-picker-trigger:focus-visible,
-.stitch-drawer-wrapper .module-picker-trigger:focus,
-.stitch-drawer-wrapper .module-picker-trigger:focus-within,
-.stitch-drawer-wrapper .stitch-table-input:focus,
-.stitch-drawer-wrapper .exec-status-select :deep(.el-select__wrapper.is-focused),
-.stitch-drawer-wrapper .tag-selector :deep(.el-select__wrapper.is-focused) {
+:global(.stitch-drawer-wrapper .stitch-input:focus),
+:global(.stitch-drawer-wrapper .stitch-select:focus),
+:global(.stitch-drawer-wrapper .stitch-textarea:focus),
+:global(.stitch-drawer-wrapper .stitch-textarea-wrap:focus-within),
+:global(.stitch-drawer-wrapper .stitch-level-picker:focus-visible),
+:global(.stitch-drawer-wrapper .module-picker-trigger:focus-visible),
+:global(.stitch-drawer-wrapper .module-picker-trigger:focus),
+:global(.stitch-drawer-wrapper .module-picker-trigger:focus-within),
+:global(.stitch-drawer-wrapper .stitch-table-input:focus),
+:global(.stitch-drawer-wrapper .exec-status-select :deep(.el-select__wrapper.is-focused)),
+:global(.stitch-drawer-wrapper .tag-selector :deep(.el-select__wrapper.is-focused)) {
   background: var(--case-editor-field-bg-focus) !important;
   border-color: var(--tp-accent-primary-border) !important;
   box-shadow: 0 0 0 2px var(--tp-accent-primary-soft) !important;
 }
 
 /* 聚焦反馈只落在控件本体，字段名称保持稳定，避免编辑时整屏标签变成强调色。 */
-.stitch-drawer-wrapper .stitch-form-item:focus-within label {
+:global(.stitch-drawer-wrapper .stitch-form-item:focus-within label) {
   color: var(--tp-text-primary) !important;
 }
 

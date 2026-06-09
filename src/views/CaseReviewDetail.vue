@@ -1288,6 +1288,15 @@ watch(
       <section class="rv2-summary">
         <div class="rv2-summary-l">
           <div id="case-summary-title" class="rv2-summary-title-row">
+            <button
+              type="button"
+              class="rv2-back-btn"
+              title="返回列表"
+              aria-label="返回评审任务列表"
+              @click="router.push('/case-reviews')"
+            >
+              <span class="material-symbols-outlined">arrow_back</span>
+            </button>
             <h1 class="rv2-summary-title">
               {{ currentItem?.title_snapshot || review.name }}
             </h1>
@@ -2131,6 +2140,34 @@ watch(
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
+}
+
+/* ── 返回列表按钮 ── */
+.rv2-back-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%; /* 圆形微背景 */
+  background: transparent;
+  color: var(--rv2-fg-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+  padding: 0;
+  flex-shrink: 0;
+}
+.rv2-back-btn:hover,
+.rv2-back-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--rv2-outline);
+  outline: none;
+}
+.rv2-back-btn .material-symbols-outlined {
+  font-size: 20px;
 }
 
 /* ── 顶部上下文条 ── */
@@ -3115,6 +3152,10 @@ watch(
   font-size: 12px;
   font-weight: 500;
 }
+/* 步骤表头添加列之间的竖线分割，使列与列之间视觉边界更清晰 */
+.rv2-step-table th:not(:last-child) {
+  border-right: 1px solid rgba(74, 68, 85, 0.15);
+}
 .rv2-step-row {
   border-bottom: 1px solid rgba(74, 68, 85, 0.1);
   transition: background 0.2s;
@@ -3129,12 +3170,18 @@ watch(
   padding: 12px 16px;
   vertical-align: top;
 }
-.rv2-step-col-num {
-  width: 60px;
+/* 步骤内容单元格添加列之间的竖线分割，提升数据列之间的可读性 */
+.rv2-step-table td:not(:last-child) {
+  border-right: 1px solid rgba(74, 68, 85, 0.1);
 }
-.rv2-step-col-desc,
+.rv2-step-col-num {
+  width: 80px;
+}
+.rv2-step-col-desc {
+  width: 45%;
+}
 .rv2-step-col-expect {
-  width: 40%;
+  width: auto;
 }
 .rv2-step-num {
   font-family: 'JetBrains Mono', monospace;
@@ -4866,6 +4913,16 @@ watch(
   margin-bottom: 5px;
 }
 
+/* ── 返回列表按钮主题适配 ── */
+.rv2-back-btn {
+  color: var(--tp-text-secondary);
+}
+.rv2-back-btn:hover,
+.rv2-back-btn:focus-visible {
+  background: var(--tp-surface-hover);
+  color: var(--tp-primary);
+}
+
 .rv2-summary-title {
   font-size: 16px;
   line-height: var(--tp-line-tight);
@@ -5774,7 +5831,7 @@ watch(
 }
 
 .rv2-step-col-num {
-  width: 48px;
+  width: 80px;
 }
 
 .rv2,

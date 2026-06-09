@@ -2942,9 +2942,9 @@
 }
 
 .ai-trace-card {
-  flex: 1;
-  max-height: 520px;
-  overflow-y: auto;
+  flex: none;
+  max-height: none;
+  overflow: visible;
 }
 
 .ai-trace-empty {
@@ -4115,7 +4115,7 @@ html[data-theme='genart'] .ai-fiber-pipe {
 }
 
 .ai-trace-card {
-  max-height: calc(100dvh - 300px);
+  max-height: none;
 }
 
 .ai-task-detail-page .ai-timeline {
@@ -4952,7 +4952,9 @@ html[data-theme='genart'] .ai-fiber-pipe {
   top: 70px;
   align-self: start;
   max-height: calc(100dvh - 86px);
-  padding-right: 0;
+  padding-right: 2px;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .ai-task-detail-page .ai-detail-right {
@@ -5222,6 +5224,27 @@ html[data-theme='genart'] .ai-fiber-pipe {
 .ai-auth-warning .material-symbols-outlined {
   flex: 0 0 auto;
   color: var(--tp-accent-warning);
+  font-size: 17px;
+  line-height: 18px;
+}
+
+.ai-auth-success {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in oklch, var(--tp-accent-success-border) 76%, transparent);
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--tp-accent-success-soft) 84%, var(--tp-surface-card));
+  color: var(--tp-text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.ai-auth-success .material-symbols-outlined {
+  flex: 0 0 auto;
+  color: var(--tp-accent-success);
   font-size: 17px;
   line-height: 18px;
 }

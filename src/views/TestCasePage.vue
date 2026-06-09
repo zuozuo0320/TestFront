@@ -3111,14 +3111,14 @@ watch(selectedProject, (newId) => {
 
             <!-- AI 智检助手 -->
             <section
-              class="case-ai-card"
+              class="stitch-ai-panel"
               :class="{ 'is-ai-locked': !editingId && !aiAnalyzing && !aiError && !aiResult }"
             >
-              <div class="case-ai-head">
-                <div class="case-ai-icon">
+              <div class="ai-header">
+                <div class="ai-icon">
                   <span class="material-symbols-outlined">smart_toy</span>
                 </div>
-                <div class="case-ai-title">
+                <div class="ai-header-title">
                   <h4>AI 智检助手</h4>
                   <span>
                     {{ aiAnalyzing ? '分析中...' : aiResult ? '分析完成' : '智能审计可用' }}
@@ -3127,19 +3127,19 @@ watch(selectedProject, (newId) => {
               </div>
 
               <!-- 加载态 -->
-              <div v-if="aiAnalyzing" class="case-ai-state">
+              <div v-if="aiAnalyzing" class="ai-state">
                 <div class="ai-spinner"></div>
-                <p class="case-ai-description">正在进行 AI 质量分析，请稍候...</p>
+                <p class="text-variant">正在进行 AI 质量分析，请稍候...</p>
               </div>
 
               <!-- 错误态 -->
-              <div v-else-if="aiError" class="case-ai-body">
-                <p class="case-ai-error">{{ aiError }}</p>
-                <button type="button" class="case-ai-action" @click="runAIAnalyze">重新检测</button>
+              <div v-else-if="aiError" class="ai-body">
+                <p class="ai-error">{{ aiError }}</p>
+                <button type="button" class="ai-btn" @click="runAIAnalyze">重新检测</button>
               </div>
 
               <!-- 分析结果 -->
-              <div v-else-if="aiResult">
+              <div v-else-if="aiResult" class="ai-result-body">
                 <div class="ai-dims-container">
                   <div
                     v-for="dim in [
@@ -3159,7 +3159,7 @@ watch(selectedProject, (newId) => {
                   </div>
                 </div>
 
-                <p v-if="aiResult.summary" class="case-ai-description">
+                <p v-if="aiResult.summary" class="text-variant">
                   {{ aiResult.summary }}
                 </p>
 
@@ -3194,21 +3194,16 @@ watch(selectedProject, (newId) => {
                   </div>
                 </div>
 
-                <button type="button" class="case-ai-action" @click="runAIAnalyze">重新检测</button>
+                <button type="button" class="ai-btn" @click="runAIAnalyze">重新检测</button>
               </div>
 
               <!-- 初始态 -->
-              <div v-else class="case-ai-body">
-                <p class="case-ai-description">
+              <div v-else class="ai-body">
+                <p class="text-variant">
                   基于当前用例内容，AI
                   将从覆盖率、边界值、综合质量三个维度进行分析，给出评分和改进建议。
                 </p>
-                <button
-                  type="button"
-                  class="case-ai-action"
-                  :disabled="!editingId"
-                  @click="runAIAnalyze"
-                >
+                <button type="button" class="ai-btn" :disabled="!editingId" @click="runAIAnalyze">
                   {{ editingId ? '开始检测' : '保存后可检测' }}
                 </button>
               </div>
@@ -3765,159 +3760,311 @@ html[data-theme='genart'] .step-icon-menu .el-dropdown-menu__item:not(.is-disabl
 <style scoped>
 @import '../styles/testcase-drawer.css';
 
-.case-ai-card {
-  position: relative;
+.stitch-ai-panel {
+  position: relative !important;
   display: flex !important;
+  flex: 0 0 auto !important; /* 防止在 Flex 布局下被压缩 */
   flex-direction: column !important;
-  gap: 10px !important;
-  min-height: 148px !important;
-  height: auto !important;
-  max-height: none !important;
-  overflow: visible !important;
-  padding: 14px !important;
-  border: 1px solid color-mix(in srgb, var(--tp-primary) 20%, var(--tp-border-subtle)) !important;
-  border-radius: 10px !important;
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--tp-primary) 5%, var(--tp-surface-card)),
-      var(--tp-surface-card)
-    ),
-    var(--tp-surface-card) !important;
-  box-shadow: var(--tp-shadow-sm) !important;
+  gap: var(--tp-space-3, 12px) !important;
+  padding: 16px !important;
+  border-radius: var(--tp-radius-md, 12px) !important;
   box-sizing: border-box !important;
+  transition: all var(--tp-transition) !important;
+  min-height: 148px !important; /* 保证卡片有舒适的基准高度 */
+  height: auto !important;
+  overflow: visible !important; /* 允许阴影与子元素自然溢出不被裁剪 */
+  /* 采用与智能匹配相符的高级渐变背景 */
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--tp-primary) 6%, var(--tp-surface-card)),
+    color-mix(in srgb, var(--tp-accent-info) 4%, var(--tp-surface-card))
+  ) !important;
+  border: 1px solid color-mix(in srgb, var(--tp-primary) 18%, var(--tp-border-subtle)) !important;
+  box-shadow:
+    0 8px 30px rgba(139, 92, 246, 0.04),
+    var(--tp-shadow-sm) !important;
 }
 
-.case-ai-card:hover {
-  border-color: color-mix(in srgb, var(--tp-primary) 32%, var(--tp-border-subtle)) !important;
+/* 悬浮微光与上浮反馈，增强可交互感 */
+.stitch-ai-panel:hover {
+  border-color: color-mix(in srgb, var(--tp-primary) 30%, var(--tp-border-subtle)) !important;
+  box-shadow:
+    0 12px 32px rgba(139, 92, 246, 0.08),
+    var(--tp-shadow-md) !important;
+  transform: translateY(-2px) !important;
 }
 
-.case-ai-card.is-ai-locked {
-  min-height: 136px !important;
+/* 锁定/不可编辑状态时的静音表现 */
+.stitch-ai-panel.is-ai-locked {
+  opacity: 0.82 !important;
+  background: var(--tp-surface-muted) !important;
+  border-color: var(--tp-border-subtle) !important;
+  box-shadow: none !important;
+  transform: none !important;
 }
 
-.case-ai-head {
+/* 头部组件间距对齐 */
+.stitch-ai-panel .ai-header {
   display: flex !important;
   align-items: center !important;
   gap: 10px !important;
-  min-height: 32px !important;
-  margin: 0 !important;
+  margin: 0 0 4px 0 !important;
 }
 
-.case-ai-icon {
-  width: 30px !important;
-  height: 30px !important;
-  flex: 0 0 30px !important;
-  display: inline-flex !important;
+/* 智能机器人 Squircle 徽章容器 */
+.stitch-ai-panel .ai-icon {
+  width: 32px !important;
+  height: 32px !important;
+  flex: 0 0 32px !important;
+  border-radius: 9px !important;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(99, 102, 241, 0.1)) !important;
+  border: 1px solid rgba(139, 92, 246, 0.25) !important;
+  display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  border-radius: 9px !important;
-  background: var(--tp-primary) !important;
-  color: #fff !important;
+  box-shadow: none !important;
 }
 
-.case-ai-icon .material-symbols-outlined {
-  color: #fff !important;
-  font-size: 17px !important;
-  line-height: 1 !important;
+.stitch-ai-panel .ai-icon .material-symbols-outlined {
+  font-size: 18px !important;
+  color: var(--tp-primary) !important;
 }
 
-.case-ai-title {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+/* 头部标题区域，紧凑型双行排版 */
+.stitch-ai-panel .ai-header-title {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  min-width: 0 !important;
 }
 
-.case-ai-title h4 {
+.stitch-ai-panel .ai-header-title h4 {
   margin: 0 !important;
   color: var(--tp-text-primary) !important;
   font-size: 13px !important;
-  font-weight: var(--tp-font-semibold) !important;
+  font-weight: 600 !important;
   line-height: 18px !important;
-  white-space: nowrap;
 }
 
-.case-ai-title span {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
+.stitch-ai-panel .ai-header-title span {
+  display: block !important;
   color: var(--tp-text-muted) !important;
   font-size: 11px !important;
   line-height: 14px !important;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  letter-spacing: 0 !important;
-  text-transform: none !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+  overflow: hidden !important;
 }
 
-.case-ai-body,
-.case-ai-state {
+/* 内容布局，保证所有状态元素严格遵守 100% 宽度，防止溢出边框 */
+.stitch-ai-panel .ai-body,
+.stitch-ai-panel .ai-state,
+.stitch-ai-panel .ai-result-body {
   display: flex !important;
   flex-direction: column !important;
-  gap: 10px !important;
-}
-
-.case-ai-state {
-  align-items: center;
-  padding: 8px 0 2px;
-  text-align: center;
-}
-
-.case-ai-description {
-  display: block !important;
+  gap: 12px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
   margin: 0 !important;
-  overflow: visible !important;
-  color: var(--tp-text-secondary) !important;
-  font-size: 12px !important;
-  line-height: 1.5 !important;
-  -webkit-line-clamp: initial !important;
-  line-clamp: initial !important;
-  -webkit-box-orient: initial !important;
 }
 
-.case-ai-error {
+/* 进度加载态自适应 */
+.stitch-ai-panel .ai-state {
+  align-items: center !important;
+  padding: 8px 0 2px !important;
+  text-align: center !important;
+}
+
+/* 加载动画圈 */
+.stitch-ai-panel .ai-spinner {
+  width: 24px !important;
+  height: 24px !important;
+  border: 2px solid rgba(139, 92, 246, 0.15) !important;
+  border-top-color: var(--tp-primary) !important;
+  border-radius: 50% !important;
+  animation: ai-spin 1s linear infinite !important;
+  margin: 0 auto !important;
+}
+
+/* 错误文字提示 */
+.stitch-ai-panel .ai-error {
   margin: 0 !important;
   color: var(--tp-danger, #ef4444) !important;
   font-size: 12px !important;
-  line-height: 1.45 !important;
+  line-height: 1.5 !important;
 }
 
-.case-ai-action {
-  width: 100% !important;
-  min-height: 34px !important;
-  padding: 0 12px !important;
-  border: 0 !important;
-  border-radius: 8px !important;
-  background: var(--tp-primary) !important;
-  color: #fff !important;
+/* 卡片文本描述，限制间距与字体 */
+.stitch-ai-panel .text-variant {
+  display: block !important;
+  margin: 0 0 4px 0 !important;
+  color: var(--tp-text-secondary) !important;
   font-size: 12px !important;
-  font-weight: var(--tp-font-semibold) !important;
-  line-height: 34px !important;
-  cursor: pointer;
+  line-height: 1.5 !important;
+  word-break: break-all !important;
+}
+
+/* AI 检测/重试按钮：高级质感渐变，保证水平居中和盒模型 */
+.stitch-ai-panel .ai-btn {
+  width: 100% !important;
+  min-height: 36px !important;
+  padding: 0 16px !important;
+  border-radius: 8px !important;
+  background: var(--tp-btn-bg, linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)) !important;
+  color: var(--tp-btn-text, #ffffff) !important;
+  border: none !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2) !important;
+  transition: all 0.2s ease !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+}
+
+.stitch-ai-panel .ai-btn:hover:not(:disabled) {
+  background: var(--tp-btn-bg-hover, linear-gradient(135deg, #7c3aed 0%, #db2777 100%)) !important;
+  box-shadow: 0 6px 16px rgba(139, 92, 246, 0.3) !important;
+  transform: translateY(-1px) !important;
+}
+
+.stitch-ai-panel .ai-btn:active:not(:disabled) {
+  transform: translateY(0) !important;
+}
+
+.stitch-ai-panel .ai-btn:disabled {
+  background: var(--tp-surface-input, rgba(0, 0, 0, 0.05)) !important;
+  color: var(--tp-text-disabled, rgba(0, 0, 0, 0.25)) !important;
   box-shadow: none !important;
-  transition:
-    background var(--tp-transition, 0.2s),
-    opacity var(--tp-transition, 0.2s);
+  cursor: not-allowed !important;
+  opacity: 0.6 !important;
+  border: 1px solid var(--tp-border-subtle) !important;
 }
 
-.case-ai-action:hover:not(:disabled) {
-  background: var(--tp-btn-bg-hover, var(--tp-primary-dark)) !important;
+/* 智检结果：评估维度卡片网格 */
+.stitch-ai-panel .ai-dims-container {
+  display: flex !important;
+  gap: 8px !important;
+  margin: 4px 0 !important;
+  width: 100% !important;
 }
 
-.case-ai-action:disabled {
-  background: var(--tp-surface-muted) !important;
+.stitch-ai-panel .ai-dim-card {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  padding: 8px 4px !important;
+  border-radius: 8px !important;
+  background: var(--tp-surface-input, rgba(0, 0, 0, 0.02)) !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  transition: all 0.2s ease !important;
+}
+
+.stitch-ai-panel .ai-dim-card:hover {
+  background: var(--tp-surface-hover, rgba(139, 92, 246, 0.05)) !important;
+  border-color: rgba(139, 92, 246, 0.2) !important;
+}
+
+.stitch-ai-panel .ai-dim-label {
+  font-size: 11px !important;
   color: var(--tp-text-muted) !important;
-  cursor: not-allowed;
-  opacity: 0.72;
+  margin-bottom: 2px !important;
 }
 
-.case-ai-card .ai-dims-container {
-  margin-bottom: 10px !important;
+.stitch-ai-panel .ai-dim-score {
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
 }
 
-.case-ai-card .ai-issues-list {
-  margin-bottom: 10px !important;
+/* 智检结果：问题及改进建议列表 */
+.stitch-ai-panel .ai-issues-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  margin: 4px 0 !important;
+  width: 100% !important;
+}
+
+.stitch-ai-panel .ai-issue-item {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 8px !important;
+  padding: 8px 10px !important;
+  border-radius: 6px !important;
+  background: var(--tp-surface-input, rgba(0, 0, 0, 0.02)) !important;
+  color: var(--tp-text-secondary) !important;
+  line-height: 1.4 !important;
+  font-size: 11px !important;
+  border: 1px solid var(--tp-border-subtle) !important;
+  transition: all 0.15s ease !important;
+}
+
+.stitch-ai-panel .ai-issue-item:hover {
+  background: var(--tp-surface-hover, rgba(139, 92, 246, 0.05)) !important;
+}
+
+.stitch-ai-panel .ai-issue-item.type-coverage {
+  border-left: 3px solid var(--tp-accent-info, #6366f1) !important;
+}
+
+.stitch-ai-panel .ai-issue-item.type-boundary {
+  border-left: 3px solid var(--tp-accent-warning, #f59e0b) !important;
+}
+
+.stitch-ai-panel .ai-issue-item.type-quality {
+  border-left: 3px solid var(--tp-primary, #8b5cf6) !important;
+}
+
+.stitch-ai-panel .ai-issue-icon {
+  font-size: 13px !important;
+  margin-top: 1px !important;
+  flex-shrink: 0 !important;
+}
+
+.stitch-ai-panel .ai-issue-item.type-coverage .ai-issue-icon {
+  color: var(--tp-accent-info) !important;
+}
+
+.stitch-ai-panel .ai-issue-item.type-boundary .ai-issue-icon {
+  color: var(--tp-accent-warning) !important;
+}
+
+.stitch-ai-panel .ai-issue-item.type-quality .ai-issue-icon {
+  color: var(--tp-primary) !important;
+}
+
+.stitch-ai-panel .ai-issue-text {
+  font-size: 11px !important;
+  color: var(--tp-text-secondary) !important;
+  line-height: 1.4 !important;
+}
+
+/* ───────────────────────────────
+   黑曜（Genart）暗色主题特别适配
+   ─────────────────────────────── */
+:global(html[data-theme='genart']) .stitch-ai-panel {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(99, 102, 241, 0.05)) !important;
+  border-color: rgba(168, 85, 247, 0.25) !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2) !important;
+}
+
+:global(html[data-theme='genart']) .stitch-ai-panel:hover {
+  border-color: rgba(168, 85, 247, 0.4) !important;
+}
+
+:global(html[data-theme='genart']) .stitch-ai-panel .ai-btn {
+  background: var(--tp-btn-bg, linear-gradient(135deg, #a78bfa 0%, #d6b36a 100%)) !important;
+  color: var(--tp-btn-text, #08090f) !important;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.2) !important;
+}
+
+:global(html[data-theme='genart']) .stitch-ai-panel .ai-btn:hover:not(:disabled) {
+  background: var(--tp-btn-bg-hover, linear-gradient(135deg, #c4b5fd 0%, #e7c982 100%)) !important;
+  box-shadow: 0 6px 16px rgba(168, 85, 247, 0.3) !important;
 }
 
 .review-cell {

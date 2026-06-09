@@ -1820,9 +1820,8 @@ html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-pct {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
-
 .tm-tag-workbench .tm-card-grid {
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important;
   align-content: start !important;
   gap: 10px !important;
   padding: 4px 2px !important;
@@ -1907,13 +1906,13 @@ html[data-theme='genart'] .tm-dial-item:not(.is-empty):hover .tm-dial-pct {
 
 @media (max-width: 1180px) {
   .tm-tag-workbench .tm-card-grid {
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)) !important;
   }
 }
 
 @media (max-width: 900px) {
   .tm-tag-workbench .tm-card-grid {
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)) !important;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important;
   }
 }
 
@@ -2364,9 +2363,12 @@ html body .tm-root .tm-tag-count-badge {
 
 /* Tabs 胶囊外壳 */
 html body .tm-root .tm-tabs {
-  display: flex !important;
+  display: inline-flex !important;
+  align-items: center !important;
   gap: 2px !important;
   padding: 2px !important;
+  height: 32px !important;
+  box-sizing: border-box !important;
   border-radius: 999px !important;
   background: var(--tp-surface-input) !important;
   border: 1px solid var(--tp-border-subtle) !important;
@@ -2374,17 +2376,21 @@ html body .tm-root .tm-tabs {
 
 /* Tab 按钮 */
 html body .tm-root .tm-tab {
-  min-height: 24px !important;
-  padding: 0 10px !important;
+  min-height: 26px !important;
+  height: 26px !important;
+  padding: 0 12px !important;
   border-radius: 999px !important;
   color: var(--tp-text-muted) !important;
-  font-size: 11px !important;
+  font-size: 12px !important;
   font-weight: var(--tp-font-medium, 500) !important;
   background: transparent !important;
   border: none !important;
   cursor: pointer !important;
   transition: all var(--tp-transition) !important;
-  line-height: 1 !important;
+  line-height: 26px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 html body .tm-root .tm-tab.active {
@@ -2404,10 +2410,10 @@ html body .tm-root .tm-head-right {
 
 /* 搜索框：支持聚焦时自然过渡变宽的物理呼吸动效 */
 html body .tm-root .tm-search-box {
-  width: 150px !important;
-  min-height: 28px !important;
-  height: 28px !important;
-  padding: 0 8px !important;
+  width: 180px !important;
+  min-height: 32px !important;
+  height: 32px !important;
+  padding: 0 10px !important;
   border-radius: 8px !important;
   background: var(--tp-surface-input) !important;
   border: 1px solid var(--tp-border-subtle) !important;
@@ -2420,19 +2426,19 @@ html body .tm-root .tm-search-box {
 }
 
 html body .tm-root .tm-search-box:focus-within {
-  width: 200px !important;
+  width: 240px !important;
   border-color: var(--tp-accent-primary-border) !important;
   background: var(--tp-surface-card) !important;
   box-shadow: 0 0 0 3px var(--tp-accent-primary-soft) !important;
 }
 
 html body .tm-root .tm-search-icon {
-  font-size: 15px !important;
+  font-size: 16px !important;
   color: var(--tp-text-subtle) !important;
 }
 
 html body .tm-root .tm-search-input {
-  font-size: 11px !important;
+  font-size: 12px !important;
   color: var(--tp-text-primary) !important;
 }
 
@@ -2440,12 +2446,12 @@ html body .tm-root .tm-search-input {
 html body .tm-root .tm-sort {
   display: flex !important;
   align-items: center !important;
-  height: 28px !important;
-  padding: 0 6px !important;
+  height: 32px !important;
+  padding: 0 8px !important;
   border-radius: 8px !important;
   background: var(--tp-surface-input) !important;
   border: 1px solid var(--tp-border-subtle) !important;
-  gap: 4px !important;
+  gap: 6px !important;
   transition:
     border-color 0.2s,
     box-shadow 0.2s !important; /* 平滑过渡焦点状态，提升可交互质感 */
@@ -2458,12 +2464,12 @@ html body .tm-root .tm-sort:focus-within {
 }
 
 html body .tm-root .tm-sort-label {
-  font-size: 11px !important;
+  font-size: 12px !important;
   color: var(--tp-text-subtle) !important;
 }
 
 html body .tm-root .tm-sort-select {
-  font-size: 11px !important;
+  font-size: 12px !important;
   color: var(--tp-text-primary) !important;
   font-weight: 600 !important;
   border: none !important;
@@ -2477,9 +2483,9 @@ html body .tm-root .tm-sort-select {
   /* 引入自定义内联 SVG 箭头，在抹除原生外观后保证下拉方向指示的可见性与美观度 */
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>") !important;
   background-repeat: no-repeat !important;
-  background-position: right 2px center !important;
+  background-position: right 4px center !important;
   background-size: 10px 10px !important;
-  padding: 0 14px 0 2px !important; /* 给自定义的下拉小箭头留出合理的右侧内边距空间，防止文字重叠 */
+  padding: 0 16px 0 2px !important; /* 给自定义的下拉小箭头留出合理的右侧内边距空间，防止文字重叠 */
 }
 
 /* 彻底禁绝 select 元素自身的聚焦虚线框和阴影，避免在不同浏览器上产生杂余内框 */
@@ -2498,16 +2504,16 @@ html body .tm-root .tm-action-btns {
 
 html body .tm-root .tm-btn-filter,
 html body .tm-root .tm-btn-wizard {
-  min-height: 28px !important;
-  height: 28px !important;
-  padding: 0 10px !important;
+  min-height: 32px !important;
+  height: 32px !important;
+  padding: 0 14px !important;
   border-radius: 8px !important;
-  font-size: 11px !important;
+  font-size: 12px !important;
   font-weight: 600 !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 4px !important;
+  gap: 6px !important;
   white-space: nowrap !important;
   cursor: pointer !important;
   border: 1px solid transparent !important;
@@ -2516,7 +2522,7 @@ html body .tm-root .tm-btn-wizard {
 
 html body .tm-root .tm-btn-filter .material-symbols-outlined,
 html body .tm-root .tm-btn-wizard .material-symbols-outlined {
-  font-size: 14px !important;
+  font-size: 16px !important;
 }
 
 /* 新建标签按钮：对齐全站统一的渐变高保真按钮样式 */
@@ -2553,7 +2559,7 @@ html body .tm-root .tm-tag-workbench .tm-card-grid {
   min-height: 0 !important;
   overflow-y: auto !important;
   padding: 0 !important; /* 卡片网格彻底贴边无缩进，完全由页面外边距统一对齐 */
-  gap: 4px !important; /* 网格卡片间隙与角色页面对齐，统一为 4px */
+  gap: 12px !important; /* 调整网格卡片间隙为 12px，提供更舒适的呼吸感与边界感 */
   transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
