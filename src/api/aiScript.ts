@@ -905,6 +905,37 @@ export interface GenerateCompositionCodeResult {
   generatedCode: string
 }
 
+/** AI 规划模式常量。 */
+export const PlannerMode = {
+  AUTO: 'auto',
+  LLM: 'llm',
+  HEURISTIC: 'heuristic',
+} as const
+export type PlannerMode = (typeof PlannerMode)[keyof typeof PlannerMode]
+
+export const PlannerModeLabel: Record<PlannerMode, string> = {
+  [PlannerMode.AUTO]: '自动',
+  [PlannerMode.LLM]: '大模型',
+  [PlannerMode.HEURISTIC]: '启发式',
+}
+
+/** 实际生效的规划器常量。 */
+export const PlannerUsed = {
+  LLM: 'LLM',
+  HEURISTIC: 'HEURISTIC',
+} as const
+export type PlannerUsed = (typeof PlannerUsed)[keyof typeof PlannerUsed]
+
+export const PlannerUsedLabel: Record<PlannerUsed, string> = {
+  [PlannerUsed.LLM]: '大模型规划',
+  [PlannerUsed.HEURISTIC]: '启发式规划',
+}
+
+export const PlannerUsedColor: Record<PlannerUsed, StatusColor> = {
+  [PlannerUsed.LLM]: 'primary',
+  [PlannerUsed.HEURISTIC]: 'info',
+}
+
 /** AI 编排建议。 */
 export interface AiCompositionPlanResult {
   planId: string
@@ -912,6 +943,8 @@ export interface AiCompositionPlanResult {
   summary: string
   steps: AiCompositionPlanStep[]
   warnings: string[]
+  plannerUsed?: PlannerUsed
+  degradedReason?: string
 }
 
 /** AI 编排建议步骤。 */
@@ -1688,6 +1721,7 @@ export async function createAiPlanFromTask(payload: {
   taskId: number
   sourceVersionId?: number
   maxSteps?: number
+  plannerMode?: PlannerMode
 }): Promise<AiCompositionPlanResult> {
   const { data } = await apiClient.post(
     '/ai-script/compositions/ai-plan-from-task',

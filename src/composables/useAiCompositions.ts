@@ -9,6 +9,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useProjectStore } from '@/stores/project'
 import { extractErrorMessage, isElMessageBoxCancel } from '@/utils/error'
 import {
+  PlannerMode,
   ScenarioCompositionStatus,
   ValidationStatus,
   addScenarioStep,
@@ -40,6 +41,7 @@ interface CompositionForm {
 interface AiPlanForm {
   taskId?: number
   maxSteps: number
+  plannerMode: PlannerMode
 }
 
 function normalizeScenarioKey(value: string) {
@@ -89,6 +91,7 @@ export function useAiCompositions() {
   const aiPlanForm = reactive<AiPlanForm>({
     taskId: undefined,
     maxSteps: 12,
+    plannerMode: PlannerMode.AUTO,
   })
 
   const hasProject = computed(() => Boolean(projectId.value))
@@ -222,6 +225,7 @@ export function useAiCompositions() {
   async function openAiPlanDialog() {
     aiPlanForm.taskId = undefined
     aiPlanForm.maxSteps = 12
+    aiPlanForm.plannerMode = PlannerMode.AUTO
     aiPlanResult.value = null
     confirmedAiPlanStepKeys.value = new Set()
     aiPlanDialogVisible.value = true
@@ -240,6 +244,7 @@ export function useAiCompositions() {
         projectId: projectId.value,
         taskId: aiPlanForm.taskId,
         maxSteps: aiPlanForm.maxSteps,
+        plannerMode: aiPlanForm.plannerMode,
       })
       confirmedAiPlanStepKeys.value = new Set()
       aiPlanResultVisible.value = true
