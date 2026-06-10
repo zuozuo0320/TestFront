@@ -35,6 +35,7 @@ import {
   generateScenarioCode,
   optimizeScenarioComposition,
   publishScenarioComposition,
+  refreshScenarioFlowRefs,
   reorderScenarioSteps,
   rollbackScenarioVersion,
   setScenarioCodeLock,
@@ -188,6 +189,7 @@ export function useAiCompositionWorkbench(compositionId: number) {
   const publishing = ref(false)
   const aiPlanning = ref(false)
   const versionDiffLoading = ref(false)
+  const refreshingFlowRefs = ref(false)
   const errorMessage = ref('')
   const stepDialogVisible = ref(false)
   const versionDiffVisible = ref(false)
@@ -250,6 +252,10 @@ export function useAiCompositionWorkbench(compositionId: number) {
       composition.value?.latestValidationStatus === 'PASSED' &&
       !publishing.value &&
       !permissionDenied.value,
+  )
+  const outdatedFlowRefs = computed(() => composition.value?.outdatedFlowRefs || [])
+  const outdatedFlowIds = computed(
+    () => new Set(outdatedFlowRefs.value.map((item) => item.targetId)),
   )
   const stepIssueMap = computed(() => {
     const result = new Map<number, StepIssue[]>()
@@ -913,6 +919,33 @@ export function useAiCompositionWorkbench(compositionId: number) {
     selectedStepId.value = step.id
   }
 
+  function isStepRefOutdated(step: AiScenarioStep) {
+    return (
+      step.stepType === ScenarioStepType.FLOW_CALL &&
+      Boolean(step.refFlowId) &&
+      outdatedFlowIds.value.has(step.refFlowId as number)
+    )
+  }
+
+  async function refreshFlowRefs(flowIds?: number[]) {
+    if (!projectId.value) return
+    if (permissionDenied.value) {
+      ElMessage.warning('当前账号无编辑权限')
+      return
+    }
+    refreshingFlowRefs.value = true
+    try {
+      const updated = await refreshScenarioFlowRefs(compositionId, projectId.value, flowIds)
+      applyCompositionDetail(updated, false)
+      await refreshGovernance()
+      ElMessage.success('引用版本已升级到最新发布版本，请重新生成代码并验证')
+    } catch (error: unknown) {
+      ElMessage.error(extractErrorMessage(error, '升级引用版本失败'))
+    } finally {
+      refreshingFlowRefs.value = false
+    }
+  }
+
   function getStepIssues(step: AiScenarioStep): StepIssue[] {
     const issues: StepIssue[] = []
     if (!step.enabled) {
@@ -925,6 +958,9 @@ export function useAiCompositionWorkbench(compositionId: number) {
       !step.manualReviewed
     ) {
       issues.push({ level: 'error', message: '低置信度 AI 步骤需要人工确认' })
+    }
+    if (isStepRefOutdated(step)) {
+      issues.push({ level: 'warning', message: '引用的固定场景已发布新版本，可升级引用版本' })
     }
     switch (step.stepType) {
       case ScenarioStepType.FLOW_CALL:
@@ -1063,6 +1099,10 @@ export function useAiCompositionWorkbench(compositionId: number) {
     acceptAiStep,
     ignoreAiStep,
     isLowConfidenceStep,
+    outdatedFlowRefs,
+    refreshingFlowRefs,
+    isStepRefOutdated,
+    refreshFlowRefs,
     getStepIssues,
     scenarioFieldError,
     stepFieldError,

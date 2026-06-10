@@ -4,11 +4,12 @@
  * 封装固定场景列表、筛选、详情、发布弹窗和错误提示，
  * 页面层只负责布局编排，避免把远程数据流程散落到 Vue 模板中。
  */
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, getCurrentInstance, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useProjectStore } from '@/stores/project'
 import { extractErrorMessage, isElMessageBoxCancel } from '@/utils/error'
 import {
+  FLOW_DSL_SUPPORTED_STEP_TYPES,
   FlowAssetStatus,
   ValidationStatus,
   archiveFlowAsset,
@@ -58,6 +59,13 @@ interface PublishFlowForm {
   postconditionsText: string
   allowAiReuse: boolean
   changeSummary: string
+}
+
+/** 编辑器内 DSL 预检告警条目，stepNo 为 0 表示整体性问题。 */
+export interface FlowDslIssue {
+  stepNo: number
+  stepType: string
+  reason: string
 }
 
 interface ManualFlowForm {
@@ -118,6 +126,60 @@ function stringifyObject(value: Record<string, unknown> | undefined) {
   return JSON.stringify(value || {}, null, 2)
 }
 
+function resolveStepType(step: Record<string, unknown>) {
+  for (const key of ['type', 'step_type', 'action_type', 'actionType']) {
+    const raw = step[key]
+    if (typeof raw === 'string' && raw.trim()) return raw.trim().toUpperCase()
+  }
+  return ''
+}
+
+/** 客户端侧 DSL 预检：JSON 合法性 + 步骤类型是否在受支持清单内，与后端编译器口径一致。 */
+export function validateFlowDslText(
+  text: string,
+  supportedStepTypes: readonly string[],
+): FlowDslIssue[] {
+  const trimmed = text.trim()
+  if (!trimmed) return []
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(trimmed)
+  } catch (error: unknown) {
+    return [{ stepNo: 0, stepType: '', reason: `DSL 不是合法 JSON：${(error as Error).message}` }]
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return [{ stepNo: 0, stepType: '', reason: 'DSL 必须是 JSON 对象' }]
+  }
+  const root = parsed as Record<string, unknown>
+  const rawSteps = Array.isArray(root.generation_steps) ? root.generation_steps : root.steps
+  if (rawSteps === undefined || rawSteps === null) return []
+  if (!Array.isArray(rawSteps)) {
+    return [{ stepNo: 0, stepType: '', reason: 'steps / generation_steps 必须是数组' }]
+  }
+  const supported = new Set(supportedStepTypes.map((item) => item.toUpperCase()))
+  const issues: FlowDslIssue[] = []
+  rawSteps.forEach((step, index) => {
+    const stepNo = index + 1
+    if (step === null || typeof step !== 'object' || Array.isArray(step)) {
+      issues.push({ stepNo, stepType: '', reason: '步骤必须是 JSON 对象' })
+      return
+    }
+    const stepType = resolveStepType(step as Record<string, unknown>)
+    if (!stepType) {
+      issues.push({ stepNo, stepType: '', reason: '缺少动作类型（type 字段）' })
+      return
+    }
+    if (!supported.has(stepType)) {
+      issues.push({
+        stepNo,
+        stepType,
+        reason: `不支持的步骤类型，发布将被拒绝。支持：${supportedStepTypes.join('、')}`,
+      })
+    }
+  })
+  return issues
+}
+
 /** 固定场景库列表与发布逻辑。 */
 export function useAiFlowAssets() {
   const projectStore = useProjectStore()
@@ -137,6 +199,9 @@ export function useAiFlowAssets() {
   const governanceLoading = ref(false)
   const compileChecking = ref(false)
   const compileCheckResult = ref<FlowCompileCheckResult | null>(null)
+  const dslIssues = ref<FlowDslIssue[]>([])
+  const supportedStepTypes = ref<string[]>([...FLOW_DSL_SUPPORTED_STEP_TYPES])
+  let dslPrecheckTimer: ReturnType<typeof setTimeout> | null = null
 
   const filters = reactive<FlowAssetFilters>({
     keyword: '',
@@ -293,6 +358,7 @@ export function useAiFlowAssets() {
 
   function openManualCreateDialog() {
     resetManualForm()
+    dslIssues.value = []
     manualDialogVisible.value = true
   }
 
@@ -310,6 +376,7 @@ export function useAiFlowAssets() {
     manualForm.codeSnapshot = flow.codeSnapshot || ''
     manualForm.allowAiReuse = flow.allowAiReuse
     manualForm.changeSummary = '更新固定场景'
+    dslIssues.value = validateFlowDslText(manualForm.dslText, supportedStepTypes.value)
     manualDialogVisible.value = true
   }
 
@@ -377,6 +444,9 @@ export function useAiFlowAssets() {
     try {
       const result = await compileCheckFlowAsset(flow.id, projectId.value)
       compileCheckResult.value = result
+      if (result.supportedStepTypes?.length) {
+        supportedStepTypes.value = result.supportedStepTypes
+      }
       if (result.compileHealth === 'OK') {
         ElMessage.success(`「${flow.flowName}」自检通过，可以发布`)
       } else {
@@ -525,6 +595,23 @@ export function useAiFlowAssets() {
     }
   }
 
+  watch(
+    () => manualForm.dslText,
+    () => {
+      if (!manualDialogVisible.value) return
+      if (dslPrecheckTimer) clearTimeout(dslPrecheckTimer)
+      dslPrecheckTimer = setTimeout(() => {
+        dslIssues.value = validateFlowDslText(manualForm.dslText, supportedStepTypes.value)
+      }, 400)
+    },
+  )
+
+  if (getCurrentInstance()) {
+    onBeforeUnmount(() => {
+      if (dslPrecheckTimer) clearTimeout(dslPrecheckTimer)
+    })
+  }
+
   watch(projectId, () => {
     page.value = 1
     fetchFlows(1)
@@ -570,6 +657,8 @@ export function useAiFlowAssets() {
     submitManualSave,
     compileChecking,
     compileCheckResult,
+    dslIssues,
+    supportedStepTypes,
     runCompileCheck,
     publishManual,
     archiveManual,

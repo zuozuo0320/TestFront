@@ -21,6 +21,7 @@ import {
   fetchScenarioVersionDiff,
   generateScenarioCode,
   optimizeScenarioComposition,
+  refreshScenarioFlowRefs,
   rollbackScenarioVersion,
   setScenarioCodeLock,
   updateScenarioGeneratedCode,
@@ -107,6 +108,7 @@ vi.mock('@/api/aiScript', () => {
     generateScenarioCode: vi.fn(),
     optimizeScenarioComposition: vi.fn(),
     publishScenarioComposition: vi.fn(),
+    refreshScenarioFlowRefs: vi.fn(),
     reorderScenarioSteps: vi.fn(),
     rollbackScenarioVersion: vi.fn(),
     setScenarioCodeLock: vi.fn(),
@@ -129,6 +131,7 @@ const mockedOptimizeScenarioComposition = vi.mocked(optimizeScenarioComposition)
 const mockedAddScenarioStep = vi.mocked(addScenarioStep)
 const mockedDeleteScenarioComposition = vi.mocked(deleteScenarioComposition)
 const mockedGenerateScenarioCode = vi.mocked(generateScenarioCode)
+const mockedRefreshScenarioFlowRefs = vi.mocked(refreshScenarioFlowRefs)
 const mockedRollbackScenarioVersion = vi.mocked(rollbackScenarioVersion)
 const mockedSetScenarioCodeLock = vi.mocked(setScenarioCodeLock)
 const mockedUpdateScenarioGeneratedCode = vi.mocked(updateScenarioGeneratedCode)
@@ -684,5 +687,103 @@ describe('useAiCompositionWorkbench', () => {
 
     expect(mockedDeleteScenarioComposition).toHaveBeenCalledWith(20, 6)
     expect(routerPush).toHaveBeenCalledWith('/ai-script/compositions')
+  })
+
+  it('存在过期引用时应标记步骤并支持一键升级引用版本', async () => {
+    selectProject(6)
+    const outdatedRef = {
+      id: 900,
+      sourceType: 'SCENARIO',
+      sourceId: 20,
+      targetType: 'FLOW',
+      targetId: 12,
+      targetName: '登录系统',
+      refOutdated: true,
+      lockedVersionNo: 1,
+      latestVersionId: 31,
+      latestVersionNo: 2,
+      createdAt: '2026-06-09T10:00:00Z',
+    }
+    mockedFetchScenarioCompositionDetail.mockResolvedValueOnce({
+      id: 20,
+      projectId: 6,
+      scenarioKey: 'login_and_check',
+      scenarioName: '登录并检查',
+      status: ScenarioCompositionStatus.DRAFT,
+      latestValidationStatus: ValidationStatus.NOT_VALIDATED,
+      revision: 1,
+      createdBy: 1,
+      createdAt: '2026-06-09T10:00:00Z',
+      updatedBy: 1,
+      updatedAt: '2026-06-09T10:00:00Z',
+      outdatedFlowRefs: [outdatedRef],
+      steps: [
+        {
+          id: 101,
+          scenarioId: 20,
+          stepNo: 1,
+          stepType: ScenarioStepType.FLOW_CALL,
+          stepName: '登录系统',
+          refFlowId: 12,
+          refFlowVersionId: 30,
+          paramMapping: {},
+          outputMapping: {},
+          manualReviewed: false,
+          aiConfidence: 0,
+          enabled: true,
+          createdAt: '2026-06-09T10:00:00Z',
+          updatedAt: '2026-06-09T10:00:00Z',
+        },
+      ],
+    })
+    mockedRefreshScenarioFlowRefs.mockResolvedValue({
+      id: 20,
+      projectId: 6,
+      scenarioKey: 'login_and_check',
+      scenarioName: '登录并检查',
+      status: ScenarioCompositionStatus.DRAFT,
+      latestValidationStatus: ValidationStatus.NOT_VALIDATED,
+      revision: 2,
+      createdBy: 1,
+      createdAt: '2026-06-09T10:00:00Z',
+      updatedBy: 1,
+      updatedAt: '2026-06-09T11:00:00Z',
+      outdatedFlowRefs: [],
+      steps: [
+        {
+          id: 101,
+          scenarioId: 20,
+          stepNo: 1,
+          stepType: ScenarioStepType.FLOW_CALL,
+          stepName: '登录系统',
+          refFlowId: 12,
+          refFlowVersionId: 31,
+          paramMapping: {},
+          outputMapping: {},
+          manualReviewed: false,
+          aiConfidence: 0,
+          enabled: true,
+          createdAt: '2026-06-09T10:00:00Z',
+          updatedAt: '2026-06-09T11:00:00Z',
+        },
+      ],
+    })
+
+    const workbench = useAiCompositionWorkbench(20)
+    await workbench.loadWorkbench()
+
+    const step = workbench.composition.value!.steps![0]!
+    expect(workbench.outdatedFlowRefs.value).toHaveLength(1)
+    expect(workbench.isStepRefOutdated(step)).toBe(true)
+    expect(
+      workbench.getStepIssues(step).some((issue) => issue.message.includes('已发布新版本')),
+    ).toBe(true)
+
+    await workbench.refreshFlowRefs()
+
+    expect(mockedRefreshScenarioFlowRefs).toHaveBeenCalledWith(20, 6, undefined)
+    expect(workbench.outdatedFlowRefs.value).toHaveLength(0)
+    expect(workbench.composition.value?.steps?.[0]?.refFlowVersionId).toBe(31)
+    expect(workbench.refreshingFlowRefs.value).toBe(false)
   })
 })

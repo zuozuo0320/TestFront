@@ -4,7 +4,8 @@
  *
  * 承接录制任务发布后的可复用流程资产，首期提供列表、筛选、详情和发布入口。
  */
-import { onMounted } from 'vue'
+import { onMounted, ref as vueRef } from 'vue'
+import type { InputInstance } from 'element-plus'
 import {
   FlowAssetStatusColor,
   FlowAssetStatusLabel,
@@ -13,7 +14,7 @@ import {
   ValidationStatusLabel,
   type AiFlowAsset,
 } from '@/api/aiScript'
-import { useAiFlowAssets } from '@/composables/useAiFlowAssets'
+import { useAiFlowAssets, type FlowDslIssue } from '@/composables/useAiFlowAssets'
 import { formatBeijingDateTime } from '@/utils/time'
 
 const {
@@ -51,6 +52,7 @@ const {
   openManualEditDialog,
   submitManualSave,
   compileChecking,
+  dslIssues,
   runCompileCheck,
   publishManual,
   archiveManual,
@@ -84,6 +86,32 @@ function getValidationColor(status?: AiFlowAsset['latestValidationStatus']) {
 
 function formatList(items?: string[]) {
   return Array.isArray(items) && items.length > 0 ? items : ['-']
+}
+
+const dslInputRef = vueRef<InputInstance>()
+
+/** 点击告警条目后定位到 DSL 文本域中对应步骤的 type 字段所在行。 */
+function locateDslIssue(issue: FlowDslIssue) {
+  const textarea = dslInputRef.value?.textarea as HTMLTextAreaElement | undefined
+  if (!textarea) return
+  const text = manualForm.dslText
+  let start = 0
+  let end = 0
+  if (issue.stepNo > 0) {
+    const regex = /"(?:type|step_type|action_type|actionType)"\s*:/g
+    let match: RegExpExecArray | null = null
+    for (let i = 0; i < issue.stepNo; i += 1) {
+      match = regex.exec(text)
+      if (!match) break
+    }
+    if (match) {
+      start = text.lastIndexOf('\n', match.index) + 1
+      const lineEnd = text.indexOf('\n', match.index)
+      end = lineEnd === -1 ? text.length : lineEnd
+    }
+  }
+  textarea.focus()
+  textarea.setSelectionRange(start, end)
 }
 </script>
 
@@ -450,7 +478,36 @@ function formatList(items?: string[]) {
           <el-input v-model="manualForm.postconditionsText" type="textarea" :rows="3" />
         </el-form-item>
         <el-form-item label="流程 DSL">
-          <el-input v-model="manualForm.dslText" type="textarea" :rows="5" spellcheck="false" />
+          <div class="dsl-editor">
+            <el-input
+              ref="dslInputRef"
+              v-model="manualForm.dslText"
+              type="textarea"
+              :rows="5"
+              spellcheck="false"
+            />
+            <el-alert
+              v-if="dslIssues.length"
+              class="dsl-issue-alert"
+              type="warning"
+              show-icon
+              :closable="false"
+            >
+              <template #title>
+                检测到 {{ dslIssues.length }} 处步骤问题，发布前需修复（点击可定位）
+              </template>
+              <ul class="dsl-issue-list">
+                <li v-for="(issue, index) in dslIssues" :key="index">
+                  <el-link type="warning" :underline="false" @click="locateDslIssue(issue)">
+                    <template v-if="issue.stepNo > 0">
+                      步骤 {{ issue.stepNo }}（{{ issue.stepType || '未知类型' }}）：
+                    </template>
+                    {{ issue.reason }}
+                  </el-link>
+                </li>
+              </ul>
+            </el-alert>
+          </div>
         </el-form-item>
         <el-form-item label="代码快照">
           <el-input
@@ -678,6 +735,20 @@ function formatList(items?: string[]) {
 
 .detail-compile-alert {
   margin-top: var(--tp-space-3);
+}
+
+.dsl-editor {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--tp-space-2);
+}
+
+.dsl-issue-list {
+  margin: var(--tp-space-1) 0 0;
+  padding-left: var(--tp-space-4);
+  font-size: 12px;
+  line-height: 1.7;
 }
 
 .detail-compile-list {

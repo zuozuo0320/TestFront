@@ -104,6 +104,10 @@ const {
   acceptAiStep,
   ignoreAiStep,
   isLowConfidenceStep,
+  outdatedFlowRefs,
+  refreshingFlowRefs,
+  isStepRefOutdated,
+  refreshFlowRefs,
   scenarioFieldError,
   stepFieldError,
   validationFieldError,
@@ -377,6 +381,35 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
         </div>
 
         <div class="steps-panel">
+          <el-alert
+            v-if="outdatedFlowRefs.length"
+            class="outdated-refs-alert"
+            type="warning"
+            show-icon
+            :closable="false"
+          >
+            <template #title>
+              {{ outdatedFlowRefs.length }} 个固定场景引用已过期，升级后需重新生成代码并验证
+            </template>
+            <ul class="outdated-refs-list">
+              <li v-for="refItem in outdatedFlowRefs" :key="refItem.id">
+                {{ refItem.targetName || `固定场景 #${refItem.targetId}` }}：锁定 V{{
+                  refItem.lockedVersionNo || '-'
+                }}
+                → 最新 V{{ refItem.latestVersionNo || '-' }}
+              </li>
+            </ul>
+            <el-button
+              type="warning"
+              size="small"
+              plain
+              :loading="refreshingFlowRefs"
+              :disabled="permissionDenied"
+              @click="refreshFlowRefs()"
+            >
+              升级引用版本
+            </el-button>
+          </el-alert>
           <div class="panel-heading">
             <h2>编排步骤</h2>
             <el-button size="small" @click="openStepDialog(StepType.ATOMIC_ACTION)">
@@ -413,6 +446,15 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
                   {{ ScenarioStepTypeLabel[step.stepType] }} · {{ getStepSubTitle(step) }}
                 </small>
               </div>
+              <el-tag
+                v-if="isStepRefOutdated(step)"
+                class="step-issue-badge"
+                type="warning"
+                effect="light"
+                size="small"
+              >
+                引用过期
+              </el-tag>
               <el-tag
                 v-if="getStepIssuesFor(step).length"
                 class="step-issue-badge"
@@ -1066,6 +1108,17 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
 
 .scenario-editor {
   margin-bottom: var(--tp-space-4);
+}
+
+.outdated-refs-alert {
+  margin-bottom: var(--tp-space-3);
+}
+
+.outdated-refs-list {
+  margin: var(--tp-space-1) 0 var(--tp-space-2);
+  padding-left: var(--tp-space-4);
+  font-size: 12px;
+  line-height: 1.7;
 }
 
 .panel-heading {
