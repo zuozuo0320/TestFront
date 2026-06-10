@@ -33,6 +33,10 @@ vi.mock('element-plus', () => ({
   },
 }))
 
+vi.mock('@/api/aiRegression', () => ({
+  reportPlanAdoption: vi.fn().mockResolvedValue({}),
+}))
+
 vi.mock('@/api/aiScript', () => {
   const ScenarioCompositionStatus = {
     DRAFT: 'DRAFT',

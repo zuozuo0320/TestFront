@@ -175,6 +175,36 @@ const router = createRouter({
     },
 
     {
+      path: '/ai-script/regression',
+
+      name: 'AiScriptRegression',
+
+      component: () => import('../views/ai-script/AiScriptRegressionPage.vue'),
+
+      meta: { requiresAuth: true },
+    },
+
+    {
+      path: '/ai-script/repair-suggestions',
+
+      name: 'AiScriptRepairSuggestions',
+
+      component: () => import('../views/ai-script/AiScriptRepairSuggestionPage.vue'),
+
+      meta: { requiresAuth: true },
+    },
+
+    {
+      path: '/ai-script/metrics',
+
+      name: 'AiScriptMetrics',
+
+      component: () => import('../views/ai-script/AiScriptMetricsPage.vue'),
+
+      meta: { requiresAuth: true },
+    },
+
+    {
       path: '/ai-script/assertions',
 
       name: 'AiScriptAssertionList',

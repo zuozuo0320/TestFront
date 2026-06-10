@@ -25,6 +25,7 @@ import {
   type ScenarioCompositionStatus as ScenarioCompositionStatusType,
   type ValidationStatus as ValidationStatusType,
 } from '@/api/aiScript'
+import { reportPlanAdoption } from '@/api/aiRegression'
 
 interface CompositionFilters {
   keyword: string
@@ -306,6 +307,18 @@ export function useAiCompositions() {
           manualReviewed: true,
           enabled: true,
         })
+      }
+      try {
+        await reportPlanAdoption({
+          projectId: projectId.value,
+          planId: aiPlanResult.value.planId,
+          compositionId: created.id,
+          adoptedSteps: aiPlanResult.value.steps.length,
+          modifiedSteps: 0,
+          manualConfirmSteps: confirmedAiPlanStepKeys.value.size,
+        })
+      } catch {
+        // 采纳上报为指标统计用途，失败不阻断草稿生成主流程
       }
       ElMessage.success('AI 编排草稿已生成')
       aiPlanDialogVisible.value = false
