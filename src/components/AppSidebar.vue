@@ -39,7 +39,14 @@ function onAvatarError(event: Event, name?: string) {
 
 type TopMenu = 'workbench' | 'project' | 'plan' | 'testcases' | 'e2e' | 'reqgen' | 'system'
 type SystemMenu = 'users' | 'roles' | 'projects' | 'tags' | 'ai-model'
-type AiScriptMenu = 'recordings' | 'flows' | 'compositions' | 'assertions'
+type AiScriptMenu =
+  | 'recordings'
+  | 'flows'
+  | 'compositions'
+  | 'assertions'
+  | 'regression'
+  | 'repair-suggestions'
+  | 'metrics'
 
 /** 无权访问系统管理一级菜单的角色集合（FR-02-22） */
 const NO_SYSTEM_ROLES = new Set(['readonly', 'developer', 'reviewer'])
@@ -191,6 +198,9 @@ const aiScriptNavItems: { key: AiScriptMenu; label: string; path: string }[] = [
   { key: 'flows', label: '固定场景', path: '/ai-script/flows' },
   { key: 'compositions', label: '场景编排', path: '/ai-script/compositions' },
   { key: 'assertions', label: '断言库', path: '/ai-script/assertions' },
+  { key: 'regression', label: '定时回归', path: '/ai-script/regression' },
+  { key: 'repair-suggestions', label: '修复建议', path: '/ai-script/repair-suggestions' },
+  { key: 'metrics', label: '编排指标', path: '/ai-script/metrics' },
 ]
 
 /** 根据当前路由高亮测试智编二级菜单，任务详情仍归属“录制任务”。 */
