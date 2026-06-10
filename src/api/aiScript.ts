@@ -558,6 +558,26 @@ export interface AiFlowAsset {
   createdAt: string
   updatedBy: number
   updatedAt: string
+  compileHealth?: FlowCompileHealth
+  compileFailures?: FlowCompileFailure[]
+}
+
+/** 固定场景编译健康度。 */
+export type FlowCompileHealth = 'OK' | 'PARTIAL'
+
+/** 固定场景 DSL 编译失败项。 */
+export interface FlowCompileFailure {
+  stepNo: number
+  stepType: string
+  reason: string
+}
+
+/** 固定场景发布前自检结果。 */
+export interface FlowCompileCheckResult {
+  flowId: number
+  compileHealth: FlowCompileHealth
+  supportedStepTypes: string[]
+  compileFailures: FlowCompileFailure[]
 }
 
 /** 固定场景版本。 */
@@ -1233,6 +1253,17 @@ export async function publishFlowAsset(
     toSnake({ projectId, changeSummary }),
   )
   return toCamel(data) as PublishFlowAssetResult
+}
+
+/** 固定场景发布前自检（草稿阶段手动触发 dry-run 编译）。 */
+export async function compileCheckFlowAsset(
+  flowId: number,
+  projectId: number,
+): Promise<FlowCompileCheckResult> {
+  const { data } = await apiClient.post(`/ai-script/flows/${flowId}/compile-check`, {
+    project_id: projectId,
+  })
+  return toCamel(data) as FlowCompileCheckResult
 }
 
 /** 归档固定场景。 */

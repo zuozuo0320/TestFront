@@ -12,6 +12,7 @@ import {
   FlowAssetStatus,
   ValidationStatus,
   archiveFlowAsset,
+  compileCheckFlowAsset,
   createFlowAsset,
   deleteFlowAsset,
   fetchFlowAssetDetail,
@@ -27,6 +28,7 @@ import {
   type AiFlowAssetVersion,
   type AiScriptTask,
   type FlowAssetStatus as FlowAssetStatusType,
+  type FlowCompileCheckResult,
   type PublishFlowAssetPayload,
   type SaveFlowAssetPayload,
   type ValidationStatus as ValidationStatusType,
@@ -133,6 +135,8 @@ export function useAiFlowAssets() {
   const versions = ref<AiFlowAssetVersion[]>([])
   const references = ref<AiAssetReference[]>([])
   const governanceLoading = ref(false)
+  const compileChecking = ref(false)
+  const compileCheckResult = ref<FlowCompileCheckResult | null>(null)
 
   const filters = reactive<FlowAssetFilters>({
     keyword: '',
@@ -367,6 +371,32 @@ export function useAiFlowAssets() {
     }
   }
 
+  async function runCompileCheck(flow: AiFlowAsset) {
+    if (!projectId.value) return
+    compileChecking.value = true
+    try {
+      const result = await compileCheckFlowAsset(flow.id, projectId.value)
+      compileCheckResult.value = result
+      if (result.compileHealth === 'OK') {
+        ElMessage.success(`「${flow.flowName}」自检通过，可以发布`)
+      } else {
+        const detail = (result.compileFailures || [])
+          .map((item) => `步骤 ${item.stepNo}（${item.stepType || '未知类型'}）：${item.reason}`)
+          .join('\n')
+        ElMessage.warning({
+          message: `「${flow.flowName}」自检未通过，发布将被拒绝：\n${detail}`,
+          duration: 8000,
+        })
+      }
+      return result
+    } catch (error: unknown) {
+      ElMessage.error(getErrorMessage(error, '发布前自检失败'))
+      return null
+    } finally {
+      compileChecking.value = false
+    }
+  }
+
   async function publishManual(flow: AiFlowAsset) {
     if (!projectId.value) return
     try {
@@ -538,6 +568,9 @@ export function useAiFlowAssets() {
     openManualCreateDialog,
     openManualEditDialog,
     submitManualSave,
+    compileChecking,
+    compileCheckResult,
+    runCompileCheck,
     publishManual,
     archiveManual,
     deleteManual,
