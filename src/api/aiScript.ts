@@ -560,10 +560,26 @@ export interface AiFlowAsset {
   updatedAt: string
   compileHealth?: FlowCompileHealth
   compileFailures?: FlowCompileFailure[]
+  outdatedFlowRefs?: AiAssetReference[]
 }
 
 /** 固定场景编译健康度。 */
 export type FlowCompileHealth = 'OK' | 'PARTIAL'
+
+/** 固定场景 DSL 支持的步骤类型兜底清单，与后端 supportedFlowDSLStepTypes 保持一致。 */
+export const FLOW_DSL_SUPPORTED_STEP_TYPES = [
+  'NAVIGATE',
+  'GOTO',
+  'CLICK',
+  'INPUT',
+  'FILL',
+  'SELECT',
+  'KEY_PRESS',
+  'WAIT',
+  'ASSERT',
+  'ASSERT_CANDIDATE',
+  'FLOW_CALL',
+] as const
 
 /** 固定场景 DSL 编译失败项。 */
 export interface FlowCompileFailure {
@@ -647,6 +663,10 @@ export interface AiAssetReference {
   targetName?: string
   impactLevel?: 'DIRECT' | 'INDIRECT' | string
   impactPath?: string[]
+  refOutdated?: boolean
+  lockedVersionNo?: number
+  latestVersionId?: number
+  latestVersionNo?: number
   createdAt: string
 }
 
@@ -737,6 +757,7 @@ export interface AiScenarioComposition {
   flowRefCount?: number
   assertionRefCount?: number
   steps?: AiScenarioStep[]
+  outdatedFlowRefs?: AiAssetReference[]
 }
 
 /** 场景编排步骤。 */
@@ -1493,6 +1514,19 @@ export async function generateScenarioCode(
     toSnake({ projectId, force, target: 'PLAYWRIGHT' }),
   )
   return toCamel(data) as GenerateCompositionCodeResult
+}
+
+/** 升级编排引用的固定场景版本到最新发布版本，flowIds 为空时升级全部过期引用。 */
+export async function refreshScenarioFlowRefs(
+  compositionId: number,
+  projectId: number,
+  flowIds?: number[],
+): Promise<AiScenarioComposition> {
+  const { data } = await apiClient.post(
+    `/ai-script/compositions/${compositionId}/refresh-flow-refs`,
+    toSnake({ projectId, flowIds: flowIds || [] }),
+  )
+  return toCamel(data) as AiScenarioComposition
 }
 
 /** 保存人工编辑后的编排 Playwright 代码。 */

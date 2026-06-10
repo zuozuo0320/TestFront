@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { useProjectStore } from '@/stores/project'
-import { useAiFlowAssets } from './useAiFlowAssets'
+import { useAiFlowAssets, validateFlowDslText } from './useAiFlowAssets'
 import {
   compileCheckFlowAsset,
   deleteFlowAsset,
@@ -40,6 +41,19 @@ vi.mock('@/api/aiScript', () => {
   return {
     ValidationStatus,
     FlowAssetStatus,
+    FLOW_DSL_SUPPORTED_STEP_TYPES: [
+      'NAVIGATE',
+      'GOTO',
+      'CLICK',
+      'INPUT',
+      'FILL',
+      'SELECT',
+      'KEY_PRESS',
+      'WAIT',
+      'ASSERT',
+      'ASSERT_CANDIDATE',
+      'FLOW_CALL',
+    ],
     archiveFlowAsset: vi.fn(),
     compileCheckFlowAsset: vi.fn(),
     createFlowAsset: vi.fn(),
@@ -287,6 +301,77 @@ describe('useAiFlowAssets', () => {
       validationStatus: '',
       pageNo: 1,
       pageSize: 20,
+    })
+  })
+
+  it('编辑 DSL 后应防抖产出预检告警', async () => {
+    vi.useFakeTimers()
+    try {
+      const flowAssets = useAiFlowAssets()
+      flowAssets.openManualCreateDialog()
+
+      flowAssets.manualForm.dslText = JSON.stringify({
+        steps: [
+          { type: 'CLICK', selector: '#login' },
+          { type: 'HOVER', selector: '#menu' },
+        ],
+      })
+      await nextTick()
+      expect(flowAssets.dslIssues.value).toEqual([])
+
+      vi.advanceTimersByTime(500)
+      expect(flowAssets.dslIssues.value).toHaveLength(1)
+      expect(flowAssets.dslIssues.value[0]).toMatchObject({ stepNo: 2, stepType: 'HOVER' })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('validateFlowDslText', () => {
+  const supported = ['NAVIGATE', 'CLICK', 'FILL', 'FLOW_CALL']
+
+  it.each([
+    { name: '空文本不告警', text: '   ', expected: [] },
+    { name: '无 steps 字段不告警', text: '{"name":"demo"}', expected: [] },
+    {
+      name: '非法 JSON 报整体问题',
+      text: '{steps:',
+      expected: [{ stepNo: 0 }],
+    },
+    {
+      name: '根节点非对象报整体问题',
+      text: '[1,2]',
+      expected: [{ stepNo: 0, reason: 'DSL 必须是 JSON 对象' }],
+    },
+    {
+      name: 'steps 非数组报整体问题',
+      text: '{"steps":{}}',
+      expected: [{ stepNo: 0, reason: 'steps / generation_steps 必须是数组' }],
+    },
+    {
+      name: '支持类型全部通过（大小写不敏感）',
+      text: '{"steps":[{"type":"click"},{"step_type":"FILL"},{"action_type":"flow_call"}]}',
+      expected: [],
+    },
+    {
+      name: '缺少类型与不支持类型分别告警',
+      text: '{"steps":[{"selector":"#a"},{"type":"HOVER"},{"type":"CLICK"}]}',
+      expected: [
+        { stepNo: 1, stepType: '' },
+        { stepNo: 2, stepType: 'HOVER' },
+      ],
+    },
+    {
+      name: 'generation_steps 优先于 steps',
+      text: '{"generation_steps":[{"type":"HOVER"}],"steps":[{"type":"CLICK"}]}',
+      expected: [{ stepNo: 1, stepType: 'HOVER' }],
+    },
+  ])('$name', ({ text, expected }) => {
+    const issues = validateFlowDslText(text, supported)
+    expect(issues).toHaveLength(expected.length)
+    expected.forEach((item, index) => {
+      expect(issues[index]).toMatchObject(item)
     })
   })
 })
