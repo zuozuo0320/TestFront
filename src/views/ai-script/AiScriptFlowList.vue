@@ -50,6 +50,8 @@ const {
   openManualCreateDialog,
   openManualEditDialog,
   submitManualSave,
+  compileChecking,
+  runCompileCheck,
   publishManual,
   archiveManual,
   deleteManual,
@@ -227,10 +229,19 @@ function formatList(items?: string[]) {
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="188" fixed="right" align="right">
+        <el-table-column label="操作" width="232" fixed="right" align="right">
           <template #default="{ row }">
             <el-button link type="primary" @click.stop="openDetail(row)">查看</el-button>
             <el-button link type="primary" @click.stop="openManualEditDialog(row)">编辑</el-button>
+            <el-button
+              v-if="row.status !== FlowAssetStatus.PUBLISHED"
+              link
+              type="primary"
+              :loading="compileChecking"
+              @click.stop="runCompileCheck(row)"
+            >
+              自检
+            </el-button>
             <el-button
               v-if="row.status !== FlowAssetStatus.PUBLISHED"
               link
@@ -291,7 +302,30 @@ function formatList(items?: string[]) {
             <el-tag :type="currentFlow.allowAiReuse ? 'success' : 'info'" effect="light">
               {{ currentFlow.allowAiReuse ? '允许 AI 复用' : '关闭 AI 复用' }}
             </el-tag>
+            <el-tag
+              v-if="currentFlow.compileHealth"
+              :type="currentFlow.compileHealth === 'OK' ? 'success' : 'warning'"
+              effect="light"
+            >
+              编译健康度 {{ currentFlow.compileHealth }}
+            </el-tag>
           </div>
+          <el-alert
+            v-if="currentFlow.compileFailures?.length"
+            class="detail-compile-alert"
+            type="warning"
+            title="存在不可编译步骤，发布将被拒绝"
+            show-icon
+            :closable="false"
+          >
+            <ul class="detail-compile-list">
+              <li v-for="failure in currentFlow.compileFailures" :key="failure.stepNo">
+                步骤 {{ failure.stepNo }}（{{ failure.stepType || '未知类型' }}）：{{
+                  failure.reason
+                }}
+              </li>
+            </ul>
+          </el-alert>
           <p class="detail-desc">{{ currentFlow.description || '暂无描述' }}</p>
 
           <div class="detail-section">
@@ -640,6 +674,17 @@ function formatList(items?: string[]) {
 
 .flow-boolean.active {
   color: var(--tp-success);
+}
+
+.detail-compile-alert {
+  margin-top: var(--tp-space-3);
+}
+
+.detail-compile-list {
+  margin: var(--tp-space-1) 0 0;
+  padding-left: var(--tp-space-4);
+  font-size: 12px;
+  line-height: 1.7;
 }
 
 .flow-pagination {

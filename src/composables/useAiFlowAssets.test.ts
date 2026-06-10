@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { useProjectStore } from '@/stores/project'
 import { useAiFlowAssets } from './useAiFlowAssets'
 import {
+  compileCheckFlowAsset,
   deleteFlowAsset,
   fetchFlowAssetList,
   fetchTaskList,
@@ -40,6 +41,7 @@ vi.mock('@/api/aiScript', () => {
     ValidationStatus,
     FlowAssetStatus,
     archiveFlowAsset: vi.fn(),
+    compileCheckFlowAsset: vi.fn(),
     createFlowAsset: vi.fn(),
     deleteFlowAsset: vi.fn(),
     fetchFlowAssetDetail: vi.fn(),
@@ -53,6 +55,7 @@ vi.mock('@/api/aiScript', () => {
   }
 })
 
+const mockedCompileCheckFlowAsset = vi.mocked(compileCheckFlowAsset)
 const mockedDeleteFlowAsset = vi.mocked(deleteFlowAsset)
 const mockedFetchFlowAssetList = vi.mocked(fetchFlowAssetList)
 const mockedFetchTaskList = vi.mocked(fetchTaskList)
@@ -184,6 +187,75 @@ describe('useAiFlowAssets', () => {
     expect(flowAssets.publishForm.flowName).toBe('Login System')
     expect(flowAssets.publishForm.flowKey).toBe('login_system')
     expect(flowAssets.publishForm.description).toBe('登录后进入首页')
+  })
+
+  it.each([
+    {
+      name: '自检通过时应提示成功',
+      result: {
+        flowId: 12,
+        compileHealth: 'OK' as const,
+        supportedStepTypes: ['NAVIGATE', 'CLICK'],
+        compileFailures: [],
+      },
+      expectHealth: 'OK',
+    },
+    {
+      name: '自检失败时应返回失败明细',
+      result: {
+        flowId: 12,
+        compileHealth: 'PARTIAL' as const,
+        supportedStepTypes: ['NAVIGATE', 'CLICK'],
+        compileFailures: [{ stepNo: 2, stepType: 'HOVER', reason: '动作类型 HOVER 暂不支持' }],
+      },
+      expectHealth: 'PARTIAL',
+    },
+  ])('$name', async ({ result, expectHealth }) => {
+    selectProject(6)
+    mockedCompileCheckFlowAsset.mockResolvedValue(result)
+
+    const flowAssets = useAiFlowAssets()
+    const returned = await flowAssets.runCompileCheck({
+      id: 12,
+      projectId: 6,
+      flowKey: 'login_system',
+      flowName: '登录系统',
+      status: FlowAssetStatus.DRAFT,
+      allowAiReuse: true,
+      latestValidationStatus: ValidationStatus.NOT_VALIDATED,
+      createdBy: 1,
+      createdAt: '2026-06-09T10:00:00Z',
+      updatedBy: 1,
+      updatedAt: '2026-06-09T10:00:00Z',
+    })
+
+    expect(mockedCompileCheckFlowAsset).toHaveBeenCalledWith(12, 6)
+    expect(returned?.compileHealth).toBe(expectHealth)
+    expect(flowAssets.compileCheckResult.value?.compileHealth).toBe(expectHealth)
+    expect(flowAssets.compileChecking.value).toBe(false)
+  })
+
+  it('自检接口报错时应返回 null 并提示错误', async () => {
+    selectProject(6)
+    mockedCompileCheckFlowAsset.mockRejectedValue(new Error('网络异常'))
+
+    const flowAssets = useAiFlowAssets()
+    const returned = await flowAssets.runCompileCheck({
+      id: 12,
+      projectId: 6,
+      flowKey: 'login_system',
+      flowName: '登录系统',
+      status: FlowAssetStatus.DRAFT,
+      allowAiReuse: true,
+      latestValidationStatus: ValidationStatus.NOT_VALIDATED,
+      createdBy: 1,
+      createdAt: '2026-06-09T10:00:00Z',
+      updatedBy: 1,
+      updatedAt: '2026-06-09T10:00:00Z',
+    })
+
+    expect(returned).toBeNull()
+    expect(flowAssets.compileChecking.value).toBe(false)
   })
 
   it('删除草稿固定场景后应刷新当前列表', async () => {
