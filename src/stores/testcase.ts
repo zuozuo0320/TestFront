@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { listTestCases, createTestCase, updateTestCase, deleteTestCase } from '../api/testcase'
 import type { TestCase } from '../api/types'
+import { extractErrorMessage } from '../utils/error'
 
 export type TableRow = {
   id: number
@@ -188,14 +189,14 @@ export const useTestCaseStore = defineStore('testcase', () => {
         sortBy: sortBy.value,
         sortOrder: sortOrder.value,
       })
-      const items = Array.isArray((data as any).items) ? (data as any).items : []
+      const items = Array.isArray(data.items) ? data.items : []
       rows.value = items.map(toRow)
-      total.value = Number((data as any).total) || 0
-      page.value = Number((data as any).page) || 1
+      total.value = Number(data.total) || 0
+      page.value = Number(data.page) || 1
       pageInput.value = String(page.value)
-      pageSize.value = Number((data as any).pageSize) || pageSize.value
-    } catch (e: any) {
-      loadError.value = e?.response?.data?.error || '加载用例失败，请重试'
+      pageSize.value = Number(data.pageSize) || pageSize.value
+    } catch (error: unknown) {
+      loadError.value = extractErrorMessage(error, '加载用例失败，请重试')
     } finally {
       loading.value = false
     }

@@ -145,6 +145,46 @@ const router = createRouter({
     },
 
     {
+      path: '/ai-script/flows',
+
+      name: 'AiScriptFlowList',
+
+      component: () => import('../views/ai-script/AiScriptFlowList.vue'),
+
+      meta: { requiresAuth: true },
+    },
+
+    {
+      path: '/ai-script/compositions',
+
+      name: 'AiScriptCompositionList',
+
+      component: () => import('../views/ai-script/AiScriptCompositionList.vue'),
+
+      meta: { requiresAuth: true },
+    },
+
+    {
+      path: '/ai-script/compositions/:compositionId',
+
+      name: 'AiScriptCompositionWorkbench',
+
+      component: () => import('../views/ai-script/AiScriptCompositionWorkbench.vue'),
+
+      meta: { requiresAuth: true },
+    },
+
+    {
+      path: '/ai-script/assertions',
+
+      name: 'AiScriptAssertionList',
+
+      component: () => import('../views/ai-script/AiScriptAssertionList.vue'),
+
+      meta: { requiresAuth: true },
+    },
+
+    {
       path: '/ai-script/:taskId',
 
       name: 'AiScriptTaskDetail',

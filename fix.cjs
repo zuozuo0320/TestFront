@@ -1,9 +1,10 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const fs = require('fs');
 
 const currentFile = 'd:/ai_project/TestFront/src/views/system/UserManagement.vue';
 const tmpUiFile = 'd:/ai_project/TestFront/tmp_ui.vue';
 
-let currentContent = fs.readFileSync(currentFile, 'utf8');
+const currentContent = fs.readFileSync(currentFile, 'utf8');
 let tmpUiContent = fs.readFileSync(tmpUiFile, 'utf8');
 
 // 1. Extract the current script block from UserManagement.vue

@@ -1,9 +1,9 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const fs = require('fs');
 const file = 'd:/ai_project/TestFront/src/views/system/UserManagement.vue';
-let content = fs.readFileSync(file, 'utf8');
+const content = fs.readFileSync(file, 'utf8');
 
 const tplStart = content.indexOf('<template>');
-const styleEnd = content.lastIndexOf('</style>') + 8;
 
 const before = content.substring(0, tplStart);
 

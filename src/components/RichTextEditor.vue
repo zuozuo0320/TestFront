@@ -1,61 +1,3 @@
-<template>
-  <div class="rich-text-editor">
-    <div v-if="editor" class="editor-toolbar">
-      <button type="button" :class="{ active: editor.isActive('bold') }" @click.prevent="editor.chain().focus().toggleBold().run()" title="加粗">
-        <BoldIcon :size="16" />
-      </button>
-      <button type="button" :class="{ active: editor.isActive('italic') }" @click.prevent="editor.chain().focus().toggleItalic().run()" title="斜体">
-        <ItalicIcon :size="16" />
-      </button>
-      <button type="button" :class="{ active: editor.isActive('underline') }" @click.prevent="editor.chain().focus().toggleUnderline().run()" title="下划线">
-        <UnderlineIcon :size="16" />
-      </button>
-      <span class="toolbar-divider" />
-      <button type="button" :class="{ active: editor.isActive('bulletList') }" @click.prevent="editor.chain().focus().toggleBulletList().run()" title="无序列表">
-        <ListIcon :size="16" />
-      </button>
-      <button type="button" :class="{ active: editor.isActive('orderedList') }" @click.prevent="editor.chain().focus().toggleOrderedList().run()" title="有序列表">
-        <ListOrderedIcon :size="16" />
-      </button>
-      <span class="toolbar-divider" />
-      <button type="button" @click.prevent="onInsertImage" title="插入图片">
-        <ImagePlusIcon :size="16" />
-      </button>
-      <button type="button" :class="{ active: editor.isActive('link') }" @click.prevent="onToggleLink" title="链接">
-        <Link2Icon :size="16" />
-      </button>
-    </div>
-    <editor-content :editor="editor" class="editor-content" />
-
-    <!-- Teleport dialogs to body so they are NOT clipped by el-drawer overflow -->
-    <Teleport to="body">
-      <!-- Image URL dialog -->
-      <div v-if="showImageDialog" class="rte-dialog-overlay" @mousedown.self="showImageDialog = false">
-        <div class="rte-dialog" @mousedown.stop>
-          <div class="rte-dialog-title">插入图片</div>
-          <input ref="imageInput" v-model="imageUrl" class="rte-dialog-input" placeholder="请输入图片 URL" @keyup.enter="confirmImage" />
-          <div class="rte-dialog-actions">
-            <button type="button" class="rte-btn rte-btn-cancel" @click="showImageDialog = false">取消</button>
-            <button type="button" class="rte-btn rte-btn-confirm" @click="confirmImage">确认</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Link URL dialog -->
-      <div v-if="showLinkDialog" class="rte-dialog-overlay" @mousedown.self="showLinkDialog = false">
-        <div class="rte-dialog" @mousedown.stop>
-          <div class="rte-dialog-title">插入链接</div>
-          <input ref="linkInput" v-model="linkUrl" class="rte-dialog-input" placeholder="请输入链接 URL" @keyup.enter="confirmLink" />
-          <div class="rte-dialog-actions">
-            <button type="button" class="rte-btn rte-btn-cancel" @click="showLinkDialog = false">取消</button>
-            <button type="button" class="rte-btn rte-btn-confirm" @click="confirmLink">确认</button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
@@ -83,7 +25,6 @@ const emit = defineEmits<{
   'update:modelValue': [value: string]
 }>()
 
-// Dialog state
 const showImageDialog = ref(false)
 const imageUrl = ref('')
 const imageInput = ref<HTMLInputElement | null>(null)
@@ -125,8 +66,13 @@ const editor = useEditor({
       return false
     },
     handleDrop: (view, event, _slice, moved) => {
-      // Handle drag and drop images directly into the editor
-      if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+      // 支持从系统文件管理器直接拖入图片，避免用户额外上传再复制 URL。
+      if (
+        !moved &&
+        event.dataTransfer &&
+        event.dataTransfer.files &&
+        event.dataTransfer.files.length > 0
+      ) {
         const file = event.dataTransfer.files[0]
         if (file && file.type.startsWith('image/')) {
           event.preventDefault()
@@ -135,10 +81,14 @@ const editor = useEditor({
             const src = e.target?.result as string
             const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY })
             if (coordinates) {
-              editor.value?.chain().focus().insertContentAt(coordinates.pos, {
-                type: 'image',
-                attrs: { src },
-              }).run()
+              editor.value
+                ?.chain()
+                .focus()
+                .insertContentAt(coordinates.pos, {
+                  type: 'image',
+                  attrs: { src },
+                })
+                .run()
             }
           }
           reader.readAsDataURL(file)
@@ -150,11 +100,14 @@ const editor = useEditor({
   },
 })
 
-watch(() => props.modelValue, (val) => {
-  if (editor.value && editor.value.getHTML() !== val) {
-    editor.value.commands.setContent(val || '', { emitUpdate: false })
-  }
-})
+watch(
+  () => props.modelValue,
+  (val) => {
+    if (editor.value && editor.value.getHTML() !== val) {
+      editor.value.commands.setContent(val || '', { emitUpdate: false })
+    }
+  },
+)
 
 onBeforeUnmount(() => {
   editor.value?.destroy()
@@ -192,6 +145,117 @@ function confirmLink() {
   showLinkDialog.value = false
 }
 </script>
+
+<template>
+  <div class="rich-text-editor">
+    <div v-if="editor" class="editor-toolbar">
+      <button
+        type="button"
+        title="加粗"
+        :class="{ active: editor.isActive('bold') }"
+        @click.prevent="editor.chain().focus().toggleBold().run()"
+      >
+        <BoldIcon :size="16" />
+      </button>
+      <button
+        type="button"
+        title="斜体"
+        :class="{ active: editor.isActive('italic') }"
+        @click.prevent="editor.chain().focus().toggleItalic().run()"
+      >
+        <ItalicIcon :size="16" />
+      </button>
+      <button
+        type="button"
+        title="下划线"
+        :class="{ active: editor.isActive('underline') }"
+        @click.prevent="editor.chain().focus().toggleUnderline().run()"
+      >
+        <UnderlineIcon :size="16" />
+      </button>
+      <span class="toolbar-divider" />
+      <button
+        type="button"
+        title="无序列表"
+        :class="{ active: editor.isActive('bulletList') }"
+        @click.prevent="editor.chain().focus().toggleBulletList().run()"
+      >
+        <ListIcon :size="16" />
+      </button>
+      <button
+        type="button"
+        title="有序列表"
+        :class="{ active: editor.isActive('orderedList') }"
+        @click.prevent="editor.chain().focus().toggleOrderedList().run()"
+      >
+        <ListOrderedIcon :size="16" />
+      </button>
+      <span class="toolbar-divider" />
+      <button type="button" title="插入图片" @click.prevent="onInsertImage">
+        <ImagePlusIcon :size="16" />
+      </button>
+      <button
+        type="button"
+        title="链接"
+        :class="{ active: editor.isActive('link') }"
+        @click.prevent="onToggleLink"
+      >
+        <Link2Icon :size="16" />
+      </button>
+    </div>
+    <EditorContent :editor="editor" class="editor-content" />
+
+    <Teleport to="body">
+      <div
+        v-if="showImageDialog"
+        class="rte-dialog-overlay"
+        @mousedown.self="showImageDialog = false"
+      >
+        <div class="rte-dialog" @mousedown.stop>
+          <div class="rte-dialog-title">插入图片</div>
+          <input
+            ref="imageInput"
+            v-model="imageUrl"
+            class="rte-dialog-input"
+            placeholder="请输入图片 URL"
+            @keyup.enter="confirmImage"
+          />
+          <div class="rte-dialog-actions">
+            <button type="button" class="rte-btn rte-btn-cancel" @click="showImageDialog = false">
+              取消
+            </button>
+            <button type="button" class="rte-btn rte-btn-confirm" @click="confirmImage">
+              确认
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        v-if="showLinkDialog"
+        class="rte-dialog-overlay"
+        @mousedown.self="showLinkDialog = false"
+      >
+        <div class="rte-dialog" @mousedown.stop>
+          <div class="rte-dialog-title">插入链接</div>
+          <input
+            ref="linkInput"
+            v-model="linkUrl"
+            class="rte-dialog-input"
+            placeholder="请输入链接 URL"
+            @keyup.enter="confirmLink"
+          />
+          <div class="rte-dialog-actions">
+            <button type="button" class="rte-btn rte-btn-cancel" @click="showLinkDialog = false">
+              取消
+            </button>
+            <button type="button" class="rte-btn rte-btn-confirm" @click="confirmLink">确认</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+  </div>
+</template>
 
 <style scoped>
 .rich-text-editor {
@@ -280,11 +344,13 @@ function confirmLink() {
 }
 </style>
 
-<!-- Global styles for teleported dialogs (not scoped) -->
 <style>
 .rte-dialog-overlay {
   position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: rgba(0, 0, 0, 0.5);
   z-index: 99999;
   display: flex;

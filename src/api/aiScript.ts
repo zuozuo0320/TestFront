@@ -159,6 +159,169 @@ export const ValidationStatusColor: Record<ValidationStatus, StatusColor> = {
   [ValidationStatus.ERROR]: 'danger',
 }
 
+/** 固定场景状态常量。 */
+export const FlowAssetStatus = {
+  DRAFT: 'DRAFT',
+  PUBLISHED: 'PUBLISHED',
+  ARCHIVED: 'ARCHIVED',
+} as const
+export type FlowAssetStatus = (typeof FlowAssetStatus)[keyof typeof FlowAssetStatus]
+
+export const FlowAssetStatusLabel: Record<FlowAssetStatus, string> = {
+  [FlowAssetStatus.DRAFT]: '草稿',
+  [FlowAssetStatus.PUBLISHED]: '已发布',
+  [FlowAssetStatus.ARCHIVED]: '已归档',
+}
+
+export const FlowAssetStatusColor: Record<FlowAssetStatus, StatusColor> = {
+  [FlowAssetStatus.DRAFT]: 'info',
+  [FlowAssetStatus.PUBLISHED]: 'success',
+  [FlowAssetStatus.ARCHIVED]: 'info',
+}
+
+/** 断言资产状态常量。 */
+export const AssertionAssetStatus = {
+  DRAFT: 'DRAFT',
+  PUBLISHED: 'PUBLISHED',
+  ARCHIVED: 'ARCHIVED',
+} as const
+export type AssertionAssetStatus = (typeof AssertionAssetStatus)[keyof typeof AssertionAssetStatus]
+
+/** 断言类型常量。 */
+export const AssertionAssetType = {
+  UI_VISIBLE: 'UI_VISIBLE',
+  UI_HIDDEN: 'UI_HIDDEN',
+  TEXT_CONTAINS: 'TEXT_CONTAINS',
+  URL_CONTAINS: 'URL_CONTAINS',
+  TABLE_ROW_EXISTS: 'TABLE_ROW_EXISTS',
+  TABLE_CELL_EQUALS: 'TABLE_CELL_EQUALS',
+  API_FIELD_EQUALS: 'API_FIELD_EQUALS',
+  CUSTOM_CODE: 'CUSTOM_CODE',
+} as const
+export type AssertionAssetType = (typeof AssertionAssetType)[keyof typeof AssertionAssetType]
+
+export const AssertionAssetStatusLabel: Record<AssertionAssetStatus, string> = {
+  [AssertionAssetStatus.DRAFT]: '草稿',
+  [AssertionAssetStatus.PUBLISHED]: '已发布',
+  [AssertionAssetStatus.ARCHIVED]: '已归档',
+}
+
+export const AssertionAssetStatusColor: Record<AssertionAssetStatus, StatusColor> = {
+  [AssertionAssetStatus.DRAFT]: 'info',
+  [AssertionAssetStatus.PUBLISHED]: 'success',
+  [AssertionAssetStatus.ARCHIVED]: 'info',
+}
+
+export const AssertionAssetTypeLabel: Record<AssertionAssetType, string> = {
+  [AssertionAssetType.UI_VISIBLE]: '元素可见',
+  [AssertionAssetType.UI_HIDDEN]: '元素不可见',
+  [AssertionAssetType.TEXT_CONTAINS]: '文本存在',
+  [AssertionAssetType.URL_CONTAINS]: 'URL 包含',
+  [AssertionAssetType.TABLE_ROW_EXISTS]: '表格行存在',
+  [AssertionAssetType.TABLE_CELL_EQUALS]: '单元格等于',
+  [AssertionAssetType.API_FIELD_EQUALS]: '接口字段等于',
+  [AssertionAssetType.CUSTOM_CODE]: '自定义代码',
+}
+
+/** 场景编排状态常量。 */
+export const ScenarioCompositionStatus = {
+  DRAFT: 'DRAFT',
+  GENERATED: 'GENERATED',
+  VALIDATING: 'VALIDATING',
+  PASSED: 'PASSED',
+  FAILED: 'FAILED',
+  PUBLISHED: 'PUBLISHED',
+  ARCHIVED: 'ARCHIVED',
+} as const
+export type ScenarioCompositionStatus =
+  (typeof ScenarioCompositionStatus)[keyof typeof ScenarioCompositionStatus]
+
+/** 编排生成代码治理状态常量。 */
+export const ScenarioCodeEditStatus = {
+  AUTO_GENERATED: 'AUTO_GENERATED',
+  MANUAL_PATCHED: 'MANUAL_PATCHED',
+  LOCKED: 'LOCKED',
+} as const
+export type ScenarioCodeEditStatus =
+  (typeof ScenarioCodeEditStatus)[keyof typeof ScenarioCodeEditStatus]
+
+/** 场景编排步骤类型常量。 */
+export const ScenarioStepType = {
+  FLOW_CALL: 'FLOW_CALL',
+  ASSERTION: 'ASSERTION',
+  ATOMIC_ACTION: 'ATOMIC_ACTION',
+  CODE_BLOCK: 'CODE_BLOCK',
+  AI_GENERATED: 'AI_GENERATED',
+} as const
+export type ScenarioStepType = (typeof ScenarioStepType)[keyof typeof ScenarioStepType]
+
+/** 编排验证状态常量。 */
+export const CompositionValidationStatus = {
+  PENDING: 'PENDING',
+  RUNNING: 'RUNNING',
+  PASSED: 'PASSED',
+  FAILED: 'FAILED',
+  CANCELED: 'CANCELED',
+} as const
+export type CompositionValidationStatus =
+  (typeof CompositionValidationStatus)[keyof typeof CompositionValidationStatus]
+
+export const ScenarioCompositionStatusLabel: Record<ScenarioCompositionStatus, string> = {
+  [ScenarioCompositionStatus.DRAFT]: '草稿',
+  [ScenarioCompositionStatus.GENERATED]: '已生成',
+  [ScenarioCompositionStatus.VALIDATING]: '验证中',
+  [ScenarioCompositionStatus.PASSED]: '验证通过',
+  [ScenarioCompositionStatus.FAILED]: '验证失败',
+  [ScenarioCompositionStatus.PUBLISHED]: '已发布',
+  [ScenarioCompositionStatus.ARCHIVED]: '已归档',
+}
+
+export const ScenarioCompositionStatusColor: Record<ScenarioCompositionStatus, StatusColor> = {
+  [ScenarioCompositionStatus.DRAFT]: 'info',
+  [ScenarioCompositionStatus.GENERATED]: 'primary',
+  [ScenarioCompositionStatus.VALIDATING]: 'primary',
+  [ScenarioCompositionStatus.PASSED]: 'success',
+  [ScenarioCompositionStatus.FAILED]: 'danger',
+  [ScenarioCompositionStatus.PUBLISHED]: 'success',
+  [ScenarioCompositionStatus.ARCHIVED]: 'info',
+}
+
+export const ScenarioCodeEditStatusLabel: Record<ScenarioCodeEditStatus, string> = {
+  [ScenarioCodeEditStatus.AUTO_GENERATED]: '自动生成',
+  [ScenarioCodeEditStatus.MANUAL_PATCHED]: '人工修改',
+  [ScenarioCodeEditStatus.LOCKED]: '已锁定',
+}
+
+export const ScenarioCodeEditStatusColor: Record<ScenarioCodeEditStatus, StatusColor> = {
+  [ScenarioCodeEditStatus.AUTO_GENERATED]: 'info',
+  [ScenarioCodeEditStatus.MANUAL_PATCHED]: 'warning',
+  [ScenarioCodeEditStatus.LOCKED]: 'danger',
+}
+
+export const ScenarioStepTypeLabel: Record<ScenarioStepType, string> = {
+  [ScenarioStepType.FLOW_CALL]: '固定场景',
+  [ScenarioStepType.ASSERTION]: '断言',
+  [ScenarioStepType.ATOMIC_ACTION]: '原子操作',
+  [ScenarioStepType.CODE_BLOCK]: '代码块',
+  [ScenarioStepType.AI_GENERATED]: 'AI 临时',
+}
+
+export const CompositionValidationStatusLabel: Record<CompositionValidationStatus, string> = {
+  [CompositionValidationStatus.PENDING]: '待验证',
+  [CompositionValidationStatus.RUNNING]: '验证中',
+  [CompositionValidationStatus.PASSED]: '通过',
+  [CompositionValidationStatus.FAILED]: '失败',
+  [CompositionValidationStatus.CANCELED]: '已取消',
+}
+
+export const CompositionValidationStatusColor: Record<CompositionValidationStatus, StatusColor> = {
+  [CompositionValidationStatus.PENDING]: 'info',
+  [CompositionValidationStatus.RUNNING]: 'primary',
+  [CompositionValidationStatus.PASSED]: 'success',
+  [CompositionValidationStatus.FAILED]: 'danger',
+  [CompositionValidationStatus.CANCELED]: 'info',
+}
+
 // ── 核心接口 ──
 
 export interface ActionPermissions {
@@ -357,6 +520,370 @@ export interface AiScriptTrace {
   errorMessage?: string
   screenshotUrl?: string
   occurredAt: string
+}
+
+/** 固定场景列表查询参数。 */
+export interface AiFlowAssetListQuery {
+  projectId: number
+  keyword?: string
+  status?: FlowAssetStatus | ''
+  validationStatus?: ValidationStatus | ''
+  pageNo?: number
+  pageSize?: number
+}
+
+/** 固定场景资产。 */
+export interface AiFlowAsset {
+  id: number
+  projectId: number
+  projectName?: string
+  flowKey: string
+  flowName: string
+  description?: string
+  sourceTaskId?: number
+  sourceTaskName?: string
+  sourceVersionId?: number
+  status: FlowAssetStatus
+  inputSchema?: Record<string, unknown>
+  outputSchema?: Record<string, unknown>
+  preconditions?: string[]
+  postconditions?: string[]
+  dsl?: Record<string, unknown>
+  codeSnapshot?: string
+  tags?: string[]
+  allowAiReuse: boolean
+  latestValidationStatus: ValidationStatus
+  createdBy: number
+  createdName?: string
+  createdAt: string
+  updatedBy: number
+  updatedAt: string
+}
+
+/** 固定场景版本。 */
+export interface AiFlowAssetVersion {
+  id: number
+  flowId: number
+  versionNo: number
+  versionStatus: FlowAssetStatus
+  dsl?: Record<string, unknown>
+  codeSnapshot?: string
+  inputSchema?: Record<string, unknown>
+  outputSchema?: Record<string, unknown>
+  changeSummary?: string
+  sourceTaskId?: number
+  sourceVersionId?: number
+  validationStatus: ValidationStatus
+  createdBy: number
+  createdAt: string
+}
+
+export interface PublishFlowAssetPayload {
+  projectId: number
+  flowKey: string
+  flowName: string
+  description?: string
+  tags: string[]
+  inputSchema?: Record<string, unknown>
+  outputSchema?: Record<string, unknown>
+  preconditions: string[]
+  postconditions: string[]
+  allowAiReuse: boolean
+  changeSummary?: string
+}
+
+export interface PublishFlowAssetResult {
+  flowId: number
+  flowVersionId: number
+  status: FlowAssetStatus
+}
+
+/** 固定场景保存参数。 */
+export interface SaveFlowAssetPayload {
+  projectId: number
+  flowKey?: string
+  flowName: string
+  description?: string
+  tags: string[]
+  inputSchema?: Record<string, unknown>
+  outputSchema?: Record<string, unknown>
+  preconditions: string[]
+  postconditions: string[]
+  dsl?: Record<string, unknown>
+  codeSnapshot?: string
+  allowAiReuse: boolean
+  changeSummary?: string
+}
+
+/** 资产引用关系。 */
+export interface AiAssetReference {
+  id: number
+  sourceType: string
+  sourceId: number
+  targetType: string
+  targetId: number
+  targetVersionId?: number
+  sourceName?: string
+  targetName?: string
+  impactLevel?: 'DIRECT' | 'INDIRECT' | string
+  impactPath?: string[]
+  createdAt: string
+}
+
+/** 断言资产列表查询参数。 */
+export interface AiAssertionAssetListQuery {
+  projectId: number
+  keyword?: string
+  status?: AssertionAssetStatus | ''
+  assertionType?: AssertionAssetType | ''
+  pageNo?: number
+  pageSize?: number
+}
+
+/** 断言资产。 */
+export interface AiAssertionAsset {
+  id: number
+  projectId: number
+  projectName?: string
+  assertionKey: string
+  assertionName: string
+  assertionType: AssertionAssetType
+  description?: string
+  paramSchema?: Record<string, unknown>
+  implementation?: Record<string, unknown>
+  failureMessageTpl?: string
+  evidenceConfig?: Record<string, unknown>
+  status: AssertionAssetStatus
+  allowAiReuse: boolean
+  latestValidationStatus: ValidationStatus
+  createdBy: number
+  createdName?: string
+  createdAt: string
+  updatedBy: number
+  updatedAt: string
+  refCount?: number
+}
+
+/** 断言资产保存参数。 */
+export interface SaveAssertionAssetPayload {
+  projectId: number
+  assertionKey?: string
+  assertionName: string
+  assertionType: AssertionAssetType
+  description?: string
+  paramSchema?: Record<string, unknown>
+  implementation?: Record<string, unknown>
+  failureMessageTpl?: string
+  evidenceConfig?: Record<string, unknown>
+  allowAiReuse: boolean
+}
+
+/** 场景编排列表查询参数。 */
+export interface AiScenarioCompositionListQuery {
+  projectId: number
+  keyword?: string
+  status?: ScenarioCompositionStatus | ''
+  validationStatus?: ValidationStatus | ''
+  pageNo?: number
+  pageSize?: number
+}
+
+/** 场景编排。 */
+export interface AiScenarioComposition {
+  id: number
+  projectId: number
+  projectName?: string
+  scenarioKey: string
+  scenarioName: string
+  description?: string
+  status: ScenarioCompositionStatus
+  dsl?: Record<string, unknown>
+  generatedCode?: string
+  codeEditStatus?: ScenarioCodeEditStatus
+  codeChangeSummary?: string
+  manualPatchedBy?: number
+  manualPatchedAt?: string
+  codeLockedBy?: number
+  codeLockedAt?: string
+  currentVersionId?: number
+  latestValidationId?: number
+  latestValidationStatus: ValidationStatus
+  revision: number
+  createdBy: number
+  createdName?: string
+  createdAt: string
+  updatedBy: number
+  updatedAt: string
+  flowRefCount?: number
+  assertionRefCount?: number
+  steps?: AiScenarioStep[]
+}
+
+/** 场景编排步骤。 */
+export interface AiScenarioStep {
+  id: number
+  scenarioId: number
+  dslStepId?: string
+  stepNo: number
+  stepType: ScenarioStepType
+  stepName: string
+  refFlowId?: number
+  refFlowVersionId?: number
+  refAssertionId?: number
+  paramMapping?: Record<string, unknown>
+  outputMapping?: Record<string, unknown>
+  atomicAction?: string
+  codeBlock?: string
+  manualReviewed: boolean
+  aiConfidence: number
+  enabled: boolean
+  flowName?: string
+  assertionName?: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** 新建场景编排参数。 */
+export interface CreateScenarioCompositionPayload {
+  projectId: number
+  scenarioKey: string
+  scenarioName: string
+  description?: string
+}
+
+/** 更新场景编排参数。 */
+export interface UpdateScenarioCompositionPayload {
+  projectId: number
+  scenarioName: string
+  description?: string
+  dsl?: Record<string, unknown>
+  expectedRevision?: number
+}
+
+/** 保存编排步骤参数。 */
+export interface SaveScenarioStepPayload {
+  projectId: number
+  stepType: ScenarioStepType
+  stepName?: string
+  refFlowId?: number
+  refFlowVersionId?: number
+  refAssertionId?: number
+  paramMapping?: Record<string, unknown>
+  outputMapping?: Record<string, unknown>
+  atomicAction?: string
+  codeBlock?: string
+  manualReviewed?: boolean
+  aiConfidence?: number
+  enabled?: boolean
+}
+
+/** 场景编排版本。 */
+export interface AiScenarioCompositionVersion {
+  id: number
+  compositionId: number
+  versionNo: number
+  versionStatus: ScenarioCompositionStatus
+  dsl?: Record<string, unknown>
+  generatedCode?: string
+  changeSummary?: string
+  createdBy: number
+  createdAt: string
+}
+
+/** 编排版本 Diff 单行摘要。 */
+export interface ScenarioVersionDiffLine {
+  kind: 'context' | 'added' | 'removed' | string
+  text: string
+}
+
+/** 编排版本 Diff 统计。 */
+export interface ScenarioVersionDiffStats {
+  baseLineCount: number
+  targetLineCount: number
+  addedLines: number
+  removedLines: number
+  unchangedLines: number
+  preview: ScenarioVersionDiffLine[]
+  truncated: boolean
+}
+
+/** 编排版本 Diff 结果。 */
+export interface AiScenarioVersionDiffResult {
+  compositionId: number
+  baseVersion: AiScenarioCompositionVersion
+  targetVersion: AiScenarioCompositionVersion
+  dslChanged: boolean
+  codeChanged: boolean
+  dslStats: ScenarioVersionDiffStats
+  codeStats: ScenarioVersionDiffStats
+  summary: string[]
+}
+
+/** 编排验证记录。 */
+export interface AiCompositionValidation {
+  id: number
+  compositionId: number
+  compositionVersionId?: number
+  projectId: number
+  status: CompositionValidationStatus
+  executorJobId?: string
+  workspaceId?: string
+  logUrl?: string
+  reportUrl?: string
+  traceUrl?: string
+  logs?: Array<Record<string, unknown>>
+  startedAt?: string
+  finishedAt?: string
+  durationMs: number
+  createdBy: number
+  createdAt: string
+  assertionResults?: AiCompositionAssertionResult[]
+}
+
+/** 编排断言验证结果。 */
+export interface AiCompositionAssertionResult {
+  id: number
+  validationId: number
+  stepId: string
+  assertionId: number
+  status: CompositionValidationStatus
+  expected?: Record<string, unknown>
+  actual?: Record<string, unknown>
+  failureMessage?: string
+  evidence?: Record<string, unknown>
+  durationMs: number
+  createdAt: string
+}
+
+/** 代码生成结果。 */
+export interface GenerateCompositionCodeResult {
+  compositionId: number
+  status: ScenarioCompositionStatus
+  files: Array<{ path: string; operation: string }>
+  warnings: string[]
+  generatedCode: string
+}
+
+/** AI 编排建议。 */
+export interface AiCompositionPlanResult {
+  planId: string
+  confidence: number
+  summary: string
+  steps: AiCompositionPlanStep[]
+  warnings: string[]
+}
+
+/** AI 编排建议步骤。 */
+export interface AiCompositionPlanStep {
+  type: ScenarioStepType
+  flowId?: number
+  flowVersionId?: number
+  flowKey?: string
+  assertionId?: number
+  assertionKey?: string
+  confidence: number
+  reason: string
+  inputs?: Record<string, unknown>
 }
 
 // ── 真实 API 方法 ──
@@ -624,6 +1151,508 @@ export async function renameTask(
 /** 更新任务关联用例 */
 export async function updateTaskCases(taskId: number, caseIds: number[]): Promise<void> {
   await apiClient.post(`/ai-script/tasks/${taskId}/cases/update`, { case_ids: caseIds })
+}
+
+/** 获取固定场景列表。 */
+export async function fetchFlowAssetList(
+  params: AiFlowAssetListQuery,
+): Promise<{ list: AiFlowAsset[]; total: number }> {
+  const query: Record<string, number | string> = {
+    project_id: params.projectId,
+  }
+  if (params.keyword) query.keyword = params.keyword
+  if (params.status) query.status = params.status
+  if (params.validationStatus) query.validation_status = params.validationStatus
+  if (params.pageNo) query.page = params.pageNo
+  if (params.pageSize) query.pageSize = params.pageSize
+
+  const { data } = await apiClient.get('/ai-script/flows', { params: query })
+  const items = data?.items ?? data ?? []
+  const total = data?.total ?? items.length
+
+  return {
+    list: toCamel(items) as AiFlowAsset[],
+    total,
+  }
+}
+
+/** 获取固定场景详情。 */
+export async function fetchFlowAssetDetail(
+  flowId: number,
+  projectId: number,
+): Promise<AiFlowAsset> {
+  const { data } = await apiClient.get(`/ai-script/flows/${flowId}`, {
+    params: { project_id: projectId },
+  })
+  return toCamel(data) as AiFlowAsset
+}
+
+/** 获取固定场景版本列表。 */
+export async function fetchFlowAssetVersions(
+  flowId: number,
+  projectId: number,
+): Promise<AiFlowAssetVersion[]> {
+  const { data } = await apiClient.get(`/ai-script/flows/${flowId}/versions`, {
+    params: { project_id: projectId },
+  })
+  return toCamel(Array.isArray(data) ? data : []) as AiFlowAssetVersion[]
+}
+
+/** 从已验证通过的录制任务发布固定场景。 */
+export async function publishFlowFromTask(
+  taskId: number,
+  payload: PublishFlowAssetPayload,
+): Promise<PublishFlowAssetResult> {
+  const { data } = await apiClient.post(`/ai-script/tasks/${taskId}/publish-flow`, toSnake(payload))
+  return toCamel(data) as PublishFlowAssetResult
+}
+
+/** 手动创建固定场景草稿。 */
+export async function createFlowAsset(payload: SaveFlowAssetPayload): Promise<AiFlowAsset> {
+  const { data } = await apiClient.post('/ai-script/flows', toSnake(payload))
+  return toCamel(data) as AiFlowAsset
+}
+
+/** 更新固定场景。 */
+export async function updateFlowAsset(
+  flowId: number,
+  payload: SaveFlowAssetPayload,
+): Promise<AiFlowAsset> {
+  const { data } = await apiClient.put(`/ai-script/flows/${flowId}`, toSnake(payload))
+  return toCamel(data) as AiFlowAsset
+}
+
+/** 发布固定场景。 */
+export async function publishFlowAsset(
+  flowId: number,
+  projectId: number,
+  changeSummary?: string,
+): Promise<PublishFlowAssetResult> {
+  const { data } = await apiClient.post(
+    `/ai-script/flows/${flowId}/publish`,
+    toSnake({ projectId, changeSummary }),
+  )
+  return toCamel(data) as PublishFlowAssetResult
+}
+
+/** 归档固定场景。 */
+export async function archiveFlowAsset(flowId: number, projectId: number): Promise<AiFlowAsset> {
+  const { data } = await apiClient.post(`/ai-script/flows/${flowId}/archive`, {
+    project_id: projectId,
+  })
+  return toCamel(data) as AiFlowAsset
+}
+
+/** 删除固定场景草稿。 */
+export async function deleteFlowAsset(flowId: number, projectId: number): Promise<void> {
+  await apiClient.delete(`/ai-script/flows/${flowId}`, {
+    params: { project_id: projectId },
+  })
+}
+
+/** 获取固定场景引用关系。 */
+export async function fetchFlowAssetReferences(
+  flowId: number,
+  projectId: number,
+): Promise<AiAssetReference[]> {
+  const { data } = await apiClient.get(`/ai-script/flows/${flowId}/references`, {
+    params: { project_id: projectId },
+  })
+  return toCamel(Array.isArray(data) ? data : []) as AiAssetReference[]
+}
+
+/** 获取断言资产列表。 */
+export async function fetchAssertionAssetList(
+  params: AiAssertionAssetListQuery,
+): Promise<{ list: AiAssertionAsset[]; total: number }> {
+  const query: Record<string, number | string> = {
+    project_id: params.projectId,
+  }
+  if (params.keyword) query.keyword = params.keyword
+  if (params.status) query.status = params.status
+  if (params.assertionType) query.assertion_type = params.assertionType
+  if (params.pageNo) query.page = params.pageNo
+  if (params.pageSize) query.pageSize = params.pageSize
+
+  const { data } = await apiClient.get('/ai-script/assertions', { params: query })
+  const items = data?.items ?? data ?? []
+  const total = data?.total ?? items.length
+
+  return {
+    list: toCamel(items) as AiAssertionAsset[],
+    total,
+  }
+}
+
+/** 获取断言资产详情。 */
+export async function fetchAssertionAssetDetail(
+  assertionId: number,
+  projectId: number,
+): Promise<AiAssertionAsset> {
+  const { data } = await apiClient.get(`/ai-script/assertions/${assertionId}`, {
+    params: { project_id: projectId },
+  })
+  return toCamel(data) as AiAssertionAsset
+}
+
+/** 创建断言资产草稿。 */
+export async function createAssertionAsset(
+  payload: SaveAssertionAssetPayload,
+): Promise<AiAssertionAsset> {
+  const { data } = await apiClient.post('/ai-script/assertions', toSnake(payload))
+  return toCamel(data) as AiAssertionAsset
+}
+
+/** 更新断言资产。 */
+export async function updateAssertionAsset(
+  assertionId: number,
+  payload: SaveAssertionAssetPayload,
+): Promise<AiAssertionAsset> {
+  const { data } = await apiClient.put(`/ai-script/assertions/${assertionId}`, toSnake(payload))
+  return toCamel(data) as AiAssertionAsset
+}
+
+/** 发布断言资产。 */
+export async function publishAssertionAsset(
+  assertionId: number,
+  projectId: number,
+): Promise<AiAssertionAsset> {
+  const { data } = await apiClient.post(`/ai-script/assertions/${assertionId}/publish`, null, {
+    params: { project_id: projectId },
+  })
+  return toCamel(data) as AiAssertionAsset
+}
+
+/** 归档断言资产。 */
+export async function archiveAssertionAsset(
+  assertionId: number,
+  projectId: number,
+): Promise<AiAssertionAsset> {
+  const { data } = await apiClient.post(`/ai-script/assertions/${assertionId}/archive`, null, {
+    params: { project_id: projectId },
+  })
+  return toCamel(data) as AiAssertionAsset
+}
+
+/** 删除断言草稿。 */
+export async function deleteAssertionAsset(assertionId: number, projectId: number): Promise<void> {
+  await apiClient.delete(`/ai-script/assertions/${assertionId}`, {
+    params: { project_id: projectId },
+  })
+}
+
+/** 获取断言引用关系。 */
+export async function fetchAssertionAssetReferences(
+  assertionId: number,
+  projectId: number,
+): Promise<AiAssetReference[]> {
+  const { data } = await apiClient.get(`/ai-script/assertions/${assertionId}/references`, {
+    params: { project_id: projectId },
+  })
+  return toCamel(Array.isArray(data) ? data : []) as AiAssetReference[]
+}
+
+/** 获取场景编排列表。 */
+export async function fetchScenarioCompositionList(
+  params: AiScenarioCompositionListQuery,
+): Promise<{ list: AiScenarioComposition[]; total: number }> {
+  const query: Record<string, number | string> = {
+    project_id: params.projectId,
+  }
+  if (params.keyword) query.keyword = params.keyword
+  if (params.status) query.status = params.status
+  if (params.validationStatus) query.validation_status = params.validationStatus
+  if (params.pageNo) query.page = params.pageNo
+  if (params.pageSize) query.pageSize = params.pageSize
+
+  const { data } = await apiClient.get('/ai-script/compositions', { params: query })
+  const items = data?.items ?? data ?? []
+  const total = data?.total ?? items.length
+
+  return {
+    list: toCamel(items) as AiScenarioComposition[],
+    total,
+  }
+}
+
+/** 创建场景编排。 */
+export async function createScenarioComposition(
+  payload: CreateScenarioCompositionPayload,
+): Promise<AiScenarioComposition> {
+  const { data } = await apiClient.post('/ai-script/compositions', toSnake(payload))
+  return toCamel(data) as AiScenarioComposition
+}
+
+/** 获取场景编排详情。 */
+export async function fetchScenarioCompositionDetail(
+  compositionId: number,
+  projectId: number,
+): Promise<AiScenarioComposition> {
+  const { data } = await apiClient.get(`/ai-script/compositions/${compositionId}`, {
+    params: { project_id: projectId },
+  })
+  return toCamel(data) as AiScenarioComposition
+}
+
+/** 更新场景编排。 */
+export async function updateScenarioComposition(
+  compositionId: number,
+  payload: UpdateScenarioCompositionPayload,
+): Promise<AiScenarioComposition> {
+  const { data } = await apiClient.put(`/ai-script/compositions/${compositionId}`, toSnake(payload))
+  return toCamel(data) as AiScenarioComposition
+}
+
+/** 添加编排步骤。 */
+export async function addScenarioStep(
+  compositionId: number,
+  payload: SaveScenarioStepPayload,
+): Promise<AiScenarioStep> {
+  const { data } = await apiClient.post(
+    `/ai-script/compositions/${compositionId}/steps`,
+    toSnake(payload),
+  )
+  return toCamel(data) as AiScenarioStep
+}
+
+/** 更新编排步骤。 */
+export async function updateScenarioStep(
+  compositionId: number,
+  stepId: number,
+  payload: SaveScenarioStepPayload,
+): Promise<AiScenarioStep> {
+  const { data } = await apiClient.put(
+    `/ai-script/compositions/${compositionId}/steps/${stepId}`,
+    toSnake(payload),
+  )
+  return toCamel(data) as AiScenarioStep
+}
+
+/** 删除编排步骤。 */
+export async function deleteScenarioStep(
+  compositionId: number,
+  stepId: number,
+  projectId: number,
+): Promise<void> {
+  await apiClient.delete(`/ai-script/compositions/${compositionId}/steps/${stepId}`, {
+    params: { project_id: projectId },
+  })
+}
+
+/** 调整编排步骤顺序。 */
+export async function reorderScenarioSteps(
+  compositionId: number,
+  projectId: number,
+  stepIds: number[],
+): Promise<void> {
+  await apiClient.put(
+    `/ai-script/compositions/${compositionId}/steps/reorder`,
+    toSnake({ projectId, stepIds }),
+  )
+}
+
+/** 生成编排 Playwright 代码。 */
+export async function generateScenarioCode(
+  compositionId: number,
+  projectId: number,
+  force = false,
+): Promise<GenerateCompositionCodeResult> {
+  const { data } = await apiClient.post(
+    `/ai-script/compositions/${compositionId}/generate-code`,
+    toSnake({ projectId, force, target: 'PLAYWRIGHT' }),
+  )
+  return toCamel(data) as GenerateCompositionCodeResult
+}
+
+/** 保存人工编辑后的编排 Playwright 代码。 */
+export async function updateScenarioGeneratedCode(
+  compositionId: number,
+  payload: {
+    projectId: number
+    generatedCode: string
+    changeSummary?: string
+    locked?: boolean
+    expectedRevision?: number
+  },
+): Promise<AiScenarioComposition> {
+  const { data } = await apiClient.put(
+    `/ai-script/compositions/${compositionId}/generated-code`,
+    toSnake(payload),
+  )
+  return toCamel(data) as AiScenarioComposition
+}
+
+/** 锁定或解除人工修改后的生成代码。 */
+export async function setScenarioCodeLock(
+  compositionId: number,
+  payload: {
+    projectId: number
+    locked: boolean
+    changeSummary?: string
+  },
+): Promise<AiScenarioComposition> {
+  const { data } = await apiClient.post(
+    `/ai-script/compositions/${compositionId}/code-lock`,
+    toSnake(payload),
+  )
+  return toCamel(data) as AiScenarioComposition
+}
+
+/** 触发编排验证。 */
+export async function validateScenarioComposition(
+  compositionId: number,
+  payload: {
+    projectId: number
+    environment?: string
+    variables?: Record<string, unknown>
+    idempotencyKey?: string
+  },
+): Promise<AiCompositionValidation> {
+  const { data } = await apiClient.post(
+    `/ai-script/compositions/${compositionId}/validate`,
+    toSnake(payload),
+  )
+  return toCamel(data) as AiCompositionValidation
+}
+
+/** 发布场景编排。 */
+export async function publishScenarioComposition(
+  compositionId: number,
+  projectId: number,
+  changeSummary?: string,
+): Promise<AiScenarioCompositionVersion> {
+  const { data } = await apiClient.post(
+    `/ai-script/compositions/${compositionId}/publish`,
+    toSnake({ projectId, changeSummary }),
+  )
+  return toCamel(data) as AiScenarioCompositionVersion
+}
+
+/** 归档场景编排。 */
+export async function archiveScenarioComposition(
+  compositionId: number,
+  projectId: number,
+): Promise<AiScenarioComposition> {
+  const { data } = await apiClient.post(
+    `/ai-script/compositions/${compositionId}/archive`,
+    toSnake({ projectId }),
+  )
+  return toCamel(data) as AiScenarioComposition
+}
+
+/** 删除场景编排草稿。 */
+export async function deleteScenarioComposition(
+  compositionId: number,
+  projectId: number,
+): Promise<void> {
+  await apiClient.delete(`/ai-script/compositions/${compositionId}`, {
+    params: { project_id: projectId },
+  })
+}
+
+/** 获取场景编排版本列表。 */
+export async function fetchScenarioCompositionVersions(
+  compositionId: number,
+  projectId: number,
+): Promise<AiScenarioCompositionVersion[]> {
+  const { data } = await apiClient.get(`/ai-script/compositions/${compositionId}/versions`, {
+    params: { project_id: projectId },
+  })
+  return toCamel(Array.isArray(data) ? data : []) as AiScenarioCompositionVersion[]
+}
+
+/** 获取两个编排版本的 DSL 和生成代码差异。 */
+export async function fetchScenarioVersionDiff(
+  compositionId: number,
+  projectId: number,
+  baseVersionId: number,
+  targetVersionId: number,
+): Promise<AiScenarioVersionDiffResult> {
+  const { data } = await apiClient.get(`/ai-script/compositions/${compositionId}/versions/diff`, {
+    params: {
+      project_id: projectId,
+      base_version_id: baseVersionId,
+      target_version_id: targetVersionId,
+    },
+  })
+  return toCamel(data) as AiScenarioVersionDiffResult
+}
+
+/** 回滚当前编排到指定发布版本快照。 */
+export async function rollbackScenarioVersion(
+  compositionId: number,
+  payload: {
+    projectId: number
+    versionId: number
+    overrideLockedCode?: boolean
+    changeSummary?: string
+  },
+): Promise<AiScenarioComposition> {
+  const { data } = await apiClient.post(
+    `/ai-script/compositions/${compositionId}/versions/rollback`,
+    toSnake(payload),
+  )
+  return toCamel(data) as AiScenarioComposition
+}
+
+/** 获取场景编排验证历史。 */
+export async function fetchScenarioCompositionValidations(
+  compositionId: number,
+  projectId: number,
+): Promise<AiCompositionValidation[]> {
+  const { data } = await apiClient.get(`/ai-script/compositions/${compositionId}/validations`, {
+    params: { project_id: projectId },
+  })
+  return toCamel(Array.isArray(data) ? data : []) as AiCompositionValidation[]
+}
+
+/** 获取场景编排引用关系。 */
+export async function fetchScenarioCompositionReferences(
+  compositionId: number,
+  projectId: number,
+): Promise<AiAssetReference[]> {
+  const { data } = await apiClient.get(`/ai-script/compositions/${compositionId}/references`, {
+    params: { project_id: projectId },
+  })
+  return toCamel(Array.isArray(data) ? data : []) as AiAssetReference[]
+}
+
+/** 从录制任务生成 AI 编排建议。 */
+export async function createAiPlanFromTask(payload: {
+  projectId: number
+  taskId: number
+  sourceVersionId?: number
+  maxSteps?: number
+}): Promise<AiCompositionPlanResult> {
+  const { data } = await apiClient.post(
+    '/ai-script/compositions/ai-plan-from-task',
+    toSnake(payload),
+  )
+  return toCamel(data) as AiCompositionPlanResult
+}
+
+/** 获取当前编排的 AI 优化建议。 */
+export async function optimizeScenarioComposition(
+  compositionId: number,
+  projectId: number,
+): Promise<AiCompositionPlanResult> {
+  const { data } = await apiClient.post(
+    `/ai-script/compositions/${compositionId}/ai-optimize`,
+    toSnake({ projectId }),
+  )
+  return toCamel(data) as AiCompositionPlanResult
+}
+
+/** 获取当前编排的 AI 断言建议。 */
+export async function fetchScenarioAiSuggestions(
+  compositionId: number,
+  projectId: number,
+): Promise<AiCompositionPlanResult> {
+  const { data } = await apiClient.post(
+    `/ai-script/compositions/${compositionId}/ai-suggest-assertions`,
+    toSnake({ projectId }),
+  )
+  return toCamel(data) as AiCompositionPlanResult
 }
 
 // ── Executor Codegen API（直连 Executor 服务） ──

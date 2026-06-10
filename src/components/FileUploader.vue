@@ -1,31 +1,5 @@
-<template>
-  <div class="file-uploader">
-    <div class="upload-area" @click="triggerUpload" @dragover.prevent @drop.prevent="handleDrop">
-      <input ref="fileInput" type="file" multiple :accept="accept" style="display:none" @change="handleFileChange" />
-      <div class="upload-icon"><UploadCloudIcon :size="28" /></div>
-      <div class="upload-text">点击或拖拽文件到此处上传</div>
-      <div class="upload-hint">单文件 ≤{{ maxSizeMB }}MB</div>
-    </div>
-    <div v-if="files.length > 0" class="file-list">
-      <div v-for="(file, idx) in files" :key="file.id || idx" class="file-item">
-        <component :is="getFileIcon(file.file_name || file.name)" :size="16" class="file-icon-svg" />
-        <span class="file-name">{{ file.file_name || file.name }}</span>
-        <span class="file-size">{{ formatSize(file.file_size || file.size) }}</span>
-        <button
-          v-if="file.id && projectId"
-          type="button"
-          class="file-download"
-          title="下载"
-          @click.stop="downloadFile(file)"
-        ><DownloadIcon :size="14" /></button>
-        <button type="button" class="file-remove" @click="removeFile(idx)" title="删除"><XIcon :size="14" /></button>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, type Component } from 'vue'
 import { apiClient } from '../api/client'
 import {
   UploadCloud as UploadCloudIcon,
@@ -38,15 +12,27 @@ import {
   File as FileDefault,
 } from 'lucide-vue-next'
 
-const props = withDefaults(defineProps<{
-  files: any[]
-  projectId?: number
-  maxSizeMB?: number
-  accept?: string
-}>(), {
-  maxSizeMB: 10,
-  accept: '*',
-})
+interface UploadedFileItem {
+  id?: number
+  file_name?: string
+  name?: string
+  file_size?: number
+  size?: number
+}
+
+const props = withDefaults(
+  defineProps<{
+    files: UploadedFileItem[]
+    projectId?: number
+    maxSizeMB?: number
+    accept?: string
+  }>(),
+  {
+    projectId: undefined,
+    maxSizeMB: 10,
+    accept: '*',
+  },
+)
 
 const emit = defineEmits<{
   upload: [file: File]
@@ -87,11 +73,13 @@ function removeFile(index: number) {
   emit('remove', index)
 }
 
-async function downloadFile(file: any) {
+async function downloadFile(file: UploadedFileItem) {
   try {
     const resp = await apiClient.get(
       `/projects/${props.projectId}/attachments/${file.id}/download`,
-      { responseType: 'blob' },
+      {
+        responseType: 'blob',
+      },
     )
     const blob = new Blob([resp.data])
     const url = URL.createObjectURL(blob)
@@ -107,29 +95,83 @@ async function downloadFile(file: any) {
   }
 }
 
-function formatSize(bytes: number) {
+function formatSize(bytes?: number) {
   if (!bytes) return ''
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function getFileIcon(name: string) {
+function getFileIcon(name: string): Component {
   if (!name) return FileDefault
   const ext = name.split('.').pop()?.toLowerCase()
-  const iconMap: Record<string, any> = {
-    pdf: FileText, doc: FileText, docx: FileText,
-    xls: FileSpreadsheet, xlsx: FileSpreadsheet, csv: FileSpreadsheet,
-    png: FileImage, jpg: FileImage, jpeg: FileImage, gif: FileImage, svg: FileImage,
-    zip: FileArchive, rar: FileArchive, '7z': FileArchive,
-    txt: FileText, md: FileText,
+  const iconMap: Record<string, Component> = {
+    pdf: FileText,
+    doc: FileText,
+    docx: FileText,
+    xls: FileSpreadsheet,
+    xlsx: FileSpreadsheet,
+    csv: FileSpreadsheet,
+    png: FileImage,
+    jpg: FileImage,
+    jpeg: FileImage,
+    gif: FileImage,
+    svg: FileImage,
+    zip: FileArchive,
+    rar: FileArchive,
+    '7z': FileArchive,
+    txt: FileText,
+    md: FileText,
   }
   return iconMap[ext || ''] || FileDefault
 }
 </script>
 
+<template>
+  <div class="file-uploader">
+    <div class="upload-area" @click="triggerUpload" @dragover.prevent @drop.prevent="handleDrop">
+      <input
+        ref="fileInput"
+        type="file"
+        multiple
+        :accept="accept"
+        style="display: none"
+        @change="handleFileChange"
+      />
+      <div class="upload-icon"><UploadCloudIcon :size="28" /></div>
+      <div class="upload-text">点击或拖拽文件到此处上传</div>
+      <div class="upload-hint">单文件 ≤{{ maxSizeMB }}MB</div>
+    </div>
+    <div v-if="files.length > 0" class="file-list">
+      <div v-for="(file, idx) in files" :key="file.id || idx" class="file-item">
+        <component
+          :is="getFileIcon(file.file_name || file.name || '')"
+          :size="16"
+          class="file-icon-svg"
+        />
+        <span class="file-name">{{ file.file_name || file.name }}</span>
+        <span class="file-size">{{ formatSize(file.file_size || file.size) }}</span>
+        <button
+          v-if="file.id && projectId"
+          type="button"
+          class="file-download"
+          title="下载"
+          @click.stop="downloadFile(file)"
+        >
+          <DownloadIcon :size="14" />
+        </button>
+        <button type="button" class="file-remove" title="删除" @click="removeFile(idx)">
+          <XIcon :size="14" />
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
 <style scoped>
-.file-uploader { width: 100%; }
+.file-uploader {
+  width: 100%;
+}
 
 .upload-area {
   border: 2px dashed rgba(255, 255, 255, 0.12);
@@ -144,10 +186,23 @@ function getFileIcon(name: string) {
   border-color: rgba(124, 77, 255, 0.4);
   background: rgba(124, 77, 255, 0.05);
 }
-.upload-icon { margin-bottom: 6px; color: rgba(255, 255, 255, 0.4); }
-.upload-text { color: rgba(255, 255, 255, 0.6); font-size: 13px; }
-.upload-hint { color: rgba(255, 255, 255, 0.3); font-size: 12px; margin-top: 4px; }
-.file-icon-svg { color: var(--tp-primary-light, #a78bfa); flex-shrink: 0; }
+.upload-icon {
+  margin-bottom: 6px;
+  color: rgba(255, 255, 255, 0.4);
+}
+.upload-text {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+}
+.upload-hint {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.file-icon-svg {
+  color: var(--tp-primary-light, #a78bfa);
+  flex-shrink: 0;
+}
 
 .file-list {
   margin-top: 10px;
@@ -164,7 +219,9 @@ function getFileIcon(name: string) {
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
-.file-icon { font-size: 16px; }
+.file-icon {
+  font-size: 16px;
+}
 .file-name {
   flex: 1;
   overflow: hidden;

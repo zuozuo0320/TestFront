@@ -7,6 +7,7 @@
 import { ref, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useProjectStore } from '@/stores/project'
+import { extractErrorMessage } from '@/utils/error'
 import {
   listAISkills,
   createAISkill,
@@ -29,8 +30,8 @@ async function fetchSkills() {
   loading.value = true
   try {
     skills.value = await listAISkills(projectId.value)
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.message || '加载 Skill 失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractErrorMessage(error, '加载 Skill 失败'))
   } finally {
     loading.value = false
   }
@@ -105,8 +106,8 @@ async function submitForm() {
     }
     showFormDialog.value = false
     await fetchSkills()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.message || '操作失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractErrorMessage(error, '操作失败'))
   }
 }
 
@@ -116,8 +117,8 @@ async function handleToggle(skill: AISkill) {
     await toggleAISkill(projectId.value, skill.id, !skill.is_active)
     ElMessage.success(skill.is_active ? '已禁用' : '已启用')
     await fetchSkills()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.message || '操作失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractErrorMessage(error, '操作失败'))
   }
 }
 

@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAiScriptStore } from '../../stores/aiScript'
+import { useAiFlowAssets } from '../../composables/useAiFlowAssets'
 import type { AiScriptTrace } from '../../api/aiScript'
 import {
   TaskStatusLabel,
@@ -9,6 +10,7 @@ import {
   TaskStatus,
   GenerationMode,
   GenerationModeLabel,
+  ValidationStatus,
   ValidationStatusLabel,
   ValidationStatusColor,
   ScriptStatusLabel,
@@ -39,6 +41,10 @@ import { extractErrorMessage } from '../../utils/error'
 const route = useRoute()
 const router = useRouter()
 const store = useAiScriptStore()
+const flowAssets = useAiFlowAssets()
+const publishFlowDialogVisible = flowAssets.publishDialogVisible
+const publishFlowSubmitting = flowAssets.publishSubmitting
+const publishFlowForm = flowAssets.publishForm
 
 const taskId = computed(() => Number(route.params.taskId))
 
@@ -566,6 +572,27 @@ async function handleConfirm() {
   }
 }
 
+async function openPublishFlowDialog() {
+  if (!task.value) return
+  if (!canPublishFlow.value) {
+    showToast('最近一次验证通过后才能发布固定场景', 'error')
+    return
+  }
+  await flowAssets.openPublishDialog(task.value)
+}
+
+function closePublishFlowDialog() {
+  if (publishFlowSubmitting.value) return
+  publishFlowDialogVisible.value = false
+}
+
+async function submitPublishFlow() {
+  await flowAssets.submitPublish()
+  if (!publishFlowDialogVisible.value) {
+    await store.loadTaskDetailFull(taskId.value)
+  }
+}
+
 async function handleDiscardScript() {
   if (!script.value) return
   const reason = prompt('请输入废弃原因')
@@ -800,6 +827,16 @@ const canExport = computed(() => {
   if (task.value?.permissions) return task.value.permissions.canExport
   return !!script.value
 })
+const canPublishFlow = computed(() => {
+  if (!task.value || !script.value) return false
+  return (
+    task.value.latestValidationStatus === ValidationStatus.PASSED ||
+    script.value.validationStatus === ValidationStatus.PASSED
+  )
+})
+const publishFlowTitle = computed(() =>
+  canPublishFlow.value ? '发布为固定场景' : '最近一次验证通过后才能发布固定场景',
+)
 const canDiscard = computed(() => {
   if (task.value?.permissions) return task.value.permissions.canDiscard
   const s = task.value?.taskStatus
@@ -1050,6 +1087,15 @@ watch(
           >
             <span class="material-symbols-outlined">edit</span>
             编辑脚本
+          </button>
+          <button
+            class="ai-btn ai-btn-secondary ai-btn-publish-flow"
+            :disabled="!canPublishFlow"
+            :title="publishFlowTitle"
+            @click="openPublishFlowDialog"
+          >
+            <span class="material-symbols-outlined">hub</span>
+            发布场景
           </button>
           <button
             v-if="canExport"
@@ -1970,6 +2016,113 @@ watch(
       </div>
     </div>
 
+    <!-- 发布固定场景 Dialog -->
+    <Teleport to="body">
+      <div
+        v-if="publishFlowDialogVisible"
+        class="ai-dialog-overlay"
+        @click.self="closePublishFlowDialog"
+      >
+        <div class="ai-dialog ai-publish-flow-dialog">
+          <div class="ai-dialog-header">
+            <h2>发布固定场景</h2>
+            <button
+              class="ai-dialog-close"
+              :disabled="publishFlowSubmitting"
+              @click="closePublishFlowDialog"
+            >
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+          <div class="ai-dialog-body ai-publish-flow-body">
+            <div class="ai-form-group">
+              <label class="ai-form-label">来源任务</label>
+              <input class="ai-form-input" :value="task?.taskName || '-'" type="text" readonly />
+            </div>
+            <div class="ai-publish-flow-grid">
+              <div class="ai-form-group">
+                <label class="ai-form-label">场景名称 *</label>
+                <input v-model="publishFlowForm.flowName" class="ai-form-input" type="text" />
+              </div>
+              <div class="ai-form-group">
+                <label class="ai-form-label">场景 Key *</label>
+                <input
+                  v-model="publishFlowForm.flowKey"
+                  class="ai-form-input"
+                  type="text"
+                  autocomplete="off"
+                />
+              </div>
+            </div>
+            <div class="ai-form-group">
+              <label class="ai-form-label">描述</label>
+              <textarea v-model="publishFlowForm.description" class="ai-form-textarea" rows="3" />
+            </div>
+            <div class="ai-form-group">
+              <label class="ai-form-label">标签</label>
+              <input
+                v-model="publishFlowForm.tagsText"
+                class="ai-form-input"
+                type="text"
+                placeholder="空格或逗号分隔"
+              />
+            </div>
+            <div class="ai-publish-flow-grid">
+              <div class="ai-form-group">
+                <label class="ai-form-label">前置条件 *</label>
+                <textarea
+                  v-model="publishFlowForm.preconditionsText"
+                  class="ai-form-textarea"
+                  rows="4"
+                />
+              </div>
+              <div class="ai-form-group">
+                <label class="ai-form-label">后置条件 *</label>
+                <textarea
+                  v-model="publishFlowForm.postconditionsText"
+                  class="ai-form-textarea"
+                  rows="4"
+                />
+              </div>
+            </div>
+            <div class="ai-publish-flow-options">
+              <label class="ai-checkbox-line">
+                <input v-model="publishFlowForm.allowAiReuse" type="checkbox" />
+                <span>允许 AI 推荐复用</span>
+              </label>
+              <input
+                v-model="publishFlowForm.changeSummary"
+                class="ai-form-input"
+                type="text"
+                placeholder="版本说明"
+              />
+            </div>
+          </div>
+          <div class="ai-dialog-footer">
+            <button
+              class="ai-btn ai-btn-ghost"
+              :disabled="publishFlowSubmitting"
+              @click="closePublishFlowDialog"
+            >
+              取消
+            </button>
+            <button
+              class="ai-btn ai-btn-primary"
+              :disabled="
+                publishFlowSubmitting ||
+                !publishFlowForm.flowName.trim() ||
+                !publishFlowForm.flowKey.trim()
+              "
+              @click="submitPublishFlow"
+            >
+              <span v-if="publishFlowSubmitting" class="ai-spinner"></span>
+              {{ publishFlowSubmitting ? '发布中...' : '发布' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- 提交录制脚本 Dialog -->
     <Teleport to="body">
       <div
@@ -2859,6 +3012,73 @@ watch(
 }
 .ai-script-empty .material-symbols-outlined {
   animation: bounce-icon 3s ease-in-out infinite !important;
+}
+
+.ai-task-detail-actions .ai-btn-publish-flow .material-symbols-outlined {
+  color: var(--tp-primary) !important;
+}
+
+.ai-publish-flow-dialog {
+  width: min(720px, calc(100vw - 32px)) !important;
+  max-height: calc(100vh - 80px) !important;
+}
+
+.ai-publish-flow-body {
+  display: flex !important;
+  max-height: calc(100vh - 210px) !important;
+  flex-direction: column !important;
+  gap: 14px !important;
+  overflow-y: auto !important;
+  padding-right: 2px !important;
+}
+
+.ai-publish-flow-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 14px !important;
+}
+
+.ai-publish-flow-dialog .ai-form-input[readonly] {
+  background: var(--tp-surface-muted) !important;
+  color: var(--tp-text-muted) !important;
+  cursor: default !important;
+}
+
+.ai-publish-flow-options {
+  display: grid !important;
+  grid-template-columns: minmax(180px, auto) minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 14px !important;
+}
+
+.ai-checkbox-line {
+  display: inline-flex !important;
+  min-height: 36px !important;
+  align-items: center !important;
+  gap: 8px !important;
+  color: var(--tp-text-secondary) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+.ai-checkbox-line input {
+  width: 16px !important;
+  height: 16px !important;
+  margin: 0 !important;
+  accent-color: var(--tp-primary) !important;
+}
+
+:global(html[data-theme='genart']) .ai-publish-flow-dialog .ai-form-input[readonly] {
+  background: var(--tp-surface-muted) !important;
+  border-color: var(--tp-border-subtle) !important;
+  color: var(--tp-text-muted) !important;
+}
+
+@media (max-width: 760px) {
+  .ai-publish-flow-grid,
+  .ai-publish-flow-options {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 @keyframes bounce-icon {

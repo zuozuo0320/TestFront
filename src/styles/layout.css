@@ -774,6 +774,7 @@
 }
 
 .sub-nav-item {
+  display: block;
   width: calc(100% - 12px);
   font-size: 13px;
   color: rgba(204, 195, 216, 0.6);
@@ -784,6 +785,7 @@
   background: transparent;
   font-family: inherit;
   text-align: left;
+  text-decoration: none;
   font-weight: 400;
   transition: all 0.2s ease;
   margin-left: 12px;

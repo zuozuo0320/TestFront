@@ -12,14 +12,33 @@
  * @module utils/error
  */
 
+/** 后端字段级校验错误。 */
+export interface FieldError {
+  field: string
+  message: string
+}
+
+interface ErrorResponseData {
+  message?: unknown
+  error?: unknown
+  errors?: unknown
+}
+
+function isFieldError(value: unknown): value is FieldError {
+  if (typeof value !== 'object' || value === null) return false
+  const maybe = value as { field?: unknown; message?: unknown }
+  return typeof maybe.field === 'string' && typeof maybe.message === 'string'
+}
+
 /**
  * 从未知错误对象中提取用户可读的消息。
  *
  * 优先顺序：
  *   1. 后端响应体 `{ message }`（经 Axios 拦截器解包前的形态）
- *   2. 后端响应体 `{ error }`（兼容旧版接口）
- *   3. Error 实例的 `message`
- *   4. 传入的兜底文案
+ *   2. 后端字段级 errors 中的第一条错误
+ *   3. 后端响应体 `{ error }`（兼容旧版接口）
+ *   4. Error 实例的 `message`
+ *   5. 传入的兜底文案
  *
  * @param err      - 未知错误，通常来自 try/catch 的捕获物
  * @param fallback - 兜底文案，默认 "操作失败"
@@ -30,11 +49,14 @@ export function extractErrorMessage(err: unknown, fallback = '操作失败'): st
   if (typeof err === 'object' && err !== null) {
     // Axios 风格：err.response.data.{message|error}
     const maybe = err as {
-      response?: { data?: { message?: unknown; error?: unknown } }
+      response?: { data?: ErrorResponseData }
       message?: unknown
     }
     const respMsg = maybe.response?.data?.message
     if (typeof respMsg === 'string' && respMsg.trim()) return respMsg
+
+    const fieldError = extractFieldErrors(err)[0]
+    if (fieldError) return fieldError.message
 
     const respErr = maybe.response?.data?.error
     if (typeof respErr === 'string' && respErr.trim()) return respErr
@@ -45,6 +67,23 @@ export function extractErrorMessage(err: unknown, fallback = '操作失败'): st
   if (typeof err === 'string' && err.trim()) return err
 
   return fallback
+}
+
+/**
+ * 从未知错误对象中提取后端字段级校验错误。
+ *
+ * 兼容后端标准响应 `{ errors: [{ field, message }] }`，也兼容拦截器或测试中
+ * 直接把同结构挂在错误对象顶层的情况。
+ */
+export function extractFieldErrors(err: unknown): FieldError[] {
+  if (typeof err !== 'object' || err === null) return []
+  const maybe = err as { response?: { data?: ErrorResponseData }; errors?: unknown }
+  const rawErrors = maybe.response?.data?.errors ?? maybe.errors
+  if (!Array.isArray(rawErrors)) return []
+  return rawErrors.filter(isFieldError).map((item) => ({
+    field: item.field,
+    message: item.message,
+  }))
 }
 
 /**

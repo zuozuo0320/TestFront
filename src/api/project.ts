@@ -4,7 +4,7 @@ import type { Project, ProjectMember } from './types'
 /** 获取项目列表 */
 export async function listProjects() {
   const { data } = await apiClient.get('/projects')
-  return (Array.isArray(data) ? data : data.projects ?? []) as Project[]
+  return (Array.isArray(data) ? data : (data.projects ?? [])) as Project[]
 }
 
 /** 创建项目 */
@@ -52,7 +52,7 @@ export async function unarchiveProject(projectId: number) {
 /** 获取项目成员列表 */
 export async function listProjectMembers(projectId: number) {
   const { data } = await apiClient.get(`/projects/${projectId}/members`)
-  return (Array.isArray(data) ? data : data.members ?? []) as ProjectMember[]
+  return (Array.isArray(data) ? data : (data.members ?? [])) as ProjectMember[]
 }
 
 /** 添加项目成员 */
@@ -74,11 +74,9 @@ export async function removeProjectMember(projectId: number, userId: number) {
 export async function uploadProjectAvatar(projectId: number, file: File) {
   const form = new FormData()
   form.append('avatar', file)
-  const { data } = await apiClient.post<{ avatar: string }>(
-    `/projects/${projectId}/avatar`,
-    form,
-    { headers: { 'Content-Type': 'multipart/form-data' } },
-  )
+  const { data } = await apiClient.post<{ avatar: string }>(`/projects/${projectId}/avatar`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
   return data
 }
 
@@ -86,7 +84,7 @@ export async function uploadProjectAvatar(projectId: number, file: File) {
 export async function getProjectOverview(projectId: number) {
   const { data } = await apiClient.get(`/projects/${projectId}/overview`)
   return data as {
-    project: any
+    project: Project
     counts: {
       requirements: number
       testcases: number

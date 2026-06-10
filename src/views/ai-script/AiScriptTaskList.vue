@@ -1142,16 +1142,6 @@ async function handleTokenInvalidate() {
       </Transition>
     </Teleport>
 
-    <!-- FAB — 跳转脚本资产 -->
-    <button
-      class="ai-fab ai-task-library-fab"
-      title="脚本资产管理"
-      aria-label="脚本资产管理"
-      @click="router.push('/ai-script/library')"
-    >
-      <span class="material-symbols-outlined">inventory_2</span>
-    </button>
-
     <!-- 新建任务 Dialog -->
     <Teleport to="body">
       <div

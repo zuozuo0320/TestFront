@@ -10,6 +10,7 @@ import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 import { loginByEmail } from '../api/auth'
 import HoloOrb from '../components/HoloOrb.vue'
+import { extractErrorMessage } from '../utils/error'
 
 const passwordFocused = ref(false)
 const router = useRouter()
@@ -53,8 +54,8 @@ async function doLogin() {
     // 触发成功过渡动画，延迟跳转
     loginSuccess.value = true
     setTimeout(() => router.push('/'), 600)
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '登录失败')
+  } catch (error: unknown) {
+    ElMessage.error(extractErrorMessage(error, '登录失败'))
     loginLoading.value = false
   }
 }

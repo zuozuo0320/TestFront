@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import { useProjectStore } from '../stores/project'
 import {
   globalModuleTree,
@@ -30,6 +31,7 @@ type MenuTreeNode = {
 }
 
 const authStore = useAuthStore()
+const route = useRoute()
 
 function onAvatarError(event: Event, name?: string) {
   authStore.handleAvatarError(event, name)
@@ -37,6 +39,7 @@ function onAvatarError(event: Event, name?: string) {
 
 type TopMenu = 'workbench' | 'project' | 'plan' | 'testcases' | 'e2e' | 'reqgen' | 'system'
 type SystemMenu = 'users' | 'roles' | 'projects' | 'tags' | 'ai-model'
+type AiScriptMenu = 'recordings' | 'flows' | 'compositions' | 'assertions'
 
 /** 无权访问系统管理一级菜单的角色集合（FR-02-22） */
 const NO_SYSTEM_ROLES = new Set(['readonly', 'developer', 'reviewer'])
@@ -183,6 +186,22 @@ const navItems: { key: TopMenu; label: string; icon: string }[] = [
   { key: 'project', label: '缺陷管理', icon: 'bug_report' },
 ]
 
+const aiScriptNavItems: { key: AiScriptMenu; label: string; path: string }[] = [
+  { key: 'recordings', label: '录制任务', path: '/ai-script' },
+  { key: 'flows', label: '固定场景', path: '/ai-script/flows' },
+  { key: 'compositions', label: '场景编排', path: '/ai-script/compositions' },
+  { key: 'assertions', label: '断言库', path: '/ai-script/assertions' },
+]
+
+/** 根据当前路由高亮测试智编二级菜单，任务详情仍归属“录制任务”。 */
+function isAiScriptNavActive(item: { key: AiScriptMenu; path: string }) {
+  const path = route.path
+  if (item.key === 'recordings') {
+    return path === '/ai-script' || path === '/ai-script/library' || /^\/ai-script\/\d+/.test(path)
+  }
+  return path === item.path || path.startsWith(`${item.path}/`)
+}
+
 const ALL_SYSTEM_NAV_ITEMS: { key: SystemMenu; label: string }[] = [
   { key: 'users', label: '用户管理' },
   { key: 'roles', label: '角色管理' },
@@ -295,28 +314,46 @@ const systemNavItems = computed(() => {
 
       <!-- Main Navigation -->
       <nav class="nav-links">
-        <button
-          v-for="item in navItems"
-          :key="item.key"
-          type="button"
-          class="main-nav-item"
-          :class="{ active: topMenu === item.key }"
-          :aria-current="topMenu === item.key ? 'page' : undefined"
-          :title="collapsed ? item.label : undefined"
-          @click="$emit('update:topMenu', item.key)"
-        >
-          <span
-            class="material-symbols-outlined nav-icon"
-            :style="
-              topMenu === item.key
-                ? { fontVariationSettings: `'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 24` }
-                : { fontVariationSettings: `'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24` }
+        <template v-for="item in navItems" :key="item.key">
+          <button
+            type="button"
+            class="main-nav-item"
+            :class="{ active: topMenu === item.key }"
+            :aria-current="
+              topMenu === item.key && (collapsed || item.key !== 'e2e') ? 'page' : undefined
             "
+            :title="collapsed ? item.label : undefined"
+            @click="$emit('update:topMenu', item.key)"
           >
-            {{ item.icon }}
-          </span>
-          <span v-if="!collapsed" class="nav-label">{{ item.label }}</span>
-        </button>
+            <span
+              class="material-symbols-outlined nav-icon"
+              :style="
+                topMenu === item.key
+                  ? { fontVariationSettings: `'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 24` }
+                  : { fontVariationSettings: `'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24` }
+              "
+            >
+              {{ item.icon }}
+            </span>
+            <span v-if="!collapsed" class="nav-label">{{ item.label }}</span>
+          </button>
+
+          <div
+            v-if="item.key === 'e2e' && topMenu === 'e2e' && !collapsed"
+            class="sub-nav ai-script-sidebar-nav"
+          >
+            <RouterLink
+              v-for="sub in aiScriptNavItems"
+              :key="sub.key"
+              class="sub-nav-item ai-script-sidebar-nav-item"
+              :class="{ active: isAiScriptNavActive(sub) }"
+              :to="sub.path"
+              :aria-current="isAiScriptNavActive(sub) ? 'page' : undefined"
+            >
+              {{ sub.label }}
+            </RouterLink>
+          </div>
+        </template>
       </nav>
 
       <!-- Test Cases Directory Tree (Visible only when TEST SUITES is active) -->

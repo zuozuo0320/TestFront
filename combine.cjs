@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const fs = require('fs');
 const originalFile = 'd:/ai_project/TestFront/src/views/system/UserManagement.vue';
 const tmpUiFile = 'd:/ai_project/TestFront/tmp_ui.vue';
 
-let orig = fs.readFileSync(originalFile, 'utf8');
+const orig = fs.readFileSync(originalFile, 'utf8');
 let tmpUi = fs.readFileSync(tmpUiFile, 'utf8');
 
 // The original file is `<template>...<script setup>...<style scoped>`

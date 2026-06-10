@@ -19,23 +19,38 @@ onMounted(() => {
 const scripts = computed(() => store.scriptVersions)
 const current = computed(() => store.currentScript)
 
+type HighlightPart = {
+  text: string
+  kind: 'plain' | 'comment' | 'keyword' | 'string'
+}
+
 /** 简易语法高亮 */
 function highlightLines(content: string) {
   return content.split('\n').map((line, i) => ({
     no: String(i + 1).padStart(2, '0'),
-    html: highlightLine(line),
+    parts: highlightLine(line),
   }))
 }
 
-function highlightLine(line: string): string {
-  let s = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  if (/^\s*\/\//.test(s)) return `<span class="ai-code-comment">${s}</span>`
-  s = s.replace(
-    /\b(import|from|export|const|let|var|async|await|function|return|test|expect)\b/g,
-    '<span class="ai-code-keyword">$1</span>',
-  )
-  s = s.replace(/'([^']*)'/g, '\'<span class="ai-code-string">$1</span>\'')
-  return s
+function highlightLine(line: string): HighlightPart[] {
+  if (/^\s*\/\//.test(line)) return [{ text: line, kind: 'comment' }]
+  const parts: HighlightPart[] = []
+  const pattern =
+    /'[^']*'|\b(import|from|export|const|let|var|async|await|function|return|test|expect)\b/g
+  let cursor = 0
+  for (const match of line.matchAll(pattern)) {
+    const index = match.index ?? 0
+    if (index > cursor) {
+      parts.push({ text: line.slice(cursor, index), kind: 'plain' })
+    }
+    const text = match[0]
+    parts.push({ text, kind: text.startsWith("'") ? 'string' : 'keyword' })
+    cursor = index + text.length
+  }
+  if (cursor < line.length) {
+    parts.push({ text: line.slice(cursor), kind: 'plain' })
+  }
+  return parts.length > 0 ? parts : [{ text: line, kind: 'plain' }]
 }
 </script>
 
@@ -227,8 +242,15 @@ function highlightLine(line: string): string {
                   v-for="line in highlightLines(current.scriptContent)"
                   :key="line.no"
                   style="color: var(--tp-gray-700)"
-                  v-html="line.html"
-                ></div>
+                >
+                  <span
+                    v-for="(part, partIndex) in line.parts"
+                    :key="partIndex"
+                    :class="part.kind !== 'plain' ? `ai-code-${part.kind}` : ''"
+                  >
+                    {{ part.text }}
+                  </span>
+                </div>
               </div>
             </div>
           </div>

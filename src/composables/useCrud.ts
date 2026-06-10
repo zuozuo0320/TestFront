@@ -1,5 +1,6 @@
 import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { extractErrorMessage } from '@/utils/error'
 
 /**
  * 通用 CRUD 对话框逻辑
@@ -17,11 +18,11 @@ import { ElMessage } from 'element-plus'
  *   }
  * )
  */
-export function useCrud<T extends Record<string, any>>(
+export function useCrud<T extends Record<string, unknown>>(
   defaultForm: T,
   options: {
-    onCreate?: (form: T) => Promise<any>
-    onUpdate?: (id: number, form: T) => Promise<any>
+    onCreate?: (form: T) => Promise<unknown>
+    onUpdate?: (id: number, form: T) => Promise<unknown>
     onSuccess?: () => void | Promise<void>
     successMessage?: string
   },
@@ -61,8 +62,8 @@ export function useCrud<T extends Record<string, any>>(
       visible.value = false
       ElMessage.success(options.successMessage || (isEditing() ? '更新成功' : '创建成功'))
       if (options.onSuccess) await options.onSuccess()
-    } catch (e: any) {
-      ElMessage.error(e?.response?.data?.error || (isEditing() ? '更新失败' : '创建失败'))
+    } catch (error: unknown) {
+      ElMessage.error(extractErrorMessage(error, isEditing() ? '更新失败' : '创建失败'))
     } finally {
       saving.value = false
     }

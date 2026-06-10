@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { extractErrorMessage } from '@/utils/error'
 
 /**
  * 通用表格逻辑：分页、加载、刷新
@@ -31,8 +32,8 @@ export function useTable<T>(
       total.value = result.total
       page.value = result.page
       pageSize.value = result.pageSize
-    } catch (e: any) {
-      error.value = e?.response?.data?.error || '加载失败，请重试'
+    } catch (err: unknown) {
+      error.value = extractErrorMessage(err, '加载失败，请重试')
     } finally {
       loading.value = false
     }
@@ -53,5 +54,16 @@ export function useTable<T>(
     loadData()
   }
 
-  return { rows, total, page, pageSize, loading, error, loadData, onPageChange, onPageSizeChange, refresh }
+  return {
+    rows,
+    total,
+    page,
+    pageSize,
+    loading,
+    error,
+    loadData,
+    onPageChange,
+    onPageSizeChange,
+    refresh,
+  }
 }
