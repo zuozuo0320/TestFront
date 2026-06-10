@@ -6,6 +6,9 @@
  */
 import { onMounted } from 'vue'
 import {
+  PlannerModeLabel,
+  PlannerUsedColor,
+  PlannerUsedLabel,
   ScenarioCompositionStatusColor,
   ScenarioCompositionStatusLabel,
   ValidationStatus,
@@ -302,13 +305,37 @@ function getValidationColor(status?: AiScenarioComposition['latestValidationStat
         <el-form-item label="最大步骤数">
           <el-input-number v-model="aiPlanForm.maxSteps" :min="1" :max="20" />
         </el-form-item>
+        <el-form-item label="规划模式">
+          <el-radio-group v-model="aiPlanForm.plannerMode">
+            <el-radio-button v-for="(label, mode) in PlannerModeLabel" :key="mode" :value="mode">
+              {{ label }}
+            </el-radio-button>
+          </el-radio-group>
+        </el-form-item>
       </el-form>
 
       <section v-if="aiPlanResultVisible && aiPlanResult" class="ai-plan-result">
         <div class="ai-plan-summary">
           <strong>{{ aiPlanResult.summary }}</strong>
+          <el-tag
+            v-if="aiPlanResult.plannerUsed"
+            size="small"
+            effect="light"
+            :type="PlannerUsedColor[aiPlanResult.plannerUsed] || 'info'"
+          >
+            {{ PlannerUsedLabel[aiPlanResult.plannerUsed] || aiPlanResult.plannerUsed }}
+          </el-tag>
           <span>置信度 {{ Math.round(aiPlanResult.confidence * 100) }}%</span>
         </div>
+        <el-alert
+          v-if="aiPlanResult.degradedReason"
+          type="warning"
+          :closable="false"
+          show-icon
+          class="ai-plan-degraded"
+          title="已降级为启发式规划"
+          :description="aiPlanResult.degradedReason"
+        />
         <div v-if="aiPlanResult.warnings.length" class="ai-plan-warning">
           {{ aiPlanResult.warnings.join('；') }}
         </div>
@@ -556,6 +583,10 @@ function getValidationColor(status?: AiScenarioComposition['latestValidationStat
   color: var(--tp-text-muted);
   font-size: 12px;
   font-style: normal;
+}
+
+.ai-plan-degraded {
+  margin-bottom: var(--tp-space-3);
 }
 
 .ai-plan-warning {

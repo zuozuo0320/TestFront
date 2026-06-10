@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { useProjectStore } from '@/stores/project'
 import { useAiCompositions } from './useAiCompositions'
 import {
+  PlannerMode,
   ScenarioCompositionStatus,
   ValidationStatus,
   addScenarioStep,
@@ -49,7 +50,13 @@ vi.mock('@/api/aiScript', () => {
     FAILED: 'FAILED',
     ERROR: 'ERROR',
   }
+  const PlannerMode = {
+    AUTO: 'auto',
+    LLM: 'llm',
+    HEURISTIC: 'heuristic',
+  }
   return {
+    PlannerMode,
     ScenarioCompositionStatus,
     ValidationStatus,
     addScenarioStep: vi.fn(),
@@ -215,11 +222,13 @@ describe('useAiCompositions', () => {
       summary: '推荐复用登录场景',
       steps: [],
       warnings: [],
+      plannerUsed: 'LLM',
     })
 
     const compositions = useAiCompositions()
     await compositions.openAiPlanDialog()
     compositions.aiPlanForm.taskId = 88
+    compositions.aiPlanForm.plannerMode = PlannerMode.LLM
     await compositions.submitAiPlan()
 
     expect(compositions.publishedTaskOptions.value.map((item) => item.id)).toEqual([88])
@@ -227,8 +236,43 @@ describe('useAiCompositions', () => {
       projectId: 6,
       taskId: 88,
       maxSteps: 12,
+      plannerMode: PlannerMode.LLM,
     })
     expect(compositions.aiPlanResultVisible.value).toBe(true)
+    expect(compositions.aiPlanResult.value?.plannerUsed).toBe('LLM')
+  })
+
+  it('重新打开弹窗应重置规划模式并透传降级信息', async () => {
+    selectProject(6)
+    mockedFetchTaskList.mockResolvedValue({ total: 0, list: [] })
+    mockedCreateAiPlanFromTask.mockResolvedValue({
+      planId: 'plan_003',
+      confidence: 0.8,
+      summary: '【启发式降级】推荐复用登录场景',
+      steps: [],
+      warnings: [],
+      plannerUsed: 'HEURISTIC',
+      degradedReason: 'LLM Planner 激活模型未配置[160201]',
+    })
+
+    const compositions = useAiCompositions()
+    await compositions.openAiPlanDialog()
+    compositions.aiPlanForm.plannerMode = PlannerMode.LLM
+    await compositions.openAiPlanDialog()
+
+    expect(compositions.aiPlanForm.plannerMode).toBe(PlannerMode.AUTO)
+
+    compositions.aiPlanForm.taskId = 88
+    await compositions.submitAiPlan()
+
+    expect(mockedCreateAiPlanFromTask).toHaveBeenCalledWith({
+      projectId: 6,
+      taskId: 88,
+      maxSteps: 12,
+      plannerMode: PlannerMode.AUTO,
+    })
+    expect(compositions.aiPlanResult.value?.plannerUsed).toBe('HEURISTIC')
+    expect(compositions.aiPlanResult.value?.degradedReason).toContain('160201')
   })
 
   it('AI 编排计划确认后应生成编排草稿并写入步骤', async () => {
