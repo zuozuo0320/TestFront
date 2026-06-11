@@ -3,15 +3,21 @@ import { createPinia, setActivePinia } from 'pinia'
 import { useProjectStore } from '@/stores/project'
 import { useAiCompositions } from './useAiCompositions'
 import {
+  FlowAssetStatus,
   PlannerMode,
   ScenarioCompositionStatus,
+  ScenarioStepType,
+  TaskStatus,
   ValidationStatus,
   addScenarioStep,
   createAiPlanFromTask,
   createScenarioComposition,
   deleteScenarioComposition,
+  fetchFlowAssetList,
   fetchScenarioCompositionList,
   fetchTaskList,
+  type AiFlowAsset,
+  type AiScriptTask,
 } from '@/api/aiScript'
 
 const routerPush = vi.fn()
@@ -59,19 +65,48 @@ vi.mock('@/api/aiScript', () => {
     LLM: 'llm',
     HEURISTIC: 'heuristic',
   }
+  const TaskStatus = {
+    DRAFT: 'DRAFT',
+    PENDING_EXECUTE: 'PENDING_EXECUTE',
+    RUNNING: 'RUNNING',
+    GENERATE_SUCCESS: 'GENERATE_SUCCESS',
+    GENERATE_FAILED: 'GENERATE_FAILED',
+    PENDING_CONFIRM: 'PENDING_CONFIRM',
+    PENDING_REVALIDATE: 'PENDING_REVALIDATE',
+    CONFIRMED: 'CONFIRMED',
+    DISCARDED: 'DISCARDED',
+    MANUAL_REVIEW: 'MANUAL_REVIEW',
+  }
+  const FlowAssetStatus = {
+    DRAFT: 'DRAFT',
+    PUBLISHED: 'PUBLISHED',
+    ARCHIVED: 'ARCHIVED',
+  }
+  const ScenarioStepType = {
+    FLOW_CALL: 'FLOW_CALL',
+    ASSERTION: 'ASSERTION',
+    ATOMIC_ACTION: 'ATOMIC_ACTION',
+    CODE_BLOCK: 'CODE_BLOCK',
+    AI_GENERATED: 'AI_GENERATED',
+  }
   return {
+    FlowAssetStatus,
     PlannerMode,
     ScenarioCompositionStatus,
+    ScenarioStepType,
+    TaskStatus,
     ValidationStatus,
     addScenarioStep: vi.fn(),
     createAiPlanFromTask: vi.fn(),
     createScenarioComposition: vi.fn(),
     deleteScenarioComposition: vi.fn(),
+    fetchFlowAssetList: vi.fn(),
     fetchScenarioCompositionList: vi.fn(),
     fetchTaskList: vi.fn(),
   }
 })
 
+const mockedFetchFlowAssetList = vi.mocked(fetchFlowAssetList)
 const mockedFetchScenarioCompositionList = vi.mocked(fetchScenarioCompositionList)
 const mockedCreateScenarioComposition = vi.mocked(createScenarioComposition)
 const mockedAddScenarioStep = vi.mocked(addScenarioStep)
@@ -83,6 +118,50 @@ function selectProject(projectId = 1) {
   const projectStore = useProjectStore()
   projectStore.selectedProjectId = projectId
   return projectStore
+}
+
+function buildFlowAsset(overrides: Partial<AiFlowAsset> = {}): AiFlowAsset {
+  return {
+    id: 12,
+    projectId: 6,
+    flowKey: 'login_system',
+    flowName: '登录系统',
+    status: FlowAssetStatus.PUBLISHED,
+    tags: [],
+    preconditions: [],
+    postconditions: [],
+    allowAiReuse: true,
+    latestValidationStatus: ValidationStatus.PASSED,
+    createdBy: 1,
+    createdAt: '2026-06-09T10:00:00Z',
+    updatedBy: 1,
+    updatedAt: '2026-06-09T10:00:00Z',
+    ...overrides,
+  }
+}
+
+function buildScriptTask(overrides: Partial<AiScriptTask> = {}): AiScriptTask {
+  return {
+    id: 88,
+    projectId: 6,
+    projectName: '默认项目',
+    projectKey: 'default',
+    taskName: '资产扫描任务页面',
+    generationMode: 'RECORDING_ENHANCED',
+    caseIds: [],
+    caseTags: [],
+    caseCount: 0,
+    scenarioDesc: '',
+    startUrl: '',
+    taskStatus: TaskStatus.CONFIRMED,
+    frameworkType: 'PLAYWRIGHT',
+    latestValidationStatus: ValidationStatus.PASSED,
+    createdBy: 1,
+    createdName: '管理员',
+    createdAt: '2026-06-09T10:00:00Z',
+    updatedAt: '2026-06-09T10:00:00Z',
+    ...overrides,
+  }
 }
 
 describe('useAiCompositions', () => {
@@ -141,13 +220,214 @@ describe('useAiCompositions', () => {
     expect(compositions.compositions.value[0]?.scenarioKey).toBe('login_and_check')
   })
 
-  it('创建编排时应规范化 Key 并进入工作台', async () => {
+  it('融合录制任务创建编排时应支持普通录制脚本片段与固定场景片段一起编排', async () => {
     selectProject(6)
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(1_781_090_000_000)
+    const expectedKey = `asset_scan_task_page_composition_${Date.now().toString(36)}`
+    mockedFetchTaskList.mockResolvedValue({
+      total: 3,
+      list: [
+        buildScriptTask({
+          id: 88,
+          taskName: 'asset scan task page',
+        }),
+        buildScriptTask({
+          id: 91,
+          taskName: '资产扫描任务页面',
+        }),
+        buildScriptTask({
+          id: 89,
+          taskName: '生成成功未确认任务',
+          taskStatus: TaskStatus.GENERATE_SUCCESS,
+        }),
+        buildScriptTask({
+          id: 90,
+          taskName: '确认但验证失败任务',
+          latestValidationStatus: ValidationStatus.FAILED,
+        }),
+      ],
+    })
+    mockedFetchFlowAssetList.mockResolvedValue({
+      total: 4,
+      list: [
+        buildFlowAsset({
+          id: 15,
+          flowKey: 'asset_scan_create_task',
+          flowName: '资产扫描任务-新建任务按钮',
+        }),
+        buildFlowAsset({
+          id: 16,
+          flowKey: 'asset_scan_fill_task_name',
+          flowName: '资产扫描任务-填写任务名称',
+        }),
+        buildFlowAsset({
+          id: 13,
+          flowKey: 'blocked_flow',
+          flowName: '关闭复用场景',
+          allowAiReuse: false,
+        }),
+        buildFlowAsset({
+          id: 14,
+          flowKey: 'failed_flow',
+          flowName: '验证失败场景',
+          latestValidationStatus: ValidationStatus.FAILED,
+        }),
+      ],
+    })
+    mockedCreateAiPlanFromTask.mockResolvedValue({
+      planId: 'fusion_plan_88',
+      confidence: 0.86,
+      summary: '基于已确认录制任务与 1 个固定场景融合生成 2 个编排步骤',
+      warnings: [],
+      plannerUsed: 'HEURISTIC',
+      steps: [
+        {
+          type: ScenarioStepType.FLOW_CALL,
+          stepName: '引用固定场景：资产扫描任务-新建任务按钮',
+          flowId: 15,
+          flowVersionId: 101,
+          flowKey: 'asset_scan_create_task',
+          confidence: 0.9,
+          reason: '固定场景与来源录制步骤 1-2 高度重合，按固定场景脚本融合',
+          inputs: {},
+        },
+        {
+          type: ScenarioStepType.ATOMIC_ACTION,
+          stepName: '保留录制步骤 3：INPUT',
+          atomicAction: 'fill',
+          confidence: 0.82,
+          reason: '来源录制任务未被固定场景覆盖，保留为编排原子步骤',
+          inputs: {
+            selector: "page.getByRole('textbox', { name: '任务名称' })",
+            value: '资产扫描回归',
+          },
+        },
+      ],
+    })
     mockedCreateScenarioComposition.mockResolvedValue({
       id: 31,
       projectId: 6,
-      scenarioKey: 'login_and_check',
-      scenarioName: '登录并检查',
+      scenarioKey: expectedKey,
+      scenarioName: 'asset scan task page编排',
+      status: ScenarioCompositionStatus.DRAFT,
+      latestValidationStatus: ValidationStatus.NOT_VALIDATED,
+      revision: 1,
+      createdBy: 1,
+      createdAt: '2026-06-09T10:00:00Z',
+      updatedBy: 1,
+      updatedAt: '2026-06-09T10:00:00Z',
+    })
+    mockedAddScenarioStep.mockResolvedValue({
+      id: 201,
+      scenarioId: 31,
+      stepNo: 1,
+      stepType: ScenarioStepType.FLOW_CALL,
+      stepName: '引用固定场景：登录系统',
+      refFlowId: 12,
+      paramMapping: {},
+      outputMapping: {},
+      manualReviewed: true,
+      aiConfidence: 0,
+      enabled: true,
+      createdAt: '2026-06-09T10:00:00Z',
+      updatedAt: '2026-06-09T10:00:00Z',
+    })
+
+    const compositions = useAiCompositions()
+    await compositions.openCreateDialog()
+    compositions.form.sourceTaskId = 88
+    compositions.fillFromSourceTask()
+    compositions.form.additionalTaskIds = [91]
+    compositions.form.sourceFlowIds = [15, 16]
+    compositions.fillFromAdditionalTasks()
+    compositions.fillFromSourceFlows()
+    compositions.moveOrderedSource('FLOW:15', -1)
+    compositions.moveOrderedSource('FLOW:15', -1)
+
+    await compositions.submitCreate()
+
+    nowSpy.mockRestore()
+
+    expect(mockedFetchFlowAssetList).toHaveBeenCalledWith({
+      projectId: 6,
+      status: FlowAssetStatus.PUBLISHED,
+      validationStatus: ValidationStatus.PASSED,
+      pageNo: 1,
+      pageSize: 100,
+    })
+    expect(compositions.reusableTaskOptions.value.map((item) => item.id)).toEqual([88, 91])
+    expect(compositions.additionalTaskOptions.value.map((item) => item.id)).toEqual([91])
+    expect(compositions.selectedAdditionalTasks.value.map((item) => item.id)).toEqual([91])
+    expect(compositions.reusableFlowOptions.value.map((item) => item.id)).toEqual([15, 16])
+    expect(compositions.selectedSourceFlows.value.map((item) => item.id)).toEqual([15, 16])
+    expect(compositions.remainingReusableFlowCount.value).toBe(0)
+    expect(compositions.form.scenarioName).toBe('asset scan task page编排')
+    expect(compositions.form.scenarioKey).toBe(expectedKey)
+    expect(mockedCreateAiPlanFromTask).toHaveBeenCalledWith({
+      projectId: 6,
+      taskId: 88,
+      preferredFlowIds: [15, 16],
+      additionalTaskIds: [91],
+      orderedSources: [
+        { type: 'FLOW', id: 15 },
+        { type: 'TASK', id: 88 },
+        { type: 'TASK', id: 91 },
+        { type: 'FLOW', id: 16 },
+      ],
+      maxSteps: 20,
+      plannerMode: PlannerMode.HEURISTIC,
+    })
+    expect(mockedCreateScenarioComposition).toHaveBeenCalledWith({
+      projectId: 6,
+      scenarioKey: expectedKey,
+      scenarioName: 'asset scan task page编排',
+      description:
+        '基于已确认录制任务「asset scan task page」按顺序融合：固定场景「资产扫描任务-新建任务按钮」 → 来源任务「asset scan task page」 → 录制脚本「资产扫描任务页面」 → 固定场景「资产扫描任务-填写任务名称」',
+    })
+    expect(mockedAddScenarioStep).toHaveBeenNthCalledWith(1, 31, {
+      projectId: 6,
+      stepType: ScenarioStepType.FLOW_CALL,
+      stepName: '引用固定场景：资产扫描任务-新建任务按钮',
+      refFlowId: 15,
+      refFlowVersionId: 101,
+      refAssertionId: undefined,
+      atomicAction: undefined,
+      paramMapping: {},
+      outputMapping: {},
+      aiConfidence: 0.9,
+      manualReviewed: true,
+      enabled: true,
+    })
+    expect(mockedAddScenarioStep).toHaveBeenNthCalledWith(2, 31, {
+      projectId: 6,
+      stepType: ScenarioStepType.ATOMIC_ACTION,
+      stepName: '保留录制步骤 3：INPUT',
+      refFlowId: undefined,
+      refFlowVersionId: undefined,
+      refAssertionId: undefined,
+      atomicAction: 'fill',
+      paramMapping: {
+        selector: "page.getByRole('textbox', { name: '任务名称' })",
+        value: '资产扫描回归',
+      },
+      outputMapping: {},
+      aiConfidence: 0.82,
+      manualReviewed: true,
+      enabled: true,
+    })
+    expect(routerPush).toHaveBeenCalledWith('/ai-script/compositions/31')
+  })
+
+  it('空白编排创建时应自动生成 Key 且不写入固定场景步骤', async () => {
+    selectProject(6)
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(1_781_090_000_000)
+    const expectedKey = `scenario_composition_${Date.now().toString(36)}`
+    mockedFetchFlowAssetList.mockResolvedValue({ total: 0, list: [] })
+    mockedCreateScenarioComposition.mockResolvedValue({
+      id: 33,
+      projectId: 6,
+      scenarioKey: expectedKey,
+      scenarioName: '资产扫描完整回归',
       status: ScenarioCompositionStatus.DRAFT,
       latestValidationStatus: ValidationStatus.NOT_VALIDATED,
       revision: 1,
@@ -158,66 +438,44 @@ describe('useAiCompositions', () => {
     })
 
     const compositions = useAiCompositions()
-    compositions.form.scenarioKey = 'Login And Check'
-    compositions.form.scenarioName = '登录并检查'
-    compositions.form.description = '组合登录固定场景和标题断言'
+    await compositions.openCreateDialog()
+    compositions.changeCreateMode('BLANK')
+    compositions.form.scenarioName = '资产扫描完整回归'
+    compositions.form.description = '从空白工作台手动编排资产扫描完整链路'
 
     await compositions.submitCreate()
 
+    nowSpy.mockRestore()
+
     expect(mockedCreateScenarioComposition).toHaveBeenCalledWith({
       projectId: 6,
-      scenarioKey: 'login_and_check',
-      scenarioName: '登录并检查',
-      description: '组合登录固定场景和标题断言',
+      scenarioKey: expectedKey,
+      scenarioName: '资产扫描完整回归',
+      description: '从空白工作台手动编排资产扫描完整链路',
     })
-    expect(routerPush).toHaveBeenCalledWith('/ai-script/compositions/31')
+    expect(mockedAddScenarioStep).not.toHaveBeenCalled()
+    expect(routerPush).toHaveBeenCalledWith('/ai-script/compositions/33')
   })
 
   it('AI 编排建议应只暴露验证通过的录制任务选项', async () => {
     selectProject(6)
     mockedFetchTaskList.mockResolvedValue({
-      total: 2,
+      total: 3,
       list: [
-        {
+        buildScriptTask({
           id: 88,
-          projectId: 6,
-          projectName: '默认项目',
-          projectKey: 'default',
           taskName: '可复用任务',
-          generationMode: 'RECORDING_ENHANCED',
-          caseIds: [],
-          caseTags: [],
-          caseCount: 0,
-          scenarioDesc: '',
-          startUrl: '',
-          taskStatus: 'GENERATE_SUCCESS',
-          frameworkType: 'PLAYWRIGHT',
-          latestValidationStatus: ValidationStatus.PASSED,
-          createdBy: 1,
-          createdName: '管理员',
-          createdAt: '2026-06-09T10:00:00Z',
-          updatedAt: '2026-06-09T10:00:00Z',
-        },
-        {
+        }),
+        buildScriptTask({
           id: 89,
-          projectId: 6,
-          projectName: '默认项目',
-          projectKey: 'default',
+          taskName: '未确认任务',
+          taskStatus: TaskStatus.GENERATE_SUCCESS,
+        }),
+        buildScriptTask({
+          id: 90,
           taskName: '未验证任务',
-          generationMode: 'RECORDING_ENHANCED',
-          caseIds: [],
-          caseTags: [],
-          caseCount: 0,
-          scenarioDesc: '',
-          startUrl: '',
-          taskStatus: 'GENERATE_SUCCESS',
-          frameworkType: 'PLAYWRIGHT',
           latestValidationStatus: ValidationStatus.FAILED,
-          createdBy: 1,
-          createdName: '管理员',
-          createdAt: '2026-06-09T10:00:00Z',
-          updatedAt: '2026-06-09T10:00:00Z',
-        },
+        }),
       ],
     })
     mockedCreateAiPlanFromTask.mockResolvedValue({
@@ -284,26 +542,10 @@ describe('useAiCompositions', () => {
     mockedFetchTaskList.mockResolvedValue({
       total: 1,
       list: [
-        {
+        buildScriptTask({
           id: 88,
-          projectId: 6,
-          projectName: '默认项目',
-          projectKey: 'default',
           taskName: '登录流程',
-          generationMode: 'RECORDING_ENHANCED',
-          caseIds: [],
-          caseTags: [],
-          caseCount: 0,
-          scenarioDesc: '',
-          startUrl: '',
-          taskStatus: 'GENERATE_SUCCESS',
-          frameworkType: 'PLAYWRIGHT',
-          latestValidationStatus: ValidationStatus.PASSED,
-          createdBy: 1,
-          createdName: '管理员',
-          createdAt: '2026-06-09T10:00:00Z',
-          updatedAt: '2026-06-09T10:00:00Z',
-        },
+        }),
       ],
     })
     mockedCreateAiPlanFromTask.mockResolvedValue({
@@ -314,12 +556,21 @@ describe('useAiCompositions', () => {
       steps: [
         {
           type: 'FLOW_CALL',
+          stepName: '引用固定场景：登录系统',
           flowId: 12,
           flowVersionId: 30,
           flowKey: 'login_system',
           confidence: 0.86,
           reason: '录制步骤匹配登录固定场景',
           inputs: { username: '${env.ADMIN_USER}' },
+        },
+        {
+          type: ScenarioStepType.ATOMIC_ACTION,
+          stepName: '保留录制步骤 3：INPUT',
+          atomicAction: 'fill',
+          confidence: 0.84,
+          reason: '来源录制任务未被固定场景覆盖',
+          inputs: { selector: '#taskName', value: '资产扫描回归' },
         },
       ],
     })
@@ -368,13 +619,28 @@ describe('useAiCompositions', () => {
     expect(mockedAddScenarioStep).toHaveBeenCalledWith(32, {
       projectId: 6,
       stepType: 'FLOW_CALL',
-      stepName: 'login_system',
+      stepName: '引用固定场景：登录系统',
       refFlowId: 12,
       refFlowVersionId: 30,
       refAssertionId: undefined,
+      atomicAction: undefined,
       paramMapping: { username: '${env.ADMIN_USER}' },
       outputMapping: {},
       aiConfidence: 0.86,
+      manualReviewed: true,
+      enabled: true,
+    })
+    expect(mockedAddScenarioStep).toHaveBeenCalledWith(32, {
+      projectId: 6,
+      stepType: ScenarioStepType.ATOMIC_ACTION,
+      stepName: '保留录制步骤 3：INPUT',
+      refFlowId: undefined,
+      refFlowVersionId: undefined,
+      refAssertionId: undefined,
+      atomicAction: 'fill',
+      paramMapping: { selector: '#taskName', value: '资产扫描回归' },
+      outputMapping: {},
+      aiConfidence: 0.84,
       manualReviewed: true,
       enabled: true,
     })

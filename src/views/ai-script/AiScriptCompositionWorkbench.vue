@@ -25,6 +25,13 @@ import {
 import { useAiCompositionWorkbench } from '@/composables/useAiCompositionWorkbench'
 import { formatBeijingDateTime } from '@/utils/time'
 
+interface ValidationScreenshot {
+  fileName?: string
+  file_name?: string
+  url?: string
+  caption?: string
+}
+
 const route = useRoute()
 const router = useRouter()
 const compositionId = Number(route.params.compositionId)
@@ -179,6 +186,28 @@ function getRunStatusColor(status?: string) {
   )
 }
 
+function getValidationScreenshots(item: { logs?: Array<Record<string, unknown>> }) {
+  return (item.logs || []).flatMap((log) => {
+    const screenshots = log.screenshots
+    return Array.isArray(screenshots) ? (screenshots as ValidationScreenshot[]) : []
+  })
+}
+
+function getValidationErrorLogs(item: { logs?: Array<Record<string, unknown>> }) {
+  return (item.logs || []).filter((log) => {
+    const level = String(log.level || '').toUpperCase()
+    return level === 'ERROR' || level === 'WARN'
+  })
+}
+
+function getLogMessage(log: Record<string, unknown>) {
+  return typeof log.message === 'string' && log.message.trim() ? log.message : JSON.stringify(log)
+}
+
+function getScreenshotName(screenshot: ValidationScreenshot) {
+  return screenshot.caption || screenshot.fileName || screenshot.file_name || '验证完成截图'
+}
+
 function diffLinePrefix(kind: string) {
   if (kind === 'added') return '+'
   if (kind === 'removed') return '-'
@@ -225,40 +254,47 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
 
 <template>
   <div class="workbench-page">
-    <section class="workbench-topbar">
+    <section class="workbench-topbar" aria-label="场景编排操作区">
       <div class="workbench-title">
-        <el-button link type="primary" @click="router.push('/ai-script/compositions')">
+        <el-button
+          class="workbench-back"
+          link
+          type="primary"
+          @click="router.push('/ai-script/compositions')"
+        >
           <span class="material-symbols-outlined">arrow_back</span>
           返回
         </el-button>
-        <div>
+        <div class="workbench-title-body">
           <span class="workbench-eyebrow">场景编排工作台</span>
-          <h1>{{ composition?.scenarioName || '场景编排' }}</h1>
-        </div>
-        <div v-if="composition" class="status-row">
-          <el-tag :type="getStatusColor(composition.status)" effect="light">
-            {{ getStatusLabel(composition.status) }}
-          </el-tag>
-          <el-tag :type="getValidationColor(composition.latestValidationStatus)" effect="light">
-            {{ getValidationLabel(composition.latestValidationStatus) }}
-          </el-tag>
-          <el-tag
-            :type="
-              ScenarioCodeEditStatusColor[
-                composition.codeEditStatus || ScenarioCodeEditStatus.AUTO_GENERATED
-              ]
-            "
-            effect="light"
-          >
-            {{
-              ScenarioCodeEditStatusLabel[
-                composition.codeEditStatus || ScenarioCodeEditStatus.AUTO_GENERATED
-              ]
-            }}
-          </el-tag>
-          <el-tag v-if="dirty" type="warning" effect="light">未保存</el-tag>
-          <el-tag v-if="permissionDenied" type="info" effect="light">只读</el-tag>
-          <span>R{{ composition.revision }}</span>
+          <div class="workbench-title-line">
+            <h1>{{ composition?.scenarioName || '场景编排' }}</h1>
+            <span v-if="composition" class="revision-pill">R{{ composition.revision }}</span>
+          </div>
+          <div v-if="composition" class="status-row">
+            <el-tag :type="getStatusColor(composition.status)" effect="light">
+              {{ getStatusLabel(composition.status) }}
+            </el-tag>
+            <el-tag :type="getValidationColor(composition.latestValidationStatus)" effect="light">
+              {{ getValidationLabel(composition.latestValidationStatus) }}
+            </el-tag>
+            <el-tag
+              :type="
+                ScenarioCodeEditStatusColor[
+                  composition.codeEditStatus || ScenarioCodeEditStatus.AUTO_GENERATED
+                ]
+              "
+              effect="light"
+            >
+              {{
+                ScenarioCodeEditStatusLabel[
+                  composition.codeEditStatus || ScenarioCodeEditStatus.AUTO_GENERATED
+                ]
+              }}
+            </el-tag>
+            <el-tag v-if="dirty" type="warning" effect="light">未保存</el-tag>
+            <el-tag v-if="permissionDenied" type="info" effect="light">只读</el-tag>
+          </div>
         </div>
       </div>
       <div class="workbench-actions">
@@ -302,7 +338,7 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
     <el-skeleton v-if="loading" :rows="12" animated />
 
     <section v-else-if="composition" class="workbench-main">
-      <aside class="asset-library">
+      <aside class="asset-library" aria-label="可复用资产">
         <el-tabs v-model="activeAssetTab" stretch>
           <el-tab-pane label="固定场景" name="flows" />
           <el-tab-pane label="断言" name="assertions" />
@@ -365,7 +401,7 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
         </div>
       </aside>
 
-      <section class="step-stage">
+      <section class="step-stage" aria-label="场景步骤编排">
         <div class="scenario-editor">
           <el-form label-position="top" :model="scenarioForm">
             <el-form-item
@@ -487,7 +523,7 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
         </div>
       </section>
 
-      <aside class="config-panel">
+      <aside class="config-panel" aria-label="步骤配置">
         <div class="panel-heading">
           <h2>步骤配置</h2>
           <el-button
@@ -551,7 +587,7 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
     </section>
 
     <section v-if="composition" class="bottom-panel">
-      <el-tabs v-model="activeBottomTab">
+      <el-tabs v-model="activeBottomTab" class="workbench-bottom-tabs">
         <el-tab-pane label="DSL" name="dsl">
           <pre class="code-preview">{{ dslText }}</pre>
         </el-tab-pane>
@@ -685,12 +721,49 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
                 </el-tag>
                 <strong>{{ item.executorJobId }}</strong>
                 <span>{{ formatBeijingDateTime(item.createdAt) }}</span>
-                <span>{{ item.durationMs }} ms</span>
+                <span>{{ item.finishedAt ? `${item.durationMs} ms` : '运行中' }}</span>
               </div>
               <div v-if="item.assertionResults?.length" class="assertion-result-list">
                 <span v-for="result in item.assertionResults" :key="result.id">
                   {{ result.stepId }} · {{ getRunStatusLabel(result.status) }}
                 </span>
+              </div>
+              <div v-if="getValidationErrorLogs(item).length" class="validation-error-list">
+                <div
+                  v-for="(log, index) in getValidationErrorLogs(item)"
+                  :key="`${item.id}-error-${index}`"
+                  class="validation-error-item"
+                >
+                  <el-tag
+                    size="small"
+                    :type="String(log.level).toUpperCase() === 'ERROR' ? 'danger' : 'warning'"
+                    effect="light"
+                  >
+                    {{ log.level || 'ERROR' }}
+                  </el-tag>
+                  <span>{{ getLogMessage(log) }}</span>
+                </div>
+              </div>
+              <div v-if="getValidationScreenshots(item).length" class="validation-evidence-list">
+                <div class="validation-evidence-title">
+                  <strong>执行完成截图</strong>
+                  <span>用于确认本次回放结束时页面状态</span>
+                </div>
+                <a
+                  v-for="screenshot in getValidationScreenshots(item)"
+                  :key="screenshot.url || getScreenshotName(screenshot)"
+                  class="validation-screenshot"
+                  :href="screenshot.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <img
+                    v-if="screenshot.url"
+                    :src="screenshot.url"
+                    :alt="getScreenshotName(screenshot)"
+                  />
+                  <span>{{ getScreenshotName(screenshot) }}</span>
+                </a>
               </div>
             </div>
           </div>
@@ -955,39 +1028,69 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
   display: flex;
   min-height: 100%;
   flex-direction: column;
-  gap: var(--tp-space-4);
+  gap: var(--tp-space-3);
   box-sizing: border-box;
 }
 
 .workbench-topbar,
 .workbench-main,
 .bottom-panel {
+  flex-shrink: 0;
   border: 1px solid var(--tp-border-subtle);
-  border-radius: var(--tp-radius-lg);
+  border-radius: var(--tp-radius-md);
   background: var(--tp-surface-card);
   box-shadow: var(--tp-shadow-sm);
 }
 
 .workbench-topbar {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--tp-space-4);
-  padding: var(--tp-space-4) var(--tp-space-5);
+  padding: var(--tp-space-4);
 }
 
 .workbench-title {
   display: flex;
   min-width: 0;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--tp-space-3);
+  flex: 1;
+}
+
+.workbench-back {
+  flex-shrink: 0;
+  min-height: 36px;
+  padding-inline: 0;
+}
+
+.workbench-back .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.workbench-title-body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--tp-space-1);
+}
+
+.workbench-title-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--tp-space-2);
 }
 
 .workbench-title h1 {
+  overflow: hidden;
   margin: 0;
   color: var(--tp-text-primary);
-  font-size: 22px;
+  font-size: var(--tp-text-2xl);
   font-weight: 700;
+  line-height: var(--tp-line-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .workbench-eyebrow {
@@ -1005,9 +1108,30 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
 }
 
 .status-row {
-  margin-left: var(--tp-space-2);
   color: var(--tp-text-muted);
   font-size: 12px;
+}
+
+.revision-pill {
+  flex-shrink: 0;
+  border-radius: var(--tp-radius-sm);
+  background: var(--tp-surface-muted);
+  color: var(--tp-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 5px var(--tp-space-2);
+}
+
+.workbench-actions {
+  justify-content: flex-end;
+  max-width: 720px;
+}
+
+.workbench-actions :deep(.el-button) {
+  min-height: 36px;
+  margin-left: 0;
+  font-weight: 700;
 }
 
 .workbench-warning {
@@ -1016,8 +1140,9 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
 
 .workbench-main {
   display: grid;
-  min-height: 560px;
-  grid-template-columns: 260px minmax(360px, 1fr) 320px;
+  height: clamp(420px, calc(100dvh - 250px), 660px);
+  min-height: 420px;
+  grid-template-columns: minmax(220px, 280px) minmax(480px, 1fr) minmax(300px, 360px);
   overflow: hidden;
 }
 
@@ -1025,6 +1150,7 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
 .step-stage,
 .config-panel {
   min-width: 0;
+  min-height: 0;
   padding: var(--tp-space-4);
 }
 
@@ -1034,10 +1160,21 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
 }
 
 .asset-library {
+  display: flex;
+  flex-direction: column;
   border-right: 1px solid var(--tp-border-subtle);
+  overflow: hidden;
+}
+
+.step-stage {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--tp-space-4);
+  overflow: hidden;
 }
 
 .config-panel {
+  overflow: auto;
   border-left: 1px solid var(--tp-border-subtle);
 }
 
@@ -1052,9 +1189,11 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
 }
 
 .asset-list {
-  max-height: 480px;
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   padding-top: var(--tp-space-3);
+  padding-right: var(--tp-space-1);
 }
 
 .asset-card,
@@ -1062,18 +1201,23 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--tp-border-subtle);
-  border-radius: var(--tp-radius-md);
+  border-radius: var(--tp-radius-sm);
   background: var(--tp-surface-card);
   color: var(--tp-text-secondary);
   cursor: pointer;
   text-align: left;
-  transition: var(--tp-transition);
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
 }
 
 .asset-card {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--tp-space-1);
+  min-height: 86px;
   padding: var(--tp-space-3);
 }
 
@@ -1084,16 +1228,30 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
   background: var(--tp-surface-hover);
 }
 
+.asset-card:focus-visible,
+.step-card:focus-visible {
+  outline: 2px solid var(--tp-primary);
+  outline-offset: 2px;
+}
+
+.step-card.active {
+  box-shadow: 0 0 0 1px var(--tp-border-strong);
+}
+
+.asset-card:hover,
+.step-card:hover {
+  transform: translateY(-1px);
+}
+
 .asset-card strong,
 .step-card strong,
 .config-summary strong,
 .history-item strong,
 .ai-suggestion strong {
-  overflow: hidden;
   color: var(--tp-text-primary);
   font-size: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: var(--tp-line-ui);
+  overflow-wrap: anywhere;
 }
 
 .asset-card span,
@@ -1107,7 +1265,15 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
 }
 
 .scenario-editor {
-  margin-bottom: var(--tp-space-4);
+  padding: var(--tp-space-1) 0 0;
+}
+
+.scenario-editor :deep(.el-form-item) {
+  margin-bottom: var(--tp-space-3);
+}
+
+.scenario-editor :deep(.el-form-item:last-child) {
+  margin-bottom: 0;
 }
 
 .outdated-refs-alert {
@@ -1132,8 +1298,15 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
 .panel-heading h2 {
   margin: 0;
   color: var(--tp-text-primary);
-  font-size: 15px;
+  font-size: var(--tp-text-lg);
   font-weight: 700;
+  line-height: var(--tp-line-ui);
+}
+
+.steps-panel {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
 }
 
 .empty-steps {
@@ -1141,9 +1314,14 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
   min-height: 260px;
   place-items: center;
   border: 1px dashed var(--tp-border-subtle);
-  border-radius: var(--tp-radius-md);
+  border-radius: var(--tp-radius-sm);
   color: var(--tp-text-muted);
   text-align: center;
+}
+
+.empty-steps p {
+  margin: var(--tp-space-2) 0 0;
+  font-size: var(--tp-text-sm);
 }
 
 .empty-steps .material-symbols-outlined {
@@ -1151,18 +1329,25 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
   font-size: 36px;
 }
 
+.step-list {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 2px var(--tp-space-1) var(--tp-space-1) 2px;
+}
+
 .step-card {
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) auto auto;
+  grid-template-columns: 36px minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: var(--tp-space-3);
-  min-height: 68px;
+  min-height: 76px;
   padding: var(--tp-space-3);
   cursor: grab;
 }
 
 .step-card.has-error {
-  border-color: var(--tp-danger);
+  border-color: var(--tp-accent-danger-border);
   background: var(--tp-accent-danger-soft);
 }
 
@@ -1177,11 +1362,11 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
 
 .step-no {
   display: inline-flex;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: 50%;
   background: var(--tp-primary-lighter);
   color: var(--tp-primary);
   font-size: 12px;
@@ -1195,9 +1380,22 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
   gap: 2px;
 }
 
+.step-main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .step-actions {
   display: flex;
   gap: var(--tp-space-1);
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
+.step-actions :deep(.el-button) {
+  min-height: 30px;
+  padding-inline: var(--tp-space-1);
 }
 
 .step-issue-badge {
@@ -1205,12 +1403,16 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
 }
 
 .config-summary {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: var(--tp-space-2);
   padding-bottom: var(--tp-space-3);
   border-bottom: 1px solid var(--tp-border-subtle);
+}
+
+.config-summary strong {
+  min-width: 0;
 }
 
 .issue-list {
@@ -1234,13 +1436,13 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
 }
 
 .issue-item.error {
-  border-color: var(--tp-danger);
+  border-color: var(--tp-accent-danger-border);
   background: var(--tp-accent-danger-soft);
   color: var(--tp-danger);
 }
 
 .issue-item.warning {
-  border-color: var(--tp-warning);
+  border-color: var(--tp-accent-warning-border);
   background: var(--tp-accent-warning-soft);
   color: var(--tp-warning);
 }
@@ -1252,14 +1454,16 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
 .config-list {
   display: flex;
   flex-direction: column;
-  gap: var(--tp-space-2);
-  margin: var(--tp-space-4) 0;
+  gap: var(--tp-space-1);
+  margin: var(--tp-space-4) 0 var(--tp-space-3);
 }
 
 .config-list div {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-columns: 76px minmax(0, 1fr);
   gap: var(--tp-space-2);
+  min-height: 28px;
+  align-items: center;
 }
 
 .config-list dt {
@@ -1268,16 +1472,15 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
 }
 
 .config-list dd {
-  overflow: hidden;
   margin: 0;
   color: var(--tp-text-primary);
   font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: var(--tp-line-ui);
+  overflow-wrap: anywhere;
 }
 
 .config-block {
-  margin-top: var(--tp-space-3);
+  margin-top: var(--tp-space-4);
 }
 
 .config-block h3 {
@@ -1292,7 +1495,7 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
   margin: 0;
   padding: var(--tp-space-3);
   border: 1px solid var(--tp-border-subtle);
-  border-radius: var(--tp-radius-md);
+  border-radius: var(--tp-radius-sm);
   background: var(--tp-surface-muted);
   color: var(--tp-text-secondary);
   font-family: var(--tp-font-family-mono);
@@ -1302,22 +1505,62 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
 }
 
 .config-block pre {
-  max-height: 160px;
+  max-height: 150px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .config-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--tp-space-2);
+  position: sticky;
+  bottom: 0;
   margin-top: var(--tp-space-4);
+  padding-top: var(--tp-space-3);
+  background: var(--tp-surface-muted);
+}
+
+.config-actions :deep(.el-button) {
+  min-height: 40px;
+  margin-left: 0;
+  font-weight: 700;
 }
 
 .bottom-panel {
+  min-height: 0;
   padding: 0 var(--tp-space-4) var(--tp-space-4);
 }
 
+.workbench-bottom-tabs :deep(.el-tabs__header) {
+  margin-bottom: var(--tp-space-3);
+}
+
+.workbench-bottom-tabs :deep(.el-tabs__item) {
+  min-height: 42px;
+  color: var(--tp-text-secondary);
+  font-weight: 700;
+}
+
+.workbench-bottom-tabs :deep(.el-tabs__item.is-active) {
+  color: var(--tp-primary);
+}
+
+.workbench-bottom-tabs :deep(.el-tabs__content) {
+  min-width: 0;
+}
+
+.workbench-bottom-tabs :deep(.el-tabs__nav-scroll) {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.workbench-bottom-tabs :deep(.el-tabs__nav) {
+  white-space: nowrap;
+}
+
 .code-preview {
-  max-height: 360px;
+  max-height: clamp(240px, 32dvh, 420px);
 }
 
 .code-panel {
@@ -1334,7 +1577,7 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
   gap: var(--tp-space-3);
   padding: var(--tp-space-3);
   border: 1px solid var(--tp-border-subtle);
-  border-radius: var(--tp-radius-md);
+  border-radius: var(--tp-radius-sm);
   background: var(--tp-surface-muted);
 }
 
@@ -1357,8 +1600,9 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
   flex-shrink: 0;
 }
 
-.code-editor {
+.code-editor :deep(.el-textarea__inner) {
   font-family: var(--tp-font-family-mono);
+  min-height: 360px;
 }
 
 .code-edit-options {
@@ -1376,7 +1620,7 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
   margin-bottom: var(--tp-space-4);
   padding: var(--tp-space-4);
   border: 1px solid var(--tp-border-subtle);
-  border-radius: var(--tp-radius-md);
+  border-radius: var(--tp-radius-sm);
   background: var(--tp-surface-muted);
 }
 
@@ -1405,7 +1649,7 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
   gap: var(--tp-space-3);
   padding: var(--tp-space-3);
   border: 1px solid var(--tp-border-subtle);
-  border-radius: var(--tp-radius-md);
+  border-radius: var(--tp-radius-sm);
   background: var(--tp-surface-muted);
 }
 
@@ -1466,7 +1710,7 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
   margin: 0;
   padding: var(--tp-space-3);
   border: 1px solid var(--tp-border-subtle);
-  border-radius: var(--tp-radius-md);
+  border-radius: var(--tp-radius-sm);
   background: var(--tp-surface-muted);
   color: var(--tp-text-secondary);
   font-family: var(--tp-font-family-mono);
@@ -1490,7 +1734,7 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
 
 .validation-card {
   border: 1px solid var(--tp-border-subtle);
-  border-radius: var(--tp-radius-md);
+  border-radius: var(--tp-radius-sm);
   background: var(--tp-surface-muted);
 }
 
@@ -1514,6 +1758,88 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
   padding: 2px var(--tp-space-2);
 }
 
+.validation-error-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tp-space-2);
+  padding: 0 var(--tp-space-3) var(--tp-space-3);
+}
+
+.validation-error-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--tp-space-2);
+  padding: var(--tp-space-2);
+  border: 1px solid var(--tp-danger-light);
+  border-radius: var(--tp-radius-sm);
+  background: var(--tp-accent-danger-soft);
+}
+
+.validation-error-item span {
+  color: var(--tp-danger);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.validation-evidence-list {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  gap: var(--tp-space-3);
+  padding: 0 var(--tp-space-3) var(--tp-space-3);
+}
+
+.validation-evidence-title {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.validation-evidence-title strong {
+  color: var(--tp-text-primary);
+  font-size: 13px;
+}
+
+.validation-evidence-title span {
+  color: var(--tp-text-muted);
+  font-size: 12px;
+}
+
+.validation-screenshot {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--tp-space-3);
+  padding: var(--tp-space-2);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: var(--tp-radius-sm);
+  background: var(--tp-surface-card);
+  color: var(--tp-text-primary);
+  text-decoration: none;
+}
+
+.validation-screenshot:hover {
+  border-color: var(--tp-border-strong);
+}
+
+.validation-screenshot img {
+  width: 96px;
+  height: 56px;
+  border-radius: var(--tp-radius-xs);
+  object-fit: cover;
+}
+
+.validation-screenshot span {
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
 .ai-suggestion {
   grid-template-columns: minmax(0, 1fr) auto auto auto;
 }
@@ -1525,7 +1851,7 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
   gap: var(--tp-space-3);
   padding: var(--tp-space-3);
   border: 1px solid var(--tp-border-subtle);
-  border-radius: var(--tp-radius-md);
+  border-radius: var(--tp-radius-sm);
   background: var(--tp-surface-muted);
 }
 
@@ -1610,9 +1936,49 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
   font-weight: 700;
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1440px) {
   .workbench-main {
+    grid-template-columns: minmax(200px, 250px) minmax(420px, 1fr) minmax(280px, 320px);
+  }
+
+  .step-card {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    gap: var(--tp-space-2);
+  }
+
+  .step-actions {
+    grid-column: 2 / -1;
+    justify-content: flex-start;
+  }
+
+  .step-issue-badge {
+    justify-self: end;
+  }
+}
+
+@media (max-width: 1180px) {
+  .workbench-topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .workbench-actions {
+    justify-content: flex-start;
+    max-width: none;
+    width: 100%;
+  }
+
+  .workbench-main {
+    height: auto;
+    min-height: 0;
     grid-template-columns: 240px minmax(320px, 1fr);
+    overflow: visible;
+  }
+
+  .asset-library,
+  .step-stage,
+  .config-panel {
+    max-height: none;
   }
 
   .config-panel {
@@ -1620,24 +1986,101 @@ async function handleStepDrop(targetStep: AiScenarioStep) {
     border-top: 1px solid var(--tp-border-subtle);
     border-left: 0;
   }
+
+  .config-actions {
+    position: static;
+  }
 }
 
 @media (max-width: 820px) {
-  .workbench-topbar {
+  .workbench-page {
+    gap: var(--tp-space-2);
+  }
+
+  .workbench-topbar,
+  .asset-library,
+  .step-stage,
+  .config-panel,
+  .bottom-panel {
+    padding: var(--tp-space-3);
+  }
+
+  .workbench-title {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--tp-space-2);
+  }
+
+  .workbench-title h1 {
+    white-space: normal;
+  }
+
+  .workbench-title-line {
+    align-items: flex-start;
     flex-direction: column;
   }
 
   .workbench-main {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    align-items: stretch;
     grid-template-columns: 1fr;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .asset-library,
+  .step-stage,
+  .config-panel {
+    flex: none;
+    width: auto;
+  }
+
+  .step-stage,
+  .steps-panel {
+    display: block;
+    overflow: visible;
   }
 
   .asset-library {
+    overflow: visible;
     border-right: 0;
     border-bottom: 1px solid var(--tp-border-subtle);
   }
 
+  .asset-list,
+  .step-list,
+  .config-panel {
+    overflow: visible;
+  }
+
   .step-card,
+  .history-item,
+  .ai-suggestion,
+  .log-item,
+  .code-panel-toolbar,
   .validation-config {
+    grid-template-columns: 1fr;
+  }
+
+  .step-card {
+    cursor: pointer;
+  }
+
+  .step-actions,
+  .code-actions,
+  .code-edit-options {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .config-list div,
+  .config-actions,
+  .validation-error-item,
+  .validation-evidence-list,
+  .validation-screenshot,
+  .diff-grid {
     grid-template-columns: 1fr;
   }
 }

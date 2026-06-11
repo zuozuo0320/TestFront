@@ -19,6 +19,7 @@ import {
   FlowAssetStatus,
   ScenarioCodeEditStatus,
   ScenarioCompositionStatus,
+  CompositionValidationStatus,
   ScenarioStepType,
   addScenarioStep,
   archiveScenarioComposition,
@@ -89,6 +90,8 @@ export interface StepIssue {
 
 const lowConfidenceThreshold = 0.8
 const editableRoles = new Set(['admin', 'manager', 'tester', 'developer'])
+const validationPollingIntervalMs = 2000
+const validationPollingTimeoutMs = 180000
 
 function parseJsonObject(value: string, fieldName: string): Record<string, unknown> {
   const trimmed = value.trim()
@@ -227,6 +230,13 @@ export function useAiCompositionWorkbench(compositionId: number) {
   const generatedCode = computed(() => composition.value?.generatedCode || '')
   const latestValidation = computed(() => validations.value[0] || null)
   const latestValidationLogs = computed(() => latestValidation.value?.logs || [])
+  const hasRunningValidation = computed(() =>
+    validations.value.some(
+      (item) =>
+        item.status === CompositionValidationStatus.PENDING ||
+        item.status === CompositionValidationStatus.RUNNING,
+    ),
+  )
   const visibleAiPlanSteps = computed(
     () =>
       aiPlan.value?.steps.filter((step) => !ignoredAiStepKeys.value.has(buildAiStepKey(step))) ||
@@ -246,7 +256,9 @@ export function useAiCompositionWorkbench(compositionId: number) {
   const canGenerate = computed(
     () => steps.value.length > 0 && !generating.value && !locked.value && !permissionDenied.value,
   )
-  const canValidate = computed(() => Boolean(generatedCode.value.trim()) && !validating.value)
+  const canValidate = computed(
+    () => Boolean(generatedCode.value.trim()) && !validating.value && !hasRunningValidation.value,
+  )
   const canPublish = computed(
     () =>
       composition.value?.latestValidationStatus === 'PASSED' &&
@@ -367,6 +379,33 @@ export function useAiCompositionWorkbench(compositionId: number) {
     if (!projectId.value) return
     const detail = await fetchScenarioCompositionDetail(compositionId, projectId.value)
     applyCompositionDetail(detail, false)
+  }
+
+  function isValidationFinished(item: AiCompositionValidation) {
+    return (
+      item.status !== CompositionValidationStatus.PENDING &&
+      item.status !== CompositionValidationStatus.RUNNING
+    )
+  }
+
+  async function waitForValidationFinished(validationId: number) {
+    if (!projectId.value) return null
+    const startedAt = Date.now()
+    while (Date.now() - startedAt < validationPollingTimeoutMs) {
+      await new Promise((resolve) => window.setTimeout(resolve, validationPollingIntervalMs))
+      const validationList = await fetchScenarioCompositionValidations(
+        compositionId,
+        projectId.value,
+      )
+      validations.value = validationList
+      const current = validationList.find((item) => item.id === validationId) || validationList[0]
+      if (current && isValidationFinished(current)) {
+        await reloadDetailOnly()
+        await refreshGovernance()
+        return current
+      }
+    }
+    throw new Error('验证仍在执行中，请稍后在验证历史中查看结果')
   }
 
   async function saveScenario() {
@@ -697,7 +736,7 @@ export function useAiCompositionWorkbench(compositionId: number) {
     }
     validating.value = true
     try {
-      await validateScenarioComposition(compositionId, {
+      const validation = await validateScenarioComposition(compositionId, {
         projectId: projectId.value,
         environment: validationForm.environment.trim() || 'test',
         variables,
@@ -706,7 +745,15 @@ export function useAiCompositionWorkbench(compositionId: number) {
       await reloadDetailOnly()
       await refreshGovernance()
       activeBottomTab.value = 'validations'
-      ElMessage.success('验证已完成')
+      ElMessage.success('验证已开始，结果将自动刷新')
+      if (!isValidationFinished(validation)) {
+        const finished = await waitForValidationFinished(validation.id)
+        if (finished?.status === CompositionValidationStatus.PASSED) {
+          ElMessage.success('验证通过')
+        } else if (finished) {
+          ElMessage.error('验证失败，请查看验证历史')
+        }
+      }
     } catch (error: unknown) {
       validationFieldErrors.value = extractFieldErrors(error)
       ElMessage.error(extractErrorMessage(error, '验证失败'))

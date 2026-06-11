@@ -30,11 +30,18 @@ const {
   aiPlanning,
   creatingFromPlan,
   sourceTasksLoading,
+  sourceFlowsLoading,
   errorMessage,
   createDialogVisible,
   aiPlanDialogVisible,
   aiPlanResultVisible,
   publishedTaskOptions,
+  reusableTaskOptions,
+  additionalTaskOptions,
+  remainingAdditionalTaskCount,
+  reusableFlowOptions,
+  remainingReusableFlowCount,
+  orderedCompositionSources,
   aiPlanResult,
   filters,
   form,
@@ -47,7 +54,13 @@ const {
   changePage,
   changePageSize,
   openCreateDialog,
-  fillScenarioKey,
+  changeCreateMode,
+  fillFromSourceTask,
+  fillFromAdditionalTasks,
+  fillFromSourceFlows,
+  moveOrderedSource,
+  removeOrderedSource,
+  fillBlankScenarioKey,
   submitCreate,
   openAiPlanDialog,
   submitAiPlan,
@@ -88,7 +101,7 @@ function getValidationColor(status?: AiScenarioComposition['latestValidationStat
       <div class="composition-title">
         <span class="composition-eyebrow">测试智编资产</span>
         <h1>场景编排</h1>
-        <p>组合固定场景、断言和原子操作，生成可验证、可发布的 Playwright 工程脚本。</p>
+        <p>融合已确认录制任务、固定场景和断言资产，生成可验证、可发布的 Playwright 工程脚本。</p>
       </div>
       <div class="composition-actions">
         <el-button :disabled="loading || !hasProject" @click="fetchCompositions(page)">
@@ -243,27 +256,207 @@ function getValidationColor(status?: AiScenarioComposition['latestValidationStat
     <el-dialog
       v-model="createDialogVisible"
       title="新建场景编排"
-      width="620px"
+      width="760px"
       class="composition-dialog"
       destroy-on-close
     >
       <el-form label-width="104px" :model="form">
-        <el-form-item label="场景名称" required>
-          <el-input
-            v-model="form.scenarioName"
-            placeholder="例如：创建测试智编任务并验证"
-            @blur="fillScenarioKey"
+        <el-form-item label="创建方式">
+          <el-segmented
+            v-model="form.createMode"
+            :options="[
+              { label: '融合录制任务', value: 'FLOW_COMBINATION' },
+              { label: '空白编排', value: 'BLANK' },
+            ]"
+            @change="changeCreateMode"
           />
         </el-form-item>
-        <el-form-item label="场景 Key" required>
-          <el-input v-model="form.scenarioKey" placeholder="create_ai_script_task_and_verify" />
+        <template v-if="form.createMode === 'FLOW_COMBINATION'">
+          <el-form-item label="来源任务" required>
+            <el-select
+              v-model="form.sourceTaskId"
+              filterable
+              :loading="sourceTasksLoading"
+              placeholder="选择已确认且验证通过的录制任务"
+              style="width: 100%"
+              @change="fillFromSourceTask"
+            >
+              <el-option
+                v-if="!sourceTasksLoading && reusableTaskOptions.length === 0"
+                disabled
+                label="暂无已确认且验证通过的录制任务"
+                :value="0"
+              />
+              <el-option
+                v-for="task in reusableTaskOptions"
+                :key="task.id"
+                :label="`${task.taskName} / TASK-${task.id}`"
+                :value="task.id"
+              >
+                <div class="task-option">
+                  <span>{{ task.taskName }}</span>
+                  <small>TASK-{{ task.id }} · {{ formatBeijingDateTime(task.updatedAt) }}</small>
+                </div>
+              </el-option>
+            </el-select>
+          </el-form-item>
+          <el-form-item label="录制脚本片段">
+            <div class="flow-picker">
+              <el-select
+                v-model="form.additionalTaskIds"
+                multiple
+                filterable
+                clearable
+                :loading="sourceTasksLoading"
+                placeholder="添加已确认且验证通过的普通录制脚本"
+                style="width: 100%"
+                @change="fillFromAdditionalTasks"
+              >
+                <el-option
+                  v-if="!sourceTasksLoading && additionalTaskOptions.length === 0"
+                  disabled
+                  label="暂无可追加的已确认录制脚本"
+                  :value="0"
+                />
+                <el-option
+                  v-for="task in additionalTaskOptions"
+                  :key="task.id"
+                  :label="`${task.taskName} / TASK-${task.id}`"
+                  :value="task.id"
+                >
+                  <div class="task-option">
+                    <span>{{ task.taskName }}</span>
+                    <small>TASK-{{ task.id }} · {{ formatBeijingDateTime(task.updatedAt) }}</small>
+                  </div>
+                </el-option>
+              </el-select>
+              <p v-if="remainingAdditionalTaskCount" class="flow-picker-hint">
+                还可继续添加 {{ remainingAdditionalTaskCount }} 个已确认脚本
+              </p>
+            </div>
+          </el-form-item>
+          <el-form-item label="固定场景片段">
+            <div class="flow-picker">
+              <el-select
+                v-model="form.sourceFlowIds"
+                multiple
+                filterable
+                clearable
+                :loading="sourceFlowsLoading"
+                placeholder="可选：添加固定场景替换重合步骤"
+                style="width: 100%"
+                @change="fillFromSourceFlows"
+              >
+                <el-option
+                  v-if="!sourceFlowsLoading && reusableFlowOptions.length === 0"
+                  disabled
+                  label="暂无已发布且验证通过的可复用固定场景"
+                  :value="0"
+                />
+                <el-option
+                  v-for="flow in reusableFlowOptions"
+                  :key="flow.id"
+                  :label="`${flow.flowName} / ${flow.flowKey}`"
+                  :value="flow.id"
+                >
+                  <div class="flow-option">
+                    <span>{{ flow.flowName }}</span>
+                    <small>{{ flow.flowKey }}</small>
+                  </div>
+                </el-option>
+              </el-select>
+              <p v-if="remainingReusableFlowCount" class="flow-picker-hint">
+                还可继续添加 {{ remainingReusableFlowCount }} 个固定场景
+              </p>
+            </div>
+          </el-form-item>
+          <el-form-item label="编排顺序" required>
+            <div class="ordered-source-list">
+              <el-empty
+                v-if="orderedCompositionSources.length === 0"
+                :image-size="64"
+                description="选择来源任务后开始编排"
+              />
+              <template v-else>
+                <div
+                  v-for="(source, index) in orderedCompositionSources"
+                  :key="source.id"
+                  class="ordered-source-item"
+                >
+                  <span class="ordered-source-index">{{ index + 1 }}</span>
+                  <div class="ordered-source-content">
+                    <div class="ordered-source-title">
+                      <el-tag
+                        size="small"
+                        effect="light"
+                        :type="source.type === 'FLOW' ? 'success' : 'primary'"
+                      >
+                        {{ source.label }}
+                      </el-tag>
+                      <strong>{{ source.title }}</strong>
+                    </div>
+                    <small>{{ source.subtitle }}</small>
+                  </div>
+                  <div class="ordered-source-actions">
+                    <el-tooltip content="上移" placement="top">
+                      <el-button
+                        circle
+                        size="small"
+                        :disabled="index === 0"
+                        aria-label="上移"
+                        @click="moveOrderedSource(source.id, -1)"
+                      >
+                        <span class="material-symbols-outlined">keyboard_arrow_up</span>
+                      </el-button>
+                    </el-tooltip>
+                    <el-tooltip content="下移" placement="top">
+                      <el-button
+                        circle
+                        size="small"
+                        :disabled="index === orderedCompositionSources.length - 1"
+                        aria-label="下移"
+                        @click="moveOrderedSource(source.id, 1)"
+                      >
+                        <span class="material-symbols-outlined">keyboard_arrow_down</span>
+                      </el-button>
+                    </el-tooltip>
+                    <el-tooltip content="移除" placement="top">
+                      <el-button
+                        circle
+                        size="small"
+                        type="danger"
+                        :disabled="!source.canRemove"
+                        aria-label="移除"
+                        @click="removeOrderedSource(source.id)"
+                      >
+                        <span class="material-symbols-outlined">close</span>
+                      </el-button>
+                    </el-tooltip>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </el-form-item>
+        </template>
+        <el-form-item v-else label="场景名称" required>
+          <el-input
+            v-model="form.scenarioName"
+            placeholder="例如：资产扫描完整回归"
+            @blur="fillBlankScenarioKey"
+          />
+        </el-form-item>
+        <el-form-item v-if="form.createMode === 'FLOW_COMBINATION'" label="编排名称">
+          <el-input v-model="form.scenarioName" disabled placeholder="选择来源任务后自动生成" />
+        </el-form-item>
+        <el-form-item label="场景 Key">
+          <el-input v-model="form.scenarioKey" disabled placeholder="自动生成唯一 Key" />
         </el-form-item>
         <el-form-item label="描述">
           <el-input
             v-model="form.description"
             type="textarea"
             :rows="3"
-            placeholder="说明编排目标、复用资产和验证边界"
+            placeholder="可补充编排目标、资产边界和验证说明"
           />
         </el-form-item>
       </el-form>
@@ -286,7 +479,7 @@ function getValidationColor(status?: AiScenarioComposition['latestValidationStat
             v-model="aiPlanForm.taskId"
             filterable
             :loading="sourceTasksLoading"
-            placeholder="选择验证通过的录制任务"
+            placeholder="选择已确认且验证通过的录制任务"
             style="width: 100%"
           >
             <el-option
@@ -348,7 +541,15 @@ function getValidationColor(status?: AiScenarioComposition['latestValidationStat
           >
             <span>{{ index + 1 }}</span>
             <div>
-              <strong>{{ step.flowKey || step.assertionKey || step.type }}</strong>
+              <strong>
+                {{
+                  step.stepName ||
+                  step.flowKey ||
+                  step.assertionKey ||
+                  step.atomicAction ||
+                  step.type
+                }}
+              </strong>
               <small>{{ step.reason }}</small>
             </div>
             <em>{{ Math.round(step.confidence * 100) }}%</em>
@@ -553,8 +754,141 @@ function getValidationColor(status?: AiScenarioComposition['latestValidationStat
   gap: 2px;
 }
 
+.flow-option {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .task-option small {
   color: var(--tp-text-muted);
+}
+
+.flow-option small {
+  color: var(--tp-text-muted);
+}
+
+.flow-picker {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--tp-space-2);
+}
+
+.flow-picker-hint {
+  margin: 0;
+  color: var(--tp-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ordered-source-list {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--tp-space-2);
+}
+
+.ordered-source-item {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--tp-space-3);
+  min-height: 56px;
+  padding: var(--tp-space-2) var(--tp-space-3);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: var(--tp-radius-md);
+  background: var(--tp-surface-muted);
+}
+
+.ordered-source-index {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--tp-surface-card);
+  color: var(--tp-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ordered-source-content {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ordered-source-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--tp-space-2);
+}
+
+.ordered-source-title strong {
+  overflow: hidden;
+  color: var(--tp-text-primary);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ordered-source-content small {
+  overflow: hidden;
+  color: var(--tp-text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ordered-source-actions {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--tp-space-1);
+}
+
+.ordered-source-actions .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.selected-flow-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tp-space-2);
+  padding: var(--tp-space-2) var(--tp-space-3);
+  border: 1px solid var(--tp-border-subtle);
+  border-radius: var(--tp-radius-md);
+  background: var(--tp-surface-muted);
+}
+
+.selected-flow-summary {
+  color: var(--tp-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.selected-flow-tags {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: var(--tp-space-2);
+}
+
+.selected-flow-tags :deep(.el-tag) {
+  max-width: 100%;
+}
+
+.selected-flow-tags :deep(.el-tag__content) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ai-plan-result {

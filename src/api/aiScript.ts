@@ -950,14 +950,25 @@ export interface AiCompositionPlanResult {
 /** AI 编排建议步骤。 */
 export interface AiCompositionPlanStep {
   type: ScenarioStepType
+  stepName?: string
   flowId?: number
   flowVersionId?: number
   flowKey?: string
   assertionId?: number
   assertionKey?: string
+  atomicAction?: string
   confidence: number
   reason: string
   inputs?: Record<string, unknown>
+}
+
+/** 场景编排来源类型。 */
+export type AiCompositionSourceType = 'TASK' | 'FLOW'
+
+/** 前端按用户编排顺序提交的片段来源。 */
+export interface AiCompositionOrderedSource {
+  type: AiCompositionSourceType
+  id: number
 }
 
 // ── 真实 API 方法 ──
@@ -1609,6 +1620,7 @@ export async function validateScenarioComposition(
   const { data } = await apiClient.post(
     `/ai-script/compositions/${compositionId}/validate`,
     toSnake(payload),
+    { timeout: 30000 },
   )
   return toCamel(data) as AiCompositionValidation
 }
@@ -1720,6 +1732,9 @@ export async function createAiPlanFromTask(payload: {
   projectId: number
   taskId: number
   sourceVersionId?: number
+  preferredFlowIds?: number[]
+  additionalTaskIds?: number[]
+  orderedSources?: AiCompositionOrderedSource[]
   maxSteps?: number
   plannerMode?: PlannerMode
 }): Promise<AiCompositionPlanResult> {
